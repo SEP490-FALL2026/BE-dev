@@ -1,6 +1,7 @@
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import { ProvisioningTaskNotFoundError } from '../../public/licensing.errors';
+import { unplacedWorkKey } from '../../../organization/public/organization.types';
 import type { ProvisioningTaskRecord } from '../provisioning-task.types';
 import { ProvisioningService } from './provisioning.service';
 
@@ -81,6 +82,8 @@ describe('ProvisioningService.list & get (acting scope vs read scope)', () => {
     getItAdminScope: jest.fn(),
     getEmployeeIdsOfWorkDepartments: jest.fn(),
     workDepartmentsOf: jest.fn(),
+    findActiveUnplacedWorkIdsForDesignee: jest.fn(),
+    itAdminsActingForUnplacedWork: jest.fn(),
   };
   const identity = { findUsableItAdminEmployeeIds: jest.fn() };
   const service = new ProvisioningService(
@@ -97,6 +100,8 @@ describe('ProvisioningService.list & get (acting scope vs read scope)', () => {
   beforeEach(() => {
     jest.resetAllMocks();
     organizationReads.businessToday.mockResolvedValue('2026-11-23');
+    organizationReads.findActiveUnplacedWorkIdsForDesignee.mockResolvedValue([]);
+    organizationReads.itAdminsActingForUnplacedWork.mockResolvedValue(new Map());
     repo.page.mockResolvedValue({ items: [{ id: 'task-1' }], total: 1 });
     views.summaries.mockResolvedValue([{ id: 'task-1' }]);
     views.views.mockResolvedValue([{ id: 'task-1' }]);
@@ -135,6 +140,31 @@ describe('ProvisioningService.list & get (acting scope vs read scope)', () => {
 
     organizationReads.workDepartmentsOf.mockResolvedValue(new Map());
     await expect(service.get(ACTOR, 'task-1')).rejects.toBeInstanceOf(ProvisioningTaskNotFoundError);
+  });
+
+  it('MINE includes unplaced designated tasks even when acting department scope is empty', async () => {
+    organizationReads.getItAdminActingScope.mockResolvedValue([]);
+    organizationReads.findActiveUnplacedWorkIdsForDesignee.mockResolvedValue(['task-unplaced-1']);
+
+    const page = await service.list(ACTOR, { scope: 'MINE', page: 1, pageSize: 20 });
+
+    expect(organizationReads.findActiveUnplacedWorkIdsForDesignee).toHaveBeenCalledWith('e-it', 'PROVISIONING_TASK');
+    expect(repo.page).toHaveBeenCalledWith(
+      expect.objectContaining({ beneficiaryEmployeeIds: [], includeTaskIds: ['task-unplaced-1'] }),
+    );
+    expect(page.items).toEqual([{ id: 'task-1' }]);
+  });
+
+  it('get returns task view when caller is designated for an unplaced task', async () => {
+    repo.find.mockResolvedValue({ id: 'task-unplaced-1', assignment: { employeeId: 'emp-unplaced' } });
+    organizationReads.workDepartmentsOf.mockResolvedValue(new Map());
+    organizationReads.itAdminsActingForUnplacedWork.mockResolvedValue(
+      new Map([[unplacedWorkKey('PROVISIONING_TASK', 'task-unplaced-1'), 'e-it']]),
+    );
+
+    const view = await service.get(ACTOR, 'task-unplaced-1');
+
+    expect(view).toEqual({ id: 'task-1' });
   });
 
   it('get returns task view when beneficiary work department is inside read scope', async () => {

@@ -222,5 +222,29 @@ describe('devices-custody.policy', () => {
         }),
       ).toEqual({ allowed: true, bySubstitute: true });
     });
+
+    it('enforces placed recipient department even when unplaced holder designation matches actor', () => {
+      expect(
+        judgeDeviceActor({
+          holderDepartmentId: null,
+          recipientDepartmentId: 'dept-b',
+          actingByDepartment: scope,
+          actor: 'it-a',
+          unplacedRequired: true,
+          unplacedDesignee: 'it-a',
+        }),
+      ).toEqual({ allowed: false, reason: 'NOT_IN_CHARGE' });
+
+      expect(
+        judgeDeviceActor({
+          holderDepartmentId: null,
+          recipientDepartmentId: 'dept-b',
+          actingByDepartment: scope,
+          actor: 'it-b',
+          unplacedRequired: true,
+          unplacedDesignee: 'it-b',
+        }),
+      ).toEqual({ allowed: true, bySubstitute: true });
+    });
   });
 });

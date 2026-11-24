@@ -97,6 +97,7 @@ export class ReplacementService {
         {
           actorEmployeeId: actor.employeeId,
           today,
+          deviceId: oldDeviceId,
           oldHolderEmployeeId: state.oldOpen.holderEmployeeId,
           recipientEmployeeId: state.oldOpen.holderEmployeeId,
         },

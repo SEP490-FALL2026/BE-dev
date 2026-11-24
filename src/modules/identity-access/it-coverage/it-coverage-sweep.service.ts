@@ -7,8 +7,8 @@ import { AccountRecordService } from '../accounts/account-record.service';
 import { ItCoverageNotifier } from './it-coverage-notifier.service';
 
 /**
- * Checks active non-starting departments on weekdays and notifies the usable Super Admin once per department per day
- * when neither a usable IT Admin in charge nor a usable appointed substitute can act for the department.
+ * Checks active non-starting departments and active unplaced-work designations on weekdays, notifying the usable Super
+ * Admin once per uncovered item per day when no usable IT Admin can act.
  */
 @Injectable()
 export class ItCoverageSweepService {
@@ -29,8 +29,19 @@ export class ItCoverageSweepService {
     const superAdminEmployeeId = await this.accounts.findUsableSuperAdminEmployeeId();
     if (!superAdminEmployeeId) return { told: 0 };
 
+    let told = await this.sweepDepartments(organization.id, superAdminEmployeeId, today);
+    told += await this.sweepUnplacedWorkDesignations(organization.id, superAdminEmployeeId, today);
+
+    return { told };
+  }
+
+  private async sweepDepartments(
+    organizationId: string,
+    superAdminEmployeeId: string,
+    today: ReturnType<typeof businessDateAt>,
+  ): Promise<number> {
     const departments = await this.organizationReads.getActiveDepartmentsForItCoverage();
-    if (departments.length === 0) return { told: 0 };
+    if (departments.length === 0) return 0;
 
     const actingByDept = await this.organizationReads.itAdminsActingFor(
       departments.map((department) => department.id),
@@ -45,7 +56,7 @@ export class ItCoverageSweepService {
       const reason = department.itAdminEmployeeId === null ? 'NO_IN_CHARGE' : 'IN_CHARGE_NOT_USABLE';
       const sent = await this.runner.run((tx) =>
         this.notifier.missingCoverage(tx, {
-          organizationId: organization.id,
+          organizationId,
           superAdminEmployeeId,
           departmentId: department.id,
           departmentName: department.name,
@@ -57,6 +68,46 @@ export class ItCoverageSweepService {
       if (sent) told += 1;
     }
 
-    return { told };
+    return told;
+  }
+
+  private async sweepUnplacedWorkDesignations(
+    organizationId: string,
+    superAdminEmployeeId: string,
+    today: ReturnType<typeof businessDateAt>,
+  ): Promise<number> {
+    const designations = await this.organizationReads.listActiveUnplacedWorkDesignations();
+    if (designations.length === 0) return 0;
+
+    const activeDesigneeIds = [
+      ...new Set(
+        designations
+          .filter((designation) => designation.designeeStatus === 'ACTIVE')
+          .map((designation) => designation.designeeEmployeeId),
+      ),
+    ];
+    const usableDesignees =
+      activeDesigneeIds.length > 0
+        ? await this.accounts.findUsableItAdminEmployeeIds(activeDesigneeIds)
+        : new Set<string>();
+
+    let told = 0;
+    for (const designation of designations) {
+      if (designation.designeeStatus === 'ACTIVE' && usableDesignees.has(designation.designeeEmployeeId)) continue;
+
+      const sent = await this.runner.run((tx) =>
+        this.notifier.unplacedWorkWaiting(tx, {
+          organizationId,
+          superAdminEmployeeId,
+          workKind: designation.workKind,
+          workId: designation.workId,
+          employeeId: designation.employeeId,
+          today,
+        }),
+      );
+      if (sent) told += 1;
+    }
+
+    return told;
   }
 }

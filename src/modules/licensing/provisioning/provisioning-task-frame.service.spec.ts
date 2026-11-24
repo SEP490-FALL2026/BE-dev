@@ -6,7 +6,9 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditApi } from '../../audit/public/audit.api';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { NotificationsApi } from '../../notifications/public/notifications.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { unplacedWorkKey } from '../../organization/public/organization.types';
 import { ProvisioningPlanBoundToDeviceError } from '../public/licensing.errors';
 import { ProvisioningNotInChargeError } from './provisioning.errors';
 import { toProvisioningApiException } from './provisioning.http-errors';
@@ -32,7 +34,9 @@ describe('ProvisioningTaskFrame.work', () => {
     businessToday: jest.fn(),
     workDepartmentsOf: jest.fn(),
     itAdminsActingFor: jest.fn(),
+    itAdminsActingForUnplacedWork: jest.fn(),
   };
+  const organizationWrites = { endUnplacedWorkDesignations: jest.fn() };
   const identity = { findUsableItAdminEmployeeIds: jest.fn(), findUsableSuperAdminEmployeeId: jest.fn() };
   const notifications = { notifyInApp: jest.fn() };
   const audit = { record: jest.fn() };
@@ -67,6 +71,8 @@ describe('ProvisioningTaskFrame.work', () => {
     organization.itAdminsActingFor.mockResolvedValue(
       new Map([['dept-1', { inCharge: 'e-it1', substitute: null, defaultAssignee: 'e-it1', actors: ['e-it1'] }]]),
     );
+    organization.itAdminsActingForUnplacedWork.mockResolvedValue(new Map());
+    organizationWrites.endUnplacedWorkDesignations.mockResolvedValue(0);
     repo.find.mockResolvedValue(null);
     identity.findUsableSuperAdminEmployeeId.mockResolvedValue('e-super');
     write.mockImplementation(() => {
@@ -89,6 +95,7 @@ describe('ProvisioningTaskFrame.work', () => {
       providers: [
         ProvisioningTaskFrame,
         { provide: ProvisioningTaskRepo, useValue: repo },
+        { provide: OrganizationApi, useValue: organizationWrites },
         { provide: OrganizationReadApi, useValue: organization },
         { provide: IdentityAccessApi, useValue: identity },
         { provide: NotificationsApi, useValue: notifications },
@@ -111,13 +118,62 @@ describe('ProvisioningTaskFrame.work', () => {
     expect(audit.record).not.toHaveBeenCalled();
   });
 
-  it('rejects when the beneficiary has no work department (unplaced) and writes nothing', async () => {
+  it('rejects when the beneficiary has no work department (unplaced) and no designation, and writes nothing', async () => {
     repo.lock.mockResolvedValue(task('e-unplaced'));
 
     await expect(frame.work(itAdmin('e-it1'), 'task-1', action)).rejects.toBeInstanceOf(ProvisioningNotInChargeError);
 
     expect(organization.itAdminsActingFor).not.toHaveBeenCalled();
+    expect(organization.itAdminsActingForUnplacedWork).toHaveBeenCalledWith(
+      [{ workKind: 'PROVISIONING_TASK', workId: 'task-1', employeeId: 'e-unplaced' }],
+      expect.any(Function),
+      tx,
+    );
     expect(write).not.toHaveBeenCalled();
+  });
+
+  it('allows the designated IT Admin on an unplaced task with bySubstitute: true and closes designation when task completes', async () => {
+    repo.lock.mockResolvedValue(task('e-unplaced'));
+    organization.itAdminsActingForUnplacedWork.mockResolvedValue(
+      new Map([[unplacedWorkKey('PROVISIONING_TASK', 'task-1'), 'e-des']]),
+    );
+    write.mockResolvedValueOnce({ action: 'REVOCATION_COMPLETED', after: { status: 'COMPLETED' } });
+
+    await frame.work(itAdmin('e-des'), 'task-1', action);
+
+    expect(audit.record).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        action: 'PROVISIONING_TASK.REVOCATION_COMPLETED',
+        after: expect.objectContaining({ bySubstitute: true }) as unknown,
+      }),
+    );
+    expect(organizationWrites.endUnplacedWorkDesignations).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        workKind: 'PROVISIONING_TASK',
+        workId: 'task-1',
+        endedByAppUserId: 'app-user-it',
+      }),
+    );
+  });
+
+  it('rejects non-designated IT Admin when an unplaced task is designated to another IT Admin', async () => {
+    repo.lock.mockResolvedValue(task('e-unplaced'));
+    organization.itAdminsActingForUnplacedWork.mockResolvedValue(
+      new Map([[unplacedWorkKey('PROVISIONING_TASK', 'task-1'), 'e-des']]),
+    );
+
+    await expect(frame.work(itAdmin('e-other'), 'task-1', action)).rejects.toBeInstanceOf(ProvisioningNotInChargeError);
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it('does not close unplaced designations when the action does not close the task', async () => {
+    repo.lock.mockResolvedValue(task('e-employee'));
+
+    await frame.work(itAdmin('e-it1'), 'task-1', action);
+
+    expect(organizationWrites.endUnplacedWorkDesignations).not.toHaveBeenCalled();
   });
 
   it('records bySubstitute: true in audit after when an appointed substitute acts on the task', async () => {

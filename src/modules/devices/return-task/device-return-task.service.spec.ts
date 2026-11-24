@@ -1,5 +1,6 @@
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuditApi } from '../../audit/public/audit.api';
+import type { OrganizationApi } from '../../organization/public/organization.api';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { RegistryRepo, RegistrationRecord } from '../registry/registry.repo';
 import type { DeviceReturnTaskNotifier } from './device-return-task-notifier.service';
@@ -65,12 +66,15 @@ function buildService() {
   const audit = {
     record: jest.fn().mockResolvedValue(undefined),
   } as unknown as jest.Mocked<Pick<AuditApi, 'record'>>;
+  const endUnplacedWorkDesignations = jest.fn().mockResolvedValue(0);
+  const organization = { endUnplacedWorkDesignations } as unknown as OrganizationApi;
   const waitingIfUnassigned = jest.fn().mockResolvedValue(false);
   const notifier = { waitingIfUnassigned } as unknown as DeviceReturnTaskNotifier;
 
   const service = new DeviceReturnTaskService(
     registry as unknown as RegistryRepo,
     repo as unknown as DeviceReturnTaskRepo,
+    organization,
     organizationReads as unknown as OrganizationReadApi,
     audit as unknown as AuditApi,
     notifier,
@@ -80,6 +84,7 @@ function buildService() {
     registry,
     repo,
     organizationReads,
+    endUnplacedWorkDesignations,
     audit,
     waitingIfUnassigned,
     tx: { tag: 'tx' } as unknown as DbTx,
@@ -172,8 +177,8 @@ describe('DeviceReturnTaskService', () => {
     });
   });
 
-  it('cancels all open tasks of the case and records audit events', async () => {
-    const { service, repo, audit, tx } = buildService();
+  it('cancels all open tasks of the case, closes unplaced designations, and records audit events', async () => {
+    const { service, repo, audit, endUnplacedWorkDesignations, tx } = buildService();
     const at = new Date('2026-11-24T12:00:00.000Z');
     repo.lockOpenByCaseId.mockResolvedValue([task('task-1'), task('task-2', { deviceId: 'dev-2' })]);
 
@@ -181,6 +186,18 @@ describe('DeviceReturnTaskService', () => {
 
     expect(result).toEqual({ cancelledIds: ['task-1', 'task-2'] });
     expect(repo.markCancelled).toHaveBeenCalledTimes(2);
+    expect(endUnplacedWorkDesignations).toHaveBeenCalledWith(tx, {
+      workKind: 'DEVICE_RETURN_TASK',
+      workId: 'task-1',
+      endedByAppUserId: null,
+      endedAt: at,
+    });
+    expect(endUnplacedWorkDesignations).toHaveBeenCalledWith(tx, {
+      workKind: 'DEVICE_RETURN_TASK',
+      workId: 'task-2',
+      endedByAppUserId: null,
+      endedAt: at,
+    });
     expect(audit.record).toHaveBeenCalledTimes(2);
     expect(audit.record).toHaveBeenCalledWith(
       tx,

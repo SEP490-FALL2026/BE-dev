@@ -4,7 +4,9 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditApi } from '../../audit/public/audit.api';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { NotificationsApi } from '../../notifications/public/notifications.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { unplacedWorkKey } from '../../organization/public/organization.types';
 import { ProvisioningTaskNotFoundError } from '../public/licensing.errors';
 import type { SelfExecutionMode } from '../public/licensing.types';
 import { licensingAuditEvent } from '../licensing-audit-event.mapper';
@@ -30,10 +32,13 @@ export interface TaskWorkContext {
  * the state before, the person in charge by default and whether the IT Admin served themselves; the Super Admin is told once for
  * a task an IT Admin served themselves (`SoD-5`). A write that returns false changed nothing and records nothing.
  */
+const CLOSING_TASK_ACTIONS = new Set(['COMPLETED', 'REVOCATION_COMPLETED', 'CLOSED_FAILED', 'CANCELLED']);
+
 @Injectable()
 export class ProvisioningTaskFrame {
   constructor(
     private readonly repo: ProvisioningTaskRepo,
+    private readonly organization: OrganizationApi,
     private readonly organizationReads: OrganizationReadApi,
     private readonly identity: IdentityAccessApi,
     private readonly notifications: NotificationsApi,
@@ -65,41 +70,60 @@ export class ProvisioningTaskFrame {
       if (!task) throw new ProvisioningTaskNotFoundError();
       const { bySubstitute } = await this.requireActingItAdmin(tx, actor, {
         beneficiaryEmployeeId: task.assignment.employeeId,
+        taskId: task.id,
         now,
       });
       action.check(task);
       const mode = await this.selfExecutionMode(actor, task.assignment.employeeId, tx);
       const done = await action.write({ tx, task, organizationId: organization.id, now });
       if (done === false) return task;
-
-      await this.audit.record(
-        tx,
-        licensingAuditEvent(
-          actor,
-          organization.id,
-          `PROVISIONING_TASK.${done.action}`,
-          'ProvisioningTask',
-          task.id,
-          {
-            status: task.status,
-            claimedBy: task.claimedByAppUserId,
-            attempts: task.attempts,
-            defaultResponsibleEmployeeId: task.defaultResponsibleEmployeeId,
-          },
-          {
-            ...done.after,
-            defaultResponsibleEmployeeId: task.defaultResponsibleEmployeeId,
-            selfExecuted: mode === 'ALLOW_SELF_EXECUTED',
-            ...(bySubstitute ? { bySubstitute: true } : {}),
-          },
-        ),
-      );
-      if (mode === 'ALLOW_SELF_EXECUTED') {
-        await this.tellSuperAdmin(tx, organization.id, task.id, actor.employeeId);
-      }
+      await this.finalizeWork(tx, actor, organization.id, task, done, { mode, bySubstitute, now });
 
       return (await this.repo.find(task.id, tx)) ?? task;
     });
+  }
+
+  private async finalizeWork(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    organizationId: string,
+    task: ProvisioningTaskRecord,
+    done: Exclude<TaskWrite, false>,
+    meta: { mode: SelfExecutionMode; bySubstitute: boolean; now: Date },
+  ): Promise<void> {
+    if (CLOSING_TASK_ACTIONS.has(done.action)) {
+      await this.organization.endUnplacedWorkDesignations(tx, {
+        workKind: 'PROVISIONING_TASK',
+        workId: task.id,
+        endedByAppUserId: actor.appUserId,
+        endedAt: meta.now,
+      });
+    }
+    await this.audit.record(
+      tx,
+      licensingAuditEvent(
+        actor,
+        organizationId,
+        `PROVISIONING_TASK.${done.action}`,
+        'ProvisioningTask',
+        task.id,
+        {
+          status: task.status,
+          claimedBy: task.claimedByAppUserId,
+          attempts: task.attempts,
+          defaultResponsibleEmployeeId: task.defaultResponsibleEmployeeId,
+        },
+        {
+          ...done.after,
+          defaultResponsibleEmployeeId: task.defaultResponsibleEmployeeId,
+          selfExecuted: meta.mode === 'ALLOW_SELF_EXECUTED',
+          ...(meta.bySubstitute ? { bySubstitute: true } : {}),
+        },
+      ),
+    );
+    if (meta.mode === 'ALLOW_SELF_EXECUTED') {
+      await this.tellSuperAdmin(tx, organizationId, task.id, actor.employeeId);
+    }
   }
 
   /**
@@ -109,7 +133,7 @@ export class ProvisioningTaskFrame {
   async requireActingItAdmin(
     tx: DbTx | undefined,
     actor: AuthenticatedPrincipal,
-    target: { beneficiaryEmployeeId: string; departmentId?: string; now?: Date },
+    target: { beneficiaryEmployeeId: string; departmentId?: string; taskId?: string; now?: Date },
   ): Promise<{ bySubstitute: boolean }> {
     let deptId = target.departmentId;
     if (deptId === undefined) {
@@ -118,7 +142,18 @@ export class ProvisioningTaskFrame {
         target.beneficiaryEmployeeId,
       );
     }
-    if (deptId === undefined) throw new ProvisioningNotInChargeError();
+    if (deptId === undefined) {
+      if (!target.taskId) throw new ProvisioningNotInChargeError();
+      const resolved = await this.organizationReads.itAdminsActingForUnplacedWork(
+        [{ workKind: 'PROVISIONING_TASK', workId: target.taskId, employeeId: target.beneficiaryEmployeeId }],
+        (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
+        tx,
+      );
+      const designee = resolved.get(unplacedWorkKey('PROVISIONING_TASK', target.taskId)) ?? null;
+      if (designee !== actor.employeeId) throw new ProvisioningNotInChargeError();
+
+      return { bySubstitute: true };
+    }
     const acting = (
       await this.organizationReads.itAdminsActingFor(
         [deptId],

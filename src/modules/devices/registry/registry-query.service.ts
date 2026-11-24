@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { unplacedWorkKey } from '../../organization/public/organization.types';
 import type { AssetDeviceType } from '../asset-code/asset-code.policy';
 import type { CollectionState } from '../devices-collection-state.policy';
 import type { DeviceCondition } from '../devices-custody.policy';
@@ -121,7 +122,16 @@ export class RegistryQueryService {
   }
 
   private async resolveOpenTaskActorIds(openTask: DeviceExtras['openReturnTask']): Promise<string[]> {
-    if (!openTask?.departmentId) return [];
+    if (!openTask) return [];
+    if (!openTask.departmentId) {
+      const resolved = await this.organizationReads.itAdminsActingForUnplacedWork(
+        [{ workKind: 'DEVICE_RETURN_TASK', workId: openTask.id, employeeId: openTask.employeeId }],
+        (ids) => this.identity.findUsableItAdminEmployeeIds(ids),
+      );
+      const designee = resolved.get(unplacedWorkKey('DEVICE_RETURN_TASK', openTask.id)) ?? null;
+
+      return designee && designee !== openTask.employeeId ? [designee] : [];
+    }
     const map = await this.organizationReads.itAdminsActingFor([openTask.departmentId], (ids) =>
       this.identity.findUsableItAdminEmployeeIds(ids),
     );

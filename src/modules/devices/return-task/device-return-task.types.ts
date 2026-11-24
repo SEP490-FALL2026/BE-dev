@@ -49,6 +49,7 @@ export interface ReturnTaskListRow extends ReturnTaskRecord {
 export interface ReturnTaskListFilter {
   organizationId: string;
   departmentIds?: readonly string[] | undefined;
+  includeTaskIds?: readonly string[] | undefined;
   excludeEmployeeId?: string | undefined;
   state: 'OPEN' | 'CLOSED' | 'ALL';
   overdue?: boolean | undefined;

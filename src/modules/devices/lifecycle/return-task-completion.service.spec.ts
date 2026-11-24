@@ -3,6 +3,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import type { AuditApi } from '../../audit/public/audit.api';
 import type { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { unplacedWorkKey } from '../../organization/public/organization.types';
 import type { RegistryRepo } from '../registry/registry.repo';
 import {
   DeviceReturnTaskAlreadyClosedError,
@@ -48,7 +49,7 @@ const actor = (employeeId = 'it-1'): AuthenticatedPrincipal =>
 
 function setup(
   task: ReturnTaskRecord | null = taskRow(),
-  options: { inCharge?: string | null; substitute?: string | null } = {},
+  options: { inCharge?: string | null; substitute?: string | null; unplacedDesignee?: string | null } = {},
 ) {
   const tx = {} as DbTx;
   const markReceived = jest.fn().mockResolvedValue(undefined);
@@ -74,6 +75,13 @@ function setup(
   const organizationReads = {
     businessToday: jest.fn().mockResolvedValue('2026-11-25'),
     itAdminsActingFor: jest.fn().mockResolvedValue(new Map([['dept-1', { inCharge, substitute, actors }]])),
+    itAdminsActingForUnplacedWork: jest
+      .fn()
+      .mockResolvedValue(
+        task && options.unplacedDesignee !== undefined
+          ? new Map([[unplacedWorkKey('DEVICE_RETURN_TASK', task.id), options.unplacedDesignee]])
+          : new Map(),
+      ),
   } as unknown as OrganizationReadApi;
   const identity = {
     findUsableItAdminEmployeeIds: jest.fn().mockResolvedValue(new Set(actors)),
@@ -165,7 +173,7 @@ describe('ReturnTaskCompletionService', () => {
         activationDecisions: [{ activationId: 'act-1', licenseRelease: 'LOST_WITH_DEVICE' }],
       },
       now,
-      { preAuthorized: { open: { id: 'reg-1' }, today: '2026-11-25', bySubstitute: false } },
+      { preAuthorized: { open: { id: 'reg-1' }, today: '2026-11-25', bySubstitute: false }, returnTaskId: 'task-1' },
     );
   });
 
@@ -210,5 +218,33 @@ describe('ReturnTaskCompletionService', () => {
     await expect(
       setup().service.complete(actor(), 'task-1', { outcome: 'NOT_RECOVERED', condition: 'USABLE', reason: 'bad' }),
     ).rejects.toBeInstanceOf(DeviceReturnTaskOutcomeFieldsInvalidError);
+  });
+
+  it('allows designated IT Admin on an unplaced return task with bySubstitute: true, rejects others, and closes designations', async () => {
+    const now = new Date('2026-11-25T10:00:00.000Z');
+    const unplaced = taskRow({ departmentId: null });
+    const ok = setup(unplaced, { unplacedDesignee: 'it-des' });
+
+    await ok.service.complete(
+      actor('it-des'),
+      'task-1',
+      { outcome: 'RECEIVED', condition: 'USABLE', softwareRemoval: { outcome: 'REMOVED' } },
+      now,
+    );
+
+    expect(ok.receive).toHaveBeenCalledWith(
+      ok.tx,
+      expect.objectContaining({ returnTaskId: 'task-1', bySubstitute: true }),
+    );
+
+    const other = setup(unplaced, { unplacedDesignee: 'it-des' });
+    await expect(
+      other.service.complete(
+        actor('it-other'),
+        'task-1',
+        { outcome: 'RECEIVED', condition: 'USABLE', softwareRemoval: { outcome: 'REMOVED' } },
+        now,
+      ),
+    ).rejects.toBeInstanceOf(DeviceReturnTaskNotInChargeError);
   });
 });

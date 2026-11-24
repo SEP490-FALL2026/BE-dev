@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { devicesEvent, type DevicesActor } from '../devices-audit-event.mapper';
 import { CredentialRevocationService } from '../credential/credential-revocation.service';
@@ -17,6 +18,7 @@ export class RegistrationEndService {
   constructor(
     private readonly repo: RegistryRepo,
     private readonly credentials: CredentialRevocationService,
+    private readonly organization: OrganizationApi,
     private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
   ) {}
@@ -40,6 +42,12 @@ export class RegistrationEndService {
       validUntil,
       cause: input.cause,
       softwareRemoval: input.softwareRemoval,
+    });
+    await this.organization.endUnplacedWorkDesignations(tx, {
+      workKind: 'DEVICE',
+      workId: registration.deviceId,
+      endedByAppUserId: by.kind === 'USER' ? by.principal.appUserId : null,
+      endedAt: input.at,
     });
     // A stop request still waiting can no longer be completed (`US-09-04`).
     await this.repo.invalidateOpenStopRequests(tx, registration.id, input.at);

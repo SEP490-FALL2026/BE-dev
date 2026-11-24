@@ -4,6 +4,7 @@ import { CatalogApi } from '../../catalog/public/catalog.api';
 import type { SeatTarget } from '../../catalog/public/catalog.types';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { unplacedWorkKey } from '../../organization/public/organization.types';
 import type {
   AccessState,
   ProvisioningChannel,
@@ -144,6 +145,7 @@ interface ViewContext {
   employeeNames: Map<string, string>;
   workDepartments: Map<string, string>;
   actingByDept: Awaited<ReturnType<OrganizationReadApi['itAdminsActingFor']>>;
+  unplacedDesignees: Map<string, string | null>;
   plans: Map<string, SeatTarget>;
   /** The note of each plan of a revocation about what to do before the seat is taken away (`QĐ-110g`: read only, nobody confirms it). */
   notes: Map<string, string | null>;
@@ -295,6 +297,7 @@ export class ProvisioningTaskViewService {
       employeeNames: new Map(),
       workDepartments: new Map(),
       actingByDept: new Map(),
+      unplacedDesignees: new Map(),
       plans: new Map(),
       notes: new Map(),
       reasons: new Map(),
@@ -338,7 +341,23 @@ export class ProvisioningTaskViewService {
     const actingByDept = await this.organizationReads.itAdminsActingFor(deptIds, (ids) =>
       this.identity.findUsableItAdminEmployeeIds(ids),
     );
-    const actingActorIds = [...actingByDept.values()].flatMap((entry) => entry.actors);
+    const unplacedRefs = records
+      .filter((task) => !workDepartments.has(task.assignment.employeeId))
+      .map((task) => ({
+        workKind: 'PROVISIONING_TASK' as const,
+        workId: task.id,
+        employeeId: task.assignment.employeeId,
+      }));
+    const unplacedDesignees =
+      unplacedRefs.length > 0
+        ? await this.organizationReads.itAdminsActingForUnplacedWork(unplacedRefs, (ids) =>
+            this.identity.findUsableItAdminEmployeeIds(ids),
+          )
+        : new Map<string, string | null>();
+    const actingActorIds = [
+      ...[...actingByDept.values()].flatMap((entry) => entry.actors),
+      ...[...unplacedDesignees.values()].filter((id): id is string => id !== null),
+    ];
     const employeeIds = [
       ...new Set([
         ...records.flatMap((task) => [
@@ -361,6 +380,7 @@ export class ProvisioningTaskViewService {
       employeeNames,
       workDepartments,
       actingByDept,
+      unplacedDesignees,
       plans,
       notes,
       reasons,
@@ -370,15 +390,40 @@ export class ProvisioningTaskViewService {
     };
   }
 
-  private summaryOf(
+  private actingForTask(task: ProvisioningTaskRecord, context: ViewContext) {
+    const deptId = context.workDepartments.get(task.assignment.employeeId);
+    if (deptId) return context.actingByDept.get(deptId);
+    const designee = context.unplacedDesignees.get(unplacedWorkKey('PROVISIONING_TASK', task.id)) ?? null;
+
+    return designee
+      ? { inCharge: null, substitute: designee, defaultAssignee: designee, actors: [designee] }
+      : undefined;
+  }
+
+  private revocationSummaryOf(
     task: ProvisioningTaskRecord,
-    { employees, employeeNames, workDepartments, actingByDept, plans, notes, reasonCounts, today, now }: ViewContext,
-  ): TaskSummaryView {
+    reasonCounts: Map<string, number>,
+    today: BusinessDate,
+  ): RevocationSummaryView | null {
+    if (!task.revocationSource) return null;
+    const terminating = isTerminating(task, task.assignment.validUntil, today);
+
+    return {
+      source: task.revocationSource,
+      reasonCount: reasonCounts.get(task.id) ?? 0,
+      completion: task.completion,
+      accessState: task.accessState,
+      paidThroughOn: task.paidThroughOn,
+      terminating,
+      terminatingUntil: terminating ? task.assignment.validUntil : null,
+    };
+  }
+
+  private summaryOf(task: ProvisioningTaskRecord, context: ViewContext): TaskSummaryView {
+    const { employees, employeeNames, plans, notes, reasonCounts, today, now } = context;
     const beneficiary = employees.get(task.assignment.employeeId);
     const plan = plans.get(task.assignment.planId);
-    const deptId = workDepartments.get(task.assignment.employeeId);
-    const acting = deptId ? actingByDept.get(deptId) : undefined;
-    const { awaitingItAdmin, actingItAdmins } = actingItAdminsViewOf(acting, employeeNames);
+    const { awaitingItAdmin, actingItAdmins } = actingItAdminsViewOf(this.actingForTask(task, context), employeeNames);
     const ended = task.completedAt ?? task.closedAt ?? task.failedAt;
 
     return {
@@ -409,19 +454,7 @@ export class ProvisioningTaskViewService {
       nextRetryAt: task.nextRetryAt,
       availableDecisions: availableDecisions(task.status, task.channel),
       closedAt: task.closedAt,
-      revocation: task.revocationSource
-        ? {
-            source: task.revocationSource,
-            reasonCount: reasonCounts.get(task.id) ?? 0,
-            completion: task.completion,
-            accessState: task.accessState,
-            paidThroughOn: task.paidThroughOn,
-            terminating: isTerminating(task, task.assignment.validUntil, today),
-            terminatingUntil: isTerminating(task, task.assignment.validUntil, today)
-              ? task.assignment.validUntil
-              : null,
-          }
-        : null,
+      revocation: this.revocationSummaryOf(task, reasonCounts, today),
       purchase: task.purchase,
       termCutAt: termCutAtOf(task, beneficiary),
       elapsedSeconds: Math.max(0, Math.floor(((ended ? ended.getTime() : now) - task.createdAt.getTime()) / 1000)),

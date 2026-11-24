@@ -236,5 +236,12 @@ export class OffboardingCaseWriter {
       subjectType: 'OFFBOARDING_CASE',
       effectiveOn: record.departureEffectiveOn,
     });
+    if (record.departmentId === null) {
+      await this.notifier.unplacedOffboardingWaiting(tx, {
+        organizationId,
+        caseId: record.id,
+        employeeId: record.employeeId,
+      });
+    }
   }
 }

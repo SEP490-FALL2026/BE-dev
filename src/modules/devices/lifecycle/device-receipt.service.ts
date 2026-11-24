@@ -3,6 +3,7 @@ import { TransactionRunner, type DbTx } from '../../../infrastructure/database/t
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { byUser, devicesEvent } from '../devices-audit-event.mapper';
 import { custodyOf, type DeviceCondition } from '../devices-custody.policy';
@@ -38,6 +39,7 @@ export class DeviceReceiptService {
     private readonly repo: RegistryRepo,
     private readonly ending: RegistrationEndService,
     private readonly returnTasks: DeviceReturnTaskRepo,
+    private readonly organization: OrganizationApi,
     private readonly organizationReads: OrganizationReadApi,
     private readonly identity: IdentityAccessApi,
     private readonly audit: AuditApi,
@@ -79,7 +81,7 @@ export class DeviceReceiptService {
 
     const removal = this.assertRemovalValid(input.softwareRemoval);
     const today = await this.organizationReads.businessToday(now, tx);
-    const bySubstitute = await this.authorizeReturn(tx, actor, today, open, returnTask);
+    const bySubstitute = await this.authorizeReturn(tx, actor, deviceId, today, open, returnTask);
     if (returnTask) {
       await this.returnTasks.markReceived(tx, returnTask.id, {
         conditionOnReceipt: input.condition,
@@ -144,9 +146,10 @@ export class DeviceReceiptService {
   private authorizeReturn(
     tx: DbTx,
     actor: AuthenticatedPrincipal,
+    deviceId: string,
     today: string,
     open: RegistrationRecord | null,
-    returnTask: { departmentId: string | null; employeeId: string } | null,
+    returnTask: { id: string; departmentId: string | null; employeeId: string } | null,
   ): Promise<boolean> {
     if (returnTask) {
       return requireReturnTaskActor(
@@ -156,6 +159,7 @@ export class DeviceReceiptService {
           actorEmployeeId: actor.employeeId,
           departmentId: returnTask.departmentId,
           taskEmployeeId: returnTask.employeeId,
+          taskId: returnTask.id,
         },
       );
     }
@@ -167,6 +171,7 @@ export class DeviceReceiptService {
       {
         actorEmployeeId: actor.employeeId,
         today,
+        deviceId,
         oldHolderEmployeeId: open.holderEmployeeId,
         recipientEmployeeId: null,
       },
@@ -190,6 +195,14 @@ export class DeviceReceiptService {
       recordAudit?: boolean;
     },
   ): Promise<void> {
+    if (input.returnTaskId) {
+      await this.organization.endUnplacedWorkDesignations(tx, {
+        workKind: 'DEVICE_RETURN_TASK',
+        workId: input.returnTaskId,
+        endedByAppUserId: input.actor.appUserId,
+        endedAt: input.now,
+      });
+    }
     if (input.openRegistration) {
       await this.ending.end(
         tx,

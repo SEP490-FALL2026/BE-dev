@@ -77,10 +77,8 @@ export function judgeDeviceActor(facts: {
   unplacedRequired?: boolean;
   unplacedDesignee?: string | null;
 }): DeviceActorVerdict {
-  if (facts.unplacedRequired) {
-    return facts.unplacedDesignee === facts.actor
-      ? { allowed: true, bySubstitute: true }
-      : { allowed: false, reason: 'NOT_IN_CHARGE' };
+  if (facts.unplacedRequired && facts.unplacedDesignee !== facts.actor) {
+    return { allowed: false, reason: 'NOT_IN_CHARGE' };
   }
 
   const holderCheck = evaluateDepartment(facts.holderDepartmentId, facts.actingByDepartment, facts.actor);
@@ -89,5 +87,8 @@ export function judgeDeviceActor(facts: {
   const recipientCheck = evaluateDepartment(facts.recipientDepartmentId, facts.actingByDepartment, facts.actor);
   if (!recipientCheck.allowed) return { allowed: false, reason: 'NOT_IN_CHARGE' };
 
-  return { allowed: true, bySubstitute: holderCheck.bySubstitute || recipientCheck.bySubstitute };
+  return {
+    allowed: true,
+    bySubstitute: Boolean(facts.unplacedRequired) || holderCheck.bySubstitute || recipientCheck.bySubstitute,
+  };
 }

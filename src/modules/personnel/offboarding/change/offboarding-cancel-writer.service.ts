@@ -61,6 +61,7 @@ export class OffboardingCancelWriter {
       ticketId: by.ticketId,
       reason: why.reason,
     });
+    await this.periods.endUnplacedDesignations(tx, held.id, by.appUserId);
     await this.record(tx, actor, held, { ...why, workState, settled, firstPlacementRestored });
     await this.hooks.onCancelled(tx, {
       fileKind: 'OFFBOARDING',

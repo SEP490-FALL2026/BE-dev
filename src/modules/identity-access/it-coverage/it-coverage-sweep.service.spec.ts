@@ -15,6 +15,7 @@ describe('ItCoverageSweepService', () => {
     getOrganization: jest.fn(),
     getActiveDepartmentsForItCoverage: jest.fn(),
     itAdminsActingFor: jest.fn(),
+    listActiveUnplacedWorkDesignations: jest.fn(),
   };
   const accounts = {
     findUsableSuperAdminEmployeeId: jest.fn(),
@@ -45,6 +46,7 @@ describe('ItCoverageSweepService', () => {
     });
     accounts.findUsableSuperAdminEmployeeId.mockResolvedValue('emp-sa');
     accounts.findUsableItAdminEmployeeIds.mockResolvedValue(new Set(['emp-usable']));
+    organizationReads.listActiveUnplacedWorkDesignations.mockResolvedValue([]);
     notifications.notifyInApp.mockResolvedValue(true);
   });
 
@@ -57,6 +59,7 @@ describe('ItCoverageSweepService', () => {
     expect(result).toEqual({ told: 0 });
     expect(accounts.findUsableSuperAdminEmployeeId).not.toHaveBeenCalled();
     expect(organizationReads.getActiveDepartmentsForItCoverage).not.toHaveBeenCalled();
+    expect(organizationReads.listActiveUnplacedWorkDesignations).not.toHaveBeenCalled();
     expect(notifications.notifyInApp).not.toHaveBeenCalled();
   });
 
@@ -123,5 +126,61 @@ describe('ItCoverageSweepService', () => {
       eventKey: 'departmentItCoverage:dep-dead-ic:2026-11-23',
     });
     expect(result).toEqual({ told: 1 });
+  });
+
+  it('notifies Super Admin with UNPLACED_WORK_WAITING when an active unplaced-work designee is inactive or not usable, even with no departments', async () => {
+    organizationReads.getActiveDepartmentsForItCoverage.mockResolvedValue([]);
+    organizationReads.listActiveUnplacedWorkDesignations.mockResolvedValue([
+      {
+        id: 'des-usable',
+        organizationId: 'org-1',
+        workKind: 'PROVISIONING_TASK',
+        workId: 'task-ok',
+        employeeId: 'emp-unplaced-1',
+        designeeEmployeeId: 'emp-usable',
+        designeeStatus: 'ACTIVE',
+      },
+      {
+        id: 'des-locked',
+        organizationId: 'org-1',
+        workKind: 'OFFBOARDING_CASE',
+        workId: 'case-1',
+        employeeId: 'emp-unplaced-2',
+        designeeEmployeeId: 'emp-locked',
+        designeeStatus: 'ACTIVE',
+      },
+      {
+        id: 'des-left',
+        organizationId: 'org-1',
+        workKind: 'DEVICE_RETURN_TASK',
+        workId: 'ret-1',
+        employeeId: 'emp-unplaced-3',
+        designeeEmployeeId: 'emp-usable',
+        designeeStatus: 'TERMINATED',
+      },
+    ]);
+    accounts.findUsableItAdminEmployeeIds.mockResolvedValue(new Set(['emp-usable']));
+
+    const result = await makeService().run(monday);
+
+    expect(organizationReads.itAdminsActingFor).not.toHaveBeenCalled();
+    expect(notifications.notifyInApp).toHaveBeenCalledTimes(2);
+    expect(notifications.notifyInApp).toHaveBeenNthCalledWith(1, tx, {
+      organizationId: 'org-1',
+      recipientEmployeeId: 'emp-sa',
+      code: 'UNPLACED_WORK_WAITING',
+      subject: null,
+      params: { workKind: 'OFFBOARDING_CASE', workId: 'case-1', employeeId: 'emp-unplaced-2' },
+      eventKey: 'unplacedWork:OFFBOARDING_CASE:case-1:2026-11-23',
+    });
+    expect(notifications.notifyInApp).toHaveBeenNthCalledWith(2, tx, {
+      organizationId: 'org-1',
+      recipientEmployeeId: 'emp-sa',
+      code: 'UNPLACED_WORK_WAITING',
+      subject: null,
+      params: { workKind: 'DEVICE_RETURN_TASK', workId: 'ret-1', employeeId: 'emp-unplaced-3' },
+      eventKey: 'unplacedWork:DEVICE_RETURN_TASK:ret-1:2026-11-23',
+    });
+    expect(result).toEqual({ told: 2 });
   });
 });

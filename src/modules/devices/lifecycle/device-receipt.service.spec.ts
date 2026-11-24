@@ -2,7 +2,9 @@ import type { TransactionRunner, DbTx } from '../../../infrastructure/database/t
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { AuditApi } from '../../audit/public/audit.api';
 import type { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
+import type { OrganizationApi } from '../../organization/public/organization.api';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { unplacedWorkKey } from '../../organization/public/organization.types';
 import { DeviceNotFoundError, DeviceNotInChargeError } from '../public/devices.errors';
 import type { RegistrationEndService } from '../registry/registration-end.service';
 import { DeviceAlreadyRetiredError } from '../registry/registry.errors';
@@ -24,6 +26,7 @@ interface SetupOptions {
   workDepartmentId?: string | null;
   inCharge?: string | null;
   substitute?: string | null;
+  unplacedDesignee?: string | null;
 }
 
 describe('DeviceReceiptService', () => {
@@ -123,7 +126,17 @@ describe('DeviceReceiptService', () => {
             ])
           : new Map(),
       ),
+      itAdminsActingForUnplacedWork: jest.fn().mockResolvedValue(
+        options.unplacedDesignee !== undefined
+          ? new Map([
+              [unplacedWorkKey('DEVICE_RETURN_TASK', taskRecord?.id ?? 'task-1'), options.unplacedDesignee],
+              [unplacedWorkKey('DEVICE', device?.id ?? 'dev-1'), options.unplacedDesignee],
+            ])
+          : new Map(),
+      ),
     } as unknown as OrganizationReadApi;
+    const endUnplacedWorkDesignations = jest.fn().mockResolvedValue(0);
+    const organization = { endUnplacedWorkDesignations } as unknown as OrganizationApi;
     const identity = {
       findUsableItAdminEmployeeIds: jest.fn().mockResolvedValue(new Set(actors)),
     } as unknown as IdentityAccessApi;
@@ -132,9 +145,18 @@ describe('DeviceReceiptService', () => {
       run: jest.fn().mockImplementation((work: (tx: DbTx) => Promise<unknown>) => work(tx)),
     } as unknown as TransactionRunner;
 
-    const service = new DeviceReceiptService(repo, ending, returnTasks, organizationReads, identity, audit, runner);
+    const service = new DeviceReceiptService(
+      repo,
+      ending,
+      returnTasks,
+      organization,
+      organizationReads,
+      identity,
+      audit,
+      runner,
+    );
 
-    return { service, repo, ending, returnTasks, audit };
+    return { service, repo, ending, returnTasks, audit, endUnplacedWorkDesignations };
   }
 
   const firstAuditAfter = (audit: AuditApi): Record<string, unknown> => {
@@ -272,5 +294,28 @@ describe('DeviceReceiptService', () => {
     expect(calls[1]?.[1].after).toEqual(
       expect.objectContaining({ outcome: 'RECEIVED', viaDeviceReturn: true, bySubstitute: true }),
     );
+  });
+
+  it('allows designated IT Admin to complete an unplaced return task via device return and closes designations', async () => {
+    const { service, endUnplacedWorkDesignations, audit } = setup({
+      openRegistration: null,
+      openReturnTask: { departmentId: null, employeeId: 'emp-1' },
+      unplacedDesignee: 'it-des',
+    });
+
+    await service.returnToStock(
+      actor('it-des'),
+      'dev-1',
+      { condition: 'USABLE', softwareRemoval: { outcome: 'REMOVED' } },
+      now,
+    );
+
+    expect(endUnplacedWorkDesignations).toHaveBeenCalledWith(tx, {
+      workKind: 'DEVICE_RETURN_TASK',
+      workId: 'task-1',
+      endedByAppUserId: 'user-it-des',
+      endedAt: now,
+    });
+    expect(firstAuditAfter(audit)).toEqual(expect.objectContaining({ bySubstitute: true }));
   });
 });

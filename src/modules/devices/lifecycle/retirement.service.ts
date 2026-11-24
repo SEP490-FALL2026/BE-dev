@@ -5,6 +5,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditApi } from '../../audit/public/audit.api';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { LicensingDeviceActivationApi } from '../../licensing/public/licensing-device-activation.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { byUser, devicesEvent } from '../devices-audit-event.mapper';
 import { custodyOf } from '../devices-custody.policy';
@@ -37,6 +38,7 @@ export class RetirementService {
     private readonly repo: RegistryRepo,
     private readonly ending: RegistrationEndService,
     private readonly activations: LicensingDeviceActivationApi,
+    private readonly organization: OrganizationApi,
     private readonly organizationReads: OrganizationReadApi,
     private readonly identity: IdentityAccessApi,
     private readonly audit: AuditApi,
@@ -63,7 +65,10 @@ export class RetirementService {
     deviceId: string,
     input: RetireDeviceInput,
     now: Date = new Date(),
-    options?: { preAuthorized?: { open: RegistrationRecord | null; today: BusinessDate; bySubstitute: boolean } },
+    options?: {
+      preAuthorized?: { open: RegistrationRecord | null; today: BusinessDate; bySubstitute: boolean };
+      returnTaskId?: string | undefined;
+    },
   ): Promise<void> {
     const { open, today, bySubstitute } =
       options?.preAuthorized ?? (await this.lockAndAuthorize(tx, actor, deviceId, now));
@@ -85,6 +90,7 @@ export class RetirementService {
       },
     });
     await this.repo.retireDevice(tx, deviceId, now, input.reason, kind);
+    await this.closeUnplacedDesignations(tx, actor.appUserId, deviceId, options?.returnTaskId, now);
     await this.audit.record(
       tx,
       devicesEvent(byUser(actor), organizationId, 'DEVICE.RETIRED', 'ManagedDevice', deviceId, null, {
@@ -95,6 +101,29 @@ export class RetirementService {
         ...(bySubstitute ? { bySubstitute: true } : {}),
       }),
     );
+  }
+
+  private async closeUnplacedDesignations(
+    tx: DbTx,
+    endedByAppUserId: string,
+    deviceId: string,
+    returnTaskId: string | undefined,
+    endedAt: Date,
+  ): Promise<void> {
+    if (returnTaskId) {
+      await this.organization.endUnplacedWorkDesignations(tx, {
+        workKind: 'DEVICE_RETURN_TASK',
+        workId: returnTaskId,
+        endedByAppUserId,
+        endedAt,
+      });
+    }
+    await this.organization.endUnplacedWorkDesignations(tx, {
+      workKind: 'DEVICE',
+      workId: deviceId,
+      endedByAppUserId,
+      endedAt,
+    });
   }
 
   private async lockAndAuthorize(
@@ -124,6 +153,7 @@ export class RetirementService {
           {
             actorEmployeeId: actor.employeeId,
             today,
+            deviceId,
             oldHolderEmployeeId: open.holderEmployeeId,
             recipientEmployeeId: null,
           },

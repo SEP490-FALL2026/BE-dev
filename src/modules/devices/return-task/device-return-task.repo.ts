@@ -52,7 +52,16 @@ function toListRow(row: TaskWithDeviceRow): ReturnTaskListRow {
 
 function buildListWhere(filter: ReturnTaskListFilter): Prisma.DeviceReturnTaskWhereInput {
   const where: Prisma.DeviceReturnTaskWhereInput = { organizationId: filter.organizationId };
-  if (filter.departmentIds) where.departmentId = { in: [...filter.departmentIds] };
+  if (filter.departmentIds) {
+    if (filter.includeTaskIds && filter.includeTaskIds.length > 0) {
+      const scopeOr: Prisma.DeviceReturnTaskWhereInput[] = [];
+      if (filter.departmentIds.length > 0) scopeOr.push({ departmentId: { in: [...filter.departmentIds] } });
+      scopeOr.push({ id: { in: [...filter.includeTaskIds] } });
+      where.AND = [{ OR: scopeOr }];
+    } else {
+      where.departmentId = { in: [...filter.departmentIds] };
+    }
+  }
   if (filter.excludeEmployeeId) where.employeeId = { not: filter.excludeEmployeeId };
 
   const todayDate = toDateColumn(filter.today);
@@ -233,7 +242,9 @@ export class DeviceReturnTaskRepo {
     skip: number,
     take: number,
   ): Promise<{ rows: ReturnTaskListRow[]; total: number }> {
-    if (filter.departmentIds && filter.departmentIds.length === 0) return { rows: [], total: 0 };
+    if (filter.departmentIds && filter.departmentIds.length === 0 && !filter.includeTaskIds?.length) {
+      return { rows: [], total: 0 };
+    }
     const where = buildListWhere(filter);
 
     return this.prisma.$transaction(

@@ -42,7 +42,7 @@ interface LockedDeviceState {
   device: DeviceRecord;
   custody: DeviceCustody;
   holderEmployeeId: string | null;
-  returnTask: { found: boolean; departmentId: string | null };
+  returnTask: { found: boolean; id?: string | null; departmentId: string | null; employeeId?: string | null };
 }
 
 /**
@@ -202,7 +202,12 @@ export class DeviceActivationCommandService {
       return requireDepartmentActor(
         tx,
         { organizationReads: this.organizationReads, identity: this.identity },
-        { actorEmployeeId: actor.employeeId, departmentId: state.returnTask.departmentId },
+        {
+          actorEmployeeId: actor.employeeId,
+          departmentId: state.returnTask.departmentId,
+          returnTaskId: state.returnTask.id,
+          returnTaskEmployeeId: state.returnTask.employeeId,
+        },
       );
     }
     if (state.custody === 'ASSIGNED' && state.holderEmployeeId) {
@@ -212,6 +217,7 @@ export class DeviceActivationCommandService {
         {
           actorEmployeeId: actor.employeeId,
           today,
+          deviceId: state.device.id,
           oldHolderEmployeeId: state.holderEmployeeId,
           recipientEmployeeId: null,
         },

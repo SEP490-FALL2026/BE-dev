@@ -214,14 +214,17 @@ export class RegistryService {
     const departmentId =
       (await this.organizationReads.workDepartmentsOf([holder.id], dates.today, tx)).get(holder.id) ?? null;
     if (!departmentId) {
-      judgeDeviceActor({
+      const verdict = judgeDeviceActor({
         holderDepartmentId: null,
         recipientDepartmentId: null,
         actingByDepartment: new Map(),
         actor: actorEmployeeId,
         unplacedRequired: true,
+        unplacedDesignee: null,
       });
-      throw new DeviceNotInChargeError();
+      if (!verdict.allowed) throw new DeviceNotInChargeError();
+
+      return { holderId: holder.id, validFrom, bySubstitute: verdict.bySubstitute };
     }
     const actingByDepartment = await this.organizationReads.itAdminsActingFor(
       [departmentId],

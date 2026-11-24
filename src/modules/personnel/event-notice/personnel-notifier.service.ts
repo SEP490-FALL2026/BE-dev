@@ -453,6 +453,26 @@ export class PersonnelNotifier {
     });
   }
 
+  /** Notifies the usable Super Admin when an offboarding case opens for a never-placed employee. */
+  async unplacedOffboardingWaiting(
+    tx: DbTx,
+    input: { organizationId: string; caseId: string; employeeId: string },
+  ): Promise<void> {
+    const unplaced = await this.organizationReads.unplacedAmong([input.employeeId], tx);
+    if (!unplaced.has(input.employeeId)) return;
+    const superAdmin = await this.identity.findUsableSuperAdminEmployeeId(tx);
+    if (superAdmin === null || superAdmin === input.employeeId) return;
+
+    await this.notifications.notifyInApp(tx, {
+      organizationId: input.organizationId,
+      recipientEmployeeId: superAdmin,
+      code: 'UNPLACED_WORK_WAITING',
+      subject: null,
+      params: { workKind: 'OFFBOARDING_CASE', workId: input.caseId, employeeId: input.employeeId },
+      eventKey: `unplacedWork:OFFBOARDING_CASE:${input.caseId}`,
+    });
+  }
+
   /** A person who holds a role that needs someone to take over is leaving: the Super Admin is told, once for each role. */
   async roleHolderLeaving(
     tx: DbTx,

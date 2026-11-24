@@ -81,7 +81,12 @@ export class ReturnTaskCompletionService {
     const bySubstitute = await requireReturnTaskActor(
       tx,
       { organizationReads: this.organizationReads, identity: this.identity },
-      { actorEmployeeId: actor.employeeId, departmentId: task.departmentId, taskEmployeeId: task.employeeId },
+      {
+        actorEmployeeId: actor.employeeId,
+        departmentId: task.departmentId,
+        taskEmployeeId: task.employeeId,
+        taskId: task.id,
+      },
     );
     const today = await this.organizationReads.businessToday(now, tx);
 
@@ -167,7 +172,7 @@ export class ReturnTaskCompletionService {
       task.deviceId,
       { retirementKind: 'LOST', reason, activationDecisions: input.activationDecisions },
       now,
-      { preAuthorized: { open, today, bySubstitute } },
+      { preAuthorized: { open, today, bySubstitute }, returnTaskId: task.id },
     );
     await this.audit.record(
       tx,

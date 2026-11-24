@@ -20,6 +20,7 @@ function notifierOf(world: {
   actingByDept?: Record<string, ActingSpec>;
   heads?: Record<string, string>;
   workDepartments?: Record<string, string>;
+  unplaced?: string[];
   readScopeByActor?: Record<string, string[]>;
 }) {
   const told: InAppNotificationInput[] = [];
@@ -39,6 +40,9 @@ function notifierOf(world: {
       Promise.resolve(
         new Map(ids.flatMap((id) => (world.workDepartments?.[id] ? [[id, world.workDepartments[id]] as const] : []))),
       ),
+    ),
+    unplacedAmong: jest.fn((ids: readonly string[]) =>
+      Promise.resolve(new Set(ids.filter((id) => (world.unplaced ?? []).includes(id)))),
     ),
     getItAdminScope: jest.fn((actorId: string) => Promise.resolve(world.readScopeByActor?.[actorId] ?? [])),
     itAdminsActingFor: jest.fn(
@@ -284,5 +288,33 @@ describe('departure, transfer, and handover notifications', () => {
         bySubstitute: true,
       });
     });
+  });
+
+  it('notifies usable Super Admin with UNPLACED_WORK_WAITING for a never-placed offboarding case only', async () => {
+    const unplaced = notifierOf({ usableSuperAdmin: 'sa', unplaced: ['emp-u'] });
+    const placed = notifierOf({ usableSuperAdmin: 'sa', unplaced: [] });
+
+    await unplaced.notifier.unplacedOffboardingWaiting(TX, {
+      organizationId: ORGANIZATION,
+      caseId: 'case-u',
+      employeeId: 'emp-u',
+    });
+    await placed.notifier.unplacedOffboardingWaiting(TX, {
+      organizationId: ORGANIZATION,
+      caseId: 'case-p',
+      employeeId: 'emp-p',
+    });
+
+    expect(unplaced.told).toEqual([
+      {
+        organizationId: ORGANIZATION,
+        recipientEmployeeId: 'sa',
+        code: 'UNPLACED_WORK_WAITING',
+        subject: null,
+        params: { workKind: 'OFFBOARDING_CASE', workId: 'case-u', employeeId: 'emp-u' },
+        eventKey: 'unplacedWork:OFFBOARDING_CASE:case-u',
+      },
+    ]);
+    expect(placed.told).toEqual([]);
   });
 });

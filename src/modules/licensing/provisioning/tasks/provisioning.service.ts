@@ -3,6 +3,7 @@ import { Page, pageOf } from '../../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import { IdentityAccessApi } from '../../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
+import { unplacedWorkKey } from '../../../organization/public/organization.types';
 import { ProvisioningTaskNotFoundError } from '../../public/licensing.errors';
 import { RevocationListeners } from '../../public/licensing.extension-points';
 import type { ProvisioningChannel, ProvisioningTaskStatus } from '../../public/licensing.types';
@@ -51,20 +52,26 @@ export class ProvisioningService {
   ): Promise<Page<TaskSummaryView>> {
     assertItAdmin(actor);
     const usable = (ids: readonly string[]) => this.identity.findUsableItAdminEmployeeIds(ids);
-    const deptIds =
+    const [deptIds, unplacedTaskIds] = await Promise.all([
       query.scope === 'MINE'
-        ? await this.organizationReads.getItAdminActingScope(actor.employeeId, usable)
-        : await this.organizationReads.getItAdminScope(actor.employeeId, usable);
-    if (deptIds.length === 0) return pageOf([], 0, query.page, query.pageSize);
+        ? this.organizationReads.getItAdminActingScope(actor.employeeId, usable)
+        : this.organizationReads.getItAdminScope(actor.employeeId, usable),
+      this.organizationReads.findActiveUnplacedWorkIdsForDesignee(actor.employeeId, 'PROVISIONING_TASK'),
+    ]);
+    if (deptIds.length === 0 && unplacedTaskIds.length === 0) return pageOf([], 0, query.page, query.pageSize);
 
     const today = await this.organizationReads.businessToday();
-    const beneficiaryEmployeeIds = await this.organizationReads.getEmployeeIdsOfWorkDepartments(deptIds, today);
-    if (beneficiaryEmployeeIds.length === 0) return pageOf([], 0, query.page, query.pageSize);
+    const beneficiaryEmployeeIds =
+      deptIds.length > 0 ? await this.organizationReads.getEmployeeIdsOfWorkDepartments(deptIds, today) : [];
+    if (beneficiaryEmployeeIds.length === 0 && unplacedTaskIds.length === 0) {
+      return pageOf([], 0, query.page, query.pageSize);
+    }
 
     const { items, total } = await this.repo.page({
       ...(query.channel ? { channel: query.channel } : {}),
       ...(query.status ? { status: query.status } : {}),
       beneficiaryEmployeeIds,
+      ...(unplacedTaskIds.length > 0 ? { includeTaskIds: unplacedTaskIds } : {}),
       ...(query.claimableNow !== undefined ? { claimableOn: { today, claimable: query.claimableNow } } : {}),
       ...(query.overdue !== undefined ? { overdueOn: { today, overdue: query.overdue } } : {}),
       skip: (query.page - 1) * query.pageSize,
@@ -84,7 +91,16 @@ export class ProvisioningService {
     const deptId = (await this.organizationReads.workDepartmentsOf([task.assignment.employeeId], today)).get(
       task.assignment.employeeId,
     );
-    if (!deptId) throw new ProvisioningTaskNotFoundError();
+    if (!deptId) {
+      const resolved = await this.organizationReads.itAdminsActingForUnplacedWork(
+        [{ workKind: 'PROVISIONING_TASK', workId: task.id, employeeId: task.assignment.employeeId }],
+        (ids) => this.identity.findUsableItAdminEmployeeIds(ids),
+      );
+      const designee = resolved.get(unplacedWorkKey('PROVISIONING_TASK', task.id)) ?? null;
+      if (designee !== actor.employeeId) throw new ProvisioningTaskNotFoundError();
+
+      return (await this.views.views([task]))[0];
+    }
 
     const readScope = await this.organizationReads.getItAdminScope(actor.employeeId, (ids) =>
       this.identity.findUsableItAdminEmployeeIds(ids),

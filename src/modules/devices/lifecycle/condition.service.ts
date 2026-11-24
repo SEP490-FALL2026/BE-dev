@@ -56,26 +56,7 @@ export class ConditionService {
       });
       this.assertMayChangeCondition(custody, device.condition, input.condition);
 
-      let bySubstitute = false;
-      if (returnTask.found) {
-        bySubstitute = await requireDepartmentActor(
-          tx,
-          { organizationReads: this.organizationReads, identity: this.identity },
-          { actorEmployeeId: actor.employeeId, departmentId: returnTask.departmentId },
-        );
-      } else if (open) {
-        const today = await this.organizationReads.businessToday(now, tx);
-        bySubstitute = await requireLifecycleActor(
-          tx,
-          { organizationReads: this.organizationReads, identity: this.identity },
-          {
-            actorEmployeeId: actor.employeeId,
-            today,
-            oldHolderEmployeeId: open.holderEmployeeId,
-            recipientEmployeeId: null,
-          },
-        );
-      }
+      const bySubstitute = await this.authorizeChange(tx, actor, deviceId, open, returnTask, now);
 
       const conditionNote = input.note ?? null;
       await this.repo.updateCondition(tx, deviceId, input.condition, conditionNote);
@@ -92,6 +73,42 @@ export class ConditionService {
         ),
       );
     });
+  }
+
+  private async authorizeChange(
+    tx: Parameters<RegistryRepo['lockDevice']>[0],
+    actor: AuthenticatedPrincipal,
+    deviceId: string,
+    open: { holderEmployeeId: string } | null,
+    returnTask: { found: boolean; id?: string | null; departmentId: string | null; employeeId?: string | null },
+    now: Date,
+  ): Promise<boolean> {
+    if (returnTask.found) {
+      return requireDepartmentActor(
+        tx,
+        { organizationReads: this.organizationReads, identity: this.identity },
+        {
+          actorEmployeeId: actor.employeeId,
+          departmentId: returnTask.departmentId,
+          returnTaskId: returnTask.id,
+          returnTaskEmployeeId: returnTask.employeeId,
+        },
+      );
+    }
+    if (!open) return false;
+    const today = await this.organizationReads.businessToday(now, tx);
+
+    return requireLifecycleActor(
+      tx,
+      { organizationReads: this.organizationReads, identity: this.identity },
+      {
+        actorEmployeeId: actor.employeeId,
+        today,
+        deviceId,
+        oldHolderEmployeeId: open.holderEmployeeId,
+        recipientEmployeeId: null,
+      },
+    );
   }
 
   private assertMayChangeCondition(

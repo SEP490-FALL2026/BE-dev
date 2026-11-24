@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../../audit/public/audit.api';
+import { OrganizationApi } from '../../../organization/public/organization.api';
 import { AssignmentService } from '../../assignment/assignment.service';
 import type { GrantCancellation } from '../../public/licensing.types';
 import type { GrantCancelCause } from '../../public/licensing-open-grants.types';
@@ -39,6 +40,7 @@ export class ProvisioningCancellationService {
   constructor(
     private readonly tasks: ProvisioningTaskRepo,
     private readonly assignments: AssignmentService,
+    private readonly organization: OrganizationApi,
     private readonly audit: AuditApi,
   ) {}
 
@@ -102,6 +104,12 @@ export class ProvisioningCancellationService {
           });
         }
         await this.tasks.markCancelled(tx, task.id, actor.appUserId, reason, input.now);
+        await this.organization.endUnplacedWorkDesignations(tx, {
+          workKind: 'PROVISIONING_TASK',
+          workId: task.id,
+          endedByAppUserId: actor.appUserId,
+          endedAt: input.now,
+        });
         await this.audit.record(
           tx,
           licensingAuditEvent(

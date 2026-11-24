@@ -178,13 +178,18 @@ export class RegistryRepo {
   async findOpenReturnTaskDepartmentId(
     tx: DbTx,
     deviceId: string,
-  ): Promise<{ found: boolean; departmentId: string | null }> {
+  ): Promise<{ found: boolean; id?: string | null; departmentId: string | null; employeeId?: string | null }> {
     const task = await tx.deviceReturnTask.findFirst({
       where: { deviceId, state: 'OPEN' },
-      select: { departmentId: true },
+      select: { id: true, departmentId: true, employeeId: true },
     });
 
-    return { found: task !== null, departmentId: task?.departmentId ?? null };
+    return {
+      found: task !== null,
+      id: task?.id ?? null,
+      departmentId: task?.departmentId ?? null,
+      employeeId: task?.employeeId ?? null,
+    };
   }
 
   async updateCondition(tx: DbTx, id: string, condition: DeviceCondition, conditionNote: string | null): Promise<void> {

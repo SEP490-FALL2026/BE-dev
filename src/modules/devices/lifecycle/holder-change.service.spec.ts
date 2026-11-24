@@ -113,6 +113,7 @@ describe('HolderChangeService', () => {
           options.actingByDepartment ??
             new Map([['dept-new', { inCharge: 'it-1', substitute: null, actors: ['it-1'] }]]),
         ),
+      itAdminsActingForUnplacedWork: jest.fn().mockResolvedValue(new Map()),
     } as unknown as OrganizationReadApi;
     const identity = {
       findUsableItAdminEmployeeIds: jest.fn().mockResolvedValue(new Set(['it-1', 'it-sub'])),

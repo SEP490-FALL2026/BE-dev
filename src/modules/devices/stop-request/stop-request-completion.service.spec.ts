@@ -1,4 +1,5 @@
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { unplacedWorkKey } from '../../organization/public/organization.types';
 import { StopRequestCompletionService } from './stop-request-completion.service';
 import * as errors from './stop-request.errors';
 
@@ -29,6 +30,7 @@ function harness(options: {
   departmentId?: string | null;
   acting?: { actors: string[]; substitute: string | null } | undefined;
   holderEmployeeId?: string;
+  unplacedDesignee?: string | null;
 }) {
   const holderEmployeeId = options.holderEmployeeId ?? 'emp-holder';
   const request = { ...REQUEST, holderEmployeeId };
@@ -60,6 +62,13 @@ function harness(options: {
     businessToday: jest.fn().mockResolvedValue('2026-10-21'),
     workDepartmentsOf: jest.fn().mockResolvedValue(deptMap),
     itAdminsActingFor: jest.fn().mockResolvedValue(actingMap),
+    itAdminsActingForUnplacedWork: jest
+      .fn()
+      .mockResolvedValue(
+        options.unplacedDesignee !== undefined
+          ? new Map([[unplacedWorkKey('DEVICE', REQUEST.deviceId), options.unplacedDesignee]])
+          : new Map(),
+      ),
   };
   const record = jest.fn<void, [unknown, { after: Record<string, unknown> }]>();
   const audit = { record };
@@ -138,5 +147,18 @@ describe('StopRequestCompletionService (acting IT Admin)', () => {
     expect(result.selfHandled).toBe(true);
     const event = record.mock.calls[0][1];
     expect(event.after).toMatchObject({ state: 'COMPLETED', selfHandled: true });
+  });
+
+  it('allows designated IT Admin to complete a stop request on an unplaced holder device with bySubstitute: true', async () => {
+    const { service, record } = harness({ departmentId: null, unplacedDesignee: 'emp-des' });
+
+    await service.complete(actorOf('emp-des'), 'req-1');
+
+    expect(record).toHaveBeenCalledTimes(1);
+    expect(record.mock.calls[0][1].after).toMatchObject({
+      state: 'COMPLETED',
+      selfHandled: false,
+      bySubstitute: true,
+    });
   });
 });

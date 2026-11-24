@@ -3,6 +3,7 @@ import type { ApiException } from '../../../infrastructure/http/errors/api.excep
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { AuditApi } from '../../audit/public/audit.api';
 import type { LicensingDeviceActivationApi } from '../../licensing/public/licensing-device-activation.api';
+import type { OrganizationApi } from '../../organization/public/organization.api';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { DeviceNotFoundError } from '../public/devices.errors';
 import { DeviceAlreadyRetiredError } from '../registry/registry.errors';
@@ -84,6 +85,8 @@ describe('VoidService', () => {
       closeAllOfDevice,
     } as unknown as LicensingDeviceActivationApi;
 
+    const endUnplacedWorkDesignations = jest.fn().mockResolvedValue(0);
+    const organization = { endUnplacedWorkDesignations } as unknown as OrganizationApi;
     const organizationReads = {
       getOrganization: jest.fn().mockResolvedValue({ id: 'org-1' }),
       businessToday: jest.fn().mockResolvedValue('2026-11-24'),
@@ -94,9 +97,9 @@ describe('VoidService', () => {
       run: jest.fn().mockImplementation((work: (tx: DbTx) => Promise<unknown>) => work(tx)),
     } as unknown as TransactionRunner;
 
-    const service = new VoidService(repo, activations, organizationReads, audit, runner);
+    const service = new VoidService(repo, activations, organization, organizationReads, audit, runner);
 
-    return { service, mocks: { voidDeviceMock, closeAllOfDevice, auditRecord } };
+    return { service, mocks: { voidDeviceMock, closeAllOfDevice, auditRecord, endUnplacedWorkDesignations } };
   }
 
   const expectErrorCode = async (
@@ -140,6 +143,12 @@ describe('VoidService', () => {
       voidedAt: now,
       voidReason: 'Entered twice by mistake',
       voidedByAppUserId: 'user-it-1',
+    });
+    expect(mocks.endUnplacedWorkDesignations).toHaveBeenCalledWith(tx, {
+      workKind: 'DEVICE',
+      workId: 'dev-1',
+      endedByAppUserId: 'user-it-1',
+      endedAt: now,
     });
     expect(mocks.auditRecord).toHaveBeenCalledWith(
       tx,

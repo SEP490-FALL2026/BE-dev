@@ -2,10 +2,11 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { NotificationsApi } from '../../notifications/public/notifications.api';
+import type { UnplacedWorkKind } from '../../organization/public/organization.types';
 
 export type MissingItCoverageReason = 'NO_IN_CHARGE' | 'IN_CHARGE_NOT_USABLE';
 
-/** Sends the daily Super Admin alert when an active non-starting department has no acting IT Admin. */
+/** Sends daily Super Admin alerts when a department or unplaced-work designation loses usable IT coverage. */
 @Injectable()
 export class ItCoverageNotifier {
   constructor(private readonly notifications: NotificationsApi) {}
@@ -34,6 +35,31 @@ export class ItCoverageNotifier {
         reason: input.reason,
       },
       eventKey: `departmentItCoverage:${input.departmentId}:${input.today}`,
+    });
+  }
+
+  unplacedWorkWaiting(
+    tx: DbTx,
+    input: {
+      organizationId: string;
+      superAdminEmployeeId: string;
+      workKind: UnplacedWorkKind;
+      workId: string;
+      employeeId: string;
+      today: BusinessDate;
+    },
+  ): Promise<boolean> {
+    return this.notifications.notifyInApp(tx, {
+      organizationId: input.organizationId,
+      recipientEmployeeId: input.superAdminEmployeeId,
+      code: 'UNPLACED_WORK_WAITING',
+      subject: null,
+      params: {
+        workKind: input.workKind,
+        workId: input.workId,
+        employeeId: input.employeeId,
+      },
+      eventKey: `unplacedWork:${input.workKind}:${input.workId}:${input.today}`,
     });
   }
 }

@@ -71,18 +71,20 @@ export class DeviceReturnTaskQueryService {
   private async resolveScopeFilter(
     actor: AuthenticatedPrincipal,
     scope: 'MINE' | 'ALL',
-  ): Promise<{ departmentIds?: readonly string[]; excludeEmployeeId?: string }> {
+  ): Promise<{ departmentIds?: readonly string[]; includeTaskIds?: readonly string[]; excludeEmployeeId?: string }> {
     if (actor.roles.includes('SUPER_ADMIN')) return {};
     const usableAmong = (ids: readonly string[]) => this.identity.findUsableItAdminEmployeeIds(ids);
-    if (scope === 'MINE') {
-      return {
-        departmentIds: await this.organizationReads.getItAdminActingScope(actor.employeeId, usableAmong),
-        excludeEmployeeId: actor.employeeId,
-      };
-    }
+    const [departmentIds, unplacedTaskIds] = await Promise.all([
+      scope === 'MINE'
+        ? this.organizationReads.getItAdminActingScope(actor.employeeId, usableAmong)
+        : this.organizationReads.getItAdminScope(actor.employeeId, usableAmong),
+      this.organizationReads.findActiveUnplacedWorkIdsForDesignee(actor.employeeId, 'DEVICE_RETURN_TASK'),
+    ]);
 
     return {
-      departmentIds: await this.organizationReads.getItAdminScope(actor.employeeId, usableAmong),
+      departmentIds,
+      ...(unplacedTaskIds.length > 0 ? { includeTaskIds: unplacedTaskIds } : {}),
+      ...(scope === 'MINE' ? { excludeEmployeeId: actor.employeeId } : {}),
     };
   }
 
@@ -90,21 +92,35 @@ export class DeviceReturnTaskQueryService {
     employees: Map<string, EmployeeBrief>;
     departments: Map<string, DepartmentBrief>;
     actingByDepartment: Map<string, ActingItAdminsResult>;
+    unplacedDesignees: Map<string, string | null>;
   }> {
     const departmentIds = [...new Set(rows.map((row) => row.departmentId).filter((id): id is string => id !== null))];
-    const [briefs, actingByDepartment] = await Promise.all([
+    const unplacedRefs = rows
+      .filter((row) => row.departmentId === null)
+      .map((row) => ({
+        workKind: 'DEVICE_RETURN_TASK' as const,
+        workId: row.id,
+        employeeId: row.employeeId,
+      }));
+    const [briefs, actingByDepartment, unplacedDesignees] = await Promise.all([
       departmentIds.length > 0 ? this.organizationReads.getDepartmentBriefs(departmentIds) : Promise.resolve([]),
       departmentIds.length > 0
         ? this.organizationReads.itAdminsActingFor(departmentIds, (ids) =>
             this.identity.findUsableItAdminEmployeeIds(ids),
           )
         : Promise.resolve(new Map<string, ActingItAdminsResult>()),
+      unplacedRefs.length > 0
+        ? this.organizationReads.itAdminsActingForUnplacedWork(unplacedRefs, (ids) =>
+            this.identity.findUsableItAdminEmployeeIds(ids),
+          )
+        : Promise.resolve(new Map<string, string | null>()),
     ]);
 
     const employeeIds = [
       ...new Set([
         ...rows.map((row) => row.employeeId),
         ...[...actingByDepartment.values()].flatMap((acting) => acting.actors),
+        ...[...unplacedDesignees.values()].filter((id): id is string => id !== null),
       ]),
     ];
     const employeeRecords = employeeIds.length > 0 ? await this.organizationReads.getEmployees(employeeIds) : [];
@@ -115,6 +131,7 @@ export class DeviceReturnTaskQueryService {
       ),
       departments: new Map(briefs.map((dept) => [dept.id, { id: dept.id, name: dept.name }])),
       actingByDepartment,
+      unplacedDesignees,
     };
   }
 

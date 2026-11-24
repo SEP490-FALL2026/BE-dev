@@ -1,6 +1,7 @@
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { unplacedWorkKey } from '../../organization/public/organization.types';
 import { judgeDeviceActor } from '../devices-custody.policy';
 import { DeviceNotInChargeError } from '../public/devices.errors';
 import { DeviceReturnTaskNotInChargeError } from './lifecycle.errors';
@@ -18,6 +19,21 @@ export function normalizeSoftwareRemoval(input: SoftwareRemovalInput): Normalize
   return { outcome: input.outcome, note: note.length > 0 ? note : null };
 }
 
+async function resolveUnplacedDeviceDesignee(
+  tx: DbTx,
+  deps: { organizationReads: OrganizationReadApi; identity: IdentityAccessApi },
+  input: { deviceId?: string | undefined; employeeIds: readonly string[] },
+): Promise<string | null> {
+  if (!input.deviceId || input.employeeIds.length !== 1) return null;
+  const resolved = await deps.organizationReads.itAdminsActingForUnplacedWork(
+    [{ workKind: 'DEVICE', workId: input.deviceId, employeeId: input.employeeIds[0] }],
+    (ids) => deps.identity.findUsableItAdminEmployeeIds(ids, tx),
+    tx,
+  );
+
+  return resolved.get(unplacedWorkKey('DEVICE', input.deviceId)) ?? null;
+}
+
 /**
  * Checks whether the acting IT Admin covers both the current holder department and recipient department
  * (when applicable), returning whether a substitute acting appointment authorized the action.
@@ -28,6 +44,7 @@ export async function requireLifecycleActor(
   input: {
     actorEmployeeId: string;
     today: string;
+    deviceId?: string | undefined;
     oldHolderEmployeeId: string | null;
     recipientEmployeeId: string | null;
   },
@@ -39,32 +56,29 @@ export async function requireLifecycleActor(
   const holderDepartmentId = input.oldHolderEmployeeId ? (workDepts.get(input.oldHolderEmployeeId) ?? null) : null;
   const recipientDepartmentId = input.recipientEmployeeId ? (workDepts.get(input.recipientEmployeeId) ?? null) : null;
 
-  if ((input.oldHolderEmployeeId && !holderDepartmentId) || (input.recipientEmployeeId && !recipientDepartmentId)) {
-    const verdict = judgeDeviceActor({
-      holderDepartmentId,
-      recipientDepartmentId,
-      actingByDepartment: new Map(),
-      actor: input.actorEmployeeId,
-      unplacedRequired: true,
-    });
-    if (!verdict.allowed) throw new DeviceNotInChargeError();
-
-    return verdict.bySubstitute;
-  }
+  const unplacedEmployeeIds = [...new Set(employeeIds.filter((id) => !workDepts.get(id)))];
+  const unplacedRequired = unplacedEmployeeIds.length > 0;
+  const unplacedDesignee = unplacedRequired
+    ? await resolveUnplacedDeviceDesignee(tx, deps, { deviceId: input.deviceId, employeeIds: unplacedEmployeeIds })
+    : null;
 
   const departmentIds = [
     ...new Set([holderDepartmentId, recipientDepartmentId].filter((id): id is string => id !== null)),
   ];
-  const actingByDepartment = await deps.organizationReads.itAdminsActingFor(
-    departmentIds,
-    (ids) => deps.identity.findUsableItAdminEmployeeIds(ids, tx),
-    tx,
-  );
+  const actingByDepartment =
+    departmentIds.length > 0
+      ? await deps.organizationReads.itAdminsActingFor(
+          departmentIds,
+          (ids) => deps.identity.findUsableItAdminEmployeeIds(ids, tx),
+          tx,
+        )
+      : new Map();
   const verdict = judgeDeviceActor({
     holderDepartmentId,
     recipientDepartmentId,
     actingByDepartment,
     actor: input.actorEmployeeId,
+    ...(unplacedRequired ? { unplacedRequired: true, unplacedDesignee } : {}),
   });
   if (!verdict.allowed) throw new DeviceNotInChargeError();
 
@@ -78,15 +92,30 @@ export async function requireLifecycleActor(
 export async function requireDepartmentActor(
   tx: DbTx,
   deps: { organizationReads: OrganizationReadApi; identity: IdentityAccessApi },
-  input: { actorEmployeeId: string; departmentId: string | null },
+  input: {
+    actorEmployeeId: string;
+    departmentId: string | null;
+    returnTaskId?: string | null | undefined;
+    returnTaskEmployeeId?: string | null | undefined;
+  },
 ): Promise<boolean> {
   if (!input.departmentId) {
+    let unplacedDesignee: string | null = null;
+    if (input.returnTaskId && input.returnTaskEmployeeId && input.actorEmployeeId !== input.returnTaskEmployeeId) {
+      const resolved = await deps.organizationReads.itAdminsActingForUnplacedWork(
+        [{ workKind: 'DEVICE_RETURN_TASK', workId: input.returnTaskId, employeeId: input.returnTaskEmployeeId }],
+        (ids) => deps.identity.findUsableItAdminEmployeeIds(ids, tx),
+        tx,
+      );
+      unplacedDesignee = resolved.get(unplacedWorkKey('DEVICE_RETURN_TASK', input.returnTaskId)) ?? null;
+    }
     const verdict = judgeDeviceActor({
       holderDepartmentId: null,
       recipientDepartmentId: null,
       actingByDepartment: new Map(),
       actor: input.actorEmployeeId,
       unplacedRequired: true,
+      unplacedDesignee,
     });
     if (!verdict.allowed) throw new DeviceNotInChargeError();
 
@@ -116,10 +145,22 @@ export async function requireDepartmentActor(
 export async function requireReturnTaskActor(
   tx: DbTx,
   deps: { organizationReads: OrganizationReadApi; identity: IdentityAccessApi },
-  input: { actorEmployeeId: string; departmentId: string | null; taskEmployeeId: string },
+  input: { actorEmployeeId: string; departmentId: string | null; taskEmployeeId: string; taskId?: string | undefined },
 ): Promise<boolean> {
-  if (input.actorEmployeeId === input.taskEmployeeId || !input.departmentId) {
+  if (input.actorEmployeeId === input.taskEmployeeId) {
     throw new DeviceReturnTaskNotInChargeError();
+  }
+  if (!input.departmentId) {
+    if (!input.taskId) throw new DeviceReturnTaskNotInChargeError();
+    const resolved = await deps.organizationReads.itAdminsActingForUnplacedWork(
+      [{ workKind: 'DEVICE_RETURN_TASK', workId: input.taskId, employeeId: input.taskEmployeeId }],
+      (ids) => deps.identity.findUsableItAdminEmployeeIds(ids, tx),
+      tx,
+    );
+    const designee = resolved.get(unplacedWorkKey('DEVICE_RETURN_TASK', input.taskId)) ?? null;
+    if (designee !== input.actorEmployeeId) throw new DeviceReturnTaskNotInChargeError();
+
+    return true;
   }
 
   const actingByDept = await deps.organizationReads.itAdminsActingFor(

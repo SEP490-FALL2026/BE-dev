@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { devicesEvent } from '../devices-audit-event.mapper';
 import { RegistryRepo } from '../registry/registry.repo';
@@ -25,6 +26,7 @@ export class DeviceReturnTaskService {
   constructor(
     private readonly registry: RegistryRepo,
     private readonly repo: DeviceReturnTaskRepo,
+    private readonly organization: OrganizationApi,
     private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly notifier: DeviceReturnTaskNotifier,
@@ -115,6 +117,12 @@ export class DeviceReturnTaskService {
     const cancelledIds: string[] = [];
     for (const task of tasks) {
       await this.repo.markCancelled(tx, task.id, input.at);
+      await this.organization.endUnplacedWorkDesignations(tx, {
+        workKind: 'DEVICE_RETURN_TASK',
+        workId: task.id,
+        endedByAppUserId: null,
+        endedAt: input.at,
+      });
       await this.audit.record(
         tx,
         devicesEvent(

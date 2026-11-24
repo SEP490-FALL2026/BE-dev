@@ -4,6 +4,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import type { AuditApi } from '../../audit/public/audit.api';
 import type { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import type { LicensingDeviceActivationApi } from '../../licensing/public/licensing-device-activation.api';
+import type { OrganizationApi } from '../../organization/public/organization.api';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { DeviceNotFoundError, DeviceNotInChargeError } from '../public/devices.errors';
 import type { RegistrationEndService } from '../registry/registration-end.service';
@@ -99,6 +100,8 @@ describe('RetirementService', () => {
         ]),
       ),
     } as unknown as OrganizationReadApi;
+    const endUnplacedWorkDesignations = jest.fn().mockResolvedValue(0);
+    const organization = { endUnplacedWorkDesignations } as unknown as OrganizationApi;
     const identity = {
       findUsableItAdminEmployeeIds: jest.fn().mockResolvedValue(new Set(actors)),
     } as unknown as IdentityAccessApi;
@@ -107,9 +110,18 @@ describe('RetirementService', () => {
       run: jest.fn().mockImplementation((work: (tx: DbTx) => Promise<unknown>) => work(tx)),
     } as unknown as TransactionRunner;
 
-    const service = new RetirementService(repo, ending, activations, organizationReads, identity, audit, runner);
+    const service = new RetirementService(
+      repo,
+      ending,
+      activations,
+      organization,
+      organizationReads,
+      identity,
+      audit,
+      runner,
+    );
 
-    return { service, repo, ending, activations, audit };
+    return { service, repo, ending, activations, audit, endUnplacedWorkDesignations };
   }
 
   const firstAuditAfter = (audit: AuditApi): Record<string, unknown> => {
@@ -217,12 +229,35 @@ describe('RetirementService', () => {
       'Stolen in transit',
       'LOST',
     );
+    expect(bySub.endUnplacedWorkDesignations).toHaveBeenCalledWith(tx, {
+      workKind: 'DEVICE',
+      workId: 'dev-1',
+      endedByAppUserId: 'user-it-sub',
+      endedAt: now,
+    });
     expect(firstAuditAfter(bySub.audit)).toEqual({
       reason: 'Stolen in transit',
       retirementKind: 'LOST',
       endedRegistrationId: 'reg-1',
       activationDecisions: [{ activationId: 'act-key-1', licenseReleased: false }],
       bySubstitute: true,
+    });
+
+    const withReturnTask = setup();
+    await withReturnTask.service.retireInTx(
+      tx,
+      actor('it-1'),
+      'org-1',
+      'dev-1',
+      { retirementKind: 'LOST', reason: 'Not recovered' },
+      now,
+      { preAuthorized: { open: null, today: '2026-11-24', bySubstitute: true }, returnTaskId: 'task-9' },
+    );
+    expect(withReturnTask.endUnplacedWorkDesignations).toHaveBeenCalledWith(tx, {
+      workKind: 'DEVICE_RETURN_TASK',
+      workId: 'task-9',
+      endedByAppUserId: 'user-it-1',
+      endedAt: now,
     });
   });
 

@@ -1,6 +1,7 @@
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { unplacedWorkKey } from '../../organization/public/organization.types';
 import { DeviceReturnTaskNotFoundError } from './device-return-task.errors';
 import { DeviceReturnTaskQueryService } from './device-return-task-query.service';
 import type { DeviceReturnTaskRepo } from './device-return-task.repo';
@@ -55,7 +56,10 @@ function buildQueryService(rows: ReturnTaskListRow[]) {
     { id: 'emp-1', employeeCode: 'NV-01', fullName: 'Holder One' },
     { id: 'it-in-charge', employeeCode: 'NV-02', fullName: 'InCharge IT' },
     { id: 'it-sub', employeeCode: 'NV-03', fullName: 'Sub IT' },
+    { id: 'it-des', employeeCode: 'NV-04', fullName: 'Designee IT' },
   ]);
+  const findActiveUnplacedWorkIdsForDesignee = jest.fn().mockResolvedValue([]);
+  const itAdminsActingForUnplacedWork = jest.fn().mockResolvedValue(new Map());
   const organizationReads = {
     getOrganization: jest.fn().mockResolvedValue({ id: 'org-1' }),
     businessToday: jest.fn().mockResolvedValue('2026-11-25'),
@@ -63,16 +67,26 @@ function buildQueryService(rows: ReturnTaskListRow[]) {
     getItAdminScope,
     getDepartmentBriefs,
     itAdminsActingFor,
+    findActiveUnplacedWorkIdsForDesignee,
+    itAdminsActingForUnplacedWork,
     getEmployees,
   } as unknown as OrganizationReadApi;
 
   const identity = {
-    findUsableItAdminEmployeeIds: jest.fn().mockResolvedValue(new Set(['it-in-charge', 'it-sub'])),
+    findUsableItAdminEmployeeIds: jest.fn().mockResolvedValue(new Set(['it-in-charge', 'it-sub', 'it-des'])),
   } as unknown as IdentityAccessApi;
 
   const service = new DeviceReturnTaskQueryService(repo, organizationReads, identity);
 
-  return { service, page, getItAdminActingScope, getItAdminScope, itAdminsActingFor };
+  return {
+    service,
+    page,
+    getItAdminActingScope,
+    getItAdminScope,
+    itAdminsActingFor,
+    findActiveUnplacedWorkIdsForDesignee,
+    itAdminsActingForUnplacedWork,
+  };
 }
 
 describe('DeviceReturnTaskQueryService', () => {
@@ -156,5 +170,35 @@ describe('DeviceReturnTaskQueryService', () => {
     const { service } = buildQueryService([]);
 
     await expect(service.get('missing-id')).rejects.toThrow(DeviceReturnTaskNotFoundError);
+  });
+
+  it('includes unplaced designated return tasks in MINE and resolves their acting designee', async () => {
+    const row = listRow({ id: 'task-u1', departmentId: null, employeeId: 'emp-1' });
+    const {
+      service,
+      page,
+      getItAdminActingScope,
+      findActiveUnplacedWorkIdsForDesignee,
+      itAdminsActingForUnplacedWork,
+    } = buildQueryService([row]);
+    getItAdminActingScope.mockResolvedValue([]);
+    findActiveUnplacedWorkIdsForDesignee.mockResolvedValue(['task-u1']);
+    itAdminsActingForUnplacedWork.mockResolvedValue(
+      new Map([[unplacedWorkKey('DEVICE_RETURN_TASK', 'task-u1'), 'it-des']]),
+    );
+
+    const res = await service.list(principal('it-des'), { scope: 'MINE', state: 'OPEN', page: 1, pageSize: 20 });
+
+    expect(findActiveUnplacedWorkIdsForDesignee).toHaveBeenCalledWith('it-des', 'DEVICE_RETURN_TASK');
+    expect(page).toHaveBeenCalledWith(
+      expect.objectContaining({ departmentIds: [], includeTaskIds: ['task-u1'], excludeEmployeeId: 'it-des' }),
+      0,
+      20,
+    );
+    expect(res.items[0]).toMatchObject({
+      id: 'task-u1',
+      waiting: false,
+      actingItAdmins: [{ id: 'it-des', fullName: 'Designee IT', bySubstitute: true }],
+    });
   });
 });

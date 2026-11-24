@@ -4,6 +4,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditApi } from '../../audit/public/audit.api';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { unplacedWorkKey } from '../../organization/public/organization.types';
 import { byUser, devicesEvent } from '../devices-audit-event.mapper';
 import { judgeDeviceActor } from '../devices-custody.policy';
 import { DeviceNotInChargeError } from '../public/devices.errors';
@@ -49,7 +50,13 @@ export class CollectorInstallationService {
       if (judgeHolder(holder) !== 'OK') throw new DeviceHolderNotWorkingError();
 
       const today = await this.organizationReads.businessToday(now, tx);
-      const bySubstitute = await this.requireActingItAdmin(tx, registration.holderEmployeeId, actor.employeeId, today);
+      const bySubstitute = await this.requireActingItAdmin(
+        tx,
+        registration.deviceId,
+        registration.holderEmployeeId,
+        actor.employeeId,
+        today,
+      );
 
       await this.repo.enableCollector(tx, registration.id);
       await this.audit.record(
@@ -75,6 +82,7 @@ export class CollectorInstallationService {
 
   private async requireActingItAdmin(
     tx: Parameters<RegistryRepo['lockRegistrationChain']>[0],
+    deviceId: string,
     holderEmployeeId: string,
     actorEmployeeId: string,
     today: string,
@@ -82,12 +90,19 @@ export class CollectorInstallationService {
     const departmentId =
       (await this.organizationReads.workDepartmentsOf([holderEmployeeId], today, tx)).get(holderEmployeeId) ?? null;
     if (!departmentId) {
+      const resolved = await this.organizationReads.itAdminsActingForUnplacedWork(
+        [{ workKind: 'DEVICE', workId: deviceId, employeeId: holderEmployeeId }],
+        (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
+        tx,
+      );
+      const unplacedDesignee = resolved.get(unplacedWorkKey('DEVICE', deviceId)) ?? null;
       const verdict = judgeDeviceActor({
         holderDepartmentId: null,
         recipientDepartmentId: null,
         actingByDepartment: new Map(),
         actor: actorEmployeeId,
         unplacedRequired: true,
+        unplacedDesignee,
       });
       if (!verdict.allowed) throw new DeviceNotInChargeError();
 

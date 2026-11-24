@@ -8,6 +8,7 @@ import { OrganizationHistoryApi } from '../../organization/public/organization-h
 import { EmployeeNotFoundError } from '../../organization/public/organization.errors';
 import { OrganizationApi } from '../../organization/public/organization.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { unplacedWorkKey } from '../../organization/public/organization.types';
 import { PersonnelAccessRefusedError } from '../public/personnel.errors';
 import { technicalStepRefusal } from '../personnel-self-action.policy';
 import type { PersonnelActor } from '../public/personnel.types';
@@ -97,7 +98,18 @@ export class OffboardingFrame {
             throw new OffboardingRefusedError('NOT_IN_CHARGE');
           }
           if (held.departmentId === null) {
-            throw new OffboardingRefusedError('NOT_IN_CHARGE');
+            const resolved = await this.organizationReads.itAdminsActingForUnplacedWork(
+              [{ workKind: 'OFFBOARDING_CASE', workId: held.id, employeeId: held.employeeId }],
+              (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
+              tx,
+            );
+            const designee = resolved.get(unplacedWorkKey('OFFBOARDING_CASE', held.id)) ?? null;
+            if (designee !== actor.employeeId) {
+              throw new OffboardingRefusedError('NOT_IN_CHARGE');
+            }
+            bySubstitute = true;
+
+            return;
           }
           const acting = (
             await this.organizationReads.itAdminsActingFor(

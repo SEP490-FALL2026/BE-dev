@@ -80,7 +80,10 @@ export class ProvisioningGrantService {
     if (!(error instanceof GrantRequestRefusedError) || error.reason !== 'ENDED') return null;
     const task = await this.tasks.findGrantOf(input.requestId, input.beneficiaryEmployeeId);
     if (!task) return null;
-    await this.frame.requireActingItAdmin(undefined, actor, { beneficiaryEmployeeId: task.assignment.employeeId });
+    await this.frame.requireActingItAdmin(undefined, actor, {
+      beneficiaryEmployeeId: task.assignment.employeeId,
+      taskId: task.id,
+    });
 
     return { task: (await this.views.views([task]))[0], warnings: [] };
   }

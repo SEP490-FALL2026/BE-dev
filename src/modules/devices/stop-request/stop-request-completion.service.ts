@@ -4,6 +4,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditApi } from '../../audit/public/audit.api';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { unplacedWorkKey } from '../../organization/public/organization.types';
 import { byUser, devicesEvent } from '../devices-audit-event.mapper';
 import { RegistryRepo } from '../registry/registry.repo';
 import {
@@ -44,7 +45,13 @@ export class StopRequestCompletionService {
       // Read again under the lock: whoever wrote this request first took the same lock.
       const request = await this.repo.find(id, tx);
       if (!request) throw new DeviceStopRequestNotFoundError();
-      const bySubstitute = await this.requireActingItAdmin(tx, registration.holderEmployeeId, actor.employeeId, now);
+      const bySubstitute = await this.requireActingItAdmin(
+        tx,
+        registration.deviceId,
+        registration.holderEmployeeId,
+        actor.employeeId,
+        now,
+      );
       if (request.state !== 'OPEN')
         return { kind: 'NOT_OPEN', state: request.state === 'COMPLETED' ? 'COMPLETED' : 'INVALID' };
       if (registration.endedAt !== null) {
@@ -88,6 +95,7 @@ export class StopRequestCompletionService {
 
   private async requireActingItAdmin(
     tx: DbTx,
+    deviceId: string,
     holderEmployeeId: string,
     actorEmployeeId: string,
     now: Date,
@@ -95,7 +103,17 @@ export class StopRequestCompletionService {
     const today = await this.organizationReads.businessToday(now, tx);
     const departmentId =
       (await this.organizationReads.workDepartmentsOf([holderEmployeeId], today, tx)).get(holderEmployeeId) ?? null;
-    if (!departmentId) throw new DeviceStopRequestNotInChargeError();
+    if (!departmentId) {
+      const resolved = await this.organizationReads.itAdminsActingForUnplacedWork(
+        [{ workKind: 'DEVICE', workId: deviceId, employeeId: holderEmployeeId }],
+        (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
+        tx,
+      );
+      const designee = resolved.get(unplacedWorkKey('DEVICE', deviceId)) ?? null;
+      if (designee !== actorEmployeeId) throw new DeviceStopRequestNotInChargeError();
+
+      return true;
+    }
     const acting = (
       await this.organizationReads.itAdminsActingFor(
         [departmentId],

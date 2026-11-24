@@ -83,6 +83,7 @@ export class HolderChangeService {
         {
           actorEmployeeId: actor.employeeId,
           today,
+          deviceId,
           oldHolderEmployeeId: open?.holderEmployeeId ?? null,
           recipientEmployeeId: validatedHolder.id,
         },

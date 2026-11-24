@@ -3,6 +3,7 @@ import { TransactionRunner } from '../../../infrastructure/database/transaction-
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { LicensingDeviceActivationApi } from '../../licensing/public/licensing-device-activation.api';
+import { OrganizationApi } from '../../organization/public/organization.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { byUser, devicesEvent } from '../devices-audit-event.mapper';
 import { custodyOf } from '../devices-custody.policy';
@@ -23,6 +24,7 @@ export class VoidService {
   constructor(
     private readonly repo: RegistryRepo,
     private readonly activations: LicensingDeviceActivationApi,
+    private readonly organization: OrganizationApi,
     private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
@@ -78,6 +80,12 @@ export class VoidService {
         voidedAt: now,
         voidReason: reason,
         voidedByAppUserId: actor.appUserId,
+      });
+      await this.organization.endUnplacedWorkDesignations(tx, {
+        workKind: 'DEVICE',
+        workId: deviceId,
+        endedByAppUserId: actor.appUserId,
+        endedAt: now,
       });
       await this.audit.record(
         tx,

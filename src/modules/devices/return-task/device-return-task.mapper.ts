@@ -1,5 +1,5 @@
 import type { BusinessDate } from '../../../core/business-date';
-import type { ActingItAdminsResult } from '../../organization/public/organization.types';
+import { unplacedWorkKey, type ActingItAdminsResult } from '../../organization/public/organization.types';
 import { isOverdue } from './device-return-task.policy';
 import type { ReturnTaskListRow } from './device-return-task.types';
 
@@ -19,8 +19,13 @@ export function resolveTaskActingItAdmins(
   departmentId: string | null,
   taskEmployeeId: string,
   actingByDepartment: ReadonlyMap<string, ActingItAdminsResult>,
+  unplacedDesignee: string | null = null,
 ): Array<{ id: string; bySubstitute: boolean }> {
-  if (!departmentId) return [];
+  if (!departmentId) {
+    return unplacedDesignee && unplacedDesignee !== taskEmployeeId
+      ? [{ id: unplacedDesignee, bySubstitute: true }]
+      : [];
+  }
   const acting = actingByDepartment.get(departmentId);
   if (!acting) return [];
 
@@ -39,6 +44,7 @@ export function toReturnTaskItem(
     employees: ReadonlyMap<string, EmployeeBrief>;
     departments: ReadonlyMap<string, DepartmentBrief>;
     actingByDepartment: ReadonlyMap<string, ActingItAdminsResult>;
+    unplacedDesignees?: ReadonlyMap<string, string | null>;
   },
 ) {
   const employee = context.employees.get(row.employeeId) ?? {
@@ -46,13 +52,20 @@ export function toReturnTaskItem(
     employeeCode: '',
     fullName: '',
   };
-  const acting = resolveTaskActingItAdmins(row.departmentId, row.employeeId, context.actingByDepartment).map(
-    (entry) => ({
-      id: entry.id,
-      fullName: context.employees.get(entry.id)?.fullName ?? '',
-      bySubstitute: entry.bySubstitute,
-    }),
-  );
+  const unplacedDesignee =
+    row.departmentId === null
+      ? (context.unplacedDesignees?.get(unplacedWorkKey('DEVICE_RETURN_TASK', row.id)) ?? null)
+      : null;
+  const acting = resolveTaskActingItAdmins(
+    row.departmentId,
+    row.employeeId,
+    context.actingByDepartment,
+    unplacedDesignee,
+  ).map((entry) => ({
+    id: entry.id,
+    fullName: context.employees.get(entry.id)?.fullName ?? '',
+    bySubstitute: entry.bySubstitute,
+  }));
 
   return {
     id: row.id,

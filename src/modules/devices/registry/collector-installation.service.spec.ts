@@ -3,6 +3,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import type { AuditApi } from '../../audit/public/audit.api';
 import type { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { unplacedWorkKey } from '../../organization/public/organization.types';
 import { DeviceNotInChargeError } from '../public/devices.errors';
 import { CollectorInstallationService } from './collector-installation.service';
 import {
@@ -19,6 +20,7 @@ interface SetupOptions {
   workDepartmentId?: string | null;
   inCharge?: string | null;
   substitute?: string | null;
+  unplacedDesignee?: string | null;
 }
 
 describe('CollectorInstallationService', () => {
@@ -81,6 +83,13 @@ describe('CollectorInstallationService', () => {
             ])
           : new Map(),
       ),
+      itAdminsActingForUnplacedWork: jest
+        .fn()
+        .mockResolvedValue(
+          options.unplacedDesignee !== undefined
+            ? new Map([[unplacedWorkKey('DEVICE', registration?.deviceId ?? 'dev-1'), options.unplacedDesignee]])
+            : new Map(),
+        ),
     } as unknown as OrganizationReadApi;
     const identity = {
       findUsableItAdminEmployeeIds: jest.fn().mockResolvedValue(new Set(actors)),
@@ -137,5 +146,18 @@ describe('CollectorInstallationService', () => {
     await expect(setup({ workDepartmentId: null }).service.enable(actor(), 'reg-1', now)).rejects.toBeInstanceOf(
       DeviceNotInChargeError,
     );
+  });
+
+  it('allows designated IT Admin for an unplaced holder device with bySubstitute: true', async () => {
+    const { service, audit } = setup({ workDepartmentId: null, unplacedDesignee: 'it-des' });
+
+    const deviceId = await service.enable(actor('it-des'), 'reg-1', now);
+
+    expect(deviceId).toBe('dev-1');
+    expect(firstAuditAfter(audit)).toEqual({
+      deviceId: 'dev-1',
+      collectorInstalled: true,
+      bySubstitute: true,
+    });
   });
 });
