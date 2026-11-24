@@ -131,6 +131,17 @@ describe('the rights that ended and the IT Admin queue (integration, real Postgr
       expect(await h.count('provisioning_tasks')).toBe(tasksBefore);
     });
 
+    it('refuses an IT Admin who is not in charge of the department of the holder, and nothing starts (F2-4)', async () => {
+      const { assignmentId } = await right(2);
+      const otherEmployee = await h.person(`XQ-IT2-${seq}`);
+      const otherIt = await h.account(`XQ-IT2-${seq}`, otherEmployee, 'IT_ADMIN');
+      const tasksBefore = await h.count('provisioning_tasks');
+
+      expect(h.codeOf(await h.startRevocation(assignmentId, otherIt).expect(403))).toBe('PROVISIONING.NOT_IN_CHARGE');
+
+      expect(await h.count('provisioning_tasks')).toBe(tasksBefore);
+    });
+
     it('answers a page with the same number of statements however many rights there are', async () => {
       const first = await right(3, lossy);
       await started(first.assignmentId);
@@ -219,6 +230,7 @@ describe('the rights that ended and the IT Admin queue (integration, real Postgr
     it('ignores a renewal sent after the end: it is a new request and the revocation goes on (AC-8)', async () => {
       seq += 1;
       const unit = await h.departmentWithHead(`P-XQ${seq}`);
+      await h.setItAdminInCharge(unit.department, { employeeId: h.it1.employeeId, account: h.it1 });
       await h.budgetFor(unit, { total: 100 * M, held: 20 * M, spent: 40 * M });
       const assignmentId = await h.seatOf(unit.member, { planId: internalPlan }, { expectedEndDate: h.inDays(-3) });
 

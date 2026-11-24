@@ -281,7 +281,6 @@ describe('device return task list, completion, device detail, and dashboard (int
     const emp3 = await h.worker(des, `E-RT-3-${(seq += 1)}`);
     await createAssignedDevice(emp3.employeeId);
     const case3 = await h.recordedCase(emp3, { lastWorkingDay: h.today(), accessBlockMode: 'BLOCK_NOW' });
-    await h.leaveOnLastDay(case3.id).expect(200);
     await h.lockAccount(case3.id, { note: 'Locked account' }).expect(200);
     await h.blockPass();
     await h.lockMailbox(case3.id).expect(200);

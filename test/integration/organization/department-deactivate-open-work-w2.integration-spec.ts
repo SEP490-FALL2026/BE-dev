@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
+import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
+import { DevicesApi } from '../../../src/modules/devices/public/devices.api';
 import { OrganizationReadApi } from '../../../src/modules/organization/public/organization-read.api';
 import { ProvisioningHarness } from '../../support/provisioning-harness';
 
@@ -57,12 +59,13 @@ describe('departmentDeactivate open work checks: return tasks, SaaS issues, ghos
         [orgId, deviceId, holderId, today, actorAppUserId],
       )
     ).rows[0].id;
+    const caseId = randomUUID();
     const taskId = (
       await h.ctx.sql.query<{ id: string }>(
         `INSERT INTO device_return_tasks (id, organization_id, device_id, registration_id, employee_id, offboarding_case_id, department_id, due_on, state)
          VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7::date, 'OPEN')
          RETURNING id`,
-        [orgId, deviceId, regId, holderId, randomUUID(), dept.id, today],
+        [orgId, deviceId, regId, holderId, caseId, dept.id, today],
       )
     ).rows[0].id;
 
@@ -79,10 +82,13 @@ describe('departmentDeactivate open work checks: return tasks, SaaS issues, ghos
       label: assetCode,
     });
 
-    await h.ctx.sql.query(
-      `UPDATE device_return_tasks SET state = 'CANCELLED', handled_by_app_user_id = $2, handled_at = now() WHERE id = $1`,
-      [taskId, actorAppUserId],
-    );
+    // The task is closed the way the product closes it when its departure case is cancelled: CANCELLED, closed by the system.
+    const cancelled = await h.ctx.app
+      .get(TransactionRunner, { strict: false })
+      .run((tx) =>
+        h.ctx.app.get(DevicesApi, { strict: false }).cancelReturnTasksOfCase(tx, { caseId, at: new Date() }),
+      );
+    expect(cancelled.cancelledIds).toEqual([taskId]);
 
     await request(h.server())
       .post(`/api/v1/departments/${dept.id}/deactivate`)

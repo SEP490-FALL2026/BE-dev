@@ -104,12 +104,18 @@ describe('BF-5 rejecting future-placed employees (integration, real PostgreSQL)'
   });
 
   it('rejects provisioning grant and device handover for a future-placed employee with 409 EMPLOYEE.NOT_STARTED', async () => {
-    const grantRes = await h
-      .grant({
-        requestId: h.gate.grantable(futureStaff.employeeId, internalPlanId, dept.id),
-        accountIdentifier: 'future-user@acme.vn',
-      })
-      .expect(409);
+    // A real request, approved while the person was placed; the placement then starts in the future, as when a start date is moved.
+    const head = await h.staff(dept, 'BF5-H1');
+    await h.makeHead(dept, head);
+    const grantee = await h.staff(dept, 'BF5-G1');
+    const sent = await h.sent(grantee, internalPlanId);
+    await h.decide(sent.id, { decision: 'APPROVE' }, head.account).expect(200);
+    await h.ctx.sql.query(`UPDATE employee_placements SET valid_from = ($2::date + 7) WHERE employee_id = $1`, [
+      grantee.employeeId,
+      h.today(),
+    ]);
+
+    const grantRes = await h.grant({ requestId: sent.id }).expect(409);
     expect(h.codeOf(grantRes)).toBe('EMPLOYEE.NOT_STARTED');
 
     const deviceRes = await request(server())
@@ -146,7 +152,7 @@ describe('BF-5 rejecting future-placed employees (integration, real PostgreSQL)'
     expect(h.codeOf(holderChangeRes)).toBe('EMPLOYEE.NOT_STARTED');
   });
 
-  it('R1-2: allows an employee with both current and future placements (201) and keeps NO_DEPARTMENT / HOLDER_UNPLACED for never-placed employees', async () => {
+  it('R1-2: allows an employee with both current and future placements (201) and keeps REQUEST_PARTY.INELIGIBLE / HOLDER_UNPLACED for never-placed employees', async () => {
     const futureDept = await h.departmentWithUnit('BF5-FIN');
     const transferringStaff = await h.staff(dept, 'BF5-TR1');
     await h.ctx.sql.query(
@@ -162,8 +168,9 @@ describe('BF-5 rejecting future-placed employees (integration, real PostgreSQL)'
     await h.submit(h.form(internalPlanId), transferringStaff.account).expect(201);
 
     const neverPlaced = await h.unplacedStaff('BF5-UNP1');
-    const noDeptRes = await h.submit(h.form(internalPlanId), neverPlaced.account).expect(409);
-    expect(h.codeOf(noDeptRes)).toBe('ACCESS_REQUEST.NO_DEPARTMENT');
+    // R1-2: a person with no placement at all is refused as a party of a Request (422), before the department is looked at: not NOT_STARTED.
+    const noDeptRes = await h.submit(h.form(internalPlanId), neverPlaced.account).expect(422);
+    expect(h.codeOf(noDeptRes)).toBe('REQUEST_PARTY.INELIGIBLE');
 
     const unplacedDeviceRes = await request(server())
       .post('/api/v1/devices')
