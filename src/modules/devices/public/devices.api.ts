@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { CredentialSessionService } from '../credential/session/credential-session.service';
+import { InitialRecordQueryService } from '../initial-record/initial-record-query.service';
 import { RegistrationEndService } from '../registry/registration-end.service';
 import { RegistryQueryRepo } from '../registry/registry-query.repo';
 import { RegistryRepo } from '../registry/registry.repo';
@@ -11,6 +12,7 @@ import { DeviceReturnTaskService } from '../return-task/device-return-task.servi
 import type {
   CancelReturnTasksOfCaseInput,
   DeviceCollectionState,
+  DeviceInitialRecordProgress,
   DeviceIntakeContext,
   EndedRegistrations,
   EndRegistrationsOfHolderInput,
@@ -35,7 +37,12 @@ export class DevicesApi {
     private readonly queries: RegistryQueryRepo,
     private readonly returnTasks: DeviceReturnTaskService,
     private readonly returnTaskRepo: DeviceReturnTaskRepo,
+    private readonly initialRecordQueries: InitialRecordQueryService,
   ) {}
+
+  initialRecordProgress(tx?: DbTx): Promise<DeviceInitialRecordProgress> {
+    return this.initialRecordQueries.progress(tx);
+  }
 
   returnDueOn(facts: ReturnDueFacts): BusinessDate {
     return computeReturnDueOn(facts);

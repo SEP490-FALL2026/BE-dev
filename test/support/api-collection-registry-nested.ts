@@ -195,7 +195,10 @@ const NESTED_ARRAYS_SECOND_HALF: readonly NestedArrayEntry[] = [
     classification: 'bounded',
     findings: [],
     owner: 'g2-onboarding-checklist',
-    businessMaximum: { maxItems: 5, source: 'the five-step tuple of the checklist in onboarding.service.ts (FR-9.1)' },
+    businessMaximum: {
+      maxItems: 6,
+      source: 'the six-step tuple of the checklist in onboarding.service.ts (FR-9.1, W2-13)',
+    },
     rationale: 'The steps of the onboarding checklist.',
     removeWhen: 'Review when the checklist steps change.',
   },

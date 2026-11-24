@@ -9,6 +9,7 @@ import { OPENAPI_DOCUMENT_BUDGET_MS } from '../../support/openapi-document-budge
 
 const ID = '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11';
 const DEVICES = '/api/v1/devices';
+const INITIAL_RECORDS = '/api/v1/device-initial-records';
 const REGISTRATIONS = '/api/v1/device-registrations';
 const ME = '/api/v1/me';
 const NOTICES = '/api/v1/monitoring-notice-versions';
@@ -39,6 +40,7 @@ describe('company machine routes (http contract, no database)', () => {
 
   const routes = [
     ['post', DEVICES, { deviceType: 'LAP', hostname: 'h', os: 'Windows 11' }],
+    ['post', INITIAL_RECORDS, { deviceType: 'LAP', hostname: 'h', os: 'Windows 11', assetCode: 'IT-OLD-0042' }],
     ['get', DEVICES, undefined],
     ['get', `${DEVICES}/${ID}`, undefined],
     ['patch', `${DEVICES}/${ID}`, { expectedUpdatedAt: '2026-11-24T00:00:00.000Z', hostname: 'h2' }],
@@ -90,6 +92,7 @@ describe('company machine routes (http contract, no database)', () => {
 
     for (const response of [
       await as(request(server).post(DEVICES).send(routes[0][2])),
+      await as(request(server).post(INITIAL_RECORDS).send(routes[1][2])),
       await as(request(server).get(DEVICES)),
       await as(request(server).get(`${DEVICES}/${ID}`)),
       await as(
@@ -233,6 +236,24 @@ describe('company machine routes (http contract, no database)', () => {
       'post',
       DEVICES,
       { ...(routes[0][2] as object), assetCode: 'LAP-26-0001' },
+    ],
+    [
+      'an initial record with blank assetCode',
+      'post',
+      INITIAL_RECORDS,
+      { ...(routes[0][2] as object), assetCode: '   ' },
+    ],
+    [
+      'an initial record with duplicate keyActivations',
+      'post',
+      INITIAL_RECORDS,
+      { ...(routes[0][2] as object), keyActivations: [{ licenseKeyId: ID }, { licenseKeyId: ID }] },
+    ],
+    [
+      'an initial record with an unknown field',
+      'post',
+      INITIAL_RECORDS,
+      { ...(routes[0][2] as object), organizationId: ID },
     ],
     [
       'a handover day that is not a date',
@@ -420,6 +441,22 @@ describe('company machine routes (http contract, no database)', () => {
           'holderEmployeeId',
           'handedOverOn',
           'collectorInstalled',
+        ],
+        ['deviceType', 'hostname', 'os'],
+      ],
+      [
+        'DeviceInitialRecordBodyDto',
+        [
+          'deviceType',
+          'hostname',
+          'os',
+          'serialNumber',
+          'bundledPlanIds',
+          'holderEmployeeId',
+          'handedOverOn',
+          'collectorInstalled',
+          'assetCode',
+          'keyActivations',
         ],
         ['deviceType', 'hostname', 'os'],
       ],

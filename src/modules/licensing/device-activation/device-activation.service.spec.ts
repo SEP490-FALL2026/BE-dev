@@ -319,4 +319,56 @@ describe('DeviceActivationService', () => {
       ),
     ).rejects.toBeInstanceOf(DeviceActivationKeyWithdrawnError);
   });
+
+  it('openByKey resolves planId from key, leaves activationsUsed unchanged for INITIAL, and enforces lot capacity', async () => {
+    const keyInput = (licenseKeyId = 'key-1') => ({
+      organizationId: 'org-1',
+      deviceId: 'dev-1',
+      licenseKeyId,
+      origin: 'INITIAL' as const,
+      on: '2026-11-24' as const,
+      at: now,
+      by: actor,
+    });
+    const { service, catalog, repo } = setup({
+      planTarget: { planId: 'plan-1', keyBinding: 'DEVICE_KEY' },
+      keyMeta: {
+        id: 'key-1',
+        organizationId: 'org-1',
+        subscriptionId: 'sub-1',
+        planId: 'plan-1',
+        masked: 'AC-01-****',
+        withdrawnAt: null,
+        maxActivations: 10,
+        initialActivationsUsed: 4,
+      },
+      operationCount: 2,
+      occupiedCount: 3,
+      lockedTarget: { purchasedQuantity: 5 },
+    });
+
+    const opened = await service.openByKey(tx, keyInput());
+
+    expect((catalog as unknown as { findPlanSeatTargets: jest.Mock }).findPlanSeatTargets).toHaveBeenCalledWith(
+      ['plan-1'],
+      tx,
+    );
+    expect(opened).toMatchObject({ activationsUsed: 6, maxActivations: 10, overActivationCap: false });
+    expect((repo as unknown as { insert: jest.Mock }).insert).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({ planId: 'plan-1', licenseKeyId: 'key-1', origin: 'INITIAL', overActivationCap: false }),
+    );
+    await expect(setup({ keyMeta: null }).service.openByKey(tx, keyInput('key-missing'))).rejects.toBeInstanceOf(
+      DeviceActivationKeyNotFoundError,
+    );
+    await expect(
+      setup({ planTarget: { applicationStatus: 'RETIRED' } }).service.openByKey(tx, keyInput()),
+    ).rejects.toBeInstanceOf(DeviceActivationPlanNotFoundError);
+    await expect(
+      setup({ planTarget: { keyBinding: 'DEVICE_BUNDLED' } }).service.openByKey(tx, keyInput()),
+    ).rejects.toBeInstanceOf(DeviceActivationPlanNotDeviceBoundError);
+    await expect(
+      setup({ occupiedCount: 5, lockedTarget: { purchasedQuantity: 5 } }).service.openByKey(tx, keyInput()),
+    ).rejects.toBeInstanceOf(DeviceActivationLotFullError);
+  });
 });

@@ -3,6 +3,7 @@ import { Prisma } from '../../../generated/prisma/client';
 import { fromDateColumn, type BusinessDate } from '../../../core/business-date';
 import { escapeLikePattern, searchKey } from '../../../core/search-key';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AssetDeviceType } from '../asset-code/asset-code.policy';
 import type { CollectionState } from '../devices-collection-state.policy';
 import type { DeviceCondition, DeviceCustody } from '../devices-custody.policy';
@@ -186,6 +187,22 @@ export class RegistryQueryRepo {
   async countByState(organizationId: string, state: CollectionState): Promise<number> {
     const counted = await this.prisma.$queryRaw<{ total: bigint }[]>`
       SELECT count(*) AS total ${FROM_SQL} WHERE ${whereOf({ organizationId, state })}`;
+
+    return Number(counted[0]?.total ?? 0n);
+  }
+
+  /** Counts open registrations on non-voided, non-retired devices that lack any signed BM-06 record. */
+  async countOpenRegistrationsMissingSignature(organizationId: string, tx?: DbTx): Promise<number> {
+    const db = tx ?? this.prisma;
+    const counted = await db.$queryRaw<{ total: bigint }[]>`
+      SELECT count(*) AS total
+        FROM device_registrations r
+        JOIN managed_devices d ON d.id = r.device_id
+       WHERE d.organization_id = ${organizationId}::uuid
+         AND d.voided_at IS NULL
+         AND d.retired_at IS NULL
+         AND r.ended_at IS NULL
+         AND NOT EXISTS (SELECT 1 FROM device_signature_records s WHERE s.registration_id = r.id)`;
 
     return Number(counted[0]?.total ?? 0n);
   }

@@ -29,6 +29,10 @@ import { DeviceEnrollmentController } from './credential/enrollment/device-enrol
 import { CredentialEnrollmentService } from './credential/enrollment/credential-enrollment.service';
 import { DeviceSessionController } from './credential/session/device-session.controller';
 import { CredentialSessionService } from './credential/session/credential-session.service';
+import { InitialRecordActivationService } from './initial-record/initial-record-activation.service';
+import { InitialRecordController } from './initial-record/initial-record.controller';
+import { InitialRecordQueryService } from './initial-record/initial-record-query.service';
+import { InitialRecordService } from './initial-record/initial-record.service';
 import { ConditionService } from './lifecycle/condition.service';
 import { DeviceReceiptService } from './lifecycle/device-receipt.service';
 import { HolderChangeService } from './lifecycle/holder-change.service';
@@ -90,6 +94,7 @@ import { StopRequestSweepService } from './stop-request/stop-request-sweep.servi
   controllers: [
     NoticeController,
     RegistryController,
+    InitialRecordController,
     LifecycleController,
     DeviceReturnTaskController,
     ReturnTaskCompletionController,
@@ -111,6 +116,9 @@ import { StopRequestSweepService } from './stop-request/stop-request-sweep.servi
     RegistryQueryRepo,
     RegistryQueryService,
     RegistryService,
+    InitialRecordActivationService,
+    InitialRecordQueryService,
+    InitialRecordService,
     HolderChangeService,
     DeviceReceiptService,
     ConditionService,

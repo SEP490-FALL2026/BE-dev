@@ -28,6 +28,7 @@ import { DeviceActivationRepo, type KeyActivationMeta } from './device-activatio
 import type {
   ActivationActor,
   ActivationRecord,
+  OpenActivationByKeyInput,
   OpenActivationInput,
   OpenedActivation,
 } from './device-activation.types';
@@ -57,6 +58,18 @@ export class DeviceActivationService {
     }
 
     return this.openKeyedPlan(tx, activePlan, input, at);
+  }
+
+  /** Opens a `DEVICE_KEY` activation by resolving `planId` from `licenseKeyId` inside the caller's transaction. */
+  async openByKey(tx: DbTx, input: OpenActivationByKeyInput): Promise<OpenedActivation> {
+    const probe = await this.repo.findKeyWithMeta(tx, input.licenseKeyId);
+    if (!probe) throw new DeviceActivationKeyNotFoundError();
+
+    const [planTarget] = await this.catalog.findPlanSeatTargets([probe.planId], tx);
+    if (!planTarget || planTarget.applicationStatus !== 'APPROVED') throw new DeviceActivationPlanNotFoundError();
+    if (planTarget.keyBinding !== 'DEVICE_KEY') throw new DeviceActivationPlanNotDeviceBoundError();
+
+    return this.openKeyedPlan(tx, planTarget, { ...input, planId: probe.planId }, input.at ?? new Date());
   }
 
   private async openNonKeyedPlan(

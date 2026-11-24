@@ -48,6 +48,10 @@ export interface OpenActivationInput {
   by: ActivationActor;
 }
 
+export type OpenActivationByKeyInput = Omit<OpenActivationInput, 'planId' | 'licenseKeyId'> & {
+  licenseKeyId: string;
+};
+
 export interface CloseActivationInput {
   activationId: string;
   cause: 'DEACTIVATED';

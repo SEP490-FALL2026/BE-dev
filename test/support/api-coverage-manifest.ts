@@ -334,6 +334,7 @@ export const API_COVERAGE_MANIFEST: readonly string[] = [
   'POST /api/v1/auth/password-resets',
   'POST /api/v1/auth/refresh',
   'POST /api/v1/devices',
+  'POST /api/v1/device-initial-records',
   'GET /api/v1/devices',
   'GET /api/v1/devices/{id}',
   'PATCH /api/v1/devices/{id}',

@@ -10,6 +10,7 @@ import type {
   CloseActivationInput,
   CloseAllDeviceActivationsInput,
   MoveActivationInput,
+  OpenActivationByKeyInput,
   OpenActivationInput,
   OpenedActivation,
 } from '../device-activation/device-activation.types';
@@ -28,6 +29,10 @@ export class LicensingDeviceActivationApi {
 
   open(tx: DbTx, input: OpenActivationInput): Promise<OpenedActivation> {
     return this.service.open(tx, input);
+  }
+
+  openByKey(tx: DbTx, input: OpenActivationByKeyInput): Promise<OpenedActivation> {
+    return this.service.openByKey(tx, input);
   }
 
   close(tx: DbTx, input: CloseActivationInput): Promise<ActivationRecord> {

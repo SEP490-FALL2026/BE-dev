@@ -77,3 +77,8 @@ export interface ReturnTaskCounts {
   open: number;
   overdue: number;
 }
+
+export interface DeviceInitialRecordProgress {
+  initialRecords: number;
+  signaturesMissing: number;
+}
