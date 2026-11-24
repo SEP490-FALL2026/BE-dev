@@ -12,6 +12,8 @@ describe('department IT substitutes, acting scope, work departments and load war
   let organizationReads: OrganizationReadApi;
   let identityAccess: IdentityAccessApi;
   let itCoverageSweeps: ItCoverageSweepService;
+  let codeSeq = 0;
+  const code = (prefix: string): string => `${prefix}-${(codeSeq += 1)}`;
 
   beforeAll(async () => {
     await h.start();
@@ -66,10 +68,10 @@ describe('department IT substitutes, acting scope, work departments and load war
     ).rows;
 
   it('appoints, rejects invalid/duplicate/in-charge/inactive/forbidden, lists scoped, and ends REMOVED (W2-27 (a), (b))', async () => {
-    const dept = await h.departmentWithUnit(h.unique('DES'));
-    const ha = await h.staff(dept, h.unique('E-HA'), 'IT_ADMIN');
-    const minh = await h.staff(dept, h.unique('E-MINH'), 'IT_ADMIN');
-    const plain = await h.staff(dept, h.unique('E-EMP'), 'EMPLOYEE');
+    const dept = await h.departmentWithUnit(code('DES'));
+    const ha = await h.staff(dept, code('E-HA'), 'IT_ADMIN');
+    const minh = await h.staff(dept, code('E-MINH'), 'IT_ADMIN');
+    const plain = await h.staff(dept, code('E-EMP'), 'EMPLOYEE');
     await updateDepartment(dept.id, { itAdminEmployeeId: ha.employeeId }).expect(200);
 
     // IT Admin cannot appoint or end
@@ -164,9 +166,9 @@ describe('department IT substitutes, acting scope, work departments and load war
   });
 
   it('closes active substitute with IN_CHARGE_NAMED on non-null change, keeps on null, and closes DEPARTMENT_RETIRED on deactivate (W2-27 (c), (w))', async () => {
-    const dept = await h.departmentWithUnit(h.unique('CLS'));
-    const it1 = await h.staff(dept, h.unique('E-IT1'), 'IT_ADMIN');
-    const it2 = await h.staff(dept, h.unique('E-IT2'), 'IT_ADMIN');
+    const dept = await h.departmentWithUnit(code('CLS'));
+    const it1 = await h.staff(dept, code('E-IT1'), 'IT_ADMIN');
+    const it2 = await h.staff(dept, code('E-IT2'), 'IT_ADMIN');
     await updateDepartment(dept.id, { itAdminEmployeeId: it1.employeeId }).expect(200);
 
     const firstSub = dataOf<{ substitute: { id: string } }>(
@@ -200,7 +202,7 @@ describe('department IT substitutes, acting scope, work departments and load war
       await request(h.server())
         .post('/api/v1/departments')
         .set({ Authorization: `Bearer ${h.admin}` })
-        .send({ code: h.unique('RET'), name: 'Retiring' })
+        .send({ code: code('RET'), name: 'Retiring' })
         .expect(201),
     );
     const secondSub = dataOf<{ substitute: { id: string } }>(
@@ -243,14 +245,14 @@ describe('department IT substitutes, acting scope, work departments and load war
   });
 
   it('allows overLimit > 4 as soft warning on substitute appoint and departmentUpdate while keeping 4-dept hard cap for in-charge (W2-27 (p))', async () => {
-    const base = await h.departmentWithUnit(h.unique('CAP'));
-    const minh = await h.staff(base, h.unique('E-MINH-CAP'), 'IT_ADMIN');
-    const lan = await h.staff(base, h.unique('E-LAN-CAP'), 'IT_ADMIN');
+    const base = await h.departmentWithUnit(code('CAP'));
+    const minh = await h.staff(base, code('E-MINH-CAP'), 'IT_ADMIN');
+    const lan = await h.staff(base, code('E-LAN-CAP'), 'IT_ADMIN');
 
-    const minhDepts = await Promise.all([1, 2, 3, 4].map(() => h.departmentWithUnit(h.unique('MC'))));
+    const minhDepts = await Promise.all([1, 2, 3, 4].map(() => h.departmentWithUnit(code('MC'))));
     for (const d of minhDepts) await updateDepartment(d.id, { itAdminEmployeeId: minh.employeeId }).expect(200);
 
-    const fifth = await h.departmentWithUnit(h.unique('M5'));
+    const fifth = await h.departmentWithUnit(code('M5'));
     expect(errCode(await updateDepartment(fifth.id, { itAdminEmployeeId: minh.employeeId }).expect(409))).toBe(
       'DEPARTMENT.IT_ADMIN_LIMIT_REACHED',
     );
@@ -259,12 +261,12 @@ describe('department IT substitutes, acting scope, work departments and load war
     ).itAdminLoad;
     expect(minhLoad).toEqual({ employeeId: minh.employeeId, inChargeCount: 4, substituteCount: 1, overLimit: true });
 
-    const lanInCharge = await Promise.all([1, 2].map(() => h.departmentWithUnit(h.unique('LI'))));
-    const lanSubs = await Promise.all([1, 2].map(() => h.departmentWithUnit(h.unique('LS'))));
+    const lanInCharge = await Promise.all([1, 2].map(() => h.departmentWithUnit(code('LI'))));
+    const lanSubs = await Promise.all([1, 2].map(() => h.departmentWithUnit(code('LS'))));
     for (const d of lanInCharge) await updateDepartment(d.id, { itAdminEmployeeId: lan.employeeId }).expect(200);
     for (const d of lanSubs) await appoint(d.id, { substituteEmployeeId: lan.employeeId, reason: 'Sub' }).expect(201);
 
-    const lanThird = await h.departmentWithUnit(h.unique('L3'));
+    const lanThird = await h.departmentWithUnit(code('L3'));
     const lanLoad = dataOf<{ itAdminLoad: { inChargeCount: number; substituteCount: number; overLimit: boolean } }>(
       await updateDepartment(lanThird.id, { itAdminEmployeeId: lan.employeeId }).expect(200),
     ).itAdminLoad;
@@ -272,13 +274,13 @@ describe('department IT substitutes, acting scope, work departments and load war
   });
 
   it('resolves workDepartmentsOf (including leaver fallback), acting scope vs read scope, and itAdminsActingFor (S2-1, S2-2, S2-3)', async () => {
-    const dept = await h.departmentWithUnit(h.unique('SCP'));
-    const leaver = await h.staff(dept, h.unique('E-LVR'));
+    const dept = await h.departmentWithUnit(code('SCP'));
+    const leaver = await h.staff(dept, code('E-LVR'));
     const unplacedId = await insertEmployeeWithoutPlacement(h.ctx, h.seed, {
-      code: h.unique('E-UNP'),
+      code: code('E-UNP'),
       email: null,
     });
-    const observer = await h.staff(dept, h.unique('E-OBS'), 'IT_ADMIN');
+    const observer = await h.staff(dept, code('E-OBS'), 'IT_ADMIN');
     await h.ctx.sql.query(
       `UPDATE employee_placements SET valid_to = $2::date WHERE employee_id = $1 AND valid_to IS NULL`,
       [leaver.employeeId, h.today()],
@@ -300,11 +302,11 @@ describe('department IT substitutes, acting scope, work departments and load war
   });
 
   it('runs appoint X to D concurrently with X submitting Request for 20 rounds without 40P01 deadlock (S2-9)', async () => {
-    const dept = await h.departmentWithUnit(h.unique('CON'));
-    const head = await h.staff(dept, h.unique('E-HD'));
+    const dept = await h.departmentWithUnit(code('CON'));
+    const head = await h.staff(dept, code('E-HD'));
     await h.makeHead(dept, head);
     const planId = await h.plan('K5');
-    const itUserCode = h.unique('E-X');
+    const itUserCode = code('E-X');
     const itUserId = await h.member(dept.code, itUserCode, await h.title());
     const itUserAccount = await createActivatedAccount(h.ctx, h.seed, {
       code: itUserCode,
@@ -315,7 +317,7 @@ describe('department IT substitutes, acting scope, work departments and load war
     });
 
     for (let round = 0; round < 20; round += 1) {
-      const targetDept = await h.departmentWithUnit(h.unique('TD'));
+      const targetDept = await h.departmentWithUnit(code('TD'));
       const [appointRes, submitRes] = await Promise.all([
         appoint(targetDept.id, { substituteEmployeeId: itUserId, reason: `Round ${round}` }),
         h.submit(
@@ -329,11 +331,11 @@ describe('department IT substitutes, acting scope, work departments and load war
   });
 
   it('alerts Super Admin once per weekday for uncovered non-starting departments and skips starting/covered/weekends (W2-27 i, S2-8)', async () => {
-    const noInCharge = await h.departmentWithUnit(h.unique('NOC'));
-    const lockedInChargeDept = await h.departmentWithUnit(h.unique('LIC'));
-    const coveredBySubDept = await h.departmentWithUnit(h.unique('SUB'));
-    const lockedIt = await h.staff(lockedInChargeDept, h.unique('E-LCK'), 'IT_ADMIN');
-    const subIt = await h.staff(coveredBySubDept, h.unique('E-SUBC'), 'IT_ADMIN');
+    const noInCharge = await h.departmentWithUnit(code('NOC'));
+    const lockedInChargeDept = await h.departmentWithUnit(code('LIC'));
+    const coveredBySubDept = await h.departmentWithUnit(code('SUB'));
+    const lockedIt = await h.staff(lockedInChargeDept, code('E-LCK'), 'IT_ADMIN');
+    const subIt = await h.staff(coveredBySubDept, code('E-SUBC'), 'IT_ADMIN');
     await updateDepartment(lockedInChargeDept.id, { itAdminEmployeeId: lockedIt.employeeId }).expect(200);
     await h.ctx.sql.query(`UPDATE app_users SET status = 'LOCKED' WHERE employee_id = $1`, [lockedIt.employeeId]);
     await appoint(coveredBySubDept.id, { substituteEmployeeId: subIt.employeeId, reason: 'Cover' }).expect(201);

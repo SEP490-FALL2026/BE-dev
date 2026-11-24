@@ -153,16 +153,20 @@ describe('device activations licensing facade & S-6 lot occupancy (integration, 
       ),
     ).rejects.toBeInstanceOf(DeviceActivationLotFullError);
 
-    // (f) & S-6: GET /subscriptions/:id shows 2 occupied, PATCH below occupied fails with 422 QUANTITY_BELOW_OCCUPIED.
-    const detail = dataOf<{ seats: { occupied: number } }>(
+    // (f) & S-6: GET /subscriptions/:id/seat-usage shows 2 occupied, PATCH below occupied fails with 422 QUANTITY_BELOW_OCCUPIED.
+    const usage = dataOf<{ occupied: number }>(
+      await request(server()).get(`/api/v1/subscriptions/${subId}/seat-usage`).set(as(it1)).expect(200),
+    );
+    expect(usage.occupied).toBe(2);
+
+    const detail = dataOf<{ updatedAt: string }>(
       await request(server()).get(`/api/v1/subscriptions/${subId}`).set(as(it1)).expect(200),
     );
-    expect(detail.seats.occupied).toBe(2);
 
     const reduceRes = await request(server())
       .patch(`/api/v1/subscriptions/${subId}`)
       .set(as(it1))
-      .send({ purchasedQuantity: 1 })
+      .send({ expectedUpdatedAt: detail.updatedAt, purchasedQuantity: 1 })
       .expect(422);
     expect(codeOf(reduceRes)).toBe('SUBSCRIPTION.QUANTITY_BELOW_OCCUPIED');
   });
@@ -255,9 +259,9 @@ describe('device activations licensing facade & S-6 lot occupancy (integration, 
       }),
     );
 
-    const sub = dataOf<{ seats: { occupied: number } }>(
-      await request(server()).get(`/api/v1/subscriptions/${subId}`).set(as(it1)).expect(200),
+    const sub = dataOf<{ occupied: number }>(
+      await request(server()).get(`/api/v1/subscriptions/${subId}/seat-usage`).set(as(it1)).expect(200),
     );
-    expect(sub.seats.occupied).toBe(2);
+    expect(sub.occupied).toBe(2);
   });
 });

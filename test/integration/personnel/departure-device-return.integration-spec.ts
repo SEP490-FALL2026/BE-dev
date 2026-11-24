@@ -293,7 +293,7 @@ describe('departure device return tasks and cancellation lock ordering (integrat
         request(h.server())
           .post(`/api/v1/device-activations/${activationId}/deactivation`)
           .set(h.as(h.it1))
-          .send({ licenseRelease: 'RELEASED' }),
+          .send({ licenseRelease: 'RETURN_TO_LOT' }),
       ]);
 
       expect(cancelRes.status).toBe(200);

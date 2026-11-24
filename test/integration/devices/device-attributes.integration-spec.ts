@@ -254,8 +254,8 @@ describe('the correction of the attributes of a machine (integration, real Postg
     const itSubId = randomUUID();
     const itOtherId = randomUUID();
     await sql.query(
-      `INSERT INTO employees (id, organization_id, employee_code, full_name, work_email, normalized_work_email, hire_date, updated_at)
-       VALUES ($1, $2, 'E-ATTR-H', 'Attr Holder', 'attr-h@acme.vn', 'attr-h@acme.vn', '2025-01-01', now())`,
+      `INSERT INTO employees (id, organization_id, employee_code, full_name, work_email, normalized_work_email, employment_type, hire_date, updated_at)
+       VALUES ($1, $2, 'E-ATTR-H', 'Attr Holder', 'attr-h@acme.vn', 'attr-h@acme.vn', 'STAFF', '2025-01-01', now())`,
       [holderId, org],
     );
     await sql.query(

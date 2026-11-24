@@ -58,7 +58,7 @@ describe('BF-5 rejecting future-placed employees (integration, real PostgreSQL)'
     const submitRes = await h.submit(h.form(internalPlanId), futureStaff.account).expect(409);
     expect(h.codeOf(submitRes)).toBe('EMPLOYEE.NOT_STARTED');
 
-    const previewRes = await h.previewRequest(h.form(internalPlanId), futureStaff.account).expect(409);
+    const previewRes = await h.previewRequest({ planId: internalPlanId }, futureStaff.account).expect(409);
     expect(h.codeOf(previewRes)).toBe('EMPLOYEE.NOT_STARTED');
 
     const proposeRes = await h.propose(h.proposeBody(), futureStaff.account).expect(409);

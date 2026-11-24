@@ -152,9 +152,9 @@ describe('device activation list, withdrawn key replacement & idleDevice filter 
     ).activation.id;
 
     await h.ctx.sql.query(
-      `INSERT INTO device_return_tasks (id, organization_id, device_id, departure_case_id, holder_employee_id, department_id, due_on)
-       VALUES (gen_random_uuid(), $1, $2, gen_random_uuid(), $3, $4, '2026-12-01')`,
-      [h.seed.organizationId, awaiting.id, h.employee.employeeId, h.seed.departmentId],
+      `INSERT INTO device_return_tasks (id, organization_id, device_id, registration_id, employee_id, offboarding_case_id, department_id, due_on)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, gen_random_uuid(), $5, '2026-12-01')`,
+      [h.seed.organizationId, awaiting.id, awaiting.registrationId, h.employee.employeeId, h.seed.departmentId],
     );
 
     const idle = h.dataOf<{ items: ActivationListItemWire[] }>(await listActivations('?idleDevice=true').expect(200));

@@ -109,7 +109,7 @@ describe('MF-1 blocking device-bound K4 plans and S-4 provisioning guard (integr
       const submitRes = await h.submit(h.form(planId), designer.account).expect(422);
       expect(bodyOf(submitRes).error.code).toBe('ACCESS_REQUEST.PLAN_BOUND_TO_DEVICE');
 
-      const previewRes = await h.previewRequest(h.form(planId), designer.account).expect(422);
+      const previewRes = await h.previewRequest({ planId }, designer.account).expect(422);
       expect(bodyOf(previewRes).error.code).toBe('ACCESS_REQUEST.PLAN_BOUND_TO_DEVICE');
 
       const draftRes = await request(server())

@@ -4,7 +4,7 @@ import { TransactionRunner } from '../../../src/infrastructure/database/transact
 import { DevicesApi } from '../../../src/modules/devices/public/devices.api';
 import { RegistryService } from '../../../src/modules/devices/registry/registry.service';
 import { PersonnelFileHookContributions } from '../../../src/modules/personnel/public/personnel.extension-points';
-import { principalOf } from '../../support/builders/account.builder';
+import { insertEmployeeWithoutPlacement, principalOf } from '../../support/builders/account.builder';
 import { DevicesHarness, type DeviceWire } from '../../support/devices-harness';
 import { pretendBusinessToday } from '../../support/pretend-today';
 
@@ -159,8 +159,7 @@ describe('the register of company machines (integration, real PostgreSQL)', () =
     expect(h.codeOf(await h.createDevice(body({ holderEmployeeId: handing })).expect(409))).toBe(
       'DEVICE.HOLDER_NOT_WORKING',
     );
-    const unplaced = await holder();
-    await sql().query(`DELETE FROM employee_placements WHERE employee_id = $1`, [unplaced]);
+    const unplaced = await insertEmployeeWithoutPlacement(h.ctx, h.seed, { code: 'E-REG-UNPLACED' });
     expect(h.codeOf(await h.createDevice(body({ holderEmployeeId: unplaced })).expect(409))).toBe(
       'DEVICE.HOLDER_UNPLACED',
     );

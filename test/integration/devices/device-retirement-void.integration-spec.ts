@@ -148,10 +148,10 @@ describe('device retirement and voiding (integration, real PostgreSQL)', () => {
     );
     expect(retiredDisposed).toMatchObject({ custody: 'RETIRED', retirementKind: 'DISPOSED', holder: null });
 
-    const subAfterDispose = h.dataOf<{ seats: { occupied: number } }>(
-      await request(server()).get(`/api/v1/subscriptions/${subId}`).set(as(h.it1)).expect(200),
+    const subAfterDispose = h.dataOf<{ occupied: number }>(
+      await request(server()).get(`/api/v1/subscriptions/${subId}/seat-usage`).set(as(h.it1)).expect(200),
     );
-    expect(subAfterDispose.seats.occupied).toBe(0);
+    expect(subAfterDispose.occupied).toBe(0);
 
     // Retire LOST with LOST_WITH_DEVICE keeps seat occupied.
     const lostDev = await h.registered(await h.person('E-RET-LOST'));
@@ -170,10 +170,10 @@ describe('device retirement and voiding (integration, real PostgreSQL)', () => {
     );
     expect(retiredLost).toMatchObject({ custody: 'RETIRED', retirementKind: 'LOST', holder: null });
 
-    const subAfterLost = h.dataOf<{ seats: { occupied: number } }>(
-      await request(server()).get(`/api/v1/subscriptions/${subId}`).set(as(h.it1)).expect(200),
+    const subAfterLost = h.dataOf<{ occupied: number }>(
+      await request(server()).get(`/api/v1/subscriptions/${subId}/seat-usage`).set(as(h.it1)).expect(200),
     );
-    expect(subAfterLost.seats.occupied).toBe(1);
+    expect(subAfterLost.occupied).toBe(1);
 
     // Awaiting return machine cannot be retired directly.
     const awaiting = await h.registered(await h.person('E-RET-AWAIT'));

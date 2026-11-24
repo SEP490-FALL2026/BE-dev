@@ -148,8 +148,8 @@ describe('device replacement (integration, real PostgreSQL)', () => {
 
     // Substitute on seed dept succeeds and audits bySubstitute: true.
     await h.ctx.sql.query(
-      `INSERT INTO department_it_substitutes (id, organization_id, department_id, substitute_employee_id, replaced_employee_id, reason, appointed_by_app_user_id)
-       VALUES (gen_random_uuid(), $1, $2, $3, $4, 'Coverage', $5)`,
+      `INSERT INTO department_it_substitutes (id, organization_id, department_id, substitute_employee_id, replaced_employee_id, reason, appointed_at, appointed_by_app_user_id)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, 'Coverage', now(), $5)`,
       [h.seed.organizationId, h.seed.departmentId, itDept2.employeeId, h.it1.employeeId, h.it1.appUserId],
     );
 

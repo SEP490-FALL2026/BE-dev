@@ -35,15 +35,29 @@ describe('stop request completion acting IT Admin enforcement (H13) (integration
     return { employeeId, account };
   };
 
+  const registerAndActivate = async (holder: ApiAccount, itAccount: ApiAccount = h.it1): Promise<string> => {
+    const device = await h.registered(holder.employeeId, {}, itAccount);
+    await h
+      .recordSignature(
+        device.registrationId as string,
+        { documentId: await h.scan(itAccount), noticeVersionId: notice.id },
+        itAccount,
+      )
+      .expect(201);
+    await h.acknowledge(holder, device.registrationId as string, notice.id).expect(201);
+    return device.registrationId as string;
+  };
+
   const createHolderWithStopRequest = async (
     deptCode: string | null,
     prefix: string,
+    itAccount: ApiAccount = h.it1,
   ): Promise<{ holder: ApiAccount; stopRequestId: string }> => {
     const code = nextCode(prefix);
     const employeeId = deptCode ? await h.member(deptCode, code, title) : await h.person(code);
     const holder = await h.account(code, employeeId, 'EMPLOYEE');
-    const device = await h.active(holder, notice);
-    const created = stopOf(await h.requestStop(holder, device.registrationId as string).expect(201));
+    const registrationId = await registerAndActivate(holder, itAccount);
+    const created = stopOf(await h.requestStop(holder, registrationId).expect(201));
     return { holder, stopRequestId: created.id };
   };
 
@@ -71,7 +85,7 @@ describe('stop request completion acting IT Admin enforcement (H13) (integration
       'DEVICE_STOP_REQUEST.NOT_IN_CHARGE',
     );
 
-    const { stopRequestId: stopA } = await createHolderWithStopRequest(deptA.code, 'HLDA');
+    const { stopRequestId: stopA } = await createHolderWithStopRequest(deptA.code, 'HLDA', itA.account);
     // itB is not in charge of deptA -> 403 DEVICE_STOP_REQUEST.NOT_IN_CHARGE
     expect(h.codeOf(await h.completeStop(stopA, itB.account).expect(403))).toBe('DEVICE_STOP_REQUEST.NOT_IN_CHARGE');
 
@@ -101,7 +115,7 @@ describe('stop request completion acting IT Admin enforcement (H13) (integration
       itInCharge.employeeId,
     ]);
 
-    const { stopRequestId } = await createHolderWithStopRequest(dept.code, 'HLDS');
+    const { stopRequestId } = await createHolderWithStopRequest(dept.code, 'HLDS', itInCharge.account);
 
     const subRes = await appointSubstitute(dept.id, itSub.employeeId, 'Substitute cover').expect(201);
     const subId = h.dataOf<{ substitute: { id: string } }>(subRes).substitute.id;
@@ -123,9 +137,14 @@ describe('stop request completion acting IT Admin enforcement (H13) (integration
     await createItAdmin(deptB.code, 'MITB');
     await h.ctx.sql.query(`UPDATE departments SET it_admin_employee_id = $2 WHERE id = $1`, [deptA.id, itA.employeeId]);
 
+    const holderCode = nextCode('MHLD');
+    const holderEmployeeId = await h.member(deptA.code, holderCode, title);
+    const holder = await h.account(holderCode, holderEmployeeId, 'EMPLOYEE');
+    const registrationId = await registerAndActivate(holder, itA.account);
+
     await h.ctx.sql.query(`UPDATE app_users SET status = 'LOCKED' WHERE id = $1`, [itA.account.appUserId]);
     try {
-      const { stopRequestId } = await createHolderWithStopRequest(deptA.code, 'MHLD');
+      const stopRequestId = stopOf(await h.requestStop(holder, registrationId).expect(201)).id;
       const { rows } = await h.ctx.sql.query<{ recipient_employee_id: string }>(
         `SELECT recipient_employee_id FROM in_app_notifications
           WHERE code = 'DEVICE_STOP_REQUESTED' AND event_key = $1

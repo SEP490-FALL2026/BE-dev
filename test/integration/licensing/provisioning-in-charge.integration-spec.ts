@@ -201,13 +201,10 @@ describe('provisioning in-charge, substitute, self-execution, and scope rules (i
   });
 
   it('allows self-execution by acting IT Admin even when substitute is appointed, records selfExecuted=true and notifies Super Admin (W2-27 (j), Owner Q9)', async () => {
-    const selfMember = await h.person('PIC-SELFIT');
+    const selfDept = await h.department('PIC-SD');
+    const selfMember = await h.member(selfDept.code, 'PIC-SELFIT', title);
     const selfAccount = await h.account('PIC-SELFIT', selfMember, 'IT_ADMIN');
-    const selfDept = await h.department('PIC-SD', selfMember);
-    await h.ctx.sql.query(
-      `UPDATE employee_placements SET department_id = $2 WHERE employee_id = $1 AND valid_to IS NULL`,
-      [selfMember, selfDept.id],
-    );
+    await h.ctx.sql.query(`UPDATE departments SET it_admin_employee_id = $2 WHERE id = $1`, [selfDept.id, selfMember]);
     const subRes = await appointSubstitute(selfDept.id, minhEmployee, 'Cover during self grant').expect(201);
     const subId = h.dataOf<{ substitute: { id: string } }>(subRes).substitute.id;
     try {

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { ApiAccount, createActivatedAccount } from '../../support/api-accounts';
+import { insertEmployeeWithoutPlacement } from '../../support/builders/account.builder';
 import { declareApplication } from '../../support/builders/catalog.builder';
 import { DevicesHarness, type DeviceWire } from '../../support/devices-harness';
 import { insertEmployeeFixture } from '../../support/http-test-app';
@@ -207,13 +208,10 @@ describe('device initial records & onboarding checklist step 6 (W2-13, integrati
   });
 
   it('rejects initial recording to an unplaced holder with 409 DEVICE.HOLDER_UNPLACED', async () => {
-    const unplaced = (
-      await insertEmployeeFixture(h.ctx.app, h.seed, {
-        code: 'E-UNPLACED-INIT',
-        email: 'unplaced-init@acme.vn',
-      })
-    ).employeeId;
-    await h.ctx.sql.query(`DELETE FROM employee_placements WHERE employee_id = $1`, [unplaced]);
+    const unplaced = await insertEmployeeWithoutPlacement(h.ctx, h.seed, {
+      code: 'E-UNPLACED-INIT',
+      email: 'unplaced-init@acme.vn',
+    });
 
     const res = await postInitial({
       deviceType: 'LAP',

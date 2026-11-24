@@ -61,7 +61,7 @@ describe('device return task list, completion, device detail, and dashboard (int
 
   const appointSubstitute = (departmentId: string, substituteEmployeeId: string) =>
     request(h.server())
-      .post(`/api/v1/departments/${departmentId}/it-substitute`)
+      .post(`/api/v1/departments/${departmentId}/it-substitutes`)
       .set(h.as(h.sa))
       .send({ substituteEmployeeId, reason: 'Cover leaving IT Admin' });
 

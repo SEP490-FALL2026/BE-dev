@@ -52,9 +52,9 @@ describe('SaaS issue awaiting assignee and sweep assignment (integration, real P
     const sub = await h.staff(await h.departmentWithUnit('P-SAWSUB1'), 'E-SAW-SUB1', 'IT_ADMIN');
     const { department, member, assignmentId } = await reporter(it1);
     await h.ctx.sql.query(
-      `INSERT INTO department_it_substitutes (id, department_id, substitute_employee_id, reason, appointed_by_app_user_id)
-       VALUES (gen_random_uuid(), $1, $2, 'Temporary cover', $3)`,
-      [department.id, sub.employeeId, h.it1.appUserId],
+      `INSERT INTO department_it_substitutes (id, organization_id, department_id, substitute_employee_id, reason, appointed_at, appointed_by_app_user_id)
+       VALUES (gen_random_uuid(), $1, $2, $3, 'Temporary cover', now(), $4)`,
+      [h.seed.organizationId, department.id, sub.employeeId, h.it1.appUserId],
     );
 
     const issue = await h.reported(member.account, assignmentId);
@@ -104,9 +104,9 @@ describe('SaaS issue awaiting assignee and sweep assignment (integration, real P
 
     // Appoint substitute, then run sweep -> assigned once, audit SAAS_ISSUE.ASSIGNED, SAAS_ISSUE_SUBMITTED sent to substitute.
     await h.ctx.sql.query(
-      `INSERT INTO department_it_substitutes (id, department_id, substitute_employee_id, reason, appointed_by_app_user_id)
-       VALUES (gen_random_uuid(), $1, $2, 'Cover', $3)`,
-      [department.id, sub.employeeId, h.it1.appUserId],
+      `INSERT INTO department_it_substitutes (id, organization_id, department_id, substitute_employee_id, reason, appointed_at, appointed_by_app_user_id)
+       VALUES (gen_random_uuid(), $1, $2, $3, 'Cover', now(), $4)`,
+      [h.seed.organizationId, department.id, sub.employeeId, h.it1.appUserId],
     );
     const pass = await h.sweepIssues();
     expect(pass.assigned).toBeGreaterThanOrEqual(1);

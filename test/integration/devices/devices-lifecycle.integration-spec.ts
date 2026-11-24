@@ -186,8 +186,8 @@ describe('device lifecycle: handover, holder change, and return to stock (integr
 
     // Appoint h.it1 temporarily on dept2 -> cross-dept transfer succeeds and audits bySubstitute: true.
     await sql().query(
-      `INSERT INTO department_it_substitutes (id, organization_id, department_id, substitute_employee_id, replaced_employee_id, reason, appointed_by_app_user_id)
-       VALUES (gen_random_uuid(), $1, $2, $3, $4, 'Cross-dept cover', $5)`,
+      `INSERT INTO department_it_substitutes (id, organization_id, department_id, substitute_employee_id, replaced_employee_id, reason, appointed_at, appointed_by_app_user_id)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, 'Cross-dept cover', now(), $5)`,
       [h.seed.organizationId, dept2Id, h.it1.employeeId, itDept2.employeeId, h.it1.appUserId],
     );
     const moved = h.dataOf<DeviceWire>(await h.changeHolder(machine.id, targetDept2, {}, h.it1).expect(201));

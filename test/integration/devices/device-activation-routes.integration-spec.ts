@@ -130,10 +130,14 @@ describe('device activation routes & bundled intake (integration, real PostgreSQ
     const third = await h.activateDevice(inStock2.id, { planId, licenseKeyId: keyId }, h.it1).expect(409);
     expect(h.codeOf(third)).toBe('DEVICE_ACTIVATION.LOT_FULL');
 
-    const sub = h.dataOf<{ updatedAt: string; seats: { occupied: number } }>(
+    const seatUsage = h.dataOf<{ occupied: number }>(
+      await request(server()).get(`/api/v1/subscriptions/${subscriptionId}/seat-usage`).set(as(h.it1)).expect(200),
+    );
+    expect(seatUsage.occupied).toBe(2);
+
+    const sub = h.dataOf<{ updatedAt: string }>(
       await request(server()).get(`/api/v1/subscriptions/${subscriptionId}`).set(as(h.it1)).expect(200),
     );
-    expect(sub.seats.occupied).toBe(2);
 
     const reduce = await request(server())
       .patch(`/api/v1/subscriptions/${subscriptionId}`)
@@ -162,9 +166,15 @@ describe('device activation routes & bundled intake (integration, real PostgreSQ
 
     const heldForReturn = await h.registered(h.employee.employeeId);
     await h.ctx.sql.query(
-      `INSERT INTO device_return_tasks (id, organization_id, device_id, departure_case_id, holder_employee_id, department_id, due_on)
-       VALUES (gen_random_uuid(), $1, $2, gen_random_uuid(), $3, $4, '2026-12-01')`,
-      [h.seed.organizationId, heldForReturn.id, h.employee.employeeId, h.seed.departmentId],
+      `INSERT INTO device_return_tasks (id, organization_id, device_id, registration_id, employee_id, offboarding_case_id, department_id, due_on)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, gen_random_uuid(), $5, '2026-12-01')`,
+      [
+        h.seed.organizationId,
+        heldForReturn.id,
+        heldForReturn.registrationId,
+        h.employee.employeeId,
+        h.seed.departmentId,
+      ],
     );
     const resAwaiting = await h
       .activateDevice(heldForReturn.id, { planId: keyPlanId, licenseKeyId: keyId })
@@ -252,10 +262,10 @@ describe('device activation routes & bundled intake (integration, real PostgreSQ
 
     // (b) Deactivate with LOST_WITH_DEVICE keeps lot occupied.
     await deactivateActivation(moved.activation.id, { licenseRelease: 'LOST_WITH_DEVICE' }).expect(201);
-    const sub = h.dataOf<{ seats: { occupied: number } }>(
-      await request(server()).get(`/api/v1/subscriptions/${subId}`).set(as(h.it1)).expect(200),
+    const sub = h.dataOf<{ occupied: number }>(
+      await request(server()).get(`/api/v1/subscriptions/${subId}/seat-usage`).set(as(h.it1)).expect(200),
     );
-    expect(sub.seats.occupied).toBe(2);
+    expect(sub.occupied).toBe(2);
 
     // (d) Deactivating an already closed activation fails with 409.
     const alreadyClosed = await deactivateActivation(a1.activation.id).expect(409);

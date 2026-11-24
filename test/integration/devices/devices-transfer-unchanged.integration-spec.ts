@@ -59,7 +59,7 @@ describe('department transfer keeps device registrations and activations intact 
           os: 'Windows 11',
           bundledPlanIds: [planId],
           holderEmployeeId: mover.employeeId,
-          handedOverOn: '2026-02-01',
+          handedOverOn: '2026-10-15',
         })
         .expect(201),
     );
