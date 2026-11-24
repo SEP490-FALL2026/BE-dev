@@ -395,12 +395,12 @@ describe('the register of machines after the migrations of wave 2 (integration, 
       return { id, device, registration };
     };
 
-    it('makes one job for a holding, and one open job for a machine', async () => {
+    it('makes one open job for a machine, even for the same holding', async () => {
       const { id, device, registration } = await job();
 
       expect(
         (await refusal(sql, insertJob, [randomUUID(), org, device, registration, holder, randomUUID()]))?.constraint,
-      ).toBe('device_return_tasks_registration_id_key');
+      ).toBe('device_return_tasks_one_open');
 
       // The first holding ends and the machine is held again: a second job for the machine is refused while the first is open.
       await sql.query(
@@ -417,6 +417,20 @@ describe('the register of machines after the migrations of wave 2 (integration, 
         [id, user],
       );
       expect(await refusal(sql, insertJob, [randomUUID(), org, device, second, holder, randomUUID()])).toBeNull();
+    });
+
+    it('lets a holding have a new job once its earlier job is closed, one open at a time', async () => {
+      const { id, device, registration } = await job();
+      await sql.query(
+        `UPDATE device_return_tasks SET state = 'NOT_RECOVERED', handled_at = now(), handled_by_app_user_id = $2, outcome_note = 'Cancelled' WHERE id = $1`,
+        [id, user],
+      );
+
+      const again = randomUUID();
+      expect(await refusal(sql, insertJob, [again, org, device, registration, holder, randomUUID()])).toBeNull();
+      expect(
+        (await refusal(sql, insertJob, [randomUUID(), org, device, registration, holder, randomUUID()]))?.constraint,
+      ).toBe('device_return_tasks_one_open');
     });
 
     it('closes a job once, with what its state needs, and then changes nothing', async () => {

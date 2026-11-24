@@ -44,7 +44,16 @@ describe('the answers of the correction of a machine (the codes of the SPEC)', (
 
   it('shows an example for each of its answers, under the code the SPEC names and no other', () => {
     expect(Object.keys(DEVICE_ATTRIBUTES_ERROR_EXAMPLES).sort()).toEqual(
-      ['ALREADY_RETIRED', 'NOT_FOUND', 'NOT_IN_CHARGE', 'SERIAL_TAKEN', 'STALE', 'UPDATE_EMPTY', 'VOIDED'].sort(),
+      [
+        'ALREADY_RETIRED',
+        'EMPLOYEE_NOT_STARTED',
+        'NOT_FOUND',
+        'NOT_IN_CHARGE',
+        'SERIAL_TAKEN',
+        'STALE',
+        'UPDATE_EMPTY',
+        'VOIDED',
+      ].sort(),
     );
   });
 });

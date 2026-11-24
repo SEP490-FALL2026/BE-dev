@@ -49,7 +49,7 @@ export class DeviceAttributesController {
     {
       status: HttpStatus.FORBIDDEN,
       description:
-        'Only an IT Admin corrects a machine; an assigned machine or one awaiting return requires an acting IT Admin of the holder department (DEVICE.NOT_IN_CHARGE).',
+        'Only an IT Admin corrects a machine; an assigned machine or one awaiting return requires an acting IT Admin of the holder department, and never the person who is leaving with it (DEVICE.NOT_IN_CHARGE).',
       examples: [FORBIDDEN_EXAMPLE, EXAMPLES.NOT_IN_CHARGE],
     },
     {
@@ -60,8 +60,14 @@ export class DeviceAttributesController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The machine changed since it was read (DEVICE.STALE, details.currentUpdatedAt), it was voided (DEVICE.VOIDED) or taken out of use (DEVICE.ALREADY_RETIRED), or another machine has the serial number (DEVICE.SERIAL_TAKEN). Nothing is written.',
-      examples: [EXAMPLES.STALE, EXAMPLES.VOIDED, EXAMPLES.ALREADY_RETIRED, EXAMPLES.SERIAL_TAKEN],
+        'The machine changed since it was read (DEVICE.STALE, details.currentUpdatedAt), it was voided (DEVICE.VOIDED) or taken out of use (DEVICE.ALREADY_RETIRED), another machine has the serial number (DEVICE.SERIAL_TAKEN), or the holder has not started working in a department yet (EMPLOYEE.NOT_STARTED). Nothing is written.',
+      examples: [
+        EXAMPLES.STALE,
+        EXAMPLES.VOIDED,
+        EXAMPLES.ALREADY_RETIRED,
+        EXAMPLES.SERIAL_TAKEN,
+        EXAMPLES.EMPLOYEE_NOT_STARTED,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,

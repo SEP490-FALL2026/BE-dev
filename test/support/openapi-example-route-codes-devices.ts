@@ -51,7 +51,7 @@ export const ROUTE_ERROR_CODES_DEVICES: Readonly<Record<string, Partial<Record<R
     deviceUpdate: {
       '403': ['DEVICE.NOT_IN_CHARGE'],
       '404': ['DEVICE.NOT_FOUND'],
-      '409': ['DEVICE.ALREADY_RETIRED', 'DEVICE.SERIAL_TAKEN', 'DEVICE.STALE', 'DEVICE.VOIDED'],
+      '409': ['DEVICE.ALREADY_RETIRED', 'DEVICE.SERIAL_TAKEN', 'DEVICE.STALE', 'DEVICE.VOIDED', 'EMPLOYEE.NOT_STARTED'],
       '422': ['DEVICE.UPDATE_EMPTY'],
     },
     aiToolStatusSnapshotCreate: {

@@ -76204,7 +76204,7 @@
             }
           },
           "403": {
-            "description": "Only an IT Admin corrects a machine; an assigned machine or one awaiting return requires an acting IT Admin of the holder department (DEVICE.NOT_IN_CHARGE).",
+            "description": "Only an IT Admin corrects a machine; an assigned machine or one awaiting return requires an acting IT Admin of the holder department, and never the person who is leaving with it (DEVICE.NOT_IN_CHARGE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -76257,7 +76257,7 @@
             }
           },
           "409": {
-            "description": "The machine changed since it was read (DEVICE.STALE, details.currentUpdatedAt), it was voided (DEVICE.VOIDED) or taken out of use (DEVICE.ALREADY_RETIRED), or another machine has the serial number (DEVICE.SERIAL_TAKEN). Nothing is written.",
+            "description": "The machine changed since it was read (DEVICE.STALE, details.currentUpdatedAt), it was voided (DEVICE.VOIDED) or taken out of use (DEVICE.ALREADY_RETIRED), another machine has the serial number (DEVICE.SERIAL_TAKEN), or the holder has not started working in a department yet (EMPLOYEE.NOT_STARTED). Nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -76303,6 +76303,17 @@
                       "error": {
                         "code": "DEVICE.SERIAL_TAKEN",
                         "message": "The serial number is already used by another machine.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
                         "requestId": "req_example"
                       }
                     }
