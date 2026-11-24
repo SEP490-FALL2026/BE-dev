@@ -247,6 +247,9 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   DEPARTMENT_IT_SUBSTITUTE_APPOINTED: ['substituteId', 'departmentId', 'substituteEmployeeId', 'replacedEmployeeId'],
   DEPARTMENT_IT_SUBSTITUTE_ENDED: ['substituteId', 'departmentId', 'substituteEmployeeId', 'endCause'],
   DEPARTMENT_IT_COVERAGE_MISSING: ['departmentId', 'departmentName', 'inChargeEmployeeId', 'reason'],
+  // Offboarding device return task reminders and unassigned alerts.
+  DEVICE_RETURN_OVERDUE: ['taskId', 'deviceId', 'assetCode', 'employeeId', 'dueOn'],
+  DEVICE_RETURN_WAITING: ['taskId', 'deviceId', 'assetCode', 'employeeId', 'departmentId', 'dueOn'],
 };
 
 /** Whether the code is one of the closed table. */

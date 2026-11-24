@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { addDays } from '../../../src/core/business-date';
+import { DeviceReturnTaskSweepService } from '../../../src/modules/devices/return-task/device-return-task-sweep.service';
 import { declareApplication } from '../../support/builders/catalog.builder';
 import { createDepartment, enterEmployee } from '../../support/builders/organization.builder';
 import { OffboardingHarness } from '../../support/offboarding-harness';
@@ -113,6 +114,13 @@ describe('device return task list, completion, device detail, and dashboard (int
     expect(waitingTask.waiting).toBe(true);
     expect(waitingTask.overdue).toBe(true);
     expect(waitingTask.actingItAdmins).toEqual([]);
+
+    const waitingNotice = await h.ctx.sql.query<{ count: string }>(
+      `SELECT count(*)::text AS count FROM in_app_notifications
+        WHERE code = 'DEVICE_RETURN_WAITING' AND subject_id = $1 AND recipient_employee_id = $2`,
+      [waitingTask.id, h.sa.employeeId],
+    );
+    expect(Number(waitingNotice.rows[0].count)).toBe(1);
 
     const denied = await completeTask(
       waitingTask.id,
@@ -271,5 +279,52 @@ describe('device return task list, completion, device detail, and dashboard (int
     expect(h.dataOf<{ closed: boolean }>(closureRes).closed).toBe(true);
     const open3 = h.dataOf<{ items: ReturnTaskWire[] }>(await listTasks('?state=OPEN', h.sa).expect(200)).items;
     expect(open3.some((t) => t.offboardingCaseId === case3.id)).toBe(true);
+  });
+
+  it('sends overdue return task reminders once per working day and skips weekends', async () => {
+    const emp = await h.worker(des, `E-RT-SW-${(seq += 1)}`);
+    await createAssignedDevice(emp.employeeId);
+    const caseWire = await h.recordedCase(emp, { lastWorkingDay: h.day(5), accessBlockMode: 'WITH_LAST_DAY' });
+    const tasks = h.dataOf<{ items: ReturnTaskWire[] }>(await listTasks('?state=OPEN', h.sa).expect(200)).items;
+    const task = tasks.find((t) => t.offboardingCaseId === caseWire.id)!;
+    await h.ctx.sql.query(`UPDATE device_return_tasks SET due_on = $2::date WHERE id = $1`, [task.id, '2026-01-01']);
+
+    const sweeper = h.ctx.app.get(DeviceReturnTaskSweepService, { strict: false });
+    const countNotices = async (recipientId: string) =>
+      Number(
+        (
+          await h.ctx.sql.query<{ count: string }>(
+            `SELECT count(*)::text AS count FROM in_app_notifications
+              WHERE code = 'DEVICE_RETURN_OVERDUE' AND subject_id = $1 AND recipient_employee_id = $2`,
+            [task.id, recipientId],
+          )
+        ).rows[0].count,
+      );
+
+    // Next working Monday -> Saturday/Sunday skipped; Monday runs twice -> 1 notice per recipient.
+    const findWeekday = (offset: number, weekend: boolean) => {
+      for (let i = offset; i < offset + 10; i += 1) {
+        const d = new Date(Date.now() + i * 86_400_000);
+        const day = d.getUTCDay();
+        if (weekend ? day === 0 || day === 6 : day >= 1 && day <= 5) return d;
+      }
+      throw new Error('Could not find target calendar date');
+    };
+
+    const mondayLike = findWeekday(0, false);
+    const nextWorkday = findWeekday(14, false);
+    const weekendDay = findWeekday(0, true);
+
+    await sweeper.run(weekendDay);
+    expect(await countNotices(h.it1.employeeId)).toBe(0);
+
+    await sweeper.run(mondayLike);
+    await sweeper.run(mondayLike);
+    expect(await countNotices(h.it1.employeeId)).toBe(1);
+    expect(await countNotices(h.sa.employeeId)).toBe(1);
+
+    await sweeper.run(nextWorkday);
+    expect(await countNotices(h.it1.employeeId)).toBe(2);
+    expect(await countNotices(h.sa.employeeId)).toBe(2);
   });
 });

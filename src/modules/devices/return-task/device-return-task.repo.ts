@@ -280,4 +280,42 @@ export class DeviceReturnTaskRepo {
       overdue: Number(rows[0]?.overdue_count ?? 0n),
     };
   }
+
+  async listOverdueCandidateIds(organizationId: string, today: BusinessDate, limit: number): Promise<string[]> {
+    const todayDate = toDateColumn(today);
+    const rows = await this.prisma.$queryRaw<{ id: string }[]>`
+      SELECT id FROM device_return_tasks
+       WHERE organization_id = ${organizationId}::uuid
+         AND state = 'OPEN'::"DeviceReturnTaskState"
+         AND due_on < ${todayDate}::date
+         AND overdue_noticed_on IS DISTINCT FROM ${todayDate}::date
+       ORDER BY due_on ASC, id ASC
+       LIMIT ${limit}`;
+
+    return rows.map((row) => row.id);
+  }
+
+  async lockOverdueForNoticeSkipLocked(
+    tx: DbTx,
+    id: string,
+  ): Promise<(ReturnTaskRecord & { assetCode: string }) | null> {
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT id FROM device_return_tasks
+       WHERE id = ${id}::uuid AND state = 'OPEN'::"DeviceReturnTaskState"
+       FOR UPDATE SKIP LOCKED`;
+    if (locked.length === 0) return null;
+    const row = await tx.deviceReturnTask.findUnique({
+      where: { id },
+      include: { device: { select: { assetCode: true } } },
+    });
+
+    return row ? { ...toRecord(row), assetCode: row.device.assetCode } : null;
+  }
+
+  async markOverdueNoticed(tx: DbTx, id: string, today: BusinessDate): Promise<void> {
+    await tx.deviceReturnTask.update({
+      where: { id },
+      data: { overdueNoticedOn: toDateColumn(today) },
+    });
+  }
 }

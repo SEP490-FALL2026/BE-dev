@@ -54,8 +54,11 @@ import { RegistryQueryService } from './registry/registry-query.service';
 import { RegistryRepo } from './registry/registry.repo';
 import { RegistryService } from './registry/registry.service';
 import { DeviceReturnTaskController } from './return-task/device-return-task.controller';
+import { DeviceReturnOverdueSweeper } from './return-task/device-return-task.job';
+import { DeviceReturnTaskNotifier } from './return-task/device-return-task-notifier.service';
 import { DeviceReturnTaskQueryService } from './return-task/device-return-task-query.service';
 import { DeviceReturnTaskRepo } from './return-task/device-return-task.repo';
+import { DeviceReturnTaskSweepService } from './return-task/device-return-task-sweep.service';
 import { DeviceReturnTaskService } from './return-task/device-return-task.service';
 import { SignatureRecordController } from './registry/signature-record.controller';
 import { SignatureRecordService } from './registry/signature-record.service';
@@ -123,8 +126,11 @@ import { StopRequestSweepService } from './stop-request/stop-request-sweep.servi
     DeviceAttributesService,
     RegistrationEndService,
     DeviceReturnTaskRepo,
+    DeviceReturnTaskNotifier,
     DeviceReturnTaskQueryService,
     DeviceReturnTaskService,
+    DeviceReturnTaskSweepService,
+    DeviceReturnOverdueSweeper,
     SignatureRecordService,
     CollectorInstallationService,
     AcknowledgementRepo,

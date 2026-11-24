@@ -4,6 +4,7 @@ import { AuditApi } from '../../audit/public/audit.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { devicesEvent } from '../devices-audit-event.mapper';
 import { RegistryRepo } from '../registry/registry.repo';
+import { DeviceReturnTaskNotifier } from './device-return-task-notifier.service';
 import { shouldClearOverdueNotice } from './device-return-task.policy';
 import { DeviceReturnTaskRepo } from './device-return-task.repo';
 import type { CancelReturnTasksInput, MoveReturnTaskDueInput, OpenReturnTasksInput } from './device-return-task.types';
@@ -26,6 +27,7 @@ export class DeviceReturnTaskService {
     private readonly repo: DeviceReturnTaskRepo,
     private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
+    private readonly notifier: DeviceReturnTaskNotifier,
   ) {}
 
   async openForDeparture(tx: DbTx, input: OpenReturnTasksInput): Promise<{ taskIds: string[] }> {
@@ -66,6 +68,12 @@ export class DeviceReturnTaskService {
           },
         ),
       );
+      const device = await this.registry.findDevice(registration.deviceId, tx);
+      await this.notifier.waitingIfUnassigned(tx, {
+        organizationId: registration.organizationId,
+        task,
+        assetCode: device?.assetCode ?? '',
+      });
       createdIds.push(task.id);
     }
 

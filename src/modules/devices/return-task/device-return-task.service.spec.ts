@@ -2,6 +2,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuditApi } from '../../audit/public/audit.api';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { RegistryRepo, RegistrationRecord } from '../registry/registry.repo';
+import type { DeviceReturnTaskNotifier } from './device-return-task-notifier.service';
 import type { DeviceReturnTaskRepo } from './device-return-task.repo';
 import { DeviceReturnTaskService } from './device-return-task.service';
 import type { ReturnTaskRecord } from './device-return-task.types';
@@ -44,7 +45,8 @@ const task = (id: string, overrides: Partial<ReturnTaskRecord> = {}): ReturnTask
 function buildService() {
   const registry = {
     lockOpenRegistrationsOfHolder: jest.fn(),
-  } as unknown as jest.Mocked<Pick<RegistryRepo, 'lockOpenRegistrationsOfHolder'>>;
+    findDevice: jest.fn().mockResolvedValue({ assetCode: 'LAP-26-0002' }),
+  } as unknown as jest.Mocked<Pick<RegistryRepo, 'lockOpenRegistrationsOfHolder' | 'findDevice'>>;
   const repo = {
     findExistingRegistrationIds: jest.fn(),
     insertOpen: jest.fn(),
@@ -63,24 +65,34 @@ function buildService() {
   const audit = {
     record: jest.fn().mockResolvedValue(undefined),
   } as unknown as jest.Mocked<Pick<AuditApi, 'record'>>;
+  const waitingIfUnassigned = jest.fn().mockResolvedValue(false);
+  const notifier = { waitingIfUnassigned } as unknown as DeviceReturnTaskNotifier;
 
   const service = new DeviceReturnTaskService(
     registry as unknown as RegistryRepo,
     repo as unknown as DeviceReturnTaskRepo,
     organizationReads as unknown as OrganizationReadApi,
     audit as unknown as AuditApi,
+    notifier,
   );
-  return { service, registry, repo, organizationReads, audit, tx: { tag: 'tx' } as unknown as DbTx };
+  return {
+    service,
+    registry,
+    repo,
+    organizationReads,
+    audit,
+    waitingIfUnassigned,
+    tx: { tag: 'tx' } as unknown as DbTx,
+  };
 }
 
 describe('DeviceReturnTaskService', () => {
   it('opens one task per missing open registration, preserves null departmentId, and audits each creation', async () => {
-    const { service, registry, repo, audit, tx } = buildService();
+    const { service, registry, repo, audit, waitingIfUnassigned, tx } = buildService();
     registry.lockOpenRegistrationsOfHolder.mockResolvedValue([reg('reg-1', 'dev-1'), reg('reg-2', 'dev-2')]);
     repo.findExistingRegistrationIds.mockResolvedValue(new Set(['reg-1']));
-    repo.insertOpen.mockResolvedValue(
-      task('task-2', { deviceId: 'dev-2', registrationId: 'reg-2', departmentId: null }),
-    );
+    const createdTask = task('task-2', { deviceId: 'dev-2', registrationId: 'reg-2', departmentId: null });
+    repo.insertOpen.mockResolvedValue(createdTask);
 
     const result = await service.openForDeparture(tx, {
       employeeId: 'emp-1',
@@ -99,6 +111,11 @@ describe('DeviceReturnTaskService', () => {
       offboardingCaseId: 'case-1',
       departmentId: null,
       dueOn: '2026-11-30',
+    });
+    expect(waitingIfUnassigned).toHaveBeenCalledWith(tx, {
+      organizationId: 'org-1',
+      task: createdTask,
+      assetCode: 'LAP-26-0002',
     });
     expect(audit.record).toHaveBeenCalledTimes(1);
     expect(audit.record).toHaveBeenCalledWith(

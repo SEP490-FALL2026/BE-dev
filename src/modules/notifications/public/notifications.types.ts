@@ -232,6 +232,9 @@ export const IN_APP_NOTIFICATION_CODES = [
   'DEPARTMENT_IT_SUBSTITUTE_APPOINTED',
   'DEPARTMENT_IT_SUBSTITUTE_ENDED',
   'DEPARTMENT_IT_COVERAGE_MISSING',
+  // Offboarding device return task waiting for acting IT coverage and daily overdue reminders.
+  'DEVICE_RETURN_OVERDUE',
+  'DEVICE_RETURN_WAITING',
 ] as const;
 
 export type InAppNotificationCode = (typeof IN_APP_NOTIFICATION_CODES)[number];

@@ -167,4 +167,26 @@ export const OPS_TEXTS = {
         'Department {departmentId:name} has no acting IT Admin in charge or substitute right now ({reason:enum}[ — {inChargeEmployeeId:name}]). Please assign an IT Admin in charge or appoint a substitute.',
     },
   },
+  DEVICE_RETURN_OVERDUE: {
+    vi: {
+      title: 'Thu hồi máy quá hạn',
+      message: 'Việc thu hồi máy {assetCode} từ {employeeId:name} đã quá hạn {dueOn:date}.',
+    },
+    en: {
+      title: 'Device return overdue',
+      message: 'Device return for {assetCode} from {employeeId:name} passed its due date {dueOn:date}.',
+    },
+  },
+  DEVICE_RETURN_WAITING: {
+    vi: {
+      title: 'Việc thu hồi máy đang chờ phân công IT',
+      message:
+        'Việc thu hồi máy {assetCode} từ {employeeId:name}[ tại phòng {departmentId:name}] (hạn {dueOn:date}) chưa có IT Admin xử lý.',
+    },
+    en: {
+      title: 'Device return awaiting IT Admin',
+      message:
+        'Device return for {assetCode} from {employeeId:name}[ in {departmentId:name}] (due {dueOn:date}) has no acting IT Admin.',
+    },
+  },
 } satisfies Partial<Record<InAppNotificationCode, NotificationTexts>>;
