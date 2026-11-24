@@ -218,3 +218,13 @@ export class SubscriptionQuantityReasonRequiredError extends Error {
     this.name = 'SubscriptionQuantityReasonRequiredError';
   }
 }
+
+export class SubscriptionPriceMismatchError extends Error {
+  constructor(
+    readonly expectedUnitPriceMinor: bigint,
+    readonly currency = 'VND',
+  ) {
+    super('The provided unitPrice does not match monthlyUnitPrice multiplied by the billing cycle months.');
+    this.name = 'SubscriptionPriceMismatchError';
+  }
+}

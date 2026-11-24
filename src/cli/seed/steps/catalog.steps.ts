@@ -61,7 +61,7 @@ async function oneApplication(
     functionalGroupId,
     ...(application.vendorName ? { vendorName: application.vendorName } : {}),
     dataSensitivity: application.dataSensitivity,
-    plan: firstPlanBody(first),
+    plan: firstPlanBody(first, commitmentMonthsForPlan(ctx, first)),
   });
   ctx.ids.applications.set(application.key, created.id);
   if (created.vendor) ctx.ids.vendors.set(application.key, created.vendor.id);
@@ -69,15 +69,30 @@ async function oneApplication(
   return { status: 'done', label };
 }
 
+function commitmentMonthsForPlan(ctx: DemoRunContext, plan: DemoPlan): 1 | 12 | undefined {
+  if (plan.provisioningType === 'K1') return 1;
+  if (plan.provisioningType === 'K2') {
+    return ctx.fixture.subscriptions.find((subscription) => subscription.plan === plan.key)?.termMonths;
+  }
+
+  return undefined;
+}
+
 /** The plan of the one command: the body of a plan without its application, which the command is making. */
-function firstPlanBody(plan: DemoPlan): Record<string, unknown> {
-  const body = planBody('', plan);
+function firstPlanBody(plan: DemoPlan, referenceCommitmentMonths?: 1 | 12): Record<string, unknown> {
+  const body = planBody('', plan, referenceCommitmentMonths);
   delete body.applicationId;
 
   return body;
 }
 
-export function planBody(applicationId: string, plan: DemoPlan): Record<string, unknown> {
+export function planBody(
+  applicationId: string,
+  plan: DemoPlan,
+  referenceCommitmentMonths?: 1 | 12,
+): Record<string, unknown> {
+  const commitment = referenceCommitmentMonths ?? (plan.provisioningType === 'K1' ? 1 : undefined);
+
   return {
     applicationId,
     name: plan.name,
@@ -90,6 +105,7 @@ export function planBody(applicationId: string, plan: DemoPlan): Record<string, 
     ...(plan.keyBinding ? { keyBinding: plan.keyBinding } : {}),
     // QĐ-113a: the price before tax in dong of a paid plan, the one a request falls back to when no subscription of the plan has a price.
     ...(plan.referencePrice ? { referencePrice: { amount: plan.referencePrice, currency: 'VND' } } : {}),
+    ...(commitment !== undefined ? { referenceCommitmentMonths: commitment } : {}),
   };
 }
 
@@ -128,7 +144,12 @@ async function plans(ctx: DemoRunContext): Promise<StepOutcome> {
         );
       } else if (ctx.mode === 'plan') results.push({ status: 'planned', label: plan.name });
       else {
-        const created = await ctx.api.call<{ id: string }>(admin, 'POST', '/plans', planBody(applicationId, plan));
+        const created = await ctx.api.call<{ id: string }>(
+          admin,
+          'POST',
+          '/plans',
+          planBody(applicationId, plan, commitmentMonthsForPlan(ctx, plan)),
+        );
         ctx.ids.plans.set(plan.key, created.id);
         results.push({ status: 'done', label: plan.name });
       }
@@ -269,9 +290,10 @@ export function subscriptionStartDate(ctx: DatedContext, subscription: DemoSubsc
 
 /** The terms of a subscription (everything but which plan and for whom), as the API takes them on creation and on update of a draft. */
 export function subscriptionTerms(ctx: DemoRunContext, subscription: DemoSubscription): Record<string, unknown> {
+  const priceFields = termOrPerpetualPriceFields(subscription);
   const base = {
     purchasedQuantity: purchasedQuantityOf(ctx, subscription),
-    unitPrice: subscription.unitPrice,
+    ...priceFields,
     // The quote of the vendor when it is not in dong, kept beside the price (FX-1); the price itself is always in dong.
     ...(subscription.originalPrice ? { originalPrice: subscription.originalPrice } : {}),
     responsibleItAdminEmployeeId: ctx.ids.employees.get(subscription.responsible),
@@ -311,6 +333,18 @@ export function subscriptionBody(
     planId,
     kind: subscription.kind,
     ...subscriptionTerms(ctx, subscription),
+  };
+}
+
+function termOrPerpetualPriceFields(subscription: DemoSubscription): Record<string, unknown> {
+  if (subscription.kind === 'PERPETUAL') return { unitPrice: subscription.unitPrice };
+  const cycleMonths = subscription.billingCycle === 'ANNUAL' ? 12n : 1n;
+  const rawUnit = BigInt(subscription.unitPrice.amount);
+  const monthlyMinor = (rawUnit * 2n + cycleMonths) / (2n * cycleMonths);
+
+  return {
+    monthlyUnitPrice: { amount: String(monthlyMinor), currency: 'VND' },
+    ...(monthlyMinor * cycleMonths === rawUnit ? { unitPrice: subscription.unitPrice } : {}),
   };
 }
 

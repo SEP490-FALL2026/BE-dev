@@ -1,0 +1,6 @@
+# Tự quyết và điểm cần Owner — Đợt 3 thiết kế lại, làn `biz`
+
+| D-n | Gói | file:line | Câu hỏi | Phương án A/B/C | Chọn + căn cứ | Cách đảo lại | Mức (tự chốt / cần Owner) |
+| --- | --- | --------- | ------- | --------------- | ------------- | ------------ | ------------------------- |
+| D-1 | P1 | `test/support/api-collection-registry-exceptions.ts:36,159` | Thêm `monthlyUnitPrice` vào `subscriptionSchema` làm `COLLECTION_EXCEPTIONS` của `subscriptionList` lệch trường thực tế | A: giữ nguyên (gate đỏ) · B: thêm `'monthlyUnitPrice'` vào `itemProperties` của 2 mục `subscriptionList` có sẵn · C: thêm exception mới | B: không thêm exception mới, chỉ đồng bộ `itemProperties` của `subscriptionList` đã có với schema mới (`SPEC-B1` W3-02 #4) | Bỏ `'monthlyUnitPrice'` khỏi 2 mảng `itemProperties` | tự chốt |
+| D-2 | P1 | `src/cli/seed/steps/catalog.steps.ts:339-349` | Gửi `monthlyUnitPrice` và `referenceCommitmentMonths` ở seed mà không sửa `demo-fixture.types.ts` ngoài phạm vi P1 | A: sửa fixture + types · B: giữ fixture `shared-demo-v4/catalog.ts`, tính `monthlyUnitPrice` trong `catalog.steps.ts` và chỉ kèm `unitPrice` khi chia hết | B: khớp danh sách file P1, vẫn tạo đúng `monthlyUnitPrice` + `referenceCommitmentMonths` và giữ xanh `shared-demo-v4.spec.ts` | Khi P22 cập nhật fixture B3 có thể chuyển sang khai trực tiếp | tự chốt |

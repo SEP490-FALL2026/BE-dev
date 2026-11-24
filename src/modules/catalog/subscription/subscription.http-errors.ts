@@ -1,4 +1,5 @@
 import { HttpStatus } from '@nestjs/common';
+import { formatAmount } from '../../../core/money/money';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { toMoneyApiException } from '../../../infrastructure/http/errors/money-errors';
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
@@ -11,6 +12,7 @@ import {
 import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import {
   SubscriptionApplicationRetiredError,
+  SubscriptionPriceMismatchError,
   SubscriptionPriceNotVndError,
   SubscriptionBillingCycleUnsupportedError,
   SubscriptionBillingLongerThanCommitmentError,
@@ -83,6 +85,14 @@ export function toSubscriptionApiException(error: unknown): unknown {
   }
   if (error instanceof SubscriptionPriceNotVndError) {
     return refuse(UNPROCESSABLE, 'SUBSCRIPTION.PRICE_NOT_VND', error.message, { currency: error.currency });
+  }
+  if (error instanceof SubscriptionPriceMismatchError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.PRICE_MISMATCH', error.message, {
+      expectedUnitPrice: {
+        amount: formatAmount(error.expectedUnitPriceMinor, 0),
+        currency: error.currency,
+      },
+    });
   }
 
   // The pool of a K2 or K4 plan is one: a second live subscription is refused once the seat baseline is closed (`QĐ-104k`(3)).
@@ -169,6 +179,7 @@ export const SUBSCRIPTION_ERROR_EXAMPLES = {
   QUANTITY_BELOW_OCCUPIED: example(new SubscriptionQuantityBelowOccupiedError(3, 2)),
   STILL_DRAFT: example(new SubscriptionStillDraftError(['UNIT_PRICE'])),
   PRICE_NOT_VND: example(new SubscriptionPriceNotVndError('USD')),
+  PRICE_MISMATCH: example(new SubscriptionPriceMismatchError(6_000_000n)),
   COMMITMENT_TERM_REQUIRED: example(new SubscriptionCommitmentTermRequiredError()),
   COMMITMENT_TERM_NOT_ALLOWED: example(new SubscriptionCommitmentTermNotAllowedError()),
   K1_MONTHLY_ONLY: example(new SubscriptionK1MonthlyOnlyError()),

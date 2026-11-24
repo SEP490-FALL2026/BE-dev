@@ -21,6 +21,7 @@ import {
   missingDataOf,
   nextStateOf,
   noticeInputOf,
+  resolveSubscriptionPrices,
   sameUnitPrice,
   subscriptionStatusOf,
 } from './subscription.policy';
@@ -71,14 +72,17 @@ export class SubscriptionChangeService {
     }
     assertVersionForQuantityChange(input.purchasedQuantity, expectedUpdatedAt);
     assertDeclarableCycle(input.billingCycle);
-    const money = input.unitPrice ? await this.pricing.read(input.unitPrice) : null;
+    const sentUnit = input.unitPrice ? await this.pricing.read(input.unitPrice, 'unitPrice') : undefined;
+    const sentMonthly = input.monthlyUnitPrice
+      ? await this.pricing.read(input.monthlyUnitPrice, 'monthlyUnitPrice')
+      : undefined;
     const originalPrice = input.originalPrice
       ? await this.pricing.readOriginal(input.originalPrice)
       : input.originalPrice;
     const organizationId = await this.guard.requireOrganizationId();
 
     const record = await this.runner.run((tx) =>
-      this.changeIn(tx, actor, id, { input, money, originalPrice, organizationId, expectedUpdatedAt }),
+      this.changeIn(tx, actor, id, { input, sentUnit, sentMonthly, originalPrice, organizationId, expectedUpdatedAt }),
     );
 
     return (await this.views.viewAll([record]))[0];
@@ -90,14 +94,15 @@ export class SubscriptionChangeService {
     id: string,
     change: {
       input: UpdateSubscriptionInput;
-      money: { amountMinor: bigint; currency: string } | null;
+      sentUnit: { amountMinor: bigint; currency: string } | undefined;
+      sentMonthly: { amountMinor: bigint; currency: string } | undefined;
       /** What the change gives: the price read, `null` to take it away, `undefined` when it says nothing. */
       originalPrice: OriginalPriceRecord | null | undefined;
       organizationId: string;
       expectedUpdatedAt?: Date;
     },
   ): Promise<SubscriptionRecord> {
-    const { input, money, originalPrice, organizationId, expectedUpdatedAt } = change;
+    const { input, sentUnit, sentMonthly, originalPrice, organizationId, expectedUpdatedAt } = change;
     const current = input.isPrimaryForPlan
       ? await this.lockForPrimaryChange(tx, id, expectedUpdatedAt)
       : await this.lockFresh(tx, id, expectedUpdatedAt);
@@ -117,13 +122,25 @@ export class SubscriptionChangeService {
       ...next,
     });
 
-    const samePrice = sameUnitPrice(current.unitPrice, money);
+    const resolvedPrice = resolveSubscriptionPrices({
+      kind: current.kind,
+      billingCycle: next.billingCycle,
+      cycleChanged: input.billingCycle !== undefined && input.billingCycle !== current.billingCycle,
+      sentMonthly,
+      sentUnit,
+      currentMonthlyMinor: current.monthlyUnitPriceMinor,
+      currentUnitMoney: current.unitPrice
+        ? { amountMinor: current.unitPrice.amountMinor, currency: current.unitPrice.currency }
+        : null,
+    });
+    const samePrice = sameUnitPrice(current.unitPrice, resolvedPrice.unitMoney);
     const priced = samePrice
       ? { unitPrice: current.unitPrice, priceSnapshot: current.priceSnapshot }
-      : await this.pricing.priceToday(tx, money);
+      : await this.pricing.priceToday(tx, resolvedPrice.unitMoney);
     const state: SubscriptionState = {
       ...next,
       ...priced,
+      monthlyUnitPriceMinor: resolvedPrice.monthlyUnitPriceMinor,
       originalPrice: originalPrice === undefined ? current.originalPrice : originalPrice,
       status: this.statusAfter(plan, current, { ...next, ...priced }),
     };
@@ -132,10 +149,41 @@ export class SubscriptionChangeService {
 
     const updated = await this.subscriptions.update(tx, id, state);
     await this.auditChange(tx, actor, { current, updated, organizationId, quantityChangeReason });
+    await this.notifySeatChange(tx, actor, current, updated, organizationId);
+
+    return updated;
+  }
+
+  private async notifySeatChange(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    current: SubscriptionRecord,
+    updated: SubscriptionRecord,
+    organizationId: string,
+  ): Promise<void> {
+    if (
+      current.purchasedQuantity !== null &&
+      updated.purchasedQuantity !== null &&
+      updated.purchasedQuantity < current.purchasedQuantity
+    ) {
+      await this.guard.tellSeatReduction(tx, {
+        organizationId,
+        subscriptionId: current.id,
+        planProvisioningType: current.planProvisioningType,
+        status: current.status,
+        responsibleItAdminEmployeeId: updated.responsibleItAdminEmployeeId,
+        from: current.purchasedQuantity,
+        to: updated.purchasedQuantity,
+        updatedAt: updated.updatedAt,
+        actor,
+      });
+
+      return;
+    }
     // A rise of the seats of a K2 or K4 pool is told to the IT Admin who answers for it, whoever changed the number (`QĐ-110v`, SPEC P24).
     await this.guard.tellSeatIncrease(tx, {
       organizationId,
-      subscriptionId: id,
+      subscriptionId: current.id,
       planProvisioningType: current.planProvisioningType,
       status: current.status,
       responsibleItAdminEmployeeId: updated.responsibleItAdminEmployeeId,
@@ -144,8 +192,6 @@ export class SubscriptionChangeService {
       requestId: null,
       actor,
     });
-
-    return updated;
   }
 
   private quantityReasonOf(current: SubscriptionRecord, input: UpdateSubscriptionInput): string | undefined {

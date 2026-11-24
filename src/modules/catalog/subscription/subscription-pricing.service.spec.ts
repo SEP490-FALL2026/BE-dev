@@ -2,7 +2,10 @@ import { MoneyOutOfRangeError } from '../../../core/money/money.errors';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { FinanceApi } from '../../finance/public/finance.api';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import { SubscriptionPriceNotVndError } from './subscription.errors';
+import { declareSubscriptionBodySchema, updateSubscriptionBodySchema } from './subscription.dto';
+import { SubscriptionPriceMismatchError, SubscriptionPriceNotVndError } from './subscription.errors';
+import { toSubscriptionApiException } from './subscription.http-errors';
+import { resolveSubscriptionPrices } from './subscription.policy';
 import { SubscriptionPricingService } from './subscription-pricing.service';
 
 describe('QĐ-111an: the pricing of a subscription reads dong and no exchange rate', () => {
@@ -84,4 +87,106 @@ describe('QĐ-111an: the pricing of a subscription reads dong and no exchange ra
       SubscriptionPriceNotVndError,
     );
   });
+});
+
+describe('W3-02 #4: resolveSubscriptionPrices & write DTO billingCycle', () => {
+  const vnd = (amountMinor: bigint) => ({ amountMinor, currency: 'VND' });
+
+  it.each([
+    {
+      label: 'monthlyUnitPrice 500.000 ANNUAL -> monthly 500.000, unit 6.000.000',
+      cycle: 'ANNUAL' as const,
+      sentMonthly: vnd(500_000n),
+      sentUnit: undefined,
+      expectedMonthly: 500_000n,
+      expectedUnit: 6_000_000n,
+    },
+    {
+      label: 'unitPrice 6.000.000 ANNUAL -> monthly 500.000, unit 6.000.000',
+      cycle: 'ANNUAL' as const,
+      sentMonthly: undefined,
+      sentUnit: vnd(6_000_000n),
+      expectedMonthly: 500_000n,
+      expectedUnit: 6_000_000n,
+    },
+    {
+      label: 'unitPrice 1.000.001 ANNUAL (kills ceil) -> monthly 83.333, unit 999.996',
+      cycle: 'ANNUAL' as const,
+      sentMonthly: undefined,
+      sentUnit: vnd(1_000_001n),
+      expectedMonthly: 83_333n,
+      expectedUnit: 999_996n,
+    },
+    {
+      label: 'unitPrice 1.000.002 ANNUAL (boundary, kills floor) -> monthly 83.334, unit 1.000.008',
+      cycle: 'ANNUAL' as const,
+      sentMonthly: undefined,
+      sentUnit: vnd(1_000_002n),
+      expectedMonthly: 83_334n,
+      expectedUnit: 1_000_008n,
+    },
+    {
+      label: 'monthlyUnitPrice 500.000 MONTHLY -> monthly 500.000, unit 500.000',
+      cycle: 'MONTHLY' as const,
+      sentMonthly: vnd(500_000n),
+      sentUnit: undefined,
+      expectedMonthly: 500_000n,
+      expectedUnit: 500_000n,
+    },
+    {
+      label: 'matching monthly 500.000 and unit 6.000.000 ANNUAL -> accepted',
+      cycle: 'ANNUAL' as const,
+      sentMonthly: vnd(500_000n),
+      sentUnit: vnd(6_000_000n),
+      expectedMonthly: 500_000n,
+      expectedUnit: 6_000_000n,
+    },
+  ])('$label', ({ cycle, sentMonthly, sentUnit, expectedMonthly, expectedUnit }) => {
+    const resolved = resolveSubscriptionPrices({
+      kind: 'TERM',
+      billingCycle: cycle,
+      cycleChanged: false,
+      sentMonthly,
+      sentUnit,
+    });
+
+    expect(resolved.monthlyUnitPriceMinor).toBe(expectedMonthly);
+    expect(resolved.unitMoney).toEqual({ amountMinor: expectedUnit, currency: 'VND' });
+  });
+
+  it('refuses mismatched monthlyUnitPrice and unitPrice with 422 SUBSCRIPTION.PRICE_MISMATCH and details.expectedUnitPrice', () => {
+    let caught: unknown;
+    try {
+      resolveSubscriptionPrices({
+        kind: 'TERM',
+        billingCycle: 'ANNUAL',
+        cycleChanged: false,
+        sentMonthly: vnd(500_000n),
+        sentUnit: vnd(6_000_001n),
+      });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(SubscriptionPriceMismatchError);
+    const httpEx = toSubscriptionApiException(caught);
+    expect(httpEx).toMatchObject({
+      status: 422,
+      response: {
+        code: 'SUBSCRIPTION.PRICE_MISMATCH',
+        details: { expectedUnitPrice: { amount: '6000000', currency: 'VND' } },
+      },
+    });
+  });
+
+  it.each(['QUARTERLY', 'OTHER'] as const)(
+    'rejects %s in write DTOs (422 VALIDATION_ERROR at HTTP boundary) while accepting MONTHLY and ANNUAL',
+    (badCycle) => {
+      const baseCreate = { planId: '00000000-0000-4000-8000-000000000001', kind: 'TERM' as const };
+      expect(declareSubscriptionBodySchema.safeParse({ ...baseCreate, billingCycle: badCycle }).success).toBe(false);
+      expect(updateSubscriptionBodySchema.safeParse({ billingCycle: badCycle }).success).toBe(false);
+      expect(declareSubscriptionBodySchema.safeParse({ ...baseCreate, billingCycle: 'ANNUAL' }).success).toBe(true);
+      expect(updateSubscriptionBodySchema.safeParse({ billingCycle: 'MONTHLY' }).success).toBe(true);
+    },
+  );
 });

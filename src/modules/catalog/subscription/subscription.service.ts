@@ -14,7 +14,13 @@ import {
   SubscriptionPlanNotFoundError,
   SubscriptionStillDraftError,
 } from './subscription.errors';
-import { assertSubscriptionShape, declaredStateOf, missingData, subscriptionStatusOf } from './subscription.policy';
+import {
+  assertSubscriptionShape,
+  declaredStateOf,
+  missingData,
+  resolveSubscriptionPrices,
+  subscriptionStatusOf,
+} from './subscription.policy';
 import { assertDeclarableCycle } from './pool/subscription-pool.policy';
 import { SubscriptionRepo } from './subscription.repo';
 import { snapshotOf, stateOf } from './subscription.mapper';
@@ -41,6 +47,7 @@ export interface DeclareSubscriptionInput {
   purchasedQuantity?: number;
   /** The unit price in dong (`QĐ-111an`); another currency is refused with SubscriptionPriceNotVndError. */
   unitPrice?: { amount: string; currency: string };
+  monthlyUnitPrice?: { amount: string; currency: string };
   /** The price the vendor quoted in another currency, only kept beside the price in dong (R-44). */
   originalPrice?: { amount: string; currency: string };
   billingCycle?: BillingCycle;
@@ -60,6 +67,7 @@ export interface DeclareSubscriptionInput {
 export interface UpdateSubscriptionInput {
   purchasedQuantity?: number;
   unitPrice?: { amount: string; currency: string };
+  monthlyUnitPrice?: { amount: string; currency: string };
   /** `null` takes the recorded original price away. */
   originalPrice?: { amount: string; currency: string } | null;
   billingCycle?: BillingCycle;
@@ -164,13 +172,28 @@ export class SubscriptionService {
    */
   async declare(actor: AuthenticatedPrincipal, input: DeclareSubscriptionInput): Promise<SubscriptionView> {
     assertDeclarableCycle(input.billingCycle);
-    const money = input.unitPrice ? await this.pricing.read(input.unitPrice) : null;
+    const sentUnit = input.unitPrice ? await this.pricing.read(input.unitPrice, 'unitPrice') : undefined;
+    const sentMonthly = input.monthlyUnitPrice
+      ? await this.pricing.read(input.monthlyUnitPrice, 'monthlyUnitPrice')
+      : undefined;
+    const resolvedPrice = resolveSubscriptionPrices({
+      kind: input.kind,
+      billingCycle: input.billingCycle ?? null,
+      cycleChanged: false,
+      sentMonthly,
+      sentUnit,
+    });
     const originalPrice = input.originalPrice ? await this.pricing.readOriginal(input.originalPrice) : null;
     const organizationId = await this.requireOrganizationId();
     if (input.responsibleItAdminEmployeeId) await this.poolRules.requireItAdmin(input.responsibleItAdminEmployeeId);
 
     const record = await this.runner.run((tx) =>
-      this.declareIn(tx, actor, input, { money, originalPrice, organizationId }),
+      this.declareIn(tx, actor, input, {
+        money: resolvedPrice.unitMoney,
+        monthlyUnitPriceMinor: resolvedPrice.monthlyUnitPriceMinor,
+        originalPrice,
+        organizationId,
+      }),
     );
 
     return (await this.views.viewAll([record]))[0];
@@ -182,19 +205,22 @@ export class SubscriptionService {
     input: DeclareSubscriptionInput,
     ctx: {
       money: { amountMinor: bigint; currency: string } | null;
+      monthlyUnitPriceMinor: bigint | null;
       originalPrice: OriginalPriceRecord | null;
       organizationId: string;
     },
   ): Promise<SubscriptionRecord> {
-    const { money, originalPrice, organizationId } = ctx;
+    const { money, monthlyUnitPriceMinor, originalPrice, organizationId } = ctx;
     // The plan is locked `FOR UPDATE` before anything else: no row of this subscription exists yet to lock, so the plan is what two
     // declarations of the same K2 or K4 plan take turns on (R-E02); every other writer locks a subscription first, then its plan.
     const plan = await this.plans.lockExclusive(tx, input.planId);
     if (!plan) throw new SubscriptionPlanNotFoundError();
     if (plan.applicationStatus === 'RETIRED') throw new SubscriptionApplicationRetiredError();
     await this.poolRules.assertNoLiveDuplicate(tx, plan, null, organizationId);
+    const commitmentTermMonths =
+      input.commitmentTermMonths ?? (input.kind === 'TERM' ? (plan.referenceCommitmentMonths ?? undefined) : undefined);
     const state = {
-      ...declaredStateOf(input),
+      ...declaredStateOf({ ...input, commitmentTermMonths }),
       // QĐ-111g: a declaration that names nobody takes the IT Admin responsible for the application, when they still work as one.
       responsibleItAdminEmployeeId: await this.poolRules.responsibleOfDeclaration(
         tx,
@@ -214,6 +240,7 @@ export class SubscriptionService {
       kind: input.kind,
       ...state,
       ...priced,
+      monthlyUnitPriceMinor,
       originalPrice,
       status: complete,
     });

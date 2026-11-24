@@ -223,3 +223,11 @@ export class PlanKeyBindingNotApplicableError extends Error {
     this.name = 'PlanKeyBindingNotApplicableError';
   }
 }
+
+/** Only a K1 or K2 plan has a reference commitment term (1 or 12 months). */
+export class PlanReferenceCommitmentNotApplicableError extends Error {
+  constructor() {
+    super('Only a K1 or K2 plan has a reference commitment term.');
+    this.name = 'PlanReferenceCommitmentNotApplicableError';
+  }
+}

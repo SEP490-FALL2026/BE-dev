@@ -72,6 +72,7 @@ describe('SubscriptionPoolService.assertVendorAdmins and assertActivation', () =
     pricingModel: 'PER_SEAT',
     sharingPolicy: null,
     hasAdminConsole: false,
+    referenceCommitmentMonths: null,
   };
   const k1Plan: LockedPlan = {
     ...k2Plan,

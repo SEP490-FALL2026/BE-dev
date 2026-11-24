@@ -1,4 +1,9 @@
-import { seatIncreaseNoticeOwed, seatIncreaseRecipients } from './subscription-seat-increase.policy';
+import {
+  seatIncreaseNoticeOwed,
+  seatIncreaseRecipients,
+  seatReductionNoticeOwed,
+  seatReductionRecipients,
+} from './subscription-seat-increase.policy';
 
 describe('subscription-seat-increase.policy (seat increase notice)', () => {
   describe('seatIncreaseNoticeOwed: only a K2 or K4 pool whose bought seats rise', () => {
@@ -86,6 +91,58 @@ describe('subscription-seat-increase.policy (seat increase notice)', () => {
           actor: 'it-b',
         }),
       ).toEqual([]);
+    });
+  });
+
+  describe('W3-03 seatReductionNoticeOwed & seatReductionRecipients (R1 + R2)', () => {
+    it.each([
+      ['K2', 'ACTIVE', 12, 11, true],
+      ['K2', 'ACTIVE', 11, 12, false],
+      ['K2', 'ACTIVE', 12, 12, false],
+      ['K2', 'DRAFT', 12, 11, false],
+      ['K1', 'ACTIVE', 12, 11, false],
+      ['K4', 'ACTIVE', 12, 11, false],
+    ] as const)(
+      'a %s %s subscription going from %s to %s owes reduction notice: %s',
+      (type, status, from, to, owed) => {
+        expect(seatReductionNoticeOwed({ planProvisioningType: type, status, from, to })).toBe(owed);
+      },
+    );
+
+    it('notifies responsible IT Admin + Finance when another IT Admin reduces seats', () => {
+      expect(
+        seatReductionRecipients({
+          responsible: 'khoa',
+          responsibleUsable: true,
+          superAdmin: 'sa',
+          finance: 'fin',
+          actor: 'nam',
+        }),
+      ).toEqual(['khoa', 'fin']);
+    });
+
+    it('notifies only Finance when the usable responsible IT Admin reduces seats themselves', () => {
+      expect(
+        seatReductionRecipients({
+          responsible: 'khoa',
+          responsibleUsable: true,
+          superAdmin: 'sa',
+          finance: 'fin',
+          actor: 'khoa',
+        }),
+      ).toEqual(['fin']);
+    });
+
+    it('falls back to Super Admin + Finance when the responsible IT Admin account is locked/unusable', () => {
+      expect(
+        seatReductionRecipients({
+          responsible: 'khoa',
+          responsibleUsable: false,
+          superAdmin: 'sa',
+          finance: 'fin',
+          actor: 'nam',
+        }),
+      ).toEqual(['sa', 'fin']);
     });
   });
 });

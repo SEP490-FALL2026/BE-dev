@@ -11,6 +11,7 @@ import {
   PlanPrimaryOwnerNotListedError,
   PlanProvisioningTypeMismatchError,
   PlanProvisioningTypeNotSupportedError,
+  PlanReferenceCommitmentNotApplicableError,
   PlanWorkspaceLimitExceededError,
   PlanWorkspaceMemberDuplicateError,
   PlanWorkspaceTextInvalidError,
@@ -19,9 +20,11 @@ import {
   applicationPlanName,
   assertPlanShape,
   assertPricingModelDerived,
+  assertReferenceCommitmentMonths,
   assertReferencePrice,
   assertWorkspaceShape,
   canAdoptQuotePrice,
+  referenceCommitmentOnKindChange,
   referencePriceOnKindChange,
   cleanPlanName,
   derivedPricingModel,
@@ -347,5 +350,26 @@ describe('QĐ-113a: the reference price of a plan', () => {
     expect(canAdoptQuotePrice('K4', null)).toBe(false);
     expect(canAdoptQuotePrice('K5', null)).toBe(false);
     expect(canAdoptQuotePrice('K2', price)).toBe(false);
+  });
+});
+
+describe('W3-02: referenceCommitmentMonths of a plan', () => {
+  it.each(['K1', 'K2'] as const)('accepts 1, 12 or null on a %s plan', (kind) => {
+    expect(() => assertReferenceCommitmentMonths(kind, 1)).not.toThrow();
+    expect(() => assertReferenceCommitmentMonths(kind, 12)).not.toThrow();
+    expect(() => assertReferenceCommitmentMonths(kind, null)).not.toThrow();
+  });
+
+  it.each(['K3', 'K4', 'K5'] as const)('refuses non-null on a %s plan', (kind) => {
+    expect(() => assertReferenceCommitmentMonths(kind, 12)).toThrow(PlanReferenceCommitmentNotApplicableError);
+    expect(() => assertReferenceCommitmentMonths(kind, null)).not.toThrow();
+  });
+
+  it('clears referenceCommitmentMonths when leaving K1/K2 and keeps it between K1 and K2', () => {
+    expect(referenceCommitmentOnKindChange('K2', 'K4')).toBe('CLEAR');
+    expect(referenceCommitmentOnKindChange('K1', 'K5')).toBe('CLEAR');
+    expect(referenceCommitmentOnKindChange('K1', 'K2')).toBe('KEEP');
+    expect(referenceCommitmentOnKindChange('K2', 'K1')).toBe('KEEP');
+    expect(referenceCommitmentOnKindChange('K2', 'K2')).toBe('KEEP');
   });
 });

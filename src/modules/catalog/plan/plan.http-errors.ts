@@ -12,6 +12,7 @@ import {
   PlanApplicationRetiredError,
   PlanProvisioningTypeNotSupportedError,
   PlanProvisioningTypeMismatchError,
+  PlanReferenceCommitmentNotApplicableError,
   PlanReferencePriceNotApplicableError,
   PlanReferencePriceNotPositiveError,
   PlanReferencePriceNotVndError,
@@ -89,6 +90,8 @@ export function toPlanApiException(error: unknown): unknown {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.ADMIN_CONSOLE_NOT_APPLICABLE', error.message);
   if (error instanceof PlanKeyBindingNotApplicableError)
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.KEY_BINDING_NOT_APPLICABLE', error.message);
+  if (error instanceof PlanReferenceCommitmentNotApplicableError)
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.REFERENCE_COMMITMENT_NOT_APPLICABLE', error.message);
   if (error instanceof PlanVendorAdminsInvalidError)
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.VENDOR_ADMINS_INVALID', error.message, {
       given: error.given,
@@ -145,6 +148,7 @@ export const PLAN_ERROR_EXAMPLES = {
   REFERENCE_PRICE_NOT_VND: example(new PlanReferencePriceNotVndError('USD')),
   REFERENCE_PRICE_NOT_POSITIVE: example(new PlanReferencePriceNotPositiveError()),
   REFERENCE_PRICE_NOT_APPLICABLE: example(new PlanReferencePriceNotApplicableError()),
+  REFERENCE_COMMITMENT_NOT_APPLICABLE: example(new PlanReferenceCommitmentNotApplicableError()),
   CONTROL_LEVEL_REQUIRED: example(new PlanControlLevelRequiredError()),
   DATA_LOSS_NOTE_REQUIRED: example(new PlanDataLossNoteRequiredError()),
   UPDATE_EMPTY: example(new PlanUpdateEmptyError()),

@@ -1,4 +1,5 @@
 import { addDays, type BusinessDate } from '../../../core/business-date';
+import { DONG, type Money } from '../../../core/money/money';
 import { isPricedInDong } from './price/subscription-price.policy';
 import {
   SubscriptionDatesInvalidError,
@@ -6,11 +7,13 @@ import {
   SubscriptionPerpetualHasNoTermError,
   SubscriptionPerpetualNeedsLicensedApplicationError,
   SubscriptionPlanHasNoSubscriptionError,
+  SubscriptionPriceMismatchError,
   SubscriptionQuantityReasonRequiredError,
   SubscriptionVersionRequiredError,
 } from './subscription.errors';
 import type {
   ApplicationKind,
+  BillingCycle,
   MissingItem,
   NoticeSource,
   PlanKeyBinding,
@@ -345,4 +348,97 @@ export function judgeQuantityChange(input: QuantityChangeInput): string | undefi
   }
 
   return input.quantityChangeReason;
+}
+
+const CYCLE_MONTHS_BY_CYCLE: Readonly<Record<string, bigint>> = {
+  MONTHLY: 1n,
+  QUARTERLY: 3n,
+  ANNUAL: 12n,
+};
+
+/** Months in a billing cycle for monthly/unit conversion, or null when not periodic. */
+export function cycleMonthsOf(billingCycle: BillingCycle | null | undefined): bigint | null {
+  return billingCycle ? (CYCLE_MONTHS_BY_CYCLE[billingCycle] ?? null) : null;
+}
+
+/** Integer round-half-up: `(unitMinor * 2 + m) / (2 * m)`. */
+export function monthlyFromUnitRoundHalfUp(unitMinor: bigint, cycleMonths: bigint): bigint {
+  return (unitMinor * 2n + cycleMonths) / (2n * cycleMonths);
+}
+
+/** Derives `monthlyUnitPriceMinor` from a VND `unitPrice` and `billingCycle` when callers omit `monthlyUnitPriceMinor`. */
+export function derivedMonthlyUnitPriceMinor(
+  unitPrice: { amountMinor: bigint; currency: string } | null,
+  billingCycle: BillingCycle | null,
+): bigint | null {
+  const m = cycleMonthsOf(billingCycle);
+
+  return m !== null && unitPrice?.currency === DONG ? monthlyFromUnitRoundHalfUp(unitPrice.amountMinor, m) : null;
+}
+
+function resolveSentPrices(m: bigint | null, sentMonthly: Money | undefined, sentUnit: Money | undefined) {
+  if (sentMonthly !== undefined && sentUnit !== undefined) {
+    if (m === null) return { monthlyUnitPriceMinor: sentMonthly.amountMinor, unitMoney: sentUnit };
+    const expectedUnitMinor = sentMonthly.amountMinor * m;
+    if (sentUnit.amountMinor !== expectedUnitMinor) throw new SubscriptionPriceMismatchError(expectedUnitMinor);
+
+    return {
+      monthlyUnitPriceMinor: sentMonthly.amountMinor,
+      unitMoney: { amountMinor: expectedUnitMinor, currency: DONG },
+    };
+  }
+  if (sentMonthly !== undefined) {
+    return {
+      monthlyUnitPriceMinor: sentMonthly.amountMinor,
+      unitMoney: m !== null ? { amountMinor: sentMonthly.amountMinor * m, currency: DONG } : null,
+    };
+  }
+  if (m === null) return { monthlyUnitPriceMinor: null, unitMoney: sentUnit! };
+  const monthlyMinor = monthlyFromUnitRoundHalfUp(sentUnit!.amountMinor, m);
+
+  return { monthlyUnitPriceMinor: monthlyMinor, unitMoney: { amountMinor: monthlyMinor * m, currency: DONG } };
+}
+
+function resolveUnchangedPrices(
+  m: bigint | null,
+  cycleChanged: boolean,
+  currentMonthly: bigint | null,
+  currentUnit: Money | null,
+) {
+  if (m !== null && currentMonthly !== null && cycleChanged) {
+    return { monthlyUnitPriceMinor: currentMonthly, unitMoney: { amountMinor: currentMonthly * m, currency: DONG } };
+  }
+  if (m !== null && currentMonthly === null && currentUnit?.currency === DONG && cycleChanged) {
+    const monthlyMinor = monthlyFromUnitRoundHalfUp(currentUnit.amountMinor, m);
+
+    return { monthlyUnitPriceMinor: monthlyMinor, unitMoney: { amountMinor: monthlyMinor * m, currency: DONG } };
+  }
+
+  return { monthlyUnitPriceMinor: currentMonthly, unitMoney: currentUnit };
+}
+
+/**
+ * Resolves `monthlyUnitPriceMinor` and the derived `unitPrice` for a declaration or update.
+ * Throws `SubscriptionPriceMismatchError` when both `monthlyUnitPrice` and `unitPrice` are provided and disagree.
+ */
+export function resolveSubscriptionPrices(input: {
+  kind: SubscriptionKind;
+  billingCycle: BillingCycle | null;
+  cycleChanged: boolean;
+  sentMonthly: Money | undefined;
+  sentUnit: Money | undefined;
+  currentMonthlyMinor?: bigint | null;
+  currentUnitMoney?: Money | null;
+}): { monthlyUnitPriceMinor: bigint | null; unitMoney: Money | null } {
+  const currentMonthly = input.currentMonthlyMinor ?? null;
+  const currentUnit = input.currentUnitMoney ?? null;
+  if (input.kind === 'PERPETUAL') {
+    return { monthlyUnitPriceMinor: null, unitMoney: input.sentUnit ?? currentUnit };
+  }
+  const m = cycleMonthsOf(input.billingCycle);
+  if (input.sentMonthly !== undefined || input.sentUnit !== undefined) {
+    return resolveSentPrices(m, input.sentMonthly, input.sentUnit);
+  }
+
+  return resolveUnchangedPrices(m, input.cycleChanged, currentMonthly, currentUnit);
 }

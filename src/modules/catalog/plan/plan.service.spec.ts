@@ -6,10 +6,12 @@ import type { OrganizationReadApi } from '../../organization/public/organization
 import type { ApplicationFactsService } from '../catalog-entry/application-facts.service';
 import {
   PlanNotFoundError,
+  PlanReferenceCommitmentNotApplicableError,
   PlanReferencePriceNotApplicableError,
   PlanReferencePriceNotPositiveError,
   PlanReferencePriceNotVndError,
 } from './plan.errors';
+import { toPlanApiException } from './plan.http-errors';
 import type { PlanRepo } from './plan.repo';
 import { PlanService } from './plan.service';
 import type { PlanWorkspaceService } from './plan-workspace.service';
@@ -17,25 +19,87 @@ import type { PlanWorkspaceService } from './plan-workspace.service';
 const ACTOR = { appUserId: 'it-admin', roles: ['IT_ADMIN'], sessionId: 'session' } as unknown as AuthenticatedPrincipal;
 const TX = {} as DbTx;
 
-function setup(current: { provisioningType: string } | null) {
+function setup(
+  current: {
+    provisioningType: string;
+    referenceCommitmentMonths?: 1 | 12 | null;
+    applicationKind?: 'SAAS' | 'INTERNAL';
+  } | null,
+  applicationKind: 'SAAS' | 'INTERNAL' = 'SAAS',
+) {
   const parseMoney = jest.fn((price: { amount: string; currency: string }) =>
     Promise.resolve({ amountMinor: BigInt(price.amount), currency: price.currency }),
   );
+  const insert = jest.fn((_tx: DbTx, input: Record<string, unknown>) =>
+    Promise.resolve({
+      id: 'plan-1',
+      applicationName: 'App',
+      applicationLogoUrl: null,
+      applicationKind,
+      createdAt: new Date('2026-11-25T00:00:00.000Z'),
+      updatedAt: new Date('2026-11-25T00:00:00.000Z'),
+      ...input,
+    }),
+  );
+  const update = jest.fn((_tx: DbTx, id: string, changes: Record<string, unknown>) =>
+    Promise.resolve({
+      id,
+      applicationId: 'app',
+      applicationName: 'App',
+      applicationLogoUrl: null,
+      applicationKind: current?.applicationKind ?? applicationKind,
+      name: 'Plan',
+      provisioningType: current?.provisioningType ?? 'K2',
+      keyBinding: null,
+      pricingModel: 'PER_SEAT',
+      controlLevel: 'FULL',
+      revocationNote: null,
+      dataLossOnRemoval: false,
+      sharingPolicy: null,
+      hasAdminConsole: false,
+      referencePrice: null,
+      referenceCommitmentMonths: current?.referenceCommitmentMonths ?? null,
+      createdAt: new Date('2026-11-25T00:00:00.000Z'),
+      updatedAt: new Date('2026-11-25T00:00:01.000Z'),
+      ...changes,
+    }),
+  );
   const service = new PlanService(
     {
-      lock: jest.fn().mockResolvedValue(current && { ...current, applicationKind: 'SAAS', referencePrice: null }),
+      lock: jest.fn().mockResolvedValue(
+        current && {
+          id: 'plan-1',
+          applicationId: 'app',
+          applicationName: 'App',
+          applicationLogoUrl: null,
+          applicationKind: current.applicationKind ?? applicationKind,
+          name: 'Plan',
+          keyBinding: null,
+          pricingModel: current.provisioningType === 'K1' || current.provisioningType === 'K2' ? 'PER_SEAT' : null,
+          controlLevel: current.provisioningType === 'K5' ? null : 'FULL',
+          revocationNote: null,
+          dataLossOnRemoval: false,
+          sharingPolicy: null,
+          hasAdminConsole: false,
+          referencePrice: null,
+          referenceCommitmentMonths: null,
+          ...current,
+        },
+      ),
+      insert,
+      update,
     } as unknown as PlanRepo,
     {} as PlanWorkspaceService,
     {
-      lockShared: jest.fn().mockResolvedValue({ id: 'app', kind: 'SAAS', status: 'ACTIVE' }),
+      lockShared: jest.fn().mockResolvedValue({ id: 'app', kind: applicationKind, status: 'ACTIVE' }),
     } as unknown as ApplicationFactsService,
     { getOrganization: jest.fn().mockResolvedValue({ id: 'org' }) } as unknown as OrganizationReadApi,
     { parseMoney } as unknown as FinanceApi,
-    {} as AuditApi,
+    { record: jest.fn() } as unknown as AuditApi,
     { run: (work: (tx: DbTx) => unknown) => work(TX) } as unknown as TransactionRunner,
   );
 
-  return { service, parseMoney };
+  return { service, parseMoney, insert, update };
 }
 
 const dollars = { amount: '20', currency: 'USD' };
@@ -78,5 +142,48 @@ describe('QĐ-113a the reference price of a plan is judged kind first, then curr
     await expect(service.update(ACTOR, 'plan', { referencePrice: { amount, currency: 'VND' } })).rejects.toBeInstanceOf(
       PlanReferencePriceNotPositiveError,
     );
+  });
+});
+
+describe('W3-02: referenceCommitmentMonths on plan declare & update', () => {
+  it.each(['K4', 'K5'] as const)(
+    'refuses referenceCommitmentMonths on a %s plan with 422 PLAN.REFERENCE_COMMITMENT_NOT_APPLICABLE',
+    async (kind) => {
+      const appKind = kind === 'K5' ? 'INTERNAL' : 'SAAS';
+      const { service } = setup({ provisioningType: kind, applicationKind: appKind }, appKind);
+
+      const declareErr = await service
+        .declare(ACTOR, {
+          applicationId: 'app',
+          name: 'Plan',
+          provisioningType: kind,
+          controlLevel: kind === 'K5' ? undefined : 'FULL',
+          referenceCommitmentMonths: 12,
+        })
+        .catch((e: unknown) => e);
+      expect(declareErr).toBeInstanceOf(PlanReferenceCommitmentNotApplicableError);
+      const httpEx = toPlanApiException(declareErr);
+      expect(httpEx).toMatchObject({ status: 422, response: { code: 'PLAN.REFERENCE_COMMITMENT_NOT_APPLICABLE' } });
+
+      await expect(service.update(ACTOR, 'plan', { referenceCommitmentMonths: 1 })).rejects.toBeInstanceOf(
+        PlanReferenceCommitmentNotApplicableError,
+      );
+    },
+  );
+
+  it('stores referenceCommitmentMonths on K1/K2 declare and clears it with null on update', async () => {
+    const { service, insert, update } = setup({ provisioningType: 'K2', referenceCommitmentMonths: 12 });
+
+    await service.declare(ACTOR, {
+      applicationId: 'app',
+      name: 'Team',
+      provisioningType: 'K2',
+      controlLevel: 'FULL',
+      referenceCommitmentMonths: 12,
+    });
+    expect(insert).toHaveBeenCalledWith(TX, expect.objectContaining({ referenceCommitmentMonths: 12 }));
+
+    await service.update(ACTOR, 'plan-1', { referenceCommitmentMonths: null });
+    expect(update).toHaveBeenCalledWith(TX, 'plan-1', expect.objectContaining({ referenceCommitmentMonths: null }));
   });
 });

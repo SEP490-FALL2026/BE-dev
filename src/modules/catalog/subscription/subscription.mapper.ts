@@ -7,6 +7,7 @@ export const snapshotOf = (record: SubscriptionRecord) => ({
   unitPrice: record.unitPrice
     ? `${record.unitPrice.amountMinor} ${record.unitPrice.currency} on ${record.unitPrice.recordedOn}`
     : null,
+  monthlyUnitPriceMinor: record.monthlyUnitPriceMinor?.toString() ?? null,
   reporting: record.priceSnapshot
     ? `${record.priceSnapshot.reportingMinor} ${record.priceSnapshot.reportingCurrency} at ${formatRate(record.priceSnapshot.rate)} of ${record.priceSnapshot.rateDate}`
     : null,
@@ -31,6 +32,7 @@ export const stateOf = (record: SubscriptionRecord): SubscriptionState => ({
   status: record.status,
   purchasedQuantity: record.purchasedQuantity,
   unitPrice: record.unitPrice,
+  monthlyUnitPriceMinor: record.monthlyUnitPriceMinor,
   priceSnapshot: record.priceSnapshot,
   originalPrice: record.originalPrice,
   billingCycle: record.billingCycle,
@@ -53,6 +55,7 @@ const canonical = (state: SubscriptionState): string =>
     state.status,
     state.purchasedQuantity,
     state.unitPrice && [state.unitPrice.amountMinor.toString(), state.unitPrice.currency, state.unitPrice.recordedOn],
+    state.monthlyUnitPriceMinor?.toString() ?? null,
     state.priceSnapshot && [
       state.priceSnapshot.rate.toString(),
       state.priceSnapshot.rateDate,

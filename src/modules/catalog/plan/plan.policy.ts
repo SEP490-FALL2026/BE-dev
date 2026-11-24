@@ -11,13 +11,21 @@ import {
   PlanPrimaryOwnerNotListedError,
   PlanProvisioningTypeMismatchError,
   PlanProvisioningTypeNotSupportedError,
+  PlanReferenceCommitmentNotApplicableError,
   PlanReferencePriceNotApplicableError,
   PlanReferencePriceNotVndError,
   PlanWorkspaceLimitExceededError,
   PlanWorkspaceMemberDuplicateError,
   PlanWorkspaceTextInvalidError,
 } from './plan.errors';
-import type { PricingModel, ProvisioningType, ReferencePrice, SeatTracking, WorkspaceRole } from './plan.types';
+import type {
+  PricingModel,
+  ProvisioningType,
+  ReferenceCommitmentMonths,
+  ReferencePrice,
+  SeatTracking,
+  WorkspaceRole,
+} from './plan.types';
 
 export const MAX_NAME_LENGTH = 200;
 export const MAX_NOTE_LENGTH = 2000;
@@ -171,4 +179,20 @@ export function referencePriceOnKindChange(from: ProvisioningType, to: Provision
 /** Whether the quote of an assessment may become the reference price of the plan the request is linked to (`QĐ-113a`): a K1 or K2 plan that has none; a K4 plan is priced by the IT Admin. */
 export function canAdoptQuotePrice(type: ProvisioningType, current: ReferencePrice | null): boolean {
   return (type === 'K1' || type === 'K2') && current === null;
+}
+
+/** Only a K1 or K2 plan carries a reference commitment term (1 or 12 months). */
+export function assertReferenceCommitmentMonths(
+  type: ProvisioningType,
+  months: ReferenceCommitmentMonths | null,
+): void {
+  if (months === null) return;
+  if (type !== 'K1' && type !== 'K2') throw new PlanReferenceCommitmentNotApplicableError();
+}
+
+/** Keeps the reference commitment term between K1 and K2, and clears it when moving to any other kind. */
+export function referenceCommitmentOnKindChange(from: ProvisioningType, to: ProvisioningType): 'KEEP' | 'CLEAR' {
+  if (from === to) return 'KEEP';
+
+  return to === 'K1' || to === 'K2' ? 'KEEP' : 'CLEAR';
 }

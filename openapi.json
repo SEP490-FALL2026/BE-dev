@@ -23549,7 +23549,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.APPLICATION_NOT_FOUND, APPLICATION_RETIRED, NAME_INVALID, NOTE_INVALID, PROVISIONING_TYPE_NOT_SUPPORTED, PROVISIONING_TYPE_MISMATCH, PRICING_MODEL_REQUIRED, PRICING_MODEL_NOT_APPLICABLE, PRICING_MODEL_NOT_DERIVED (the pricing model follows the kind of provisioning: leave it out or send the implied one; details.expected), CONTROL_LEVEL_REQUIRED, DATA_LOSS_NOTE_REQUIRED, ADMIN_CONSOLE_NOT_APPLICABLE (the flag hasAdminConsole belongs to a K4 plan alone, and not to one bundled with the machine), REFERENCE_PRICE_NOT_VND (the reference price is in dong), KEY_BINDING_NOT_APPLICABLE (only a K4 plan has a keyBinding), REFERENCE_PRICE_NOT_APPLICABLE (only a K1, K2 or K4 plan has one, and a K4 plan bundled with the machine has none), REFERENCE_PRICE_NOT_POSITIVE (zero or less is no price), MONEY_SCALE_EXCEEDED or MONEY_OUT_OF_RANGE (a too large amount) or UPDATE_EMPTY.",
+            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.APPLICATION_NOT_FOUND, APPLICATION_RETIRED, NAME_INVALID, NOTE_INVALID, PROVISIONING_TYPE_NOT_SUPPORTED, PROVISIONING_TYPE_MISMATCH, PRICING_MODEL_REQUIRED, PRICING_MODEL_NOT_APPLICABLE, PRICING_MODEL_NOT_DERIVED (the pricing model follows the kind of provisioning: leave it out or send the implied one; details.expected), CONTROL_LEVEL_REQUIRED, DATA_LOSS_NOTE_REQUIRED, ADMIN_CONSOLE_NOT_APPLICABLE (the flag hasAdminConsole belongs to a K4 plan alone, and not to one bundled with the machine), REFERENCE_PRICE_NOT_VND (the reference price is in dong), KEY_BINDING_NOT_APPLICABLE (only a K4 plan has a keyBinding), REFERENCE_PRICE_NOT_APPLICABLE (only a K1, K2 or K4 plan has one, and a K4 plan bundled with the machine has none), REFERENCE_COMMITMENT_NOT_APPLICABLE (only a K1 or K2 plan has a reference commitment term), REFERENCE_PRICE_NOT_POSITIVE (zero or less is no price), MONEY_SCALE_EXCEEDED or MONEY_OUT_OF_RANGE (a too large amount) or UPDATE_EMPTY.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -23729,6 +23729,17 @@
                       "error": {
                         "code": "PLAN.REFERENCE_PRICE_NOT_APPLICABLE",
                         "message": "Only a K1, K2 or K4 plan has a reference price.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PLAN.REFERENCE_COMMITMENT_NOT_APPLICABLE": {
+                    "summary": "Only a K1 or K2 plan has a reference commitment term.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PLAN.REFERENCE_COMMITMENT_NOT_APPLICABLE",
+                        "message": "Only a K1 or K2 plan has a reference commitment term.",
                         "requestId": "req_example"
                       }
                     }
@@ -24198,7 +24209,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.APPLICATION_NOT_FOUND, APPLICATION_RETIRED, NAME_INVALID, NOTE_INVALID, PROVISIONING_TYPE_NOT_SUPPORTED, PROVISIONING_TYPE_MISMATCH, PRICING_MODEL_REQUIRED, PRICING_MODEL_NOT_APPLICABLE, PRICING_MODEL_NOT_DERIVED (the pricing model follows the kind of provisioning: leave it out or send the implied one; details.expected), CONTROL_LEVEL_REQUIRED, DATA_LOSS_NOTE_REQUIRED, ADMIN_CONSOLE_NOT_APPLICABLE (the flag hasAdminConsole belongs to a K4 plan alone, and not to one bundled with the machine), REFERENCE_PRICE_NOT_VND (the reference price is in dong), KEY_BINDING_NOT_APPLICABLE (only a K4 plan has a keyBinding), REFERENCE_PRICE_NOT_APPLICABLE (only a K1, K2 or K4 plan has one, and a K4 plan bundled with the machine has none), REFERENCE_PRICE_NOT_POSITIVE (zero or less is no price), MONEY_SCALE_EXCEEDED or MONEY_OUT_OF_RANGE (a too large amount) or UPDATE_EMPTY.",
+            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.APPLICATION_NOT_FOUND, APPLICATION_RETIRED, NAME_INVALID, NOTE_INVALID, PROVISIONING_TYPE_NOT_SUPPORTED, PROVISIONING_TYPE_MISMATCH, PRICING_MODEL_REQUIRED, PRICING_MODEL_NOT_APPLICABLE, PRICING_MODEL_NOT_DERIVED (the pricing model follows the kind of provisioning: leave it out or send the implied one; details.expected), CONTROL_LEVEL_REQUIRED, DATA_LOSS_NOTE_REQUIRED, ADMIN_CONSOLE_NOT_APPLICABLE (the flag hasAdminConsole belongs to a K4 plan alone, and not to one bundled with the machine), REFERENCE_PRICE_NOT_VND (the reference price is in dong), KEY_BINDING_NOT_APPLICABLE (only a K4 plan has a keyBinding), REFERENCE_PRICE_NOT_APPLICABLE (only a K1, K2 or K4 plan has one, and a K4 plan bundled with the machine has none), REFERENCE_COMMITMENT_NOT_APPLICABLE (only a K1 or K2 plan has a reference commitment term), REFERENCE_PRICE_NOT_POSITIVE (zero or less is no price), MONEY_SCALE_EXCEEDED or MONEY_OUT_OF_RANGE (a too large amount) or UPDATE_EMPTY.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -24356,6 +24367,17 @@
                       "error": {
                         "code": "PLAN.REFERENCE_PRICE_NOT_APPLICABLE",
                         "message": "Only a K1, K2 or K4 plan has a reference price.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PLAN.REFERENCE_COMMITMENT_NOT_APPLICABLE": {
+                    "summary": "Only a K1 or K2 plan has a reference commitment term.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PLAN.REFERENCE_COMMITMENT_NOT_APPLICABLE",
+                        "message": "Only a K1 or K2 plan has a reference commitment term.",
                         "requestId": "req_example"
                       }
                     }
@@ -26816,7 +26838,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION.PLAN_NOT_FOUND and APPLICATION_RETIRED (declaring only), PLAN_HAS_NO_SUBSCRIPTION, PERPETUAL_NEEDS_LICENSED_APPLICATION, PERPETUAL_HAS_NO_TERM, DATES_INVALID or UPDATE_EMPTY; the shared-pool rules refuse COMMITMENT_TERM_REQUIRED (a term that becomes active names 1 or 12 months), COMMITMENT_TERM_NOT_ALLOWED (a perpetual purchase), K1_MONTHLY_ONLY (R-E01), K4_PERPETUAL_ONLY (a K4 plan is bought once: only a perpetual purchase is written for it), BILLING_LONGER_THAN_COMMITMENT (R-G01), BILLING_CYCLE_UNSUPPORTED (only MONTHLY and ANNUAL are written; QUARTERLY and OTHER stay readable on older data), RESPONSIBLE_REQUIRED (an active subscription names the IT Admin who answers for it), RESPONSIBLE_NOT_IT_ADMIN and VENDOR_ADMINS_REQUIRED (a plan that needs admins at the vendor, a K2 plan or a K4 plan with an admin console, is not activated as a new subscription, nor its pool made, once the seat baseline is closed while fewer than two different working IT Admins are recorded in its workspace profile; while the seat baseline is open it is let through and carries vendorAdminsBelowMinimum when read; the period a renewal continues is never asked, it only carries the flag vendorAdminsBelowMinimum), and an update may also be refused with PRIMARY_NOT_ELIGIBLE (details.reason); the unit price is refused with PRICE_NOT_VND (it is entered in dong only, details.currency), and the unit price and the original price with MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE or CURRENCY_NOT_SUPPORTED (the currency of the original price).",
+            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION.PLAN_NOT_FOUND and APPLICATION_RETIRED (declaring only), PLAN_HAS_NO_SUBSCRIPTION, PERPETUAL_NEEDS_LICENSED_APPLICATION, PERPETUAL_HAS_NO_TERM, DATES_INVALID or UPDATE_EMPTY; the shared-pool rules refuse COMMITMENT_TERM_REQUIRED (a term that becomes active names 1 or 12 months), COMMITMENT_TERM_NOT_ALLOWED (a perpetual purchase), K1_MONTHLY_ONLY (R-E01), K4_PERPETUAL_ONLY (a K4 plan is bought once: only a perpetual purchase is written for it), BILLING_LONGER_THAN_COMMITMENT (R-G01), BILLING_CYCLE_UNSUPPORTED (only MONTHLY and ANNUAL are written; QUARTERLY and OTHER stay readable on older data), RESPONSIBLE_REQUIRED (an active subscription names the IT Admin who answers for it), RESPONSIBLE_NOT_IT_ADMIN and VENDOR_ADMINS_REQUIRED (a plan that needs admins at the vendor, a K2 plan or a K4 plan with an admin console, is not activated as a new subscription, nor its pool made, once the seat baseline is closed while fewer than two different working IT Admins are recorded in its workspace profile; while the seat baseline is open it is let through and carries vendorAdminsBelowMinimum when read; the period a renewal continues is never asked, it only carries the flag vendorAdminsBelowMinimum), and an update may also be refused with PRIMARY_NOT_ELIGIBLE (details.reason); the unit price is refused with PRICE_NOT_VND (it is entered in dong only, details.currency) or PRICE_MISMATCH (when monthlyUnitPrice and unitPrice disagree, details.expectedUnitPrice), and the unit price and the original price with MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE or CURRENCY_NOT_SUPPORTED (the currency of the original price).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -27010,6 +27032,18 @@
                         "code": "SUBSCRIPTION.PRICE_NOT_VND",
                         "message": "The unit price is entered in dong (VND). Convert it first and keep the price quoted by the vendor as the original price.",
                         "details": { "currency": "USD" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.PRICE_MISMATCH": {
+                    "summary": "The provided unitPrice does not match monthlyUnitPrice multiplied by the billing cycle months.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.PRICE_MISMATCH",
+                        "message": "The provided unitPrice does not match monthlyUnitPrice multiplied by the billing cycle months.",
+                        "details": { "expectedUnitPrice": { "amount": "6000000", "currency": "VND" } },
                         "requestId": "req_example"
                       }
                     }
@@ -27492,7 +27526,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION.PLAN_NOT_FOUND and APPLICATION_RETIRED (declaring only), PLAN_HAS_NO_SUBSCRIPTION, PERPETUAL_NEEDS_LICENSED_APPLICATION, PERPETUAL_HAS_NO_TERM, DATES_INVALID or UPDATE_EMPTY; the shared-pool rules refuse COMMITMENT_TERM_REQUIRED (a term that becomes active names 1 or 12 months), COMMITMENT_TERM_NOT_ALLOWED (a perpetual purchase), K1_MONTHLY_ONLY (R-E01), K4_PERPETUAL_ONLY (a K4 plan is bought once: only a perpetual purchase is written for it), BILLING_LONGER_THAN_COMMITMENT (R-G01), BILLING_CYCLE_UNSUPPORTED (only MONTHLY and ANNUAL are written; QUARTERLY and OTHER stay readable on older data), RESPONSIBLE_REQUIRED (an active subscription names the IT Admin who answers for it), RESPONSIBLE_NOT_IT_ADMIN and VENDOR_ADMINS_REQUIRED (a plan that needs admins at the vendor, a K2 plan or a K4 plan with an admin console, is not activated as a new subscription, nor its pool made, once the seat baseline is closed while fewer than two different working IT Admins are recorded in its workspace profile; while the seat baseline is open it is let through and carries vendorAdminsBelowMinimum when read; the period a renewal continues is never asked, it only carries the flag vendorAdminsBelowMinimum), and an update may also be refused with PRIMARY_NOT_ELIGIBLE (details.reason); the unit price is refused with PRICE_NOT_VND (it is entered in dong only, details.currency), and the unit price and the original price with MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE or CURRENCY_NOT_SUPPORTED (the currency of the original price). Changing purchasedQuantity requires expectedUpdatedAt (SUBSCRIPTION.VERSION_REQUIRED) and increasing it on an active K2 subscription requires quantityChangeReason (SUBSCRIPTION.QUANTITY_REASON_REQUIRED). An update that would put the seats bought under the seats taken is refused with SUBSCRIPTION.QUANTITY_BELOW_OCCUPIED (details.occupied, details.requested). An active subscription is never lowered to a draft by an update: one still priced in another currency (an earlier release could not convert it) is refused with SUBSCRIPTION.STILL_DRAFT (details.missing is UNIT_PRICE) until the update enters the price in dong, and it stays active.",
+            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION.PLAN_NOT_FOUND and APPLICATION_RETIRED (declaring only), PLAN_HAS_NO_SUBSCRIPTION, PERPETUAL_NEEDS_LICENSED_APPLICATION, PERPETUAL_HAS_NO_TERM, DATES_INVALID or UPDATE_EMPTY; the shared-pool rules refuse COMMITMENT_TERM_REQUIRED (a term that becomes active names 1 or 12 months), COMMITMENT_TERM_NOT_ALLOWED (a perpetual purchase), K1_MONTHLY_ONLY (R-E01), K4_PERPETUAL_ONLY (a K4 plan is bought once: only a perpetual purchase is written for it), BILLING_LONGER_THAN_COMMITMENT (R-G01), BILLING_CYCLE_UNSUPPORTED (only MONTHLY and ANNUAL are written; QUARTERLY and OTHER stay readable on older data), RESPONSIBLE_REQUIRED (an active subscription names the IT Admin who answers for it), RESPONSIBLE_NOT_IT_ADMIN and VENDOR_ADMINS_REQUIRED (a plan that needs admins at the vendor, a K2 plan or a K4 plan with an admin console, is not activated as a new subscription, nor its pool made, once the seat baseline is closed while fewer than two different working IT Admins are recorded in its workspace profile; while the seat baseline is open it is let through and carries vendorAdminsBelowMinimum when read; the period a renewal continues is never asked, it only carries the flag vendorAdminsBelowMinimum), and an update may also be refused with PRIMARY_NOT_ELIGIBLE (details.reason); the unit price is refused with PRICE_NOT_VND (it is entered in dong only, details.currency) or PRICE_MISMATCH (when monthlyUnitPrice and unitPrice disagree, details.expectedUnitPrice), and the unit price and the original price with MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE or CURRENCY_NOT_SUPPORTED (the currency of the original price). Changing purchasedQuantity requires expectedUpdatedAt (SUBSCRIPTION.VERSION_REQUIRED) and increasing it on an active K2 subscription requires quantityChangeReason (SUBSCRIPTION.QUANTITY_REASON_REQUIRED). An update that would put the seats bought under the seats taken is refused with SUBSCRIPTION.QUANTITY_BELOW_OCCUPIED (details.occupied, details.requested). An active subscription is never lowered to a draft by an update: one still priced in another currency (an earlier release could not convert it) is refused with SUBSCRIPTION.STILL_DRAFT (details.missing is UNIT_PRICE) until the update enters the price in dong, and it stays active.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -27711,6 +27745,18 @@
                         "code": "SUBSCRIPTION.PRICE_NOT_VND",
                         "message": "The unit price is entered in dong (VND). Convert it first and keep the price quoted by the vendor as the original price.",
                         "details": { "currency": "USD" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.PRICE_MISMATCH": {
+                    "summary": "The provided unitPrice does not match monthlyUnitPrice multiplied by the billing cycle months.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.PRICE_MISMATCH",
+                        "message": "The provided unitPrice does not match monthlyUnitPrice multiplied by the billing cycle months.",
+                        "details": { "expectedUnitPrice": { "amount": "6000000", "currency": "VND" } },
                         "requestId": "req_example"
                       }
                     }
@@ -114793,7 +114839,14 @@
                 },
                 "required": ["amount", "currency"],
                 "additionalProperties": false,
-                "description": "The price before tax in dong, a decimal string in major units, currency VND: K1/K2, one seat for one month (a yearly price over 12); K4, one purchase. Used by a request when no subscription of the plan has a price. K5 has none."
+                "description": "The price before tax in dong, a decimal string in major units, currency VND: K1/K2, one seat for one month (a yearly price over 12); K4, price of one license. Used by a request when no subscription of the plan has a price. K5 has none."
+              },
+              "referenceCommitmentMonths": {
+                "anyOf": [
+                  { "type": "number", "enum": [1] },
+                  { "type": "number", "enum": [12] }
+                ],
+                "description": "Default commitment term in months (1 or 12) for K1/K2 plans when creating a term subscription without specifying commitmentTermMonths."
               }
             },
             "required": ["name", "provisioningType"],
@@ -114900,6 +114953,13 @@
                     "description": "The reference price in dong before tax, or null when none is entered.",
                     "nullable": true
                   },
+                  "referenceCommitmentMonths": {
+                    "anyOf": [
+                      { "type": "number", "enum": [1] },
+                      { "type": "number", "enum": [12] }
+                    ],
+                    "nullable": true
+                  },
                   "seatTracking": { "type": "string", "enum": ["APPLICABLE", "NOT_APPLICABLE"] },
                   "createdAt": { "type": "string", "format": "date-time" },
                   "updatedAt": { "type": "string", "format": "date-time" },
@@ -114919,6 +114979,7 @@
                   "sharingPolicy",
                   "hasAdminConsole",
                   "referencePrice",
+                  "referenceCommitmentMonths",
                   "seatTracking",
                   "createdAt",
                   "updatedAt",
@@ -115100,6 +115161,13 @@
                       "description": "The reference price in dong before tax, or null when none is entered.",
                       "nullable": true
                     },
+                    "referenceCommitmentMonths": {
+                      "anyOf": [
+                        { "type": "number", "enum": [1] },
+                        { "type": "number", "enum": [12] }
+                      ],
+                      "nullable": true
+                    },
                     "seatTracking": { "type": "string", "enum": ["APPLICABLE", "NOT_APPLICABLE"] },
                     "createdAt": { "type": "string", "format": "date-time" },
                     "updatedAt": { "type": "string", "format": "date-time" }
@@ -115118,6 +115186,7 @@
                     "sharingPolicy",
                     "hasAdminConsole",
                     "referencePrice",
+                    "referenceCommitmentMonths",
                     "seatTracking",
                     "createdAt",
                     "updatedAt"
@@ -115178,7 +115247,14 @@
             },
             "required": ["amount", "currency"],
             "additionalProperties": false,
-            "description": "The price before tax in dong, a decimal string in major units, currency VND: K1/K2, one seat for one month (a yearly price over 12); K4, one purchase. Used by a request when no subscription of the plan has a price. K5 has none."
+            "description": "The price before tax in dong, a decimal string in major units, currency VND: K1/K2, one seat for one month (a yearly price over 12); K4, price of one license. Used by a request when no subscription of the plan has a price. K5 has none."
+          },
+          "referenceCommitmentMonths": {
+            "anyOf": [
+              { "type": "number", "enum": [1] },
+              { "type": "number", "enum": [12] }
+            ],
+            "description": "Default commitment term in months (1 or 12) for K1/K2 plans when creating a term subscription without specifying commitmentTermMonths."
           }
         },
         "required": ["applicationId", "name", "provisioningType"],
@@ -115229,6 +115305,13 @@
                 "description": "The reference price in dong before tax, or null when none is entered.",
                 "nullable": true
               },
+              "referenceCommitmentMonths": {
+                "anyOf": [
+                  { "type": "number", "enum": [1] },
+                  { "type": "number", "enum": [12] }
+                ],
+                "nullable": true
+              },
               "seatTracking": { "type": "string", "enum": ["APPLICABLE", "NOT_APPLICABLE"] },
               "createdAt": { "type": "string", "format": "date-time" },
               "updatedAt": { "type": "string", "format": "date-time" },
@@ -115248,6 +115331,7 @@
               "sharingPolicy",
               "hasAdminConsole",
               "referencePrice",
+              "referenceCommitmentMonths",
               "seatTracking",
               "createdAt",
               "updatedAt",
@@ -115303,6 +115387,13 @@
                 "required": ["amount", "currency"],
                 "additionalProperties": false,
                 "description": "The reference price in dong before tax, or null when none is entered.",
+                "nullable": true
+              },
+              "referenceCommitmentMonths": {
+                "anyOf": [
+                  { "type": "number", "enum": [1] },
+                  { "type": "number", "enum": [12] }
+                ],
                 "nullable": true
               },
               "seatTracking": { "type": "string", "enum": ["APPLICABLE", "NOT_APPLICABLE"] },
@@ -115403,6 +115494,7 @@
               "sharingPolicy",
               "hasAdminConsole",
               "referencePrice",
+              "referenceCommitmentMonths",
               "seatTracking",
               "createdAt",
               "updatedAt",
@@ -115445,6 +115537,14 @@
             "required": ["amount", "currency"],
             "additionalProperties": false,
             "description": "The reference price; null clears it. Moving the plan to K5, or between K1/K2 and K4, clears it too.",
+            "nullable": true
+          },
+          "referenceCommitmentMonths": {
+            "anyOf": [
+              { "type": "number", "enum": [1] },
+              { "type": "number", "enum": [12] }
+            ],
+            "description": "Default commitment term in months (1 or 12) for K1/K2 plans; null clears it.",
             "nullable": true
           }
         },
@@ -116184,6 +116284,13 @@
                       "additionalProperties": false,
                       "nullable": true
                     },
+                    "monthlyUnitPrice": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
                     "originalPrice": {
                       "type": "object",
                       "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
@@ -116369,6 +116476,7 @@
                     "missing",
                     "purchasedQuantity",
                     "unitPrice",
+                    "monthlyUnitPrice",
                     "originalPrice",
                     "billingCycle",
                     "commitmentTermMonths",
@@ -116460,7 +116568,17 @@
             },
             "required": ["amount", "currency"],
             "additionalProperties": false,
-            "description": "The unit price in dong: a decimal string in major units, currency VND. Another currency is refused (SUBSCRIPTION.PRICE_NOT_VND)."
+            "description": "The unit price in dong for the billing cycle (or price of one license for K4): a decimal string in major units, currency VND. Another currency is refused (SUBSCRIPTION.PRICE_NOT_VND)."
+          },
+          "monthlyUnitPrice": {
+            "type": "object",
+            "properties": {
+              "amount": { "type": "string", "maxLength": 40 },
+              "currency": { "type": "string", "pattern": "^[A-Z]{3}$" }
+            },
+            "required": ["amount", "currency"],
+            "additionalProperties": false,
+            "description": "The monthly unit price per seat in dong (VND). Preferred on new writes; when sent alongside unitPrice, unitPrice must equal monthlyUnitPrice multiplied by the billing cycle months (SUBSCRIPTION.PRICE_MISMATCH)."
           },
           "originalPrice": {
             "type": "object",
@@ -116472,7 +116590,7 @@
             "additionalProperties": false,
             "description": "The price the vendor quoted in another currency, kept beside the price in dong so an invoice can be matched against it: a decimal string in major units of its currency. It is only kept, never converted."
           },
-          "billingCycle": { "type": "string", "enum": ["MONTHLY", "QUARTERLY", "ANNUAL", "OTHER"] },
+          "billingCycle": { "type": "string", "enum": ["MONTHLY", "ANNUAL"] },
           "commitmentTermMonths": {
             "anyOf": [
               { "type": "number", "enum": [1] },
@@ -116550,6 +116668,13 @@
                 "nullable": true
               },
               "unitPrice": {
+                "type": "object",
+                "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                "required": ["amount", "currency"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "monthlyUnitPrice": {
                 "type": "object",
                 "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
                 "required": ["amount", "currency"],
@@ -116741,6 +116866,7 @@
               "missing",
               "purchasedQuantity",
               "unitPrice",
+              "monthlyUnitPrice",
               "originalPrice",
               "billingCycle",
               "commitmentTermMonths",
@@ -116791,7 +116917,17 @@
             },
             "required": ["amount", "currency"],
             "additionalProperties": false,
-            "description": "The unit price in dong: a decimal string in major units, currency VND. Another currency is refused (SUBSCRIPTION.PRICE_NOT_VND)."
+            "description": "The unit price in dong for the billing cycle (or price of one license for K4): a decimal string in major units, currency VND. Another currency is refused (SUBSCRIPTION.PRICE_NOT_VND)."
+          },
+          "monthlyUnitPrice": {
+            "type": "object",
+            "properties": {
+              "amount": { "type": "string", "maxLength": 40 },
+              "currency": { "type": "string", "pattern": "^[A-Z]{3}$" }
+            },
+            "required": ["amount", "currency"],
+            "additionalProperties": false,
+            "description": "The monthly unit price per seat in dong (VND). Preferred on new writes; when sent alongside unitPrice, unitPrice must equal monthlyUnitPrice multiplied by the billing cycle months (SUBSCRIPTION.PRICE_MISMATCH)."
           },
           "originalPrice": {
             "type": "object",
@@ -116804,7 +116940,7 @@
             "description": "The original price the vendor quoted; null takes the recorded one away.",
             "nullable": true
           },
-          "billingCycle": { "type": "string", "enum": ["MONTHLY", "QUARTERLY", "ANNUAL", "OTHER"] },
+          "billingCycle": { "type": "string", "enum": ["MONTHLY", "ANNUAL"] },
           "commitmentTermMonths": {
             "anyOf": [
               { "type": "number", "enum": [1] },
@@ -116909,6 +117045,13 @@
                 "nullable": true
               },
               "unitPrice": {
+                "type": "object",
+                "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                "required": ["amount", "currency"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "monthlyUnitPrice": {
                 "type": "object",
                 "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
                 "required": ["amount", "currency"],
@@ -117104,6 +117247,7 @@
               "missing",
               "purchasedQuantity",
               "unitPrice",
+              "monthlyUnitPrice",
               "originalPrice",
               "billingCycle",
               "commitmentTermMonths",

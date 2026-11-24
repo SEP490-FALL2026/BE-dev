@@ -186,4 +186,16 @@ export const SUBSCRIPTION_TEXTS = {
         '{changedByEmployeeId:name} increased the seats of subscription {subscriptionId:name} from {fromQuantity} to {toQuantity}.',
     },
   },
+  SUBSCRIPTION_SEATS_REDUCED: {
+    vi: {
+      title: 'Thuê bao bị giảm số chỗ',
+      message:
+        '{changedByEmployeeId:name} đã giảm số chỗ của thuê bao {subscriptionId:name} từ {fromQuantity} xuống {toQuantity}.',
+    },
+    en: {
+      title: 'Seats reduced on a subscription',
+      message:
+        '{changedByEmployeeId:name} reduced the seats of subscription {subscriptionId:name} from {fromQuantity} to {toQuantity}.',
+    },
+  },
 } satisfies Partial<Record<InAppNotificationCode, NotificationTexts>>;

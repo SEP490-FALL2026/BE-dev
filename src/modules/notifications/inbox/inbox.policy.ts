@@ -223,6 +223,7 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   VENDOR_ADMINS_BELOW_MINIMUM: ['planId', 'applicationId', 'adminCount'],
   DEPARTMENT_WITHOUT_HEAD: ['departmentId', 'waitingCount'],
   SUBSCRIPTION_SEATS_INCREASED: ['subscriptionId', 'fromQuantity', 'toQuantity', 'requestId', 'changedByEmployeeId'],
+  SUBSCRIPTION_SEATS_REDUCED: ['subscriptionId', 'fromQuantity', 'toQuantity', 'changedByEmployeeId'],
   // What an IT Admin who leaves still answers for, once the day has come and the handover is not done (`QĐ-110j`, `R-26`).
   IT_ADMIN_HANDOVER_PENDING: ['sourceKind', 'sourceId', 'employeeId', 'dueOn'],
   // The same, told to the IT Admin who took it all: from whom, and how many of each (`QĐ-110j`, SPEC P5).

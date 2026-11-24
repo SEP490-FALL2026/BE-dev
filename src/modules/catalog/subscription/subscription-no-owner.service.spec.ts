@@ -118,4 +118,127 @@ describe('QĐ-113g: no owning department on a subscription', () => {
       expect.objectContaining({ purchasedQuantity: 50, autoRenew: true }),
     );
   });
+
+  it('declares TERM with monthlyUnitPrice 500.000 ANNUAL -> stores monthly 500.000 and unit 6.000.000, and defaults commitmentTermMonths from plan', async () => {
+    const insert = jest.fn((_t: unknown, data: object) => Promise.resolve(stored({ ...data })));
+    const planWithCommitment = { ...plan, provisioningType: 'K2', referenceCommitmentMonths: 12 as const };
+    const priceService = {
+      read: jest.fn((money: { amount: string; currency: string }) =>
+        Promise.resolve({ amountMinor: BigInt(money.amount), currency: money.currency }),
+      ),
+      priceToday: jest.fn((_t: unknown, money: { amountMinor: bigint; currency: string } | null) =>
+        Promise.resolve(
+          money
+            ? {
+                unitPrice: { ...money, recordedOn: '2026-11-25' },
+                priceSnapshot: {
+                  rate: 10_000_000_000n,
+                  rateDate: '2026-11-25',
+                  rateSource: 'SAME_CURRENCY',
+                  reportingMinor: money.amountMinor,
+                  reportingCurrency: 'VND',
+                  exchangeRateId: null,
+                },
+              }
+            : { unitPrice: null, priceSnapshot: null },
+        ),
+      ),
+    } as unknown as SubscriptionPricingService;
+    const service = new SubscriptionService(
+      { insert } as unknown as SubscriptionRepo,
+      { lockExclusive: jest.fn(() => Promise.resolve(planWithCommitment)) } as unknown as PlanFactsService,
+      priceService,
+      view,
+      { ...organization, lockDepartmentShared } as unknown as OrganizationReadApi,
+      {
+        assertNoLiveDuplicate: jest.fn(),
+        responsibleOfDeclaration: jest.fn(() => Promise.resolve('it-1')),
+        assert: jest.fn(),
+        assertVendorAdmins: jest.fn(),
+        requireItAdmin: jest.fn(),
+      } as unknown as SubscriptionPoolService,
+      audit,
+      runner,
+    );
+
+    await service.declare(actor, {
+      planId: 'plan-1',
+      kind: 'TERM',
+      purchasedQuantity: 5,
+      billingCycle: 'ANNUAL',
+      startDate: '2026-11-01',
+      monthlyUnitPrice: { amount: '500000', currency: 'VND' },
+    });
+
+    expect(insert).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        commitmentTermMonths: 12,
+        monthlyUnitPriceMinor: 500_000n,
+        unitPrice: { amountMinor: 6_000_000n, currency: 'VND', recordedOn: '2026-11-25' },
+      }),
+    );
+  });
+
+  it('declares TERM with unitPrice 1.000.001 ANNUAL -> writes monthly 83.333 and derived unitPrice 999.996', async () => {
+    const insert = jest.fn((_t: unknown, data: object) => Promise.resolve(stored({ ...data })));
+    const priceService = {
+      read: jest.fn((money: { amount: string; currency: string }) =>
+        Promise.resolve({ amountMinor: BigInt(money.amount), currency: money.currency }),
+      ),
+      priceToday: jest.fn((_t: unknown, money: { amountMinor: bigint; currency: string } | null) =>
+        Promise.resolve(
+          money
+            ? {
+                unitPrice: { ...money, recordedOn: '2026-11-25' },
+                priceSnapshot: {
+                  rate: 10_000_000_000n,
+                  rateDate: '2026-11-25',
+                  rateSource: 'SAME_CURRENCY',
+                  reportingMinor: money.amountMinor,
+                  reportingCurrency: 'VND',
+                  exchangeRateId: null,
+                },
+              }
+            : { unitPrice: null, priceSnapshot: null },
+        ),
+      ),
+    } as unknown as SubscriptionPricingService;
+    const service = new SubscriptionService(
+      { insert } as unknown as SubscriptionRepo,
+      {
+        lockExclusive: jest.fn(() => Promise.resolve({ ...plan, referenceCommitmentMonths: 1 })),
+      } as unknown as PlanFactsService,
+      priceService,
+      view,
+      { ...organization, lockDepartmentShared } as unknown as OrganizationReadApi,
+      {
+        assertNoLiveDuplicate: jest.fn(),
+        responsibleOfDeclaration: jest.fn(() => Promise.resolve('it-1')),
+        assert: jest.fn(),
+        assertVendorAdmins: jest.fn(),
+        requireItAdmin: jest.fn(),
+      } as unknown as SubscriptionPoolService,
+      audit,
+      runner,
+    );
+
+    await service.declare(actor, {
+      planId: 'plan-1',
+      kind: 'TERM',
+      purchasedQuantity: 5,
+      billingCycle: 'ANNUAL',
+      commitmentTermMonths: 12,
+      startDate: '2026-11-01',
+      unitPrice: { amount: '1000001', currency: 'VND' },
+    });
+
+    expect(insert).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        monthlyUnitPriceMinor: 83_333n,
+        unitPrice: { amountMinor: 999_996n, currency: 'VND', recordedOn: '2026-11-25' },
+      }),
+    );
+  });
 });

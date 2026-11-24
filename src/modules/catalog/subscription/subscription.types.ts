@@ -57,6 +57,7 @@ export interface SubscriptionRecord {
   status: SubscriptionStatus;
   purchasedQuantity: number | null;
   unitPrice: UnitPriceRecord | null;
+  monthlyUnitPriceMinor: bigint | null;
   priceSnapshot: PriceSnapshotRecord | null;
   originalPrice: OriginalPriceRecord | null;
   billingCycle: BillingCycle | null;
@@ -87,6 +88,7 @@ export interface NewSubscription {
   status: SubscriptionStatus;
   purchasedQuantity: number | null;
   unitPrice: UnitPriceRecord | null;
+  monthlyUnitPriceMinor?: bigint | null;
   priceSnapshot: PriceSnapshotRecord | null;
   originalPrice: OriginalPriceRecord | null;
   billingCycle: BillingCycle | null;
@@ -160,6 +162,7 @@ export interface SubscriptionView {
   missing: MissingItem[];
   purchasedQuantity: number | null;
   unitPrice: { amount: string; currency: string } | null;
+  monthlyUnitPrice: { amount: string; currency: string } | null;
   /** The price a vendor quoted in another currency, when one is recorded (`QĐ-111an`): beside the price in dong, never converted again. */
   originalPrice: { amount: string; currency: string } | null;
   billingCycle: BillingCycle | null;

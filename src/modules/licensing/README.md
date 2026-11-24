@@ -282,3 +282,15 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
 ## Test
 
 - Unit: `src/modules/licensing/**/*.spec.ts`; HTTP: `test/http/licensing/`; integration: `test/integration/licensing/`.
+
+## Từ vựng
+
+| Từ (UI/tài liệu)    | Tên ở code/wire                   | Nghĩa duy nhất                                                                |
+| ------------------- | --------------------------------- | ----------------------------------------------------------------------------- |
+| Gói                 | `Plan`, `plan`                    | Bậc và loại seat của một ứng dụng.                                            |
+| Thuê bao            | `Subscription`                    | Cam kết có kỳ của một workspace; mỗi kỳ là một bản ghi.                       |
+| Kho                 | (không có bảng)                   | Seat hoặc license **Trống** cấp được ngay.                                    |
+| Lô khóa             | `LicenseLot`, `licenseLot`        | Khoản mua đứt `K4`; không gọi là thuê bao.                                    |
+| Gói tháng / gói năm | `commitmentTermMonths` `1` / `12` | Kỳ cam kết (không phải chu kỳ trả).                                           |
+| Giá tháng           | `monthlyUnitPrice`                | VND chưa thuế, một seat một tháng (`K1`/`K2`); với `K4` là _giá một license_. |
+| Người phụ trách     | `responsibleItAdmin`              | IT Admin trả lời cho thuê bao/workspace/lô; chỉ Super Admin đổi.              |

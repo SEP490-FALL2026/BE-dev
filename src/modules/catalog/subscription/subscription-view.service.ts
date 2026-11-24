@@ -89,6 +89,9 @@ const alertsOf = (
 const mergeWarnings = (mergeCandidateIds: readonly string[]): 'SHOULD_MERGE'[] =>
   mergeCandidateIds.length > 0 ? ['SHOULD_MERGE'] : [];
 
+const monthlyUnitPriceWire = (minor: bigint | null | undefined) =>
+  minor !== null && minor !== undefined ? { amount: formatAmount(minor, 0), currency: 'VND' } : null;
+
 /**
  * A subscription as it is answered: the stored data with everything derived when it is read — the notice deadline and
  * its source, the alert dates from its point of adjustment, the data-quality warning, the tax profile of the vendor
@@ -291,6 +294,7 @@ export class SubscriptionViewService {
         missing,
         purchasedQuantity: record.purchasedQuantity,
         unitPrice,
+        monthlyUnitPrice: monthlyUnitPriceWire(record.monthlyUnitPriceMinor),
         originalPrice,
         billingCycle: record.billingCycle,
         commitmentTermMonths: record.commitmentTermMonths,

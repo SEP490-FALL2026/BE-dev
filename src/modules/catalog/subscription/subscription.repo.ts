@@ -6,6 +6,7 @@ import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { BaselineSubscription } from '../public/catalog.types';
 import { pickPriceSource, type LivenessFacts } from './pool/subscription-pool.policy';
+import { derivedMonthlyUnitPriceMinor } from './subscription.policy';
 import { livePricedOf, PLAN_KIND, PRICE_FIELDS, pricedOn, withPriceSource } from './subscription-priced.repo';
 import type {
   NewSubscription,
@@ -107,6 +108,7 @@ function toRecord(row: Row): SubscriptionRecord {
     status: row.status,
     purchasedQuantity: row.purchasedQuantity,
     unitPrice: unitPriceOf(row),
+    monthlyUnitPriceMinor: row.monthlyUnitPriceMinor,
     priceSnapshot: priceSnapshotOf(row),
     originalPrice: originalPriceOf(row),
     billingCycle: row.billingCycle,
@@ -135,6 +137,10 @@ function columnsOf(state: SubscriptionState) {
     purchasedQuantity: state.purchasedQuantity,
     unitPriceMinor: state.unitPrice?.amountMinor ?? null,
     unitPriceCurrency: state.unitPrice?.currency ?? null,
+    monthlyUnitPriceMinor:
+      state.monthlyUnitPriceMinor !== undefined
+        ? state.monthlyUnitPriceMinor
+        : derivedMonthlyUnitPriceMinor(state.unitPrice, state.billingCycle),
     priceRecordedOn: state.unitPrice ? toDateColumn(state.unitPrice.recordedOn) : null,
     priceRate: state.priceSnapshot ? formatRate(state.priceSnapshot.rate) : null,
     priceRateDate: state.priceSnapshot ? toDateColumn(state.priceSnapshot.rateDate) : null,

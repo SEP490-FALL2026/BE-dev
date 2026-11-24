@@ -26,11 +26,13 @@ import {
 import {
   assertPlanShape,
   assertPricingModelDerived,
+  assertReferenceCommitmentMonths,
   assertReferencePrice,
   assertReferencePriceKind,
   cleanPlanName,
   cleanRevocationNote,
   derivedPricingModel,
+  referenceCommitmentOnKindChange,
   referencePriceOnKindChange,
 } from './plan.policy';
 import { planAuditSnapshot as snapshot } from './plan.mapper';
@@ -46,6 +48,7 @@ import type {
   PlanSummaryRecord,
   PricingModel,
   ProvisioningType,
+  ReferenceCommitmentMonths,
   ReferencePrice,
   SharingPolicy,
   WorkspaceProfileView,
@@ -66,6 +69,7 @@ export interface DeclarePlanInput {
   hasAdminConsole?: boolean;
   /** The price in dong before tax, as text (`QĐ-113a`): K1/K2 for one seat one month, K4 for one purchase; none for K5. */
   referencePrice?: { amount: string; currency: string };
+  referenceCommitmentMonths?: ReferenceCommitmentMonths;
 }
 
 export interface UpdatePlanInput {
@@ -80,6 +84,7 @@ export interface UpdatePlanInput {
   hasAdminConsole?: boolean;
   /** `null` clears the reference price (`QĐ-113a`). */
   referencePrice?: { amount: string; currency: string } | null;
+  referenceCommitmentMonths?: ReferenceCommitmentMonths | null;
 }
 
 /**
@@ -164,11 +169,13 @@ export class PlanService {
           sharingPolicy: input.sharingPolicy ?? null,
           hasAdminConsole: input.hasAdminConsole ?? false,
           referencePrice,
+          referenceCommitmentMonths: input.referenceCommitmentMonths ?? null,
         };
         assertPlanShape({ ...plan, applicationKind: application.kind });
         assertPricingModelDerived(input.provisioningType, input.pricingModel);
         assertAdminConsoleApplicable(plan.provisioningType, input.hasAdminConsole);
         assertReferencePrice(plan.provisioningType, referencePrice);
+        assertReferenceCommitmentMonths(plan.provisioningType, plan.referenceCommitmentMonths);
         assertDeviceBundledShape(plan.keyBinding, referencePrice, plan.hasAdminConsole);
 
         const created = await this.plans.insert(tx, plan);
@@ -220,11 +227,17 @@ export class PlanService {
             input.hasAdminConsole ??
             ((input.provisioningType ?? current.provisioningType) === 'K4' ? current.hasAdminConsole : false),
           referencePrice: this.referencePriceOf(current, input.provisioningType ?? current.provisioningType, sentPrice),
+          referenceCommitmentMonths: this.referenceCommitmentOf(
+            current,
+            input.provisioningType ?? current.provisioningType,
+            input.referenceCommitmentMonths,
+          ),
         };
         assertPlanShape({ ...next, applicationKind: current.applicationKind });
         assertPricingModelDerived(next.provisioningType, input.pricingModel);
         assertAdminConsoleApplicable(next.provisioningType, input.hasAdminConsole);
         assertReferencePrice(next.provisioningType, next.referencePrice);
+        assertReferenceCommitmentMonths(next.provisioningType, next.referenceCommitmentMonths);
         assertDeviceBundledShape(next.keyBinding, next.referencePrice, next.hasAdminConsole);
         if (
           next.provisioningType !== current.provisioningType &&
@@ -263,6 +276,18 @@ export class PlanService {
     if (sent !== undefined) return sent;
 
     return referencePriceOnKindChange(current.provisioningType, nextType) === 'CLEAR' ? null : current.referencePrice;
+  }
+
+  private referenceCommitmentOf(
+    current: PlanRecord,
+    nextType: ProvisioningType,
+    sent: ReferenceCommitmentMonths | null | undefined,
+  ): ReferenceCommitmentMonths | null {
+    if (sent !== undefined) return sent;
+
+    return referenceCommitmentOnKindChange(current.provisioningType, nextType) === 'CLEAR'
+      ? null
+      : current.referenceCommitmentMonths;
   }
 
   /**
@@ -361,6 +386,9 @@ function changesOf(current: PlanRecord, next: PlanState): PlanChanges {
   if (next.sharingPolicy !== current.sharingPolicy) changes.sharingPolicy = next.sharingPolicy;
   if (next.hasAdminConsole !== current.hasAdminConsole) changes.hasAdminConsole = next.hasAdminConsole;
   if (!samePrice(next.referencePrice, current.referencePrice)) changes.referencePrice = next.referencePrice;
+  if (next.referenceCommitmentMonths !== current.referenceCommitmentMonths) {
+    changes.referenceCommitmentMonths = next.referenceCommitmentMonths;
+  }
 
   return changes;
 }

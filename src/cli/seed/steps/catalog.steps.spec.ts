@@ -50,12 +50,19 @@ describe('the body of a subscription the dataset declares', () => {
 
   it('writes the price in dong and, for the plan once priced in dollars, the original price beside it (FX-1)', () => {
     expect(subscriptionBody(ctx, subscription('cursor'), 'plan-1')).toMatchObject({
+      monthlyUnitPrice: { amount: '508000', currency: 'VND' },
       unitPrice: { amount: '508000', currency: 'VND' },
       originalPrice: { amount: '20', currency: 'USD' },
     });
     const jira = subscriptionBody(ctx, subscription('jira'), 'plan-1');
-    expect(jira).toMatchObject({ unitPrice: { amount: '200000', currency: 'VND' } });
+    expect(jira).toMatchObject({
+      monthlyUnitPrice: { amount: '200000', currency: 'VND' },
+      unitPrice: { amount: '200000', currency: 'VND' },
+    });
     expect(jira).not.toHaveProperty('originalPrice');
+    const m365Annual = subscriptionBody(ctx, subscription('m365-standard'), 'plan-1');
+    expect(m365Annual).toMatchObject({ monthlyUnitPrice: { amount: '316667', currency: 'VND' } });
+    expect(m365Annual).not.toHaveProperty('unitPrice');
   });
 
   it('declares a perpetual subscription with the day it was bought and no end', () => {
@@ -276,8 +283,12 @@ describe('the body of a plan the dataset declares', () => {
     expect(planBody('app-1', plan('grammarly-business'))).toMatchObject({
       provisioningType: 'K1',
       referencePrice: { amount: '360000', currency: 'VND' },
+      referenceCommitmentMonths: 1,
     });
     expect(planBody('app-1', plan('hr-portal-access'))).not.toHaveProperty('referencePrice');
+    expect(planBody('app-1', plan('claude-team-standard'), 12)).toMatchObject({
+      referenceCommitmentMonths: 12,
+    });
   });
 
   it('writes the key binding of a K4 plan the fixture binds to the machine, the Windows bundled with it with no price, and none for the others (W2-17)', () => {

@@ -24,6 +24,7 @@ export function toPlanSummaryWire(plan: PlanSummaryRecord) {
     sharingPolicy: plan.sharingPolicy,
     hasAdminConsole: plan.hasAdminConsole,
     referencePrice: referencePriceWire(plan.referencePrice),
+    referenceCommitmentMonths: plan.referenceCommitmentMonths,
     seatTracking: seatTrackingOf(plan.pricingModel),
     createdAt: plan.createdAt.toISOString(),
     updatedAt: plan.updatedAt.toISOString(),
@@ -52,4 +53,5 @@ export const planAuditSnapshot = (plan: PlanRecord) => ({
     amountMinor: plan.referencePrice.amountMinor.toString(),
     currency: plan.referencePrice.currency,
   },
+  referenceCommitmentMonths: plan.referenceCommitmentMonths,
 });

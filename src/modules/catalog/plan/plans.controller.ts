@@ -40,7 +40,7 @@ const READERS = {
   examples: [FORBIDDEN_EXAMPLE],
 } as const;
 const INVALID_DESCRIPTION =
-  'The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.APPLICATION_NOT_FOUND, APPLICATION_RETIRED, NAME_INVALID, NOTE_INVALID, PROVISIONING_TYPE_NOT_SUPPORTED, PROVISIONING_TYPE_MISMATCH, PRICING_MODEL_REQUIRED, PRICING_MODEL_NOT_APPLICABLE, PRICING_MODEL_NOT_DERIVED (the pricing model follows the kind of provisioning: leave it out or send the implied one; details.expected), CONTROL_LEVEL_REQUIRED, DATA_LOSS_NOTE_REQUIRED, ADMIN_CONSOLE_NOT_APPLICABLE (the flag hasAdminConsole belongs to a K4 plan alone, and not to one bundled with the machine), REFERENCE_PRICE_NOT_VND (the reference price is in dong), KEY_BINDING_NOT_APPLICABLE (only a K4 plan has a keyBinding), REFERENCE_PRICE_NOT_APPLICABLE (only a K1, K2 or K4 plan has one, and a K4 plan bundled with the machine has none), REFERENCE_PRICE_NOT_POSITIVE (zero or less is no price), MONEY_SCALE_EXCEEDED or MONEY_OUT_OF_RANGE (a too large amount) or UPDATE_EMPTY.';
+  'The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.APPLICATION_NOT_FOUND, APPLICATION_RETIRED, NAME_INVALID, NOTE_INVALID, PROVISIONING_TYPE_NOT_SUPPORTED, PROVISIONING_TYPE_MISMATCH, PRICING_MODEL_REQUIRED, PRICING_MODEL_NOT_APPLICABLE, PRICING_MODEL_NOT_DERIVED (the pricing model follows the kind of provisioning: leave it out or send the implied one; details.expected), CONTROL_LEVEL_REQUIRED, DATA_LOSS_NOTE_REQUIRED, ADMIN_CONSOLE_NOT_APPLICABLE (the flag hasAdminConsole belongs to a K4 plan alone, and not to one bundled with the machine), REFERENCE_PRICE_NOT_VND (the reference price is in dong), KEY_BINDING_NOT_APPLICABLE (only a K4 plan has a keyBinding), REFERENCE_PRICE_NOT_APPLICABLE (only a K1, K2 or K4 plan has one, and a K4 plan bundled with the machine has none), REFERENCE_COMMITMENT_NOT_APPLICABLE (only a K1 or K2 plan has a reference commitment term), REFERENCE_PRICE_NOT_POSITIVE (zero or less is no price), MONEY_SCALE_EXCEEDED or MONEY_OUT_OF_RANGE (a too large amount) or UPDATE_EMPTY.';
 /** The rule refusals of the shape of a plan, met by a declaration and by a change alike. */
 const SHAPE_EXAMPLES = [
   EXAMPLES.NAME_INVALID,
@@ -56,6 +56,7 @@ const SHAPE_EXAMPLES = [
   EXAMPLES.KEY_BINDING_NOT_APPLICABLE,
   EXAMPLES.REFERENCE_PRICE_NOT_VND,
   EXAMPLES.REFERENCE_PRICE_NOT_APPLICABLE,
+  EXAMPLES.REFERENCE_COMMITMENT_NOT_APPLICABLE,
   EXAMPLES.REFERENCE_PRICE_NOT_POSITIVE,
 ] as const;
 const DECLARE_INVALID = {

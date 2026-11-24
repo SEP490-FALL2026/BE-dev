@@ -11,8 +11,9 @@ import { businessDate } from '../../../infrastructure/http/dto/business-date.dto
  */
 const kind = z.enum(['TERM', 'PERPETUAL']);
 const status = z.enum(['DRAFT', 'ACTIVE']);
-// Data written earlier may hold a quarterly or other cycle, so the answer names all four; a new write is refused the two others by the policy.
+// Data written earlier may hold a quarterly or other cycle, so the answer names all four; new writes only accept MONTHLY or ANNUAL.
 const billingCycle = z.enum(['MONTHLY', 'QUARTERLY', 'ANNUAL', 'OTHER']);
+const declarableBillingCycle = z.enum(['MONTHLY', 'ANNUAL']);
 const commitmentTermMonths = z.union([z.literal(1), z.literal(12)]);
 const vendorMinimumSeats = z.number().int().min(1).max(1_000_000_000);
 const quantity = z.number().int().min(0).max(1_000_000_000);
@@ -22,7 +23,11 @@ const noticeDays = z.number().int().min(0).max(3650);
 const money = z.strictObject({ amount: z.string().max(40), currency: z.string().regex(/^[A-Z]{3}$/) });
 const unitPrice = money.meta({
   description:
-    'The unit price in dong: a decimal string in major units, currency VND. Another currency is refused (SUBSCRIPTION.PRICE_NOT_VND).',
+    'The unit price in dong for the billing cycle (or price of one license for K4): a decimal string in major units, currency VND. Another currency is refused (SUBSCRIPTION.PRICE_NOT_VND).',
+});
+const monthlyUnitPrice = money.meta({
+  description:
+    'The monthly unit price per seat in dong (VND). Preferred on new writes; when sent alongside unitPrice, unitPrice must equal monthlyUnitPrice multiplied by the billing cycle months (SUBSCRIPTION.PRICE_MISMATCH).',
 });
 const originalPrice = money.meta({
   description:
@@ -34,8 +39,9 @@ export const declareSubscriptionBodySchema = z.strictObject({
   kind,
   purchasedQuantity: quantity.optional(),
   unitPrice: unitPrice.optional(),
+  monthlyUnitPrice: monthlyUnitPrice.optional(),
   originalPrice: originalPrice.optional(),
-  billingCycle: billingCycle.optional(),
+  billingCycle: declarableBillingCycle.optional(),
   commitmentTermMonths: commitmentTermMonths.optional(),
   startDate: businessDate.optional(),
   endDate: businessDate.optional(),
@@ -55,10 +61,11 @@ export const declareSubscriptionBodySchema = z.strictObject({
 export const updateSubscriptionBodySchema = z.strictObject({
   purchasedQuantity: quantity.optional(),
   unitPrice: unitPrice.optional(),
+  monthlyUnitPrice: monthlyUnitPrice.optional(),
   originalPrice: originalPrice.nullable().optional().meta({
     description: 'The original price the vendor quoted; null takes the recorded one away.',
   }),
-  billingCycle: billingCycle.optional(),
+  billingCycle: declarableBillingCycle.optional(),
   commitmentTermMonths: commitmentTermMonths.optional(),
   startDate: businessDate.optional(),
   endDate: businessDate.nullable().optional(),
@@ -127,6 +134,7 @@ const subscriptionSchema = z.strictObject({
   missing: z.array(z.enum(['QUANTITY', 'START_DATE', 'BILLING_CYCLE', 'UNIT_PRICE'])),
   purchasedQuantity: z.number().int().nullable(),
   unitPrice: z.strictObject({ amount: z.string(), currency: z.string() }).nullable(),
+  monthlyUnitPrice: z.strictObject({ amount: z.string(), currency: z.string() }).nullable(),
   originalPrice: z.strictObject({ amount: z.string(), currency: z.string() }).nullable(),
   billingCycle: billingCycle.nullable(),
   commitmentTermMonths: commitmentTermMonths.nullable(),

@@ -186,3 +186,15 @@ vendor, number)`; bảng `invoices` chỉ ghi thêm (trigger + quyền runtime `
 - Cam kết (BR-MF1-07d, FR-5.8a, INV-16): duyệt chi giữ **đúng một** khoản cho năm hiện hành, trên phiên bản `APPROVED`; `commitment-hold.policy.ts` từ chối `MORE_THAN_ONE_YEAR`, `NOT_CURRENT_YEAR`, `NOT_POSITIVE`, `NO_APPROVED_BUDGET` (409 `BUDGET.COMMITMENT_NOT_HOLDABLE`). Số tiền 0 không giữ khoản. Khoản năm sau / `NO_BUDGET` ghi trước giữ nguyên (Q-27). Khoản 01/01 do `CommitmentService.holdYearStart` ghi (`origin = YEAR_START`, không `snapshot_check_id`, không kiểm ngân sách): bỏ qua (Request, năm) đã có khoản (UNIQUE INV-16), năm chưa có phiên bản `APPROVED` ⟹ `unattached_reason = 'NO_BUDGET'` rồi `attachWaiting` gắn khi phiên bản được duyệt (`FR-5.8a`, ngoại lệ duy nhất); phiên bản `APPROVED` khác tiền tệ của khoản ⟹ không ghi, trả `refused` `CURRENCY_MISMATCH` (số tiền do job quy về tiền tệ báo cáo); thứ tự khóa Request → khóa năm (job `requests/year-start-commitments`).
 
 - Thực chi của ca ngoài quy trình (`SBF-07a`, RC-2, R-45): `BudgetsApi.recordOutOfProcessSpend` (`invoice/out-of-process-spend-recorder.service.ts`) ghi MỘT dòng `invoices` (số `OOP-<caseId>`, VND, không cam kết, `out_of_process_case_id`, tháng ghi nhận) cho Cost Center chịu hoặc chưa phân bổ (`cost_center_id` rỗng); khóa năm ngân sách của Cost Center như thực chi không cam kết; không bao giờ từ chối vì vượt ngân sách (`C-08`). Người gọi là `usage` khi đóng ca `RECORD_SPENT`.
+
+## Từ vựng
+
+| Từ (UI/tài liệu)        | Tên ở code/wire                                 | Nghĩa duy nhất                                                                |
+| ----------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------- |
+| Thuê bao                | `Subscription`                                  | Cam kết có kỳ của một workspace; mỗi kỳ là một bản ghi.                       |
+| Giá tháng               | `monthlyUnitPrice`                              | VND chưa thuế, một seat một tháng (`K1`/`K2`); với `K4` là _giá một license_. |
+| Chi phí seat/khóa Trống | `idleCost`                                      | Dòng con 1 của mục _Chưa phân bổ — kho dùng chung_.                           |
+| Chênh lệch hóa đơn kho  | `invoiceVariance` (+ `invoiceVarianceInReview`) | Dòng con 2 của mục _Chưa phân bổ — kho dùng chung_.                           |
+| Mua lô khóa theo máy    | `deviceLotPurchases`                            | Dòng con 3 — tổng hóa đơn lô kho của gói khóa theo máy.                       |
+| Thay khóa do hỏng máy   | `replacementKeys`                               | Dòng con 4 — tổng hóa đơn lô thay thế khóa hỏng máy.                          |
+| Chênh do thuế           | `taxVariance`                                   | Phần thực chịu vượt giá chưa thuế do thuế không khấu trừ; báo riêng.          |

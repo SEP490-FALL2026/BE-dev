@@ -14,6 +14,7 @@ import type {
   PlanRecord,
   PlanSummaryRecord,
   ProvisioningType,
+  ReferenceCommitmentMonths,
   ReferencePrice,
   WorkspaceProfileRecord,
 } from './plan.types';
@@ -54,6 +55,7 @@ const toPlan = (row: PlanRow): PlanRecord => ({
   sharingPolicy: row.sharingPolicy,
   hasAdminConsole: row.hasAdminConsole,
   referencePrice: referencePriceOf(row),
+  referenceCommitmentMonths: row.referenceCommitmentMonths as ReferenceCommitmentMonths | null,
   createdAt: row.createdAt,
   updatedAt: row.updatedAt,
 });
@@ -101,6 +103,7 @@ export class PlanRepo {
         hasAdminConsole: input.hasAdminConsole,
         referencePriceMinor: input.referencePrice?.amountMinor ?? null,
         referencePriceCurrency: input.referencePrice?.currency ?? null,
+        referenceCommitmentMonths: input.referenceCommitmentMonths,
       },
       include: WITH_APPLICATION,
     });
@@ -170,6 +173,9 @@ export class PlanRepo {
         ...(changes.sharingPolicy !== undefined ? { sharingPolicy: changes.sharingPolicy } : {}),
         ...(changes.hasAdminConsole !== undefined ? { hasAdminConsole: changes.hasAdminConsole } : {}),
         ...referencePriceColumns(changes.referencePrice),
+        ...(changes.referenceCommitmentMonths !== undefined
+          ? { referenceCommitmentMonths: changes.referenceCommitmentMonths }
+          : {}),
       },
       include: WITH_APPLICATION,
     });
@@ -195,6 +201,7 @@ export class PlanRepo {
           pricingModel: row.pricingModel,
           sharingPolicy: row.sharingPolicy,
           hasAdminConsole: row.hasAdminConsole,
+          referenceCommitmentMonths: row.referenceCommitmentMonths as ReferenceCommitmentMonths | null,
           applicationId: row.applicationId,
           applicationName: row.application.name,
           applicationKind: row.application.kind,
@@ -221,6 +228,7 @@ export class PlanRepo {
       pricingModel: row.pricingModel,
       sharingPolicy: row.sharingPolicy,
       hasAdminConsole: row.hasAdminConsole,
+      referenceCommitmentMonths: row.referenceCommitmentMonths as ReferenceCommitmentMonths | null,
       applicationId: row.applicationId,
       applicationName: row.application.name,
       applicationKind: row.application.kind,
@@ -392,6 +400,7 @@ export class PlanRepo {
             hasAdminConsole: true,
             referencePriceMinor: true,
             referencePriceCurrency: true,
+            referenceCommitmentMonths: true,
             createdAt: true,
             updatedAt: true,
             application: { select: { name: true, kind: true, logoUrl: true } },
@@ -402,13 +411,16 @@ export class PlanRepo {
         });
 
         return {
-          items: rows.map(({ application, referencePriceMinor, referencePriceCurrency, ...row }) => ({
-            ...row,
-            referencePrice: referencePriceOf({ referencePriceMinor, referencePriceCurrency }),
-            applicationName: application.name,
-            applicationLogoUrl: application.logoUrl,
-            applicationKind: application.kind,
-          })),
+          items: rows.map(
+            ({ application, referencePriceMinor, referencePriceCurrency, referenceCommitmentMonths, ...row }) => ({
+              ...row,
+              referencePrice: referencePriceOf({ referencePriceMinor, referencePriceCurrency }),
+              referenceCommitmentMonths: referenceCommitmentMonths as ReferenceCommitmentMonths | null,
+              applicationName: application.name,
+              applicationLogoUrl: application.logoUrl,
+              applicationKind: application.kind,
+            }),
+          ),
           total: await tx.plan.count({ where }),
         };
       },

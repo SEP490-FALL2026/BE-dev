@@ -36,6 +36,7 @@ const makeRecord = (overrides: Partial<SubscriptionRecord> = {}): SubscriptionRe
   status: 'ACTIVE',
   purchasedQuantity: 10,
   unitPrice: { amountMinor: 200_000n, currency: 'VND', recordedOn: '2026-01-01' },
+  monthlyUnitPriceMinor: 16_667n,
   priceSnapshot: {
     rate: 1n,
     rateDate: '2026-01-01',
@@ -75,6 +76,7 @@ const lockedPlan: LockedPlan = {
   keyBinding: null,
   sharingPolicy: null,
   hasAdminConsole: true,
+  referenceCommitmentMonths: null,
 };
 
 interface RecordedAuditEvent {
@@ -119,6 +121,7 @@ function makeSut(stored: SubscriptionRecord = makeRecord()) {
     assertNotBelowOccupied: jest.fn().mockResolvedValue(undefined),
     judgePool: jest.fn().mockResolvedValue(undefined),
     tellSeatIncrease: jest.fn().mockResolvedValue(undefined),
+    tellSeatReduction: jest.fn().mockResolvedValue(undefined),
   };
 
   const service = new SubscriptionChangeService(
@@ -200,5 +203,30 @@ describe('SubscriptionChangeService', () => {
     expect(recordAudit).toHaveBeenCalledTimes(1);
     const event = recordAudit.mock.calls[0][1];
     expect(event.after).not.toHaveProperty('quantityChangeReason');
+  });
+
+  it('W3-03: reducing purchasedQuantity on active K2 calls tellSeatReduction and not tellSeatIncrease', async () => {
+    const { service, guard } = makeSut(makeRecord({ purchasedQuantity: 12, allowsMidTermReduction: true }));
+
+    await service.update(actor, 'sub-1', { purchasedQuantity: 11 }, baseDate);
+
+    expect(guard.tellSeatReduction).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        subscriptionId: 'sub-1',
+        from: 12,
+        to: 11,
+      }),
+    );
+    expect(guard.tellSeatIncrease).not.toHaveBeenCalled();
+  });
+
+  it('W3-03: increasing purchasedQuantity keeps tellSeatIncrease and does not call tellSeatReduction', async () => {
+    const { service, guard } = makeSut(makeRecord({ purchasedQuantity: 11 }));
+
+    await service.update(actor, 'sub-1', { purchasedQuantity: 12, quantityChangeReason: 'Growth' }, baseDate);
+
+    expect(guard.tellSeatIncrease).toHaveBeenCalledTimes(1);
+    expect(guard.tellSeatReduction).not.toHaveBeenCalled();
   });
 });

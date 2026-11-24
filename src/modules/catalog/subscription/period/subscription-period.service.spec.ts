@@ -33,6 +33,7 @@ function record(extra: Partial<SubscriptionRecord> = {}): SubscriptionRecord {
     status: 'ACTIVE',
     purchasedQuantity: 10,
     unitPrice: { amountMinor: 100000n, currency: 'VND', recordedOn: '2026-01-01' },
+    monthlyUnitPriceMinor: 8333n,
     priceSnapshot: null,
     originalPrice: null,
     billingCycle: 'ANNUAL',

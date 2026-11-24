@@ -242,6 +242,8 @@ model Plan {
   // QĐ-113a: the reference price in dong, before tax (K1/K2: one seat for one month; K4: one purchase). Both columns or none, VND, K1/K2/K4 only (CHECKs in the migration).
   referencePriceMinor    BigInt?          @map("reference_price_minor")
   referencePriceCurrency String?          @map("reference_price_currency") @db.Char(3)
+  // W3-02: default commitment term in months (1 or 12) for K1/K2 plans when creating a TERM subscription without specifying commitmentTermMonths.
+  referenceCommitmentMonths Int?          @map("reference_commitment_months") @db.SmallInt
   // Set exactly on K4 plans (CHECK plans_key_binding_k4); a plan changes it only while nothing rests on it (trigger plans_keep_children_valid).
   keyBinding        PlanKeyBinding?  @map("key_binding")
   createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -361,6 +363,7 @@ model Subscription {
   purchasedQuantity      Int?               @map("purchased_quantity")
   unitPriceMinor         BigInt?            @map("unit_price_minor")
   unitPriceCurrency      String?            @map("unit_price_currency") @db.Char(3)
+  monthlyUnitPriceMinor  BigInt?            @map("monthly_unit_price_minor")
   priceRecordedOn        DateTime?          @map("price_recorded_on") @db.Date
   priceRate              Decimal?           @map("price_rate") @db.Decimal(20, 10)
   priceRateDate          DateTime?          @map("price_rate_date") @db.Date
