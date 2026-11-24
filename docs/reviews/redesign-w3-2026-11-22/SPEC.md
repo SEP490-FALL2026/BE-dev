@@ -1,6 +1,6 @@
-# SPEC — Đợt 3 thiết kế lại: kho B1 → B2 → B3 (22/11/2026, bản 2.2, 24/11/2026)
+# SPEC — Đợt 3 thiết kế lại: kho B1 → B2 → B3 (22/11/2026, bản 2.3, 24/11/2026)
 
-- **Trạng thái:** Proposed, **bản 2.2** (24/11/2026) — bản 2 + review lượt 2 (N1 → N12, [§13.5](#135-đã-áp-review-lượt-2)) + Owner chốt T-1/T-2/T-3/T-7 + review lượt 3 chuỗi tiền (F1 → F15, [§13.6](#136-đã-áp-review-lượt-3)) + Owner chốt F8/F12/F13c. Đã áp [REVIEW-SPEC.md](REVIEW-SPEC.md) (3 reviewer, 63 finding — bảng
+- **Trạng thái:** Proposed, **bản 2.2** (24/11/2026) — bản 2 + review lượt 2 (N1 → N12, [§13.5](#135-đã-áp-review-lượt-2)) + Owner chốt T-1/T-2/T-3/T-7 + review lượt 3 chuỗi tiền (F1 → F15, [§13.6](#136-đã-áp-review-lượt-3)) + Owner chốt F8/F12/F13c + rà file giải thích (R-LATE, Q-F làm rõ, tên công ty mẫu — [§13.7](#137-đã-áp-sau-rà-file-giải-thích)). Đã áp [REVIEW-SPEC.md](REVIEW-SPEC.md) (3 reviewer, 63 finding — bảng
   [§13.3](#133-đã-áp-review-spec), [§13.4](#134-không-áp-hoặc-áp-một-phần)) và [OWNER-ANSWERS.md](OWNER-ANSWERS.md) (W3-Q1, Q-A → Q-G —
   [§13.2](#132-quyết-định-owner-owner-answersmd)). Còn chờ Owner duyệt bản 2; Sonnet/Gemini chỉ code sau khi Owner duyệt **và** đợt 2 đã ở `dev`.
 - **Nền:** BE `origin/dev` `b7a7cc80` (đợt 1 đã vào bằng squash `4e029dbd`; fix G3). **Đợt 2 (`int/redesign-w2`) merge vào `dev` trước khi tách
@@ -560,3 +560,12 @@ Nguồn: [REVIEW-SPEC-3-FABLE.md](REVIEW-SPEC-3-FABLE.md) (chuỗi tiền có tr
 | F13 | TB / Owner (c) | SPEC-B3 W3-25 (m = n; "cuối" theo số phí; người rút ⟹ `WITHDRAWAL`, phí 0 không ghi) + 3 ca; OWNER-ANSWERS F13c                                |
 | F14 | TB             | SPEC-B3 §1.2 unique M6 (409 `PURCHASE_INVOICE.LOT_ALREADY_INVOICED`, `LICENSE_LOT.REQUEST_HAS_LOT`), W3-25 tỷ lệ trừ license đã ghi phí + 2 ca |
 | F15 | Thấp           | SPEC-B1 W3-07 mục 5 + ca F15; W3-08 ca F15b (hành vi chấp nhận)                                                                                |
+
+### 13.7. Đã áp sau rà file giải thích
+
+| Điểm                                                                                                                                                                                                                           | Nơi sửa                                                                                                                                                             |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R-LATE (Owner 24/11): ghi gia hạn sau hạn chót của gói cam kết 12 — mặc định số seat kỳ cũ; ghi giảm ⟹ 422 `SUBSCRIPTION_RENEWAL.REDUCTION_AFTER_DEADLINE`; ghi tăng được; phần vượt mục tiêu ⟹ _Lỡ điểm điều chỉnh_ + `KPI-4` | SPEC-B3 W3-21 (luật + 2 ca), W3-22 (ca 1.000.000); SPEC-B1 W3-06 (`q_next` mặc định); OWNER-ANSWERS                                                                 |
+| Q-F làm rõ (Owner 24/11): sau hạn chót, seat Trống thuộc phần đã ghi giảm ⟹ _Bị khóa tới_ ngày gia hạn kỳ này; seat Trống còn trong số kỳ sau ⟹ ngày gia hạn kỳ sau                                                            | SPEC-B1 W3-06 luật (3) + ca 2 seat (33.333 / 483.333 / 483.334); OWNER-ANSWERS                                                                                      |
+| Ca Q-B "gia hạn ghi sớm rồi cấp" ghi 05/06 là **sau** hạn chót                                                                                                                                                                 | SPEC-B3 W3-16, W3-15 tiêu chí 4: ghi 28/05/2027, cấp 20/06 giữ                                                                                                      |
+| Tên lệch công ty mẫu (`Docs/Requiments/giai-thich-kho-gia-han-chi-phi-ngan-sach.md` mục _Công ty mẫu_): Minh ở Kỹ thuật, Khoa phụ trách Thiết kế, Bình là nhân viên, Nam phụ trách Kỹ thuật                                    | SPEC-B3 W3-16 (Mai thay Minh), W3-18 (Lan + Mai do Khoa; Nam ⟹ 403; ca một lần mua hai phòng ⟹ 403), W3-22 ví dụ 1A; SPEC-B2 W3-10 (admin chỉ IT: Khoa, Nam), W3-12 |

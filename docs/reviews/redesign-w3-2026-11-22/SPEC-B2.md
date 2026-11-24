@@ -100,8 +100,8 @@ id`; đếm + trang cùng snapshot (`API-LIST-DETAIL.1`).
   `workspace.errors.ts`, `workspace.http-errors.ts` + spec); facade `catalog/public/workspace.api.ts` (`WorkspaceApi`: `workspaceOfSubscription`,
   `adminsOf`, `workingAdminCount`, `responsibleOf`, `defaultWorkspaceOfVendor`). Khóa: workspace FU (tầng 5b).
 - **Tiêu chí chấp nhận:**
-  1. DB demo có hồ sơ _Claude Team — Standard_ (Khoa OWNER, Nam ADMIN) và _— Premium_ (Khoa OWNER, Bình ADMIN) cùng hãng Anthropic ⟹ sau
-     M4: **một** workspace "Anthropic", admin {Khoa OWNER, Nam ADMIN, Bình ADMIN}; `admin_note` của hồ sơ Standard.
+  1. DB demo có hồ sơ _Claude Team — Standard_ (Khoa OWNER, Nam ADMIN) và _— Premium_ (Khoa OWNER, Nam OWNER) cùng hãng Anthropic ⟹ sau
+     M4: **một** workspace "Anthropic", admin {Khoa OWNER, Nam OWNER} (OWNER ở bất kỳ gói nào ⟹ OWNER; admin chỉ là IT Admin); `admin_note` của hồ sơ Standard.
   2. Hồ sơ của gói `K3` mà ứng dụng không có nhà cung cấp ⟹ M4 dừng, thông điệp nêu `plan_id`.
   3. `POST /workspaces` hai lần cùng (hãng, tên khác hoa/thường) ⟹ lần hai 409 `WORKSPACE.NAME_TAKEN`; body có `responsibleItAdminEmployeeId`
      ⟹ 422 `VALIDATION_ERROR` (Zod strict); người tạo là `responsibleItAdmin`.
@@ -202,7 +202,7 @@ id`; đếm + trang cùng snapshot (`API-LIST-DETAIL.1`).
   | `workspaceGet` khi Nam bị khóa                                 | `flags` gồm `ADMINS_BELOW_MINIMUM`; Nam mang `ADMIN_NOT_WORKING` |
   | Nam bị khóa, Khoa phụ trách; lượt giờ chạy 3 lần               | **một** `WORKSPACE_ADMIN_NOT_WORKING` cho Khoa                   |
   | Khoa (phụ trách) đổi vai sang FINANCE                          | một thông báo cho **Super Admin** (Khoa không còn dùng được)     |
-  | Bình nghỉ việc tới mốc (đường nghỉ việc) rồi lượt giờ chạy     | một thông báo (cùng key), không hai                              |
+  | Nam nghỉ việc tới mốc (đường nghỉ việc) rồi lượt giờ chạy      | một thông báo (cùng key), không hai                              |
 
 - **Test:** unit `subscription-pool.policy.spec.ts`/`subscription-pool.service.spec.ts` (cổng), `personnel-notifier.service.spec.ts`
   (người nhận), `subscription-renewal-sweep.service.spec.ts` (một lần); integration

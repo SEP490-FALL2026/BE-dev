@@ -313,8 +313,10 @@ deviceLotPurchases, replacementKeys, total, reserve, overReserve }`; `sharedPool
   `adjustmentPeriodInstantOf` — `subscription-obligation.policy.ts:150-163, :187-200`):
   - **(2) Giảm được** ⟺ `a.point ≤ d ≤ a.deadline` (hạn chót **chưa qua** — B1-R3; ngày hạn chót còn trong cửa sổ).
   - **(3) Bị khóa tới `R`** còn lại, `R` = **ngày sớm nhất giảm được** (`earliestReducibleOn(kỳ, d)`, hàm dùng chung với W3-09):
-    - cam kết 12: `d ≤ a.deadline` ⟹ ngày gia hạn của kỳ (`a.end`); `d > a.deadline` (sau hạn chót, trước ngày gia hạn) ⟹ ngày gia hạn
-      **kỳ sau** = ngày gia hạn + 12 tháng (Q-F);
+    - cam kết 12: `d ≤ a.deadline` ⟹ ngày gia hạn của kỳ (`a.end`); `d > a.deadline` (sau hạn chót, trước ngày gia hạn) ⟹ tách theo
+      số đã ghi cho kỳ sau `q_next` (ca gia hạn; chưa ghi ⟹ `q_next` = số seat kỳ cũ — R-LATE): seat Trống thuộc **phần đã ghi giảm**
+      (`min(idle(d), seats(d) − q_next)`) ⟹ _Bị khóa tới_ **ngày gia hạn kỳ này** (sẽ bỏ ở kỳ sau); seat Trống còn nằm trong `q_next` ⟹ _Bị khóa tới_
+      **ngày gia hạn kỳ sau** = ngày gia hạn + 12 tháng (Q-F, Owner làm rõ 24/11);
     - cam kết 1: `a.deadline` (ngày thanh toán kế ≥ `d`).
   - Nhãn (1) _Lỡ điểm điều chỉnh_ cần mục tiêu đã chốt ⟹ W3-22 (B3). B1 trả `missedAdjustment: '0'`.
   - Tiền của nhãn trong tháng: chia seat-ngày Trống theo đoạn ngày liền nhãn, mỗi đoạn `roundHalfAway(seatDays × monthly / D)`, đoạn
@@ -327,16 +329,17 @@ deviceLotPurchases, replacementKeys, total, reserve, overReserve }`; `sharedPool
   (thêm `adjustmentWindowsOf(subscriptionIds, month)` và `earliestReducibleOn(subscriptionId, day)` dùng lại policy có sẵn).
 - **Tiêu chí chấp nhận:**
 
-  | Ca                                                                       | Kết quả                                                                                   |
-  | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
-  | 05/2027 Standard, 1 seat Trống cả tháng (điểm mở 02/05, hạn chót 01/06)  | 01/05: **16.129** _Bị khóa tới 01/07/2027_; 02–31/05: **483.871** _Giảm được_             |
-  | 06/2027 Standard, 1 seat Trống cả tháng (Q-F)                            | 01/06: **16.667** _Giảm được_; 02–30/06: **483.333** _Bị khóa tới 01/07/2028_             |
-  | Figma: Mai trả seat 20/01/2027, thanh toán ngày 15, seat Trống tới 20/02 | 20/01–07/02 _Bị khóa tới 15/02_; 08/02–15/02 _Giảm được_; 16/02–20/02 _Bị khóa tới 15/03_ |
-  | Tỷ lệ tháng 1/2/3/4 năm 2027 (bảng 4A file giải thích)                   | 9,14 % / 16,67 % / 10,75 % / 8,33 % ⟹ thông báo tháng 2 và 3, không tháng 1, 4            |
-  | Biên 10 %: 10 seat × 30 ngày, 30 seat-ngày Trống (diệt `>=`)             | đúng 10,00 % ⟹ **không** thông báo; 31 seat-ngày ⟹ 10,33 % ⟹ thông báo                    |
-  | Kỳ tối thiểu 5 seat, 4 người dùng (seat Trống ở mức tối thiểu)           | không tính vào tỷ lệ; vẫn vào `idleCost`                                                  |
-  | IT phụ trách bị khóa                                                     | thông báo tới Super Admin                                                                 |
-  | Chạy lượt giờ hai lần trong tháng                                        | một thông báo mỗi (thuê bao, tháng)                                                       |
+  | Ca                                                                                            | Kết quả                                                                                                                                                                                                       |
+  | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | 05/2027 Standard, 1 seat Trống cả tháng (điểm mở 02/05, hạn chót 01/06)                       | 01/05: **16.129** _Bị khóa tới 01/07/2027_; 02–31/05: **483.871** _Giảm được_                                                                                                                                 |
+  | 06/2027 Standard, 1 seat Trống cả tháng, chưa ghi kết quả (Q-F, R-LATE: `q_next` = 12)        | 01/06: **16.667** _Giảm được_; 02–30/06: **483.333** _Bị khóa tới 01/07/2028_                                                                                                                                 |
+  | 06/2027 Standard 12 seat, 2 seat Trống cả tháng; Khoa đã ghi 28/05 kỳ sau **11** (Q-F làm rõ) | 01/06: **33.333** _Giảm được_ (2 seat-ngày); 02–30/06: **483.333** _Bị khóa tới 01/07/2027_ (1 seat, phần đã ghi giảm) + **483.334** _Bị khóa tới 01/07/2028_ (1 seat, đoạn cuối nhận phần dư); Σ = 1.000.000 |
+  | Figma: Mai trả seat 20/01/2027, thanh toán ngày 15, seat Trống tới 20/02                      | 20/01–07/02 _Bị khóa tới 15/02_; 08/02–15/02 _Giảm được_; 16/02–20/02 _Bị khóa tới 15/03_                                                                                                                     |
+  | Tỷ lệ tháng 1/2/3/4 năm 2027 (bảng 4A file giải thích)                                        | 9,14 % / 16,67 % / 10,75 % / 8,33 % ⟹ thông báo tháng 2 và 3, không tháng 1, 4                                                                                                                                |
+  | Biên 10 %: 10 seat × 30 ngày, 30 seat-ngày Trống (diệt `>=`)                                  | đúng 10,00 % ⟹ **không** thông báo; 31 seat-ngày ⟹ 10,33 % ⟹ thông báo                                                                                                                                        |
+  | Kỳ tối thiểu 5 seat, 4 người dùng (seat Trống ở mức tối thiểu)                                | không tính vào tỷ lệ; vẫn vào `idleCost`                                                                                                                                                                      |
+  | IT phụ trách bị khóa                                                                          | thông báo tới Super Admin                                                                                                                                                                                     |
+  | Chạy lượt giờ hai lần trong tháng                                                             | một thông báo mỗi (thuê bao, tháng)                                                                                                                                                                           |
 
 - **Test:** unit `shared-pool-line-label.policy.spec.ts` (`it.each` bảng), `subscription-obligation.policy.spec.ts` (`earliestReducibleOn`);
   unit `budget-review-reminder.service.spec.ts` (một lần mỗi tháng).

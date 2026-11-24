@@ -257,7 +257,7 @@ IN ('CONFIRMATION','YEAR_START','TRANSFER','WITHDRAWAL')`, `applied_minor BIGINT
   2. Thân cũ một gói ⟹ một dòng; FE cũ vẫn khai được.
   3. Thêm dòng Standard vào thuê bao khác cùng workspace khi dòng Standard chưa đóng ⟹ 409 `SUBSCRIPTION.DUPLICATE_PLAN`; DB từ chối chèn trực
      tiếp (unique một phần).
-  4. Kỳ 2026–2027 đã ghi kết quả gia hạn ngày 05/06/2027 (dòng cũ `RENEWED`, `closed_on` 30/06/2027): khai thuê bao mới Standard cùng workspace
+  4. Kỳ 2026–2027 đã ghi kết quả gia hạn ngày 28/05/2027 (dòng cũ `RENEWED`, `closed_on` 30/06/2027): khai thuê bao mới Standard cùng workspace
      ⟹ 409 (dòng kỳ mới chưa đóng giữ unique); cấp Standard ngày 20/06/2027 ⟹ `chooseLine` trả **dòng cũ** (Q-C).
   5. Kỳ hết hạn không nối ngày 30/06/2027 ⟹ sweeper đặt `ENDED` ⟹ khai lại Standard ngày 05/07/2027 ⟹ 201.
   6. `PATCH` giá Standard 500.000 → 550.000 ngày 10/07/2027 ⟹ seat-tháng tháng 7 (tính 01/08) dùng 550.000; tháng 6 giữ 500.000.
@@ -304,14 +304,15 @@ effectiveOn = startDate(kỳ sau))` — một lần mua `MUA-…`, hạn hóa đ
   - Ghi sai ⟹ dòng đảo qua `recordVendor` có ghi chú; không route sửa/xóa.
 - **Tiêu chí chấp nhận (sổ của dòng Standard — ví dụ 1A của file giải thích):**
 
-  | Ngày hiệu lực | Lý do     | Cửa          | Δ   | Số seat                                                            |
-  | ------------- | --------- | ------------ | --- | ------------------------------------------------------------------ |
-  | 01/07/2026    | `INITIAL` | `ADJUSTMENT` | +10 | 10                                                                 |
-  | 21/11/2026    | `TOP_UP`  | `GRANT`      | +1  | 11 (Request của Lan, `MUA-000001`)                                 |
-  | 21/11/2026    | `TOP_UP`  | `GRANT`      | +1  | 12 (Request của Minh, `MUA-000001`)                                |
-  | 01/07/2027    | `RENEWAL` | `ADJUSTMENT` | +11 | 11 trên **dòng kỳ mới**; dòng cũ `RENEWED`, `closed_on` 30/06/2027 |
-  | 01/07/2027    | `TOP_UP`  | `GRANT`      | +1  | 12 trên dòng kỳ mới — ca Q-B dưới                                  |
-  - **Ca Q-B "gia hạn ghi sớm rồi cấp" (B2-R1):** kết quả ghi 05/06/2027 (Standard 11, 11 người đang giữ); Request của Minh duyệt 10/06, cấp
+  | Ngày hiệu lực | Lý do     | Cửa          | Δ   | Số seat                                                                                |
+  | ------------- | --------- | ------------ | --- | -------------------------------------------------------------------------------------- |
+  | 01/07/2026    | `INITIAL` | `ADJUSTMENT` | +10 | 10                                                                                     |
+  | 21/11/2026    | `TOP_UP`  | `GRANT`      | +1  | 11 (Request của Lan, `MUA-000001`)                                                     |
+  | 21/11/2026    | `TOP_UP`  | `GRANT`      | +1  | 12 (Request của Mai, `MUA-000001` — Lan và Mai cùng phòng Thiết kế, Khoa mua; QĐ-118d) |
+  | 01/07/2027    | `RENEWAL` | `ADJUSTMENT` | +11 | 11 trên **dòng kỳ mới**; dòng cũ `RENEWED`, `closed_on` 30/06/2027                     |
+  | 01/07/2027    | `TOP_UP`  | `GRANT`      | +1  | 12 trên dòng kỳ mới — ca Q-B dưới                                                      |
+  - **Ca Q-B "gia hạn ghi sớm rồi cấp" (B2-R1):** kết quả ghi **28/05/2027** (trước hạn chót 01/06; Standard 11, 11 người đang giữ); Request của Minh (Kỹ thuật) duyệt 10/06, Nam (IT
+    phụ trách Kỹ thuật) cấp
     20/06/2027 vào **dòng cũ** (12 seat, 1 Trống) ⟹ mang sang dòng kỳ mới thiếu 1 ⟹ lần mua `MUA-000002`, `TOP_UP +1` hiệu lực **01/07/2027**;
     số kỳ vọng hóa đơn = 1 × 500.000 × 12 = **6.000.000**; hạn hóa đơn (không _xuất sau_) = ngày làm việc thứ 5 từ 01/07/2027 (thứ Năm) =
     **07/07/2027**; không 409.
@@ -421,19 +422,20 @@ effectiveOn = startDate(kỳ sau))` — một lần mua `MUA-…`, hạn hóa đ
 
 - **Tiêu chí chấp nhận:**
 
-  | Ca                                                                                       | Kết quả                                                                                            |
-  | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-  | 21/11/2026 (thứ Bảy), 2 mục chờ (Lan, Minh — phòng Thiết kế, Nam làm của phòng), Trống 0 | 201 `MUA-000001`, 2 dòng `+1`; kỳ vọng **7.333.333**; hạn **27/11/2026** (thứ Hai 23/11 là ngày 1) |
-  | như trên với cờ _Hãng xuất hóa đơn sau_ + trả năm                                        | hạn **24/02/2027** (95 ngày)                                                                       |
-  | như trên với cờ + trả tháng                                                              | `invoiceObligation = NONE`; hóa đơn tháng kế kỳ vọng thêm phần của lần mua                         |
-  | Bình (IT không làm cho phòng Thiết kế) gửi mua cho Lan                                   | 403 `SEAT_PURCHASE.NOT_IN_CHARGE`, `items` = [Lan]                                                 |
-  | 3 mục chờ, 1 seat Trống                                                                  | n tối đa 2; gửi 3 mục ⟹ 409 `SEAT_PURCHASE.STOCK_AVAILABLE` (`free = 1`)                           |
-  | Mua lại cho Lan                                                                          | 422 `SEAT_PURCHASE.ITEM_NOT_PENDING`; DB từ chối `TOP_UP` thứ hai (unique)                         |
-  | Request của Minh bị hủy sau khi mua                                                      | seat thành Trống; không sổ nào ghi thêm                                                            |
-  | Lối tắt khi cấp, kho hết                                                                 | một lần mua `quantity 1` + một dòng `+1`; `purchased_quantity` của kỳ **không** đổi                |
-  | Nộp hóa đơn _Mua thêm seat_ không `seatPurchaseId`                                       | 422 `PURCHASE_INVOICE.SEAT_PURCHASE_REQUIRED`                                                      |
-  | 27/11/2026 chưa có hóa đơn (biên — diệt `<=`)                                            | **không** nhắc                                                                                     |
-  | 28/11/2026 chưa có hóa đơn                                                               | một `SEAT_PURCHASE_INVOICE_OVERDUE`; lượt sau không gửi lại                                        |
+  | Ca                                                                                                   | Kết quả                                                                                                  |
+  | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+  | 21/11/2026 (thứ Bảy), 2 mục chờ (Lan, Mai — phòng Thiết kế; Khoa là IT phụ trách phòng ghi), Trống 0 | 201 `MUA-000001`, 2 dòng `+1`; kỳ vọng **7.333.333**; hạn **27/11/2026** (thứ Hai 23/11 là ngày 1)       |
+  | như trên với cờ _Hãng xuất hóa đơn sau_ + trả năm                                                    | hạn **24/02/2027** (95 ngày)                                                                             |
+  | như trên với cờ + trả tháng                                                                          | `invoiceObligation = NONE`; hóa đơn tháng kế kỳ vọng thêm phần của lần mua                               |
+  | Nam (IT phụ trách Kỹ thuật, không làm thay Thiết kế) gửi mua cho Lan                                 | 403 `SEAT_PURCHASE.NOT_IN_CHARGE`, `items` = [Lan]                                                       |
+  | Khoa gửi một lần mua cho Lan (Thiết kế) và Minh (Kỹ thuật)                                           | 403 `SEAT_PURCHASE.NOT_IN_CHARGE`, `items` = [Minh] (một lần mua chỉ cho người phòng mình làm — QĐ-118d) |
+  | 3 mục chờ, 1 seat Trống                                                                              | n tối đa 2; gửi 3 mục ⟹ 409 `SEAT_PURCHASE.STOCK_AVAILABLE` (`free = 1`)                                 |
+  | Mua lại cho Lan                                                                                      | 422 `SEAT_PURCHASE.ITEM_NOT_PENDING`; DB từ chối `TOP_UP` thứ hai (unique)                               |
+  | Request của Mai bị hủy sau khi mua                                                                   | seat thành Trống; không sổ nào ghi thêm                                                                  |
+  | Lối tắt khi cấp, kho hết                                                                             | một lần mua `quantity 1` + một dòng `+1`; `purchased_quantity` của kỳ **không** đổi                      |
+  | Nộp hóa đơn _Mua thêm seat_ không `seatPurchaseId`                                                   | 422 `PURCHASE_INVOICE.SEAT_PURCHASE_REQUIRED`                                                            |
+  | 27/11/2026 chưa có hóa đơn (biên — diệt `<=`)                                                        | **không** nhắc                                                                                           |
+  | 28/11/2026 chưa có hóa đơn                                                                           | một `SEAT_PURCHASE_INVOICE_OVERDUE`; lượt sau không gửi lại                                              |
 
 - **Test:** unit `seat-purchase.policy.spec.ts` (hạn, `n`, kỳ vọng), `seat-purchase.service.spec.ts`, `seat-purchases.controller.spec.ts` (403 từng
   mục); http `test/http/licensing/seat-purchases.http-spec.ts`; integration `test/integration/licensing/seat-purchase-concurrency.integration-spec.ts`
@@ -520,7 +522,10 @@ tierStepSeats? }`, tính **lúc đọc**: dòng mà Request sẽ cấp vào (`ch
     target(L) = 0 nếu need = 0, ngược lại max(need, minimum_seats(L))
   Σ target < minimum_seats_total ⟹ shortfall = minimum_seats_total − Σ target; IT chọn minimumTotalHolderLineId + ghi chú bằng chứng
   subscriptionRenewalPropose (body thêm lines[{ subscriptionLineId, quantity }]):
-    quantity(L) = target(L) (+ shortfall ở dòng giữ); số khác ⟹ 422 SUBSCRIPTION_RENEWAL.LINE_QUANTITY_NOT_TARGET (details.lines)
+    tới hết hạn chót: quantity(L) = target(L) (+ shortfall ở dòng giữ); số khác ⟹ 422 SUBSCRIPTION_RENEWAL.LINE_QUANTITY_NOT_TARGET (details.lines)
+    SAU hạn chót, chưa ghi (R-LATE, Owner 24/11; cam kết 12): mặc định quantity(L) = seats(L, hạn chót) (số seat kỳ cũ); quantity < số đó ⟹
+      422 SUBSCRIPTION_RENEWAL.REDUCTION_AFTER_DEADLINE (details.lines[{ subscriptionLineId, minimum }]); ghi TĂNG vẫn được;
+      phần seat vượt target khóa lúc hạn chót ⟹ nhãn (1) Lỡ điểm điều chỉnh + KPI-4 (W3-22)
     ngoại lệ có sẵn: mức tối thiểu hãng buộc kèm bằng chứng (giữ luật hiện có)
     thân cũ (proposedQuantity) chỉ nhận khi kỳ có đúng 1 dòng; nhiều dòng ⟹ 422 SUBSCRIPTION_RENEWAL.LINES_REQUIRED
     subscription_line_targets(L, renewal_on): seats_needed, target, recorded_quantity, locked_by IT_ADMIN
@@ -545,18 +550,20 @@ tierStepSeats? }`, tính **lúc đọc**: dòng mà Request sẽ cấp vào (`ch
 
 - **Tiêu chí chấp nhận (ví dụ 2A–2E):**
 
-  | Ca                                                                        | Kết quả                                                                                                                                                 |
-  | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | 02/05/2027: Standard trả 12, gán 11, chờ 0; Premium 2/2; tối thiểu tổng 5 | target Standard **11**, Premium **2**; Σ 13 ≥ 5                                                                                                         |
-  | Ca A — Khoa đề xuất và ghi (11, 2)                                        | kỳ mới 01/07/2027: hai dòng `RENEWAL 11`, `RENEWAL 2`; số kỳ vọng (11 × 500.000 + 2 × 2.500.000) × 12 = **126.000.000** (hai hóa đơn nếu hãng tách)     |
-  | Khoa đề xuất (12, 2)                                                      | 422 `SUBSCRIPTION_RENEWAL.LINE_QUANTITY_NOT_TARGET`                                                                                                     |
-  | Khoa ghi kết quả (11, 3) sau đề xuất (11, 2)                              | 422 `SUBSCRIPTION_RENEWAL.QUANTITY_INVALID`                                                                                                             |
-  | Ca B — Khoa quên, tự gia hạn                                              | 01/06 chốt target (11, 2) `SYSTEM`; 01/07 ca hệ thống, `RENEWAL 12` + `RENEWAL 2` cờ _tự ghi_; 11 quyền mang sang; sự cố 01/07; kỳ vọng **132.000.000** |
-  | Ca C — không tự gia hạn, chưa ghi                                         | không kỳ mới; `EXPIRY_MARKED`; dòng `ENDED`                                                                                                             |
-  | 2D — năm sau còn 4 Standard, 0 Premium, tối thiểu tổng 5                  | target (4, 0), shortfall 1; Khoa ghi Standard 5 (`minimumTotalHolderLineId` = Standard, ghi chú) ⟹ Premium không có dòng kỳ mới                         |
-  | 2E — 1 Request Premium đã duyệt chờ cấp                                   | target Premium 3; `RENEWAL 3`; không cam kết mới                                                                                                        |
-  | Kỳ có 2 dòng, gửi thân cũ `proposedQuantity`                              | 422 `SUBSCRIPTION_RENEWAL.LINES_REQUIRED`                                                                                                               |
-  | Hai instance chạy tự ghi cùng lúc                                         | một ca (unique `subscription_renewals_one_live_per_period`), một bộ dòng kỳ mới                                                                         |
+  | Ca                                                                                       | Kết quả                                                                                                                                                        |
+  | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | 02/05/2027: Standard trả 12, gán 11, chờ 0; Premium 2/2; tối thiểu tổng 5                | target Standard **11**, Premium **2**; Σ 13 ≥ 5                                                                                                                |
+  | Ca A — Khoa đề xuất và ghi (11, 2)                                                       | kỳ mới 01/07/2027: hai dòng `RENEWAL 11`, `RENEWAL 2`; số kỳ vọng (11 × 500.000 + 2 × 2.500.000) × 12 = **126.000.000** (hai hóa đơn nếu hãng tách)            |
+  | Khoa đề xuất (12, 2)                                                                     | 422 `SUBSCRIPTION_RENEWAL.LINE_QUANTITY_NOT_TARGET`                                                                                                            |
+  | Khoa ghi kết quả (11, 3) sau đề xuất (11, 2)                                             | 422 `SUBSCRIPTION_RENEWAL.QUANTITY_INVALID`                                                                                                                    |
+  | R-LATE — Claude Standard 12 seat, target khóa 11 (01/06), Khoa đề xuất **11** ngày 05/06 | 422 `SUBSCRIPTION_RENEWAL.REDUCTION_AFTER_DEADLINE` (`minimum` 12)                                                                                             |
+  | R-LATE — như trên, Khoa đề xuất 12 (hoặc 13)                                             | ghi được; kỳ mới `RENEWAL 12`; số lỡ = 12 − 11 = **1** ⟹ 1 seat _Lỡ điểm điều chỉnh_; `KPI-4` cộng dần (seat lỡ Trống cả tháng 7 ⟹ 1 seat-tháng = **500.000**) |
+  | Ca B — Khoa quên, tự gia hạn                                                             | 01/06 chốt target (11, 2) `SYSTEM`; 01/07 ca hệ thống, `RENEWAL 12` + `RENEWAL 2` cờ _tự ghi_; 11 quyền mang sang; sự cố 01/07; kỳ vọng **132.000.000**        |
+  | Ca C — không tự gia hạn, chưa ghi                                                        | không kỳ mới; `EXPIRY_MARKED`; dòng `ENDED`                                                                                                                    |
+  | 2D — năm sau còn 4 Standard, 0 Premium, tối thiểu tổng 5                                 | target (4, 0), shortfall 1; Khoa ghi Standard 5 (`minimumTotalHolderLineId` = Standard, ghi chú) ⟹ Premium không có dòng kỳ mới                                |
+  | 2E — 1 Request Premium đã duyệt chờ cấp                                                  | target Premium 3; `RENEWAL 3`; không cam kết mới                                                                                                               |
+  | Kỳ có 2 dòng, gửi thân cũ `proposedQuantity`                                             | 422 `SUBSCRIPTION_RENEWAL.LINES_REQUIRED`                                                                                                                      |
+  | Hai instance chạy tự ghi cùng lúc                                                        | một ca (unique `subscription_renewals_one_live_per_period`), một bộ dòng kỳ mới                                                                                |
 
 - **Test:** unit `subscription-renewal-lines.policy.spec.ts` (target, shortfall), `subscription-renewal-auto.service.spec.ts`, `renewal-record.service.spec.ts`;
   integration `test/integration/licensing/renewal-auto-record.integration-spec.ts` (hai instance, barrier, lặp 20).
@@ -578,9 +585,10 @@ tierStepSeats? }`, tính **lúc đọc**: dòng mà Request sẽ cấp vào (`ch
   | Ca                                                                                                                                                                  | Kết quả                                                                                                                        |
   | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
   | Ca B 2A: số lỡ 1; seat dư cấp lại 16/09/2027                                                                                                                        | tháng 7: 1 · tháng 8: 1 · tháng 9: 15/30 ⟹ **2,5 seat-tháng = 1.250.000**                                                      |
+  | R-LATE: kỳ mới 12 seat, target khóa 11, seat lỡ Trống từ 01/07/2027 tới 31/08/2027                                                                                  | tháng 7: 1 · tháng 8: 1 ⟹ **2 seat-tháng = 1.000.000**                                                                         |
   | W1c: số lỡ 2, một seat cấp lại 01/10/2027, kỳ 07/2027 → 06/2028                                                                                                     | 2 × 3 + 1 × 9 = **15 seat-tháng = 7.500.000**                                                                                  |
   | `KHO-22` theo sổ (B2-R19): dòng 10 seat cả tháng 11/2026; seat 1–4 Thiết kế, 5–7 Kỹ thuật, seat 8 cấp 16/11, 9–10 Trống; sổ `TOP_UP +1` ngày 21/11 cấp ngay cho Lan | trả 300 + 10 = **310** seat-ngày = 5.166.667; giữ 225 + 10 = 235; Trống **1.250.000** (B1 với `q` = 11 cả tháng cho 1.583.333) |
-  | Ví dụ 1A: như trên nhưng sổ `TOP_UP +1` × 2 ngày 21/11 (Lan, Minh) cấp ngay                                                                                         | trả **320** seat-ngày = 5.333.333; giữ 245; Trống vẫn **1.250.000**                                                            |
+  | Ví dụ 1A: như trên nhưng sổ `TOP_UP +1` × 2 ngày 21/11 (Lan, Mai) cấp ngay                                                                                          | trả **320** seat-ngày = 5.333.333; giữ 245; Trống vẫn **1.250.000**                                                            |
   | Thuê bao theo thành viên có seat Trống _tự giảm_                                                                                                                    | không `KPI-4`                                                                                                                  |
 
 - **Test:** unit `shared-pool-line.policy.spec.ts` (nguồn sổ), `kpi-missed-adjustment.policy.spec.ts`.
