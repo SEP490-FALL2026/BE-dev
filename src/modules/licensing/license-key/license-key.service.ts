@@ -24,6 +24,7 @@ import {
 } from './license-key.errors';
 import {
   activationsUsedOf,
+  assertInitialActivationsAllowed,
   assertMaxActivationsRaised,
   assertWithdrawable,
   capReachedOf,
@@ -110,7 +111,7 @@ export class LicenseKeyService {
    * Keeps every valid key of the batch and reports each line that was not kept; a wrong line never spoils the others. One cap of activations and
    * one count of activations already used for the whole batch (a key with another number is imported in another batch).
    * Throws SeatTargetNotFoundError (no such purchase), LicenseKeyPlanNotK4Error, LicenseKeyPlanHasNoKeysError, LicenseKeyApplicationRetiredError
-   * and LicenseKeyInitializationClosedError; nothing is kept then.
+   * LicenseKeyInitializationClosedError, LicenseKeyInitialActivationsOnAccountPlanError and LicenseKeyInitialActivationsExceedMaxError; nothing is kept then.
    */
   async import(
     actor: AuthenticatedPrincipal,
@@ -149,6 +150,7 @@ export class LicenseKeyService {
       if (held.keyBinding === 'DEVICE_BUNDLED') throw new LicenseKeyPlanHasNoKeysError();
       if (held.applicationStatus === 'RETIRED') throw new LicenseKeyApplicationRetiredError();
       const maxActivations = await this.importSettings.maxActivations(tx, held.planId, input.maxActivations);
+      assertInitialActivationsAllowed({ initial: initialActivationsUsed, maxActivations, keyBinding: held.keyBinding });
 
       // One statement for the whole batch (a thousand round trips outlasted the transaction on a busy server).
       const keptIds = await this.repo.insertManyIfNew(

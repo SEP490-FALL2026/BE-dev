@@ -21,7 +21,12 @@ export function toDeviceAttributesApiException(error: unknown): unknown {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'DEVICE.UPDATE_EMPTY', error.message);
   }
   if (error instanceof DeviceNotEditableError) {
-    return refuse(HttpStatus.CONFLICT, 'DEVICE.NOT_EDITABLE', error.message, { reason: error.reason });
+    // The codes the SPEC names: a machine taken out of use is DEVICE.ALREADY_RETIRED (as on the register), a voided record DEVICE.VOIDED.
+    return refuse(
+      HttpStatus.CONFLICT,
+      error.reason === 'VOIDED' ? 'DEVICE.VOIDED' : 'DEVICE.ALREADY_RETIRED',
+      error.message,
+    );
   }
   if (error instanceof DeviceStaleError) {
     return refuse(HttpStatus.CONFLICT, 'DEVICE.STALE', error.message, {
@@ -29,7 +34,7 @@ export function toDeviceAttributesApiException(error: unknown): unknown {
     });
   }
   if (error instanceof DeviceSerialNumberTakenError) {
-    return refuse(HttpStatus.CONFLICT, 'DEVICE.SERIAL_NUMBER_TAKEN', error.message);
+    return refuse(HttpStatus.CONFLICT, 'DEVICE.SERIAL_TAKEN', error.message);
   }
 
   return toUnavailableApiException(error) ?? error;
@@ -41,8 +46,9 @@ const example = (error: Error) => errorExampleOf(toDeviceAttributesApiException(
 export const DEVICE_ATTRIBUTES_ERROR_EXAMPLES = {
   NOT_FOUND: example(new DeviceNotFoundError()),
   UPDATE_EMPTY: example(new DeviceUpdateEmptyError()),
-  NOT_EDITABLE: example(new DeviceNotEditableError('RETIRED')),
+  ALREADY_RETIRED: example(new DeviceNotEditableError('RETIRED')),
+  VOIDED: example(new DeviceNotEditableError('VOIDED')),
   // The same stand-in date as `SUBSCRIPTION.STALE`: an example never carries a real timestamp.
   STALE: example(new DeviceStaleError(new Date('2026-01-01T00:00:00.000Z'))),
-  SERIAL_NUMBER_TAKEN: example(new DeviceSerialNumberTakenError()),
+  SERIAL_TAKEN: example(new DeviceSerialNumberTakenError()),
 } as const;

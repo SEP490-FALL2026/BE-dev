@@ -58,8 +58,8 @@ export class DeviceAttributesController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The machine changed since it was read (DEVICE.STALE, details.currentUpdatedAt), it was taken out of use or voided (DEVICE.NOT_EDITABLE, details.reason) or another machine has the serial number (DEVICE.SERIAL_NUMBER_TAKEN). Nothing is written.',
-      examples: [EXAMPLES.STALE, EXAMPLES.NOT_EDITABLE, EXAMPLES.SERIAL_NUMBER_TAKEN],
+        'The machine changed since it was read (DEVICE.STALE, details.currentUpdatedAt), it was taken out of use (DEVICE.ALREADY_RETIRED), its record was voided (DEVICE.VOIDED) or another machine has the serial number (DEVICE.SERIAL_TAKEN). Nothing is written.',
+      examples: [EXAMPLES.STALE, EXAMPLES.ALREADY_RETIRED, EXAMPLES.VOIDED, EXAMPLES.SERIAL_TAKEN],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,

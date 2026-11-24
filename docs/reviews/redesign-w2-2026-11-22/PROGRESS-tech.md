@@ -74,6 +74,16 @@ Trạng thái: `chưa` · `đang làm` · `xong` · `dừng hỏi` · `bị ch�
 - **Nợ test để sửa gộp cuối đợt:** `FIX-TEST-tech.md` (20+ dòng, gồm 4 spec `devices-*` đỏ vì `retirement_kind` — việc của `biz`).
 - **Cần Owner xem:** D-3, D-4, D-7, D-10 (`OVERNIGHT-DECISIONS-tech.md`).
 
+## Bàn giao FE (đợt 2, làn tech)
+
+- `stockSummaryList`: `items[].stock.kind` có thêm `LICENSES` (`purchased` và `free` có thể `null`) cho gói K4 gắn máy bằng khóa; `switch` đủ ca phải thêm nhánh (D-14, SPEC §7.3).
+- `deviceUpdate` (`PATCH /devices/{id}`, 409): `DEVICE.STALE` (`details.currentUpdatedAt`), `DEVICE.ALREADY_RETIRED`, `DEVICE.VOIDED`, `DEVICE.SERIAL_TAKEN`; 422 `DEVICE.UPDATE_EMPTY`.
+- `licenseKeyImport`: 422 thêm `LICENSE_KEY.INITIAL_ACTIVATIONS_EXCEED_MAX` và `LICENSE_KEY.INITIAL_ACTIVATIONS_ON_ACCOUNT_PLAN` (D-15); `licenseKeyUpdate` (`PATCH /license-keys/{id}`) chỉ nâng `maxActivations`, thân có `key` hoặc rỗng ⟹ 422 `VALIDATION_ERROR`.
+
+## Sửa theo review T2–T5 và CI `45332982389` (nhánh `fix/redesign-w2-tech-t1-review`)
+
+F1 mã lỗi `PATCH /devices/{id}` theo SPEC (bỏ D-13) · F2 `minProperties: 2` ở thân · R-2 spec HTTP khóa: `PATCH` ⟹ 422 · R-7 hai nhánh 422 (D-15) · R-1 D-14 · R-3 câu trỏ sang `subscriptionResponsibleItAdminChange` ở `subscriptionUpdate` · R-4 manifest đợt 2 sang `*-wave2.ts` · R-5 ca 403 khẳng định `AUTHORIZATION.FORBIDDEN` · R-6 ca `DEVICE_ACTIVATIONS` ở `plan-key-binding` · bốn spec đỏ trên CI: ba fixture K4→K3 thêm `key_binding = NULL`, `licensing-assignment-read-contracts` đo 4 câu `license_keys` (trang, tổng, còn dùng được, đã giao — cùng một giao dịch `REPEATABLE READ`, không theo số dòng).
+
 ## Sửa theo review T1 (nhánh `fix/redesign-w2-tech-t1-review`, một commit riêng)
 
 Sửa thẳng migration chưa phát hành `20261124100200` và `20261124100300`; kiểm: `prisma:validate`, `prisma:generate`, `migrate deploy` lên DB rỗng, `migrate diff` = "No difference", 3 spec của T1 (45/45) và các spec liên quan, `lint`/`typecheck`/`arch`/`test:gates` xanh.

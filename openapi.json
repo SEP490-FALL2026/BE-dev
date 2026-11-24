@@ -25911,7 +25911,7 @@
         },
         "responses": {
           "200": {
-            "description": "The subscription as it is after the change; a new unit price is in dong and nothing is converted; a change of nothing is answered the same and not audited. The plan and the kind cannot change.",
+            "description": "The subscription as it is after the change; a new unit price is in dong and nothing is converted; a change of nothing is answered the same and not audited. The plan and the kind cannot change. The IT Admin who answers for the subscription is not changed here: the Super Admin does it with subscriptionResponsibleItAdminChange (POST /subscriptions/{id}/responsible-it-admin).",
             "content": {
               "application/json": {
                 "schema": {
@@ -37621,7 +37621,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR), the plan is not K4 (LICENSE_KEY.PLAN_NOT_K4), it is bundled with the machine and has no keys (LICENSE_KEY.PLAN_HAS_NO_KEYS) or its application is retired (LICENSE_KEY.APPLICATION_RETIRED).",
+            "description": "The request is invalid (VALIDATION_ERROR), the plan is not K4 (LICENSE_KEY.PLAN_NOT_K4), it is bundled with the machine and has no keys (LICENSE_KEY.PLAN_HAS_NO_KEYS), its application is retired (LICENSE_KEY.APPLICATION_RETIRED), initialActivationsUsed is above the cap of the batch (LICENSE_KEY.INITIAL_ACTIVATIONS_EXCEED_MAX) or the plan puts its keys on an account and initialActivationsUsed is above 0 (LICENSE_KEY.INITIAL_ACTIVATIONS_ON_ACCOUNT_PLAN).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -37668,6 +37668,29 @@
                       "error": {
                         "code": "LICENSE_KEY.APPLICATION_RETIRED",
                         "message": "The application of the purchase is retired: no license key is kept for it.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "LICENSE_KEY.INITIAL_ACTIVATIONS_EXCEED_MAX": {
+                    "summary": "The activations already used cannot be more than the cap of activations of the keys.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "LICENSE_KEY.INITIAL_ACTIVATIONS_EXCEED_MAX",
+                        "message": "The activations already used cannot be more than the cap of activations of the keys.",
+                        "details": { "initialActivationsUsed": 6, "maxActivations": 5 },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "LICENSE_KEY.INITIAL_ACTIVATIONS_ON_ACCOUNT_PLAN": {
+                    "summary": "A plan whose keys go to an account cannot start with activations already used.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "LICENSE_KEY.INITIAL_ACTIVATIONS_ON_ACCOUNT_PLAN",
+                        "message": "A plan whose keys go to an account cannot start with activations already used.",
                         "requestId": "req_example"
                       }
                     }

@@ -91,12 +91,14 @@ export class LicenseKeysController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The request is invalid (VALIDATION_ERROR), the plan is not K4 (LICENSE_KEY.PLAN_NOT_K4), it is bundled with the machine and has no keys (LICENSE_KEY.PLAN_HAS_NO_KEYS) or its application is retired (LICENSE_KEY.APPLICATION_RETIRED).',
+        'The request is invalid (VALIDATION_ERROR), the plan is not K4 (LICENSE_KEY.PLAN_NOT_K4), it is bundled with the machine and has no keys (LICENSE_KEY.PLAN_HAS_NO_KEYS), its application is retired (LICENSE_KEY.APPLICATION_RETIRED), initialActivationsUsed is above the cap of the batch (LICENSE_KEY.INITIAL_ACTIVATIONS_EXCEED_MAX) or the plan puts its keys on an account and initialActivationsUsed is above 0 (LICENSE_KEY.INITIAL_ACTIVATIONS_ON_ACCOUNT_PLAN).',
       examples: [
         VALIDATION_EXAMPLE,
         LICENSE_KEY_ERROR_EXAMPLES.PLAN_NOT_K4,
         LICENSE_KEY_ERROR_EXAMPLES.PLAN_HAS_NO_KEYS,
         LICENSE_KEY_ERROR_EXAMPLES.APPLICATION_RETIRED,
+        LICENSE_KEY_ERROR_EXAMPLES.INITIAL_ACTIVATIONS_EXCEED_MAX,
+        LICENSE_KEY_ERROR_EXAMPLES.INITIAL_ACTIVATIONS_ON_ACCOUNT_PLAN,
       ],
     },
   )

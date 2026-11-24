@@ -36,6 +36,25 @@ export class LicenseKeyInitializationClosedError extends Error {
   }
 }
 
+/** The batch tells more activations already used than the cap it gives its keys (a key cannot start above its cap). */
+export class LicenseKeyInitialActivationsExceedMaxError extends Error {
+  constructor(
+    readonly initialActivationsUsed: number,
+    readonly maxActivations: number,
+  ) {
+    super('The activations already used cannot be more than the cap of activations of the keys.');
+    this.name = 'LicenseKeyInitialActivationsExceedMaxError';
+  }
+}
+
+/** The keys of a plan on an account have no machine to count their activations: only a plan whose keys go to machines starts with some used. */
+export class LicenseKeyInitialActivationsOnAccountPlanError extends Error {
+  constructor() {
+    super('A plan whose keys go to an account cannot start with activations already used.');
+    this.name = 'LicenseKeyInitialActivationsOnAccountPlanError';
+  }
+}
+
 /** A plan bundled with the machine has no key to keep: the software comes with the machine. */
 export class LicenseKeyPlanHasNoKeysError extends Error {
   constructor() {

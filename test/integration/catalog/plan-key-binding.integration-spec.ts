@@ -209,6 +209,28 @@ describe('the key binding of a plan over HTTP (integration, real PostgreSQL)', (
       expect(codeOf(refused)).toBe('PLAN.IN_USE_BLOCKS_CHANGE');
       expect(reasonOf(refused)).toBe('KEY_BINDING_ASSIGNMENTS');
     });
+
+    it('refuses to change the binding of a plan that has a machine activated on it (DEVICE_ACTIVATIONS)', async () => {
+      const plan = await k4Plan({ keyBinding: 'DEVICE_BUNDLED' });
+      const deviceId = randomUUID();
+      await ctx.sql.query(
+        `INSERT INTO managed_devices (id, organization_id, asset_code, normalized_asset_code, hostname, os, created_by_app_user_id, updated_at)
+         SELECT $1, o.id, $2, $2, 'host', 'Windows', $3, now() FROM organizations o LIMIT 1`,
+        [deviceId, `M-${deviceId}`, randomUUID()],
+      );
+      await ctx.sql.query(
+        `INSERT INTO device_activations (id, organization_id, device_id, plan_id, license_key_id, origin, activated_on, activated_at,
+           activated_by_app_user_id)
+         SELECT gen_random_uuid(), o.id, $1, $2, NULL, 'INITIAL', '2026-03-20', now(), $3 FROM organizations o LIMIT 1`,
+        [deviceId, plan.id, randomUUID()],
+      );
+
+      const refused = await patchPlan(plan.id, { keyBinding: 'DEVICE_KEY' }).expect(409);
+
+      expect(codeOf(refused)).toBe('PLAN.IN_USE_BLOCKS_CHANGE');
+      expect(reasonOf(refused)).toBe('DEVICE_ACTIVATIONS');
+      expect(dataOf<PlanWire>(await getPlan(plan.id).expect(200)).keyBinding).toBe('DEVICE_BUNDLED');
+    });
   });
 
   describe('a subscription of a plan bundled with the machine', () => {
