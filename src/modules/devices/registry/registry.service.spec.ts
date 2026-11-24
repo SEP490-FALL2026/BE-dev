@@ -2,7 +2,10 @@ import { Prisma } from '../../../generated/prisma/client';
 import type { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { AuditApi } from '../../audit/public/audit.api';
+import type { CatalogApi } from '../../catalog/public/catalog.api';
+import type { SeatTarget } from '../../catalog/public/catalog.types';
 import type { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
+import type { LicensingDeviceActivationApi } from '../../licensing/public/licensing-device-activation.api';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { AssetCodeService } from '../asset-code/asset-code.service';
 import { DeviceNotInChargeError } from '../public/devices.errors';
@@ -31,6 +34,7 @@ describe('RegistryService device intake (W2-03, H17, org-timezone year)', () => 
       inCharge?: string | null;
       substitute?: string | null;
       insertDeviceError?: Error;
+      bundledTargets?: SeatTarget[];
     } = {},
   ) {
     const repo = {
@@ -105,10 +109,30 @@ describe('RegistryService device intake (W2-03, H17, org-timezone year)', () => 
         ),
     } as unknown as AssetCodeService;
     const audit = { record: jest.fn().mockResolvedValue(undefined) } as unknown as AuditApi;
+    const catalog = {
+      findPlanSeatTargets: jest.fn().mockResolvedValue(options.bundledTargets ?? []),
+    } as unknown as CatalogApi;
+    const deviceActivations = {
+      open: jest.fn().mockResolvedValue({
+        activation: { id: 'act-1' },
+        activationsUsed: null,
+        maxActivations: null,
+        overActivationCap: false,
+      }),
+    } as unknown as LicensingDeviceActivationApi;
 
-    const service = new RegistryService(repo, organizationReads, audit, runner, assetCodes, identity);
+    const service = new RegistryService(
+      repo,
+      organizationReads,
+      audit,
+      runner,
+      assetCodes,
+      identity,
+      catalog,
+      deviceActivations,
+    );
 
-    return { service, repo, organizationReads, assetCodes, audit };
+    return { service, repo, organizationReads, assetCodes, audit, catalog, deviceActivations };
   }
 
   const firstAuditAfter = (audit: AuditApi): Record<string, unknown> => {
@@ -178,11 +202,45 @@ describe('RegistryService device intake (W2-03, H17, org-timezone year)', () => 
     ).rejects.toBeInstanceOf(DeviceHandoverWithoutHolderError);
   });
 
-  it('rejects non-empty bundledPlanIds until bundled activation wiring lands', async () => {
-    const { service } = setup();
+  it('opens DEVICE_BUNDLED activations in sorted planId order and rejects unknown or non-bundled plans', async () => {
+    const oemTarget = (planId: string, keyBinding: 'DEVICE_BUNDLED' | 'DEVICE_KEY' = 'DEVICE_BUNDLED'): SeatTarget => ({
+      kind: 'PLAN',
+      subscriptionId: null,
+      planId,
+      planName: planId,
+      applicationId: 'app-1',
+      applicationName: 'Win OEM',
+      applicationKind: 'LICENSED',
+      provisioningType: 'K4',
+      keyBinding,
+      applicationStatus: 'APPROVED',
+      status: null,
+      purchasedQuantity: null,
+      missing: [],
+      allowsMidTermReduction: false,
+    });
+    const ok = setup({ bundledTargets: [oemTarget('plan-b'), oemTarget('plan-a')] });
+    await ok.service.create(
+      actor('it-1'),
+      { deviceType: 'LAP', hostname: 'H', os: 'Windows 11', bundledPlanIds: ['plan-b', 'plan-a'] },
+      new Date('2026-12-01T10:00:00.000Z'),
+    );
+    const openCalls = (
+      (ok.deviceActivations as unknown as { open: jest.Mock }).open.mock.calls as Array<
+        [unknown, { planId: string; licenseKeyId: string | null; origin: string }]
+      >
+    ).map(([, arg]) => arg);
+    expect(openCalls.map((call) => call.planId)).toEqual(['plan-a', 'plan-b']);
+    expect(openCalls[0]).toMatchObject({ licenseKeyId: null, origin: 'OPERATION' });
 
+    const nonBundled = setup({ bundledTargets: [oemTarget('plan-1', 'DEVICE_KEY')] });
     await expect(
-      service.create(actor(), { deviceType: 'LAP', hostname: 'H', os: 'OS', bundledPlanIds: ['plan-1'] }),
+      nonBundled.service.create(actor(), { deviceType: 'LAP', hostname: 'H', os: 'OS', bundledPlanIds: ['plan-1'] }),
+    ).rejects.toBeInstanceOf(DevicePlanNotBundledError);
+
+    const missing = setup({ bundledTargets: [] });
+    await expect(
+      missing.service.create(actor(), { deviceType: 'LAP', hostname: 'H', os: 'OS', bundledPlanIds: ['plan-missing'] }),
     ).rejects.toBeInstanceOf(DevicePlanNotBundledError);
   });
 

@@ -3,6 +3,7 @@ import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { AuditModule } from '../audit/audit.module';
 import { CatalogModule } from '../catalog/catalog.module';
 import { IdentityAccessFacadeModule } from '../identity-access/identity-access-facade.module';
+import { LicensingModule } from '../licensing/licensing.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { OperatingParametersModule } from '../operating-parameters/operating-parameters.module';
 import { OrganizationModule } from '../organization/organization.module';
@@ -10,6 +11,8 @@ import { DEVICE_CREDENTIAL_VERIFIER } from '../../infrastructure/security/tokens
 import { AcknowledgementController } from './acknowledgement/acknowledgement.controller';
 import { AcknowledgementRepo } from './acknowledgement/acknowledgement.repo';
 import { AcknowledgementService } from './acknowledgement/acknowledgement.service';
+import { DeviceActivationController } from './activation/activation.controller';
+import { DeviceActivationCommandService } from './activation/activation.service';
 import { AssetCodeRepo } from './asset-code/asset-code.repo';
 import { AssetCodeService } from './asset-code/asset-code.service';
 import { DeviceAttributesController } from './attributes/device-attributes.controller';
@@ -68,12 +71,14 @@ import { StopRequestSweepService } from './stop-request/stop-request-sweep.servi
     OperatingParametersModule,
     CatalogModule,
     IdentityAccessFacadeModule,
+    LicensingModule,
     NotificationsModule,
   ],
   controllers: [
     NoticeController,
     RegistryController,
     LifecycleController,
+    DeviceActivationController,
     DeviceAttributesController,
     SignatureRecordController,
     AcknowledgementController,
@@ -94,6 +99,7 @@ import { StopRequestSweepService } from './stop-request/stop-request-sweep.servi
     DeviceReceiptService,
     ConditionService,
     RetirementService,
+    DeviceActivationCommandService,
     AssetCodeRepo,
     AssetCodeService,
     DeviceAttributesRepo,

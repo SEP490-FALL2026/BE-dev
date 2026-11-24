@@ -155,6 +155,11 @@ export class DevicesHarness extends DocumentHarness {
     request(this.server()).post(`/api/v1/devices/${id}/condition-changes`).set(this.as(account)).send(body);
   retire = (id: string, reason = 'The disk failed.', account: ApiAccount = this.it1) =>
     request(this.server()).post(`/api/v1/devices/${id}/retirements`).set(this.as(account)).send({ reason });
+  activateDevice = (
+    deviceId: string,
+    body: { planId: string; licenseKeyId?: string },
+    account: ApiAccount = this.it1,
+  ) => request(this.server()).post(`/api/v1/devices/${deviceId}/activations`).set(this.as(account)).send(body);
   recordSignature = (registrationId: string, body: object, account: ApiAccount = this.it1) =>
     request(this.server())
       .post(`/api/v1/device-registrations/${registrationId}/signature-records`)

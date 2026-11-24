@@ -4,7 +4,14 @@ import { TransactionRunner, readSqlState, type DbTx } from '../../../infrastruct
 import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
+import type { AuditValue } from '../../audit/public/audit.types';
+import { CatalogApi } from '../../catalog/public/catalog.api';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
+import { LicensingDeviceActivationApi } from '../../licensing/public/licensing-device-activation.api';
+import {
+  DeviceActivationPlanNotDeviceBoundError,
+  DeviceActivationPlanNotFoundError,
+} from '../../licensing/public/licensing-device-activation.errors';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { AssetDeviceType } from '../asset-code/asset-code.policy';
 import { AssetCodeService } from '../asset-code/asset-code.service';
@@ -49,6 +56,8 @@ export class RegistryService {
     private readonly runner: TransactionRunner,
     private readonly assetCodes: AssetCodeService,
     private readonly identity: IdentityAccessApi,
+    private readonly catalog: CatalogApi,
+    private readonly deviceActivations: LicensingDeviceActivationApi,
   ) {}
 
   /**
@@ -61,9 +70,7 @@ export class RegistryService {
     if (!input.holderEmployeeId && (input.handedOverOn !== undefined || input.collectorInstalled !== undefined)) {
       throw new DeviceHandoverWithoutHolderError();
     }
-    if (input.bundledPlanIds && input.bundledPlanIds.length > 0) {
-      throw new DevicePlanNotBundledError();
-    }
+    const bundledPlanIds = [...new Set(input.bundledPlanIds ?? [])].sort();
     const organization = await this.requireOrganization();
 
     return this.runner.run(async (tx) => {
@@ -95,28 +102,102 @@ export class RegistryService {
             collectorInstalled,
           })
         : null;
-      await this.audit.record(
-        tx,
-        devicesEvent(byUser(actor), organization.id, 'DEVICE.REGISTERED', 'ManagedDevice', device.id, null, {
-          assetCode: device.assetCode,
-          deviceType: input.deviceType,
-          hostname: device.hostname,
-          serialNumber,
-          bundledPlanIds: input.bundledPlanIds ?? [],
-          ...(handover && registration
-            ? {
-                holderEmployeeId: handover.holderId,
-                registrationId: registration.id,
-                validFrom: handover.validFrom,
-                collectorInstalled,
-              }
-            : {}),
-          ...(handover?.bySubstitute ? { bySubstitute: true } : {}),
-        }),
-      );
+      if (bundledPlanIds.length > 0) {
+        await this.openBundledPlans(tx, actor, organization.id, device.id, bundledPlanIds, {
+          on: today,
+          at: now,
+          bySubstitute: handover?.bySubstitute ?? false,
+        });
+      }
+      await this.recordRegisteredAudit(tx, actor, organization.id, device, {
+        deviceType: input.deviceType,
+        serialNumber,
+        bundledPlanIds,
+        collectorInstalled,
+        handover,
+        registration,
+      });
 
       return device.id;
     });
+  }
+
+  private async recordRegisteredAudit(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    organizationId: string,
+    device: { id: string; assetCode: string; hostname: string },
+    details: {
+      deviceType: AssetDeviceType;
+      serialNumber: string | null;
+      bundledPlanIds: readonly string[];
+      collectorInstalled: boolean;
+      handover: { holderId: string; validFrom: string; bySubstitute: boolean } | null;
+      registration: RegistrationRecord | null;
+    },
+  ): Promise<void> {
+    const after: { [key: string]: AuditValue } = {
+      assetCode: device.assetCode,
+      deviceType: details.deviceType,
+      hostname: device.hostname,
+      serialNumber: details.serialNumber,
+      bundledPlanIds: [...details.bundledPlanIds],
+    };
+    if (details.handover && details.registration) {
+      after.holderEmployeeId = details.handover.holderId;
+      after.registrationId = details.registration.id;
+      after.validFrom = details.handover.validFrom;
+      after.collectorInstalled = details.collectorInstalled;
+    }
+    if (details.handover?.bySubstitute) after.bySubstitute = true;
+    await this.audit.record(
+      tx,
+      devicesEvent(byUser(actor), organizationId, 'DEVICE.REGISTERED', 'ManagedDevice', device.id, null, after),
+    );
+  }
+
+  private async openBundledPlans(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    organizationId: string,
+    deviceId: string,
+    planIds: readonly string[],
+    context: { on: string; at: Date; bySubstitute: boolean },
+  ): Promise<void> {
+    const targets = await this.catalog.findPlanSeatTargets(planIds, tx);
+    const byPlanId = new Map(targets.map((target) => [target.planId, target]));
+    for (const planId of planIds) {
+      const target = byPlanId.get(planId);
+      if (!target || target.keyBinding !== 'DEVICE_BUNDLED') throw new DevicePlanNotBundledError();
+    }
+    for (const planId of planIds) {
+      try {
+        await this.deviceActivations.open(tx, {
+          organizationId,
+          deviceId,
+          planId,
+          licenseKeyId: null,
+          origin: 'OPERATION',
+          on: context.on,
+          at: context.at,
+          by: {
+            kind: 'USER',
+            appUserId: actor.appUserId,
+            employeeId: actor.employeeId,
+            sessionId: actor.sessionId,
+            bySubstitute: context.bySubstitute,
+          },
+        });
+      } catch (error) {
+        if (
+          error instanceof DeviceActivationPlanNotFoundError ||
+          error instanceof DeviceActivationPlanNotDeviceBoundError
+        ) {
+          throw new DevicePlanNotBundledError();
+        }
+        throw error;
+      }
+    }
   }
 
   private async prepareInitialHandover(

@@ -47,6 +47,7 @@ describe('company machine routes (http contract, no database)', () => {
     ['post', `${DEVICES}/${ID}/returns`, { condition: 'USABLE', softwareRemoval: { outcome: 'REMOVED' } }],
     ['post', `${DEVICES}/${ID}/condition-changes`, { condition: 'IN_REPAIR' }],
     ['post', `${DEVICES}/${ID}/retirements`, { reason: 'broken' }],
+    ['post', `${DEVICES}/${ID}/activations`, { planId: ID }],
     ['post', `${REGISTRATIONS}/${ID}/signature-records`, { documentId: ID, noticeVersionId: ID }],
     ['post', `${REGISTRATIONS}/${ID}/collector-installation`, undefined],
     ['post', NOTICES, NOTICE],
@@ -95,6 +96,7 @@ describe('company machine routes (http contract, no database)', () => {
       ),
       await as(request(server).post(`${DEVICES}/${ID}/condition-changes`).send({ condition: 'IN_REPAIR' })),
       await as(request(server).post(`${DEVICES}/${ID}/retirements`).send({ reason: 'x' })),
+      await as(request(server).post(`${DEVICES}/${ID}/activations`).send({ planId: ID })),
       await as(
         request(server).post(`${REGISTRATIONS}/${ID}/signature-records`).send({ documentId: ID, noticeVersionId: ID }),
       ),
@@ -259,6 +261,13 @@ describe('company machine routes (http contract, no database)', () => {
       { condition: 'LOST' },
     ],
     ['a retirement with no reason', 'post', `${DEVICES}/${ID}/retirements`, {}],
+    ['an activation with no planId', 'post', `${DEVICES}/${ID}/activations`, {}],
+    [
+      'an activation with non-UUID licenseKeyId',
+      'post',
+      `${DEVICES}/${ID}/activations`,
+      { planId: ID, licenseKeyId: 'bad' },
+    ],
     ['a signed record with no version', 'post', `${REGISTRATIONS}/${ID}/signature-records`, { documentId: ID }],
     [
       'a collector enable on non-UUID registration id',
@@ -350,6 +359,7 @@ describe('company machine routes (http contract, no database)', () => {
       ['DeviceReturnBodyDto', ['condition', 'conditionNote', 'softwareRemoval'], ['condition', 'softwareRemoval']],
       ['ConditionChangeBodyDto', ['condition', 'note'], ['condition']],
       ['RetirementBodyDto', ['reason'], ['reason']],
+      ['OpenDeviceActivationBodyDto', ['planId', 'licenseKeyId'], ['planId']],
       ['SignatureRecordBodyDto', ['documentId', 'noticeVersionId'], ['documentId', 'noticeVersionId']],
       [
         'NoticeVersionBodyDto',

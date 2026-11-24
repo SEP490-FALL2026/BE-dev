@@ -4,6 +4,7 @@ export const SUCCESS_MESSAGES_DEVICES: Readonly<Record<string, string>> = {
   aiUsageBatchCreate: 'AI_USAGE_BATCH.PROCESSED',
   collectorAllowlistEntryList: 'COLLECTOR_ALLOWLIST.ENTRIES_LISTED',
   collectorAllowlistVersionCreate: 'COLLECTOR_ALLOWLIST.PUBLISHED',
+  deviceActivationCreate: 'DEVICE_ACTIVATION.OPENED',
   deviceConditionChange: 'DEVICE.CONDITION_CHANGED',
   deviceCreate: 'DEVICE.REGISTERED',
   deviceCredentialList: 'DEVICE_CREDENTIAL.LISTED',
