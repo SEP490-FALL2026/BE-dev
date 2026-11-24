@@ -286,7 +286,10 @@ describe('the register of machines after the migrations of wave 2 (integration, 
     it('keeps the serial number and its search key together, and one serial number once in an organization', async () => {
       expect((await insertDevice('SN-1', { serial: 'abc' })).failure?.constraint).toBe('managed_devices_serial_pair');
       expect((await insertDevice('SN-2', { serial: 'abc', normalizedSerial: 'ABC' })).failure).toBeNull();
-      expect((await insertDevice('SN-3', { serial: 'a b c', normalizedSerial: 'ABC' })).failure?.code).toBe('23505');
+      expect((await insertDevice('SN-3', { serial: 'a b c', normalizedSerial: 'ABC' })).failure).toMatchObject({
+        code: '23505',
+        constraint: 'managed_devices_organization_id_normalized_serial_number_key',
+      });
       expect((await insertDevice('SN-4')).failure).toBeNull();
       expect((await insertDevice('SN-5')).failure).toBeNull();
     });

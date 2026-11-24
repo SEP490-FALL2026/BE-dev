@@ -212,6 +212,20 @@ describe('activations of a machine, the keys of a lot and the binding of a plan 
       expect(blocked?.message).toContain('plan_change_blocked: DEVICE_ACTIVATIONS');
     });
 
+    it('does not leave K4 (the binding goes to none) while a machine holds an activation of the plan', async () => {
+      const planId = await plan('DEVICE_BUNDLED');
+      expect(await activate(await device(), planId, null)).toBeNull();
+
+      const blocked = await refusal(
+        sql,
+        `UPDATE plans SET provisioning_type = 'K1', key_binding = NULL WHERE id = $1`,
+        [planId],
+      );
+
+      expect(blocked).toMatchObject({ code: '23514', constraint: 'plans_change_keeps_device_activations' });
+      expect(blocked?.message).toContain('plan_change_blocked: DEVICE_ACTIVATIONS');
+    });
+
     it('moves when nothing rests on the plan', async () => {
       const planId = await plan('ACCOUNT');
 
@@ -332,6 +346,19 @@ describe('activations of a machine, the keys of a lot and the binding of a plan 
         'device_activations_release',
       );
       expect(await close(await activationOf(free, bundled), 'DEACTIVATED', null)).toBeNull();
+    });
+
+    it('does not tell who closed a row that is still open', async () => {
+      const bundled = await plan('DEVICE_BUNDLED');
+      const machine = await device();
+      await activate(machine, bundled, null);
+
+      const refused = await refusal(sql, `UPDATE device_activations SET closed_by_app_user_id = $2 WHERE id = $1`, [
+        await activationOf(machine, bundled),
+        user,
+      ]);
+
+      expect(refused?.constraint).toBe('device_activations_closed_complete');
     });
 
     it('never deletes a row, changes nothing of a closed one, and moves only the closing columns of an open one', async () => {

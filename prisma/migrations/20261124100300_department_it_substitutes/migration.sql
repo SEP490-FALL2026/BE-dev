@@ -67,7 +67,7 @@ CREATE INDEX "department_it_substitutes_substitute_active_idx" ON "department_it
 ALTER TABLE "department_it_substitutes" ADD CONSTRAINT "department_it_substitutes_end_complete"
   CHECK (("ended_at" IS NULL) = ("end_cause" IS NULL) AND ("ended_by_app_user_id" IS NULL OR "ended_at" IS NOT NULL));
 ALTER TABLE "department_it_substitutes" ADD CONSTRAINT "department_it_substitutes_reason_length"
-  CHECK (char_length(btrim("reason")) BETWEEN 1 AND 500);
+  CHECK (char_length("reason") <= 500 AND btrim("reason") <> '');
 
 -- unplaced_work_it_designations: one designation in force for a piece of work; the same end rules and reason length.
 CREATE UNIQUE INDEX "unplaced_work_it_designations_one_active" ON "unplaced_work_it_designations" ("work_kind", "work_id") WHERE "ended_at" IS NULL;
@@ -75,7 +75,7 @@ CREATE INDEX "unplaced_work_it_designations_designee_active_idx" ON "unplaced_wo
 ALTER TABLE "unplaced_work_it_designations" ADD CONSTRAINT "unplaced_work_it_designations_end_complete"
   CHECK (("ended_at" IS NULL) = ("end_cause" IS NULL) AND ("ended_by_app_user_id" IS NULL OR "ended_at" IS NOT NULL));
 ALTER TABLE "unplaced_work_it_designations" ADD CONSTRAINT "unplaced_work_it_designations_reason_length"
-  CHECK (char_length(btrim("reason")) BETWEEN 1 AND 500);
+  CHECK (char_length("reason") <= 500 AND btrim("reason") <> '');
 
 -- An appointment is never deleted, keeps everything it said when it was made, and ends once (the three end columns are written once).
 -- Whether the person named is an IT Admin who can work is not judged here (the role belongs to another module): the service judges it when

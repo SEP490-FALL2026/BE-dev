@@ -73,3 +73,14 @@ Trạng thái: `chưa` · `đang làm` · `xong` · `dừng hỏi` · `bị ch�
 - **Đỏ sẵn trên `origin/dev`, không phải do làn này:** `src/modules/notifications/inbox/notification-target.recipients.policy.spec.ts` (hai ca, "no controller declares …"; đo lại trên worktree sạch của `origin/dev` `b7a7cc80`) và hai ca `test/http/platform/openapi-export.http-spec.ts` (Node 24 với đường dẫn có dấu).
 - **Nợ test để sửa gộp cuối đợt:** `FIX-TEST-tech.md` (20+ dòng, gồm 4 spec `devices-*` đỏ vì `retirement_kind` — việc của `biz`).
 - **Cần Owner xem:** D-3, D-4, D-7, D-10 (`OVERNIGHT-DECISIONS-tech.md`).
+
+## Sửa theo review T1 (nhánh `fix/redesign-w2-tech-t1-review`, một commit riêng)
+
+Sửa thẳng migration chưa phát hành `20261124100200` và `20261124100300`; kiểm: `prisma:validate`, `prisma:generate`, `migrate deploy` lên DB rỗng, `migrate diff` = "No difference", 3 spec của T1 (45/45) và các spec liên quan, `lint`/`typecheck`/`arch`/`test:gates` xanh.
+
+- **M-1:** `plans_keep_children_valid`: nhánh `DEVICE_ACTIVATIONS` chạy khi `key_binding` đổi, kể cả về không có (gói rời K4); `PURCHASES`/`ASSIGNMENTS` giữ như D-2. Ca test mới: gói K4 `DEVICE_BUNDLED` có kích hoạt đổi sang K1 bị chặn.
+- **L-1:** `device_activations_closed_complete` thêm `closed_by_app_user_id IS NULL OR deactivated_at IS NOT NULL` (ca test mới).
+- **N-1:** lý do của hai bảng QĐ-118 là `char_length(reason) <= 500 AND btrim(reason) <> ''` (ca test: lý do 500 ký tự có khoảng trắng đầu bị chặn).
+- **N-2:** spec `devices-register-schema` khẳng định tên ràng buộc của serial trùng.
+- **L-2 (điều kiện T3, đã đạt):** `bindingOf` trong `plan.repo.ts` đã xóa ở `f9b35113`; T3 ghi `keyBinding` do `keyBindingOf` quyết định.
+- **D-3 (Owner chốt) cho T7:** sửa thẳng migration 1 — `DROP DEFAULT` cho `device_type` và `asset_code_origin`, bỏ `@default` ở `devices.prisma` — **chỉ sau khi** làn `biz` ghi đủ hai cột ở mọi chỗ tạo máy (B1, B7).
