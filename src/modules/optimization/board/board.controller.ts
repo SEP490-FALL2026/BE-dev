@@ -174,8 +174,8 @@ export class BoardController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The recommendation is not an open G2 (GHOST_SEAT.NOT_RECLAIMABLE) or the gate of the revocation refused the seat (GHOST_SEAT.SEAT_NOT_REVOCABLE).',
-      examples: [EXAMPLES.NOT_RECLAIMABLE, EXAMPLES.SEAT_NOT_REVOCABLE],
+        'The recommendation is not an open G2 (GHOST_SEAT.NOT_RECLAIMABLE), the gate of the revocation refused the seat (GHOST_SEAT.SEAT_NOT_REVOCABLE), or the holder has not started working in a department yet (EMPLOYEE.NOT_STARTED).',
+      examples: [EXAMPLES.NOT_RECLAIMABLE, EXAMPLES.SEAT_NOT_REVOCABLE, EXAMPLES.EMPLOYEE_NOT_STARTED],
     },
     QUERY_INVALID,
   )

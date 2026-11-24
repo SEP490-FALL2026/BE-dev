@@ -83,4 +83,5 @@ export const GHOST_SEAT_ERROR_EXAMPLES = {
   SEAT_NOT_REVOCABLE: example(new GhostSeatSeatNotRevocableError('ASSIGNMENT_IS_SERVICE_ACCOUNT')),
   PERIOD_INVALID: example(new GhostSeatPeriodInvalidError()),
   RULE_RUN_BUSY: example(new GhostSeatRuleRunBusyError('G1_G2')),
+  EMPLOYEE_NOT_STARTED: example(new EmployeeNotStartedError()),
 } as const;

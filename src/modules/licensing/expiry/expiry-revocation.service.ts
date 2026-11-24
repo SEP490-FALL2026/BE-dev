@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { describeForOperator, traceForOperator } from '../../../infrastructure/observability/operator-error';
+import { EmployeeNotStartedError } from '../../organization/public/organization.errors';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AssignmentNotOpenError, RevocationRefusedError } from '../public/licensing.errors';
 import { RenewalHoldHook } from '../public/licensing.extension-points';
@@ -25,6 +26,8 @@ const PAGE = 200;
 @Injectable()
 export class ExpiryRevocationService {
   private readonly logger = new Logger(ExpiryRevocationService.name);
+  /** The rights of a holder who has not started yet that this process already warned about: the same answer every hour is warned of once. */
+  private readonly warnedNotStarted = new Set<string>();
 
   constructor(
     private readonly repo: ExpiryRevocationRepo,
@@ -83,6 +86,18 @@ export class ExpiryRevocationService {
       // The gate refuses a right it cannot take away (K3 is specified and not built): there is no revocation to open, and the same answer every
       // hour is no fault to log. The right stays in the queue of the IT Admin, who sees what its plan allows.
       if (error instanceof RevocationRefusedError) return 0;
+      // The holder has only a placement that starts later: no technical work is made for them yet (`B-3`), so the right is skipped and tried again
+      // at the next pass (once the placement starts it opens); the warning is written once, not every hour.
+      if (error instanceof EmployeeNotStartedError) {
+        if (!this.warnedNotStarted.has(assignmentId)) {
+          this.warnedNotStarted.add(assignmentId);
+          this.logger.warn(
+            `The revocation of the right ${assignmentId} that ended is skipped: its holder has not started working in a department yet (${describeForOperator(error)})`,
+          );
+        }
+
+        return 0;
+      }
       this.logger.error(
         `Opening the revocation of the right ${assignmentId} that ended failed: ${describeForOperator(error)}`,
         traceForOperator(error),

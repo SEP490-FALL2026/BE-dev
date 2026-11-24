@@ -45,11 +45,12 @@ const DECIDER_ONLY = {
 const DECISION_CONFLICT = {
   status: HttpStatus.CONFLICT,
   description:
-    'A recommendation is paused (GHOST_SEAT.PAUSED), not waiting for a decision (GHOST_SEAT.NOT_DECIDABLE) or its seat cannot be revoked (GHOST_SEAT.SEAT_NOT_REVOCABLE), `details.items` names each; or the policy of the checklist was changed since the head was shown it (POLICY.VERSION_CHANGED), or has no version in force at the step (POLICY.NOT_IN_FORCE). Nothing was saved.',
+    'A recommendation is paused (GHOST_SEAT.PAUSED), not waiting for a decision (GHOST_SEAT.NOT_DECIDABLE) or its seat cannot be revoked (GHOST_SEAT.SEAT_NOT_REVOCABLE), `details.items` names each; the holder of a seat to reclaim has not started working in a department yet (EMPLOYEE.NOT_STARTED); or the policy of the checklist was changed since the head was shown it (POLICY.VERSION_CHANGED), or has no version in force at the step (POLICY.NOT_IN_FORCE). Nothing was saved.',
   examples: [
     EXAMPLES.PAUSED,
     EXAMPLES.NOT_DECIDABLE,
     EXAMPLES.SEAT_NOT_REVOCABLE,
+    EXAMPLES.EMPLOYEE_NOT_STARTED,
     CHECKLIST_ERROR_EXAMPLES.VERSION_CHANGED,
     CHECKLIST_ERROR_EXAMPLES.NOT_IN_FORCE,
   ],
