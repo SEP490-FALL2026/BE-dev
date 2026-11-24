@@ -133,7 +133,7 @@ describe('the IT Admin who answers for a subscription over HTTP (integration, re
     const body = { employeeId: it2.employeeId, reason: 'Take it' };
 
     for (const account of [it1, it2, finance, employee]) {
-      await change(created.id, body, account.accessToken).expect(403);
+      expect(codeOf(await change(created.id, body, account.accessToken).expect(403))).toBe('AUTHORIZATION.FORBIDDEN');
     }
     expect(await auditOf(created.id)).toEqual([]);
   });

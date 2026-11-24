@@ -344,16 +344,43 @@ describe('the activations of the license keys (integration, real PostgreSQL)', (
   });
 
   describe('the activations a key already had when it was entered', () => {
+    it('cannot be more than the cap of the batch (422), told or left to its default of one, and nothing is kept', async () => {
+      const purchase = await purchaseOf(await planOf('DEVICE_KEY'), 5);
+
+      const over = await importKeys(purchase, keysOf(1), { maxActivations: 5, initialActivationsUsed: 6 }).expect(422);
+      expect(codeOf(over)).toBe('LICENSE_KEY.INITIAL_ACTIVATIONS_EXCEED_MAX');
+      expect(detailsOf(over)).toEqual({ initialActivationsUsed: 6, maxActivations: 5 });
+      expect(codeOf(await importKeys(purchase, keysOf(1), { initialActivationsUsed: 2 }).expect(422))).toBe(
+        'LICENSE_KEY.INITIAL_ACTIVATIONS_EXCEED_MAX',
+      );
+      expect(dataOf<PageWire>(await listKeys(purchase).expect(200)).items).toHaveLength(0);
+
+      await importKeys(purchase, keysOf(1), { maxActivations: 5, initialActivationsUsed: 5 }).expect(201);
+      expect(dataOf<PageWire>(await listKeys(purchase).expect(200)).items[0]).toMatchObject({ activationsUsed: 5 });
+    });
+
+    it('cannot be told for a plan whose keys go to an account (422): only machines count activations', async () => {
+      const purchase = await purchaseOf(await planOf('ACCOUNT'), 5);
+
+      expect(codeOf(await importKeys(purchase, keysOf(1), { initialActivationsUsed: 1 }).expect(422))).toBe(
+        'LICENSE_KEY.INITIAL_ACTIVATIONS_ON_ACCOUNT_PLAN',
+      );
+      expect(dataOf<PageWire>(await listKeys(purchase).expect(200)).items).toHaveLength(0);
+
+      await importKeys(purchase, keysOf(1), { initialActivationsUsed: 0 }).expect(201);
+    });
+
+    // Last of the file: it closes the seat baseline, after which a batch that tells activations is turned away with 409 whatever it tells.
     it('are told while the installation phase is open, and refused after it closes (409), where 0 is allowed whenever', async () => {
       const purchase = await purchaseOf(await planOf('DEVICE_KEY'), 5);
-      await importKeys(purchase, keysOf(1), { initialActivationsUsed: 4 }).expect(201);
+      await importKeys(purchase, keysOf(1), { maxActivations: 5, initialActivationsUsed: 4 }).expect(201);
       expect(dataOf<PageWire>(await listKeys(purchase).expect(200)).items[0].activationsUsed).toBe(4);
 
       await request(server()).post('/api/v1/seat-baseline/close').set(as(it1)).expect(200);
 
-      expect(codeOf(await importKeys(purchase, keysOf(1), { initialActivationsUsed: 4 }).expect(409))).toBe(
-        'LICENSE_KEY.INITIALIZATION_CLOSED',
-      );
+      expect(
+        codeOf(await importKeys(purchase, keysOf(1), { maxActivations: 5, initialActivationsUsed: 4 }).expect(409)),
+      ).toBe('LICENSE_KEY.INITIALIZATION_CLOSED');
       await importKeys(purchase, keysOf(1), { initialActivationsUsed: 0 }).expect(201);
       await importKeys(purchase, keysOf(1)).expect(201);
     });

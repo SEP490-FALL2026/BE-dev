@@ -1,7 +1,13 @@
-import { LicenseKeyMaxActivationsNotRaisedError, LicenseKeyStateError } from './license-key.errors';
+import {
+  LicenseKeyInitialActivationsExceedMaxError,
+  LicenseKeyInitialActivationsOnAccountPlanError,
+  LicenseKeyMaxActivationsNotRaisedError,
+  LicenseKeyStateError,
+} from './license-key.errors';
 import {
   activationsUsedOf,
   assertAssignable,
+  assertInitialActivationsAllowed,
   assertMaxActivationsRaised,
   assertWithdrawable,
   capReachedOf,
@@ -192,6 +198,33 @@ describe('the activations of a key (KHOA-08, C-6)', () => {
     expect(capReachedOf(12, 30)).toBe(false);
     expect(capReachedOf(30, 30)).toBe(true);
     expect(capReachedOf(31, 30)).toBe(true);
+  });
+
+  it('lets a batch tell no activations already used, or as many as the cap allows, for a plan whose keys go to machines', () => {
+    expect(() =>
+      assertInitialActivationsAllowed({ initial: 0, maxActivations: 1, keyBinding: 'ACCOUNT' }),
+    ).not.toThrow();
+    expect(() =>
+      assertInitialActivationsAllowed({ initial: 0, maxActivations: 1, keyBinding: 'DEVICE_KEY' }),
+    ).not.toThrow();
+    expect(() =>
+      assertInitialActivationsAllowed({ initial: 5, maxActivations: 5, keyBinding: 'DEVICE_KEY' }),
+    ).not.toThrow();
+  });
+
+  it('refuses activations already used above the cap of the batch', () => {
+    expect(() => assertInitialActivationsAllowed({ initial: 6, maxActivations: 5, keyBinding: 'DEVICE_KEY' })).toThrow(
+      LicenseKeyInitialActivationsExceedMaxError,
+    );
+    expect(() => assertInitialActivationsAllowed({ initial: 2, maxActivations: 1, keyBinding: 'DEVICE_KEY' })).toThrow(
+      LicenseKeyInitialActivationsExceedMaxError,
+    );
+  });
+
+  it('refuses activations already used on a plan whose keys go to an account: only its machines count them', () => {
+    expect(() => assertInitialActivationsAllowed({ initial: 1, maxActivations: 5, keyBinding: 'ACCOUNT' })).toThrow(
+      LicenseKeyInitialActivationsOnAccountPlanError,
+    );
   });
 
   it('lets the cap only go up', () => {

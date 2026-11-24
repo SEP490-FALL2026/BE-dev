@@ -1,4 +1,9 @@
-import { LicenseKeyMaxActivationsNotRaisedError, LicenseKeyStateError } from './license-key.errors';
+import {
+  LicenseKeyInitialActivationsExceedMaxError,
+  LicenseKeyInitialActivationsOnAccountPlanError,
+  LicenseKeyMaxActivationsNotRaisedError,
+  LicenseKeyStateError,
+} from './license-key.errors';
 
 /** The most keys one batch holds; the DTO bounds the request with it. */
 export const MAX_KEYS_PER_BATCH = 1000;
@@ -109,6 +114,23 @@ export function activationsUsedOf(initialActivationsUsed: number, operationActiv
 /** Whether a key has used all the activations it allows. */
 export function capReachedOf(activationsUsed: number, maxActivations: number): boolean {
   return activationsUsed >= maxActivations;
+}
+
+/**
+ * What a batch may tell about the activations its keys already had (W2-Q5, the decision on R-7): none is always fine; some need a plan whose keys
+ * go to machines (an account plan has no machine to count them) and not more than the cap of the batch.
+ * Throws LicenseKeyInitialActivationsOnAccountPlanError and LicenseKeyInitialActivationsExceedMaxError.
+ */
+export function assertInitialActivationsAllowed(input: {
+  initial: number;
+  maxActivations: number;
+  keyBinding: KeyBinding;
+}): void {
+  if (input.initial === 0) return;
+  if (input.keyBinding === 'ACCOUNT') throw new LicenseKeyInitialActivationsOnAccountPlanError();
+  if (input.initial > input.maxActivations) {
+    throw new LicenseKeyInitialActivationsExceedMaxError(input.initial, input.maxActivations);
+  }
 }
 
 /** The cap of a key only goes up. Throws LicenseKeyMaxActivationsNotRaisedError. */

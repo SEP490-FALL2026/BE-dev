@@ -1,4 +1,5 @@
 import type { RouteErrorStatus } from './openapi-example-manifest';
+import { ROUTE_ERROR_CODES_WAVE2 } from './openapi-example-route-codes-wave2';
 
 /**
  * Part of ROUTE_ERROR_CODES (licensing and notifications added by G5/G6), traced on BE `0da8f56`
@@ -7,6 +8,7 @@ import type { RouteErrorStatus } from './openapi-example-manifest';
 export const ROUTE_ERROR_CODES_LICENSING: Readonly<
   Record<string, Partial<Record<RouteErrorStatus, readonly string[]>>>
 > = {
+  ...ROUTE_ERROR_CODES_WAVE2,
   assignmentExpiryReminderList: {
     '403': ['ASSIGNMENT_EXPIRY.SCOPE_FORBIDDEN'],
   },
@@ -123,7 +125,13 @@ export const ROUTE_ERROR_CODES_LICENSING: Readonly<
   licenseKeyImport: {
     '404': ['SUBSCRIPTION.NOT_FOUND'],
     '409': ['LICENSE_KEY.INITIALIZATION_CLOSED'],
-    '422': ['LICENSE_KEY.APPLICATION_RETIRED', 'LICENSE_KEY.PLAN_HAS_NO_KEYS', 'LICENSE_KEY.PLAN_NOT_K4'],
+    '422': [
+      'LICENSE_KEY.APPLICATION_RETIRED',
+      'LICENSE_KEY.INITIAL_ACTIVATIONS_EXCEED_MAX',
+      'LICENSE_KEY.INITIAL_ACTIVATIONS_ON_ACCOUNT_PLAN',
+      'LICENSE_KEY.PLAN_HAS_NO_KEYS',
+      'LICENSE_KEY.PLAN_NOT_K4',
+    ],
   },
   licenseKeyList: {
     '404': ['SUBSCRIPTION.NOT_FOUND'],
@@ -131,11 +139,6 @@ export const ROUTE_ERROR_CODES_LICENSING: Readonly<
   licenseKeyReveal: {
     '404': ['LICENSE_KEY.NOT_FOUND'],
     '409': ['LICENSE_KEY.WITHDRAWN'],
-  },
-  licenseKeyUpdate: {
-    '404': ['LICENSE_KEY.NOT_FOUND'],
-    '409': ['LICENSE_KEY.STALE'],
-    '422': ['LICENSE_KEY.MAX_ACTIVATIONS_NOT_RAISED'],
   },
   licenseKeyWithdraw: {
     '404': ['LICENSE_KEY.NOT_FOUND'],
