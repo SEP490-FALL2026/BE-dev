@@ -214,8 +214,9 @@ describe('the key binding of a plan over HTTP (integration, real PostgreSQL)', (
       const plan = await k4Plan({ keyBinding: 'DEVICE_BUNDLED' });
       const deviceId = randomUUID();
       await ctx.sql.query(
-        `INSERT INTO managed_devices (id, organization_id, asset_code, normalized_asset_code, hostname, os, created_by_app_user_id, updated_at)
-         SELECT $1, o.id, $2, $2, 'host', 'Windows', $3, now() FROM organizations o LIMIT 1`,
+        `INSERT INTO managed_devices (id, organization_id, asset_code, normalized_asset_code, hostname, os, device_type, asset_code_origin,
+           created_by_app_user_id, updated_at)
+         SELECT $1, o.id, $2, $2, 'host', 'Windows', 'OTH', 'LEGACY', $3, now() FROM organizations o LIMIT 1`,
         [deviceId, `M-${deviceId}`, randomUUID()],
       );
       await ctx.sql.query(

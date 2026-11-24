@@ -78,8 +78,9 @@ describe('activations of a machine, the keys of a lot and the binding of a plan 
   const device = async (): Promise<string> => {
     const id = randomUUID();
     await sql.query(
-      `INSERT INTO managed_devices (id, organization_id, asset_code, normalized_asset_code, hostname, os, created_by_app_user_id, updated_at)
-       VALUES ($1, $2, $3, $3, 'host', 'Windows', $4, now())`,
+      `INSERT INTO managed_devices (id, organization_id, asset_code, normalized_asset_code, hostname, os, device_type, asset_code_origin,
+         created_by_app_user_id, updated_at)
+       VALUES ($1, $2, $3, $3, 'host', 'Windows', 'OTH', 'LEGACY', $4, now())`,
       [id, org, `M-${id}`, user],
     );
 

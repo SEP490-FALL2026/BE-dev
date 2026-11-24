@@ -28,10 +28,48 @@ export interface MyDevice {
 }
 type Result = { status: StepOutcome['status']; label: string };
 
-export function deviceBody(ctx: DemoRunContext, spec: DemoDevice) {
+/** The ids of the plans the fixture bundles with a machine (the operating system that comes with it). */
+export function bundledPlanIds(ctx: DemoRunContext, bundled: readonly string[]): string[] {
+  return bundled.map((key) => {
+    const id = ctx.ids.plans.get(key);
+    if (!id) throw new Error(`No plan ${key} for a bundled machine`);
+
+    return id;
+  });
+}
+
+/** The first key of the store of a purchase bought per machine, listed by the IT Admin who answers for the purchase. */
+export async function storeKeyId(ctx: DemoRunContext, subscriptionKey: string): Promise<string | null> {
+  const subscription = ctx.fixture.subscriptions.find(({ key }) => key === subscriptionKey);
+  const subscriptionId = ctx.ids.subscriptions.get(subscriptionKey);
+  if (!subscription || !subscriptionId) return null;
+  const keys = await listAll<{ id: string }>(
+    ctx,
+    await as(ctx, subscription.responsible),
+    `/license-keys?subscriptionId=${subscriptionId}`,
+  );
+
+  return keys[0]?.id ?? null;
+}
+
+/**
+ * The body of the initial record of an old machine (W2-13): its own code kept as it is, its kind, serial number and bundled plans, the one who holds
+ * it with the collector already on it, and the key activation it already had (`keyId`).
+ */
+export function initialRecordBody(ctx: DemoRunContext, spec: DemoDevice, keyId: string | null) {
   const holderEmployeeId = ctx.ids.employees.get(spec.holder);
   if (!holderEmployeeId) throw new Error(`No employee for ${spec.assetCode}`);
-  return { assetCode: spec.assetCode, hostname: spec.assetCode, os: 'Windows 11', holderEmployeeId };
+  return {
+    assetCode: spec.assetCode,
+    deviceType: spec.deviceType,
+    hostname: spec.assetCode,
+    os: 'Windows 11',
+    serialNumber: spec.serialNumber,
+    bundledPlanIds: bundledPlanIds(ctx, spec.bundled),
+    ...(keyId ? { keyActivations: [{ licenseKeyId: keyId }] } : {}),
+    holderEmployeeId,
+    collectorInstalled: true,
+  };
 }
 
 export function signatureRecordBody(documentId: string, noticeVersionId: string) {
@@ -147,21 +185,48 @@ async function writeRegistry(
   if (spec.changeTo && device.holder?.employeeCode !== spec.changeTo) {
     const holderEmployeeId = ctx.ids.employees.get(spec.changeTo);
     if (!holderEmployeeId) return { status: 'conflict', label: `${spec.assetCode}: new holder absent` };
-    await ctx.api.call(email, 'POST', `/devices/${device.id}/holder-changes`, { holderEmployeeId });
+    // An assigned machine changes hands with the word of IT on the software of the one who gives it up; the collector of the new holder is not on it yet.
+    await ctx.api.call(email, 'POST', `/devices/${device.id}/holder-changes`, {
+      holderEmployeeId,
+      collectorInstalled: false,
+      softwareRemoval: { outcome: 'REMOVED', note: '[SV] Software of the former holder removed' },
+    });
   }
   if (spec.retire && device.state !== 'RETIRED')
     await ctx.api.call(email, 'POST', `/devices/${device.id}/retirements`, { reason: '[SV] Demo machine retired' });
   return { status: 'done', label: spec.assetCode };
 }
 
+/**
+ * An old machine is entered through the initial record while the installation phase is open (W2-13), by the IT Admin who answers for the
+ * department of its holder (QĐ-118). A machine the registry already has is left as it is.
+ */
+async function enterOldDevice(ctx: DemoRunContext, spec: DemoDevice): Promise<Result> {
+  const email = await deviceAdmin(ctx, spec);
+  const device = await findDevice(ctx, email, spec.assetCode);
+  if (device) return { status: 'present', label: spec.assetCode };
+  if (ctx.mode === 'plan') return { status: 'planned', label: spec.assetCode };
+  const keyId = spec.initialKeyOf ? await storeKeyId(ctx, spec.initialKeyOf) : null;
+  if (spec.initialKeyOf && !keyId) return { status: 'conflict', label: `${spec.assetCode}: the key store is empty` };
+  await ctx.api.call(email, 'POST', '/device-initial-records', initialRecordBody(ctx, spec, keyId));
+
+  return { status: 'done', label: spec.assetCode };
+}
+
+async function initialRecords(ctx: DemoRunContext): Promise<StepOutcome> {
+  const results: Result[] = [];
+  for (const spec of ctx.fixture.devices) results.push(await enterOldDevice(ctx, spec));
+  return summarize(results);
+}
+
 async function oneDevice(ctx: DemoRunContext, spec: DemoDevice): Promise<Result> {
   const email = await deviceAdmin(ctx, spec);
-  let device = await findDevice(ctx, email, spec.assetCode);
-  const problem = device && registryProblem(spec, device);
+  const device = await findDevice(ctx, email, spec.assetCode);
+  if (!device) return { status: 'conflict', label: `${spec.assetCode}: not entered by the initial record` };
+  const problem = registryProblem(spec, device);
   if (problem) return { status: 'conflict', label: `${spec.assetCode}: ${problem}` };
   if (!needsRegistryWrite(spec, device)) return { status: 'present', label: spec.assetCode };
   if (ctx.mode === 'plan') return { status: 'planned', label: spec.assetCode };
-  device ??= await ctx.api.call<DeviceWire>(email, 'POST', '/devices', deviceBody(ctx, spec));
   return writeRegistry(ctx, email, spec, device);
 }
 
@@ -192,7 +257,11 @@ async function acknowledgements(ctx: DemoRunContext): Promise<StepOutcome> {
   return summarize(results);
 }
 
-export const DEVICE_STEPS: readonly DemoStep[] = [
+/**
+ * What comes before the baseline closes (W2-25, S-14): the notice, the tools the collector may read, and the seven old machines entered through
+ * the initial record, which is refused once the installation phase has closed.
+ */
+export const DEVICE_INITIAL_STEPS: readonly DemoStep[] = [
   {
     key: 'devices.notice',
     title: 'Thông báo giám sát máy công ty (Super Admin)',
@@ -206,9 +275,18 @@ export const DEVICE_STEPS: readonly DemoStep[] = [
     run: allowlist,
   },
   {
+    key: 'devices.initial-records',
+    title: 'Bảy máy công ty cũ nhập hiện trạng, kèm Windows đi theo máy và lượt Office đã dùng (IT Admin)',
+    needs: ['devices.allowlist', 'org.it-admins', 'catalog.plans', 'assets.keys'],
+    run: initialRecords,
+  },
+];
+
+export const DEVICE_STEPS: readonly DemoStep[] = [
+  {
     key: 'devices.registry',
-    title: 'Bảy máy công ty và bản ký BM-06 (IT Admin)',
-    needs: ['devices.allowlist', 'org.it-admins'],
+    title: 'Bản ký BM-06, đổi người giữ và ngừng dùng của bảy máy công ty (IT Admin)',
+    needs: ['devices.initial-records', 'org.it-admins'],
     run: registry,
   },
   {

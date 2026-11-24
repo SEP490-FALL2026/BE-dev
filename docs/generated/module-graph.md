@@ -82,7 +82,7 @@ flowchart BT
   devices -->|18| licensing
   devices -->|3| notifications
   devices -->|3| operating_parameters
-  devices -->|45| organization
+  devices -->|57| organization
   finance -->|3| audit
   finance -->|3| organization
   identity_access -->|20| audit
@@ -101,7 +101,7 @@ flowchart BT
   licensing -->|19| identity_access
   licensing -->|12| notifications
   licensing -->|6| operating_parameters
-  licensing -->|59| organization
+  licensing -->|64| organization
   licensing -->|4| policies
   onboarding -->|2| catalog
   onboarding -->|2| data_import
@@ -130,7 +130,7 @@ flowchart BT
   personnel -->|32| licensing
   personnel -->|6| notifications
   personnel -->|8| operating_parameters
-  personnel -->|100| organization
+  personnel -->|101| organization
   personnel -->|8| requests
   policies -->|5| audit
   policies -->|4| identity_access
@@ -144,7 +144,7 @@ flowchart BT
   requests -->|61| licensing
   requests -->|14| notifications
   requests -->|12| operating_parameters
-  requests -->|99| organization
+  requests -->|105| organization
   requests -->|34| policies
   usage -->|10| audit
   usage -->|3| budgets

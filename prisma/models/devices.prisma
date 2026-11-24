@@ -78,9 +78,9 @@ model ManagedDevice {
   normalizedAssetCode String    @map("normalized_asset_code")
   hostname            String
   os                  String
-  // Both default for now so the code that enters a machine today still works; the package that enters machines names both.
-  deviceType          DeviceType            @default(OTH) @map("device_type")
-  assetCodeOrigin     DeviceAssetCodeOrigin @default(LEGACY) @map("asset_code_origin")
+  // Both are named by whatever enters a machine (no default): its kind, and whether the system gave its code or the company already had it.
+  deviceType          DeviceType            @map("device_type")
+  assetCodeOrigin     DeviceAssetCodeOrigin @map("asset_code_origin")
   serialNumber        String?               @map("serial_number")
   // The search key of the serial number (as the asset code has); null exactly when the serial number is.
   normalizedSerialNumber String?            @map("normalized_serial_number")
