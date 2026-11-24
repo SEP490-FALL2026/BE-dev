@@ -10,13 +10,13 @@ cd /d/FPT/FALL2026/Code/BE-WDP
 
 ## 0. Bức tranh tổng thể
 
-| Thành phần | Chạy ở đâu | Cổng trên máy |
-|---|---|---|
-| PostgreSQL 17 | Docker (service `postgres`) | **5433** |
-| MinIO (lưu file hợp đồng, ngân sách) | Docker (profile `storage`) | 9000 (API), 9001 (console) |
-| MongoDB (lịch sử gọi AI) | Docker (profile `history`) | **27018** |
-| BE API | máy bạn (`pnpm start:dev`) | **4000** |
-| Worker (gửi mail, chuyển lịch sử AI sang Mongo) | máy bạn (`pnpm start:worker`) | — |
+| Thành phần                                      | Chạy ở đâu                    | Cổng trên máy              |
+| ----------------------------------------------- | ----------------------------- | -------------------------- |
+| PostgreSQL 17                                   | Docker (service `postgres`)   | **5433**                   |
+| MinIO (lưu file hợp đồng, ngân sách)            | Docker (profile `storage`)    | 9000 (API), 9001 (console) |
+| MongoDB (lịch sử gọi AI)                        | Docker (profile `history`)    | **27018**                  |
+| BE API                                          | máy bạn (`pnpm start:dev`)    | **4000**                   |
+| Worker (gửi mail, chuyển lịch sử AI sang Mongo) | máy bạn (`pnpm start:worker`) | —                          |
 
 Vì sao 5433 và 27018: máy bạn còn Postgres và MongoDB cài sẵn (native) đang chiếm 5432 và 27017. Hai cái đó **không liên quan** — để yên.
 
@@ -96,11 +96,11 @@ Dữ liệu nằm trong **volume**, không nằm trong container hay image. Ch�
 
 Ba volume của dự án này:
 
-| Volume | Chứa |
-|---|---|
-| `software-license-management_postgres-data` | Database |
-| `software-license-management_minio-data` | File đã upload (và bucket) |
-| `software-license-management_mongodb-data` | Lịch sử gọi AI |
+| Volume                                      | Chứa                       |
+| ------------------------------------------- | -------------------------- |
+| `software-license-management_postgres-data` | Database                   |
+| `software-license-management_minio-data`    | File đã upload (và bucket) |
+| `software-license-management_mongodb-data`  | Lịch sử gọi AI             |
 
 Cách xóa đúng:
 
@@ -130,11 +130,11 @@ pnpm seed:local
 
 Vì DB đã có dữ liệu, script hỏi:
 
-| Bạn nhập | Kết quả |
-|---|---|
-| Enter | Thoát, không đổi gì |
+| Bạn nhập                              | Kết quả                                    |
+| ------------------------------------- | ------------------------------------------ |
+| Enter                                 | Thoát, không đổi gì                        |
 | Gõ đúng `software_license_management` | **Reset** schema, migrate, seed lại từ đầu |
-| `c` | Chạy tiếp, chỉ ghi phần còn thiếu |
+| `c`                                   | Chạy tiếp, chỉ ghi phần còn thiếu          |
 
 Không muốn bị hỏi:
 
@@ -155,18 +155,18 @@ pnpm seed:local --confirm-reset software_license_management # reset không hỏi
 
 ## Lỗi thường gặp
 
-| Triệu chứng | Nguyên nhân | Cách xử lý |
-|---|---|---|
-| `Cannot find module '...local-infracreate...'` | Dùng `\` trong Git Bash | Dùng `/`: `node ../local-infra/create-local-bucket.mjs` |
-| `docker compose` báo không kết nối được | Docker Desktop chưa bật | Bật Docker Desktop, đợi biểu tượng xanh |
-| `Stop pnpm start:dev before seeding; the API port is responding` | Cổng 3000 đang bị chiếm | Tắt tiến trình trên cổng 3000, rồi seed lại |
-| Seed in `mã thoát 2` và "ĐÃ CÓ 65" | **Không phải lỗi** — dữ liệu đã seed rồi, không còn gì để ghi | Bình thường. Muốn làm lại thì dùng Kịch bản C (reset) |
-| Seed dòng `demo.budget-adjustments ... chạy lại seed từ ngày đó` | Điều chỉnh ngân sách DEMO-14 chỉ tạo được khi kỳ 2026 đã khóa (sau hạn nộp) | Bình thường, không phải lỗi |
-| `OBJECT_STORAGE_REFUSED` hoặc lỗi bucket | MinIO chưa chạy hoặc chưa có bucket | Chạy lại bước `up -d --wait`, rồi `node ../local-infra/create-local-bucket.mjs` |
-| BE báo không kết nối DB | Postgres container chưa lên, hoặc sai cổng | `docker compose ps` — `postgres` phải `healthy`; `.env` dùng cổng **5433** |
-| `Port 5433/9000/27018 is already allocated` | Có thứ khác đang chiếm cổng | `docker compose ps`; tắt thứ đang chiếm hoặc đổi `POSTGRES_PORT`/`MONGODB_PORT` trong `.env` (và `DATABASE_URL`) |
-| Lịch sử AI không hiện | Worker chưa chạy | `pnpm start:worker` |
-| AI không trả lời | Cần internet + `AI_SERVICE_BASE_URL`/`AI_SERVICE_TOKEN` hợp lệ | Kiểm tra mạng, token AI server |
+| Triệu chứng                                                      | Nguyên nhân                                                                 | Cách xử lý                                                                                                       |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `Cannot find module '...local-infracreate...'`                   | Dùng `\` trong Git Bash                                                     | Dùng `/`: `node ../local-infra/create-local-bucket.mjs`                                                          |
+| `docker compose` báo không kết nối được                          | Docker Desktop chưa bật                                                     | Bật Docker Desktop, đợi biểu tượng xanh                                                                          |
+| `Stop pnpm start:dev before seeding; the API port is responding` | Cổng 3000 đang bị chiếm                                                     | Tắt tiến trình trên cổng 3000, rồi seed lại                                                                      |
+| Seed in `mã thoát 2` và "ĐÃ CÓ 65"                               | **Không phải lỗi** — dữ liệu đã seed rồi, không còn gì để ghi               | Bình thường. Muốn làm lại thì dùng Kịch bản C (reset)                                                            |
+| Seed dòng `demo.budget-adjustments ... chạy lại seed từ ngày đó` | Điều chỉnh ngân sách DEMO-14 chỉ tạo được khi kỳ 2026 đã khóa (sau hạn nộp) | Bình thường, không phải lỗi                                                                                      |
+| `OBJECT_STORAGE_REFUSED` hoặc lỗi bucket                         | MinIO chưa chạy hoặc chưa có bucket                                         | Chạy lại bước `up -d --wait`, rồi `node ../local-infra/create-local-bucket.mjs`                                  |
+| BE báo không kết nối DB                                          | Postgres container chưa lên, hoặc sai cổng                                  | `docker compose ps` — `postgres` phải `healthy`; `.env` dùng cổng **5433**                                       |
+| `Port 5433/9000/27018 is already allocated`                      | Có thứ khác đang chiếm cổng                                                 | `docker compose ps`; tắt thứ đang chiếm hoặc đổi `POSTGRES_PORT`/`MONGODB_PORT` trong `.env` (và `DATABASE_URL`) |
+| Lịch sử AI không hiện                                            | Worker chưa chạy                                                            | `pnpm start:worker`                                                                                              |
+| AI không trả lời                                                 | Cần internet + `AI_SERVICE_BASE_URL`/`AI_SERVICE_TOKEN` hợp lệ              | Kiểm tra mạng, token AI server                                                                                   |
 
 ---
 
