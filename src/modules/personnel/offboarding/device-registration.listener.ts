@@ -1,13 +1,14 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { DevicesApi } from '../../devices/public/devices.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { PersonnelFileHookContributions } from '../public/personnel.extension-points';
+import { OffboardingRepo } from './offboarding.repo';
 
 /**
- * A person who has left holds no company machine (`US-09-08`): when the departure is marked `LEFT`, in the same transaction, every
- * open registration of theirs ends with the cause `EMPLOYEE_LEFT`. It covers an abrupt departure as well as one marked after the last
- * day. A handover cancelled after the block took effect ends them too, with the cause `DEPARTURE_BLOCKED`, so the unlock that lifts the
- * block never revives a credential (`QĐ-100z`, A3 `D09`); one cancelled before the last working day takes nothing back. A transfer to
- * another department changes nothing here: the machine stays with its holder.
+ * Syncs machine custody and return tasks with offboarding lifecycle events. Re-reads the case on recording and
+ * due-date changes so return deadlines use the last working day rather than `departureEffectiveOn`. Cancelling
+ * after the access block runs here after seat revocation withdrawal on account-bound plans; locking machines and
+ * return tasks after those tiers is safe because device-key and account-bound subscription sets are disjoint.
  */
 @Injectable()
 export class DeviceRegistrationHook implements OnModuleInit {
@@ -17,10 +18,29 @@ export class DeviceRegistrationHook implements OnModuleInit {
   constructor(
     private readonly hooks: PersonnelFileHookContributions,
     private readonly devices: DevicesApi,
+    private readonly offboarding: OffboardingRepo,
+    private readonly organizationReads: OrganizationReadApi,
   ) {}
 
   onModuleInit(): void {
     this.hooks.add('personnel.device-registration', {
+      onRecorded: async (tx, event) => {
+        if (event.fileKind !== 'OFFBOARDING') return;
+        const resolved = await this.resolveDueDate(tx, event.fileId);
+        if (!resolved) return;
+        await this.devices.openReturnTasksForDeparture(tx, {
+          employeeId: resolved.record.employeeId,
+          caseId: resolved.record.id,
+          departmentId: resolved.record.departmentId,
+          dueOn: resolved.dueOn,
+        });
+      },
+      onDueChanged: async (tx, event) => {
+        if (event.fileKind !== 'OFFBOARDING') return;
+        const resolved = await this.resolveDueDate(tx, event.fileId);
+        if (!resolved) return;
+        await this.devices.moveReturnTaskDue(tx, { caseId: resolved.record.id, dueOn: resolved.dueOn });
+      },
       onLeft: async (tx, event) => {
         if (event.fileKind !== 'OFFBOARDING') return;
         await this.devices.endRegistrationsOfHolder(tx, {
@@ -30,7 +50,11 @@ export class DeviceRegistrationHook implements OnModuleInit {
         });
       },
       onCancelled: async (tx, event) => {
-        if (event.fileKind !== 'OFFBOARDING' || event.accessBlockInForce !== true) return;
+        if (event.fileKind !== 'OFFBOARDING') return;
+        // Return task cancellation runs before accessBlockInForce registration ending, and after seat withdrawal
+        // (tiers 3b-8) on account plans, which stays deadlock-free as device-key and account plans never intersect.
+        await this.devices.cancelReturnTasksOfCase(tx, { caseId: event.fileId, at: new Date() });
+        if (event.accessBlockInForce !== true) return;
         await this.devices.endRegistrationsOfHolder(tx, {
           employeeId: event.employeeId,
           end: { at: new Date() },
@@ -38,5 +62,18 @@ export class DeviceRegistrationHook implements OnModuleInit {
         });
       },
     });
+  }
+
+  private async resolveDueDate(tx: Parameters<OffboardingRepo['find']>[1], caseId: string) {
+    const record = await this.offboarding.find(caseId, tx);
+    if (!record) return null;
+    const today = await this.organizationReads.businessToday(new Date(), tx);
+    const dueOn = this.devices.returnDueOn({
+      accessBlockMode: record.accessBlockMode,
+      lastWorkingDay: record.lastWorkingDay,
+      today,
+    });
+
+    return { record, dueOn };
   }
 }

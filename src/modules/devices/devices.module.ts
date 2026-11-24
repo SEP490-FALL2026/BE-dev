@@ -51,6 +51,8 @@ import { RegistryQueryRepo } from './registry/registry-query.repo';
 import { RegistryQueryService } from './registry/registry-query.service';
 import { RegistryRepo } from './registry/registry.repo';
 import { RegistryService } from './registry/registry.service';
+import { DeviceReturnTaskRepo } from './return-task/device-return-task.repo';
+import { DeviceReturnTaskService } from './return-task/device-return-task.service';
 import { SignatureRecordController } from './registry/signature-record.controller';
 import { SignatureRecordService } from './registry/signature-record.service';
 import { StopRequestController } from './stop-request/stop-request.controller';
@@ -113,6 +115,8 @@ import { StopRequestSweepService } from './stop-request/stop-request-sweep.servi
     DeviceAttributesRepo,
     DeviceAttributesService,
     RegistrationEndService,
+    DeviceReturnTaskRepo,
+    DeviceReturnTaskService,
     SignatureRecordService,
     CollectorInstallationService,
     AcknowledgementRepo,
