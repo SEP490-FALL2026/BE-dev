@@ -5,32 +5,41 @@ import { SubscriptionPriceService } from './subscription-price.service';
 
 describe('BR-MF1-06 shared catalog price facts', () => {
   it.each([
-    ['TERM', 'RECURRING'],
-    ['PERPETUAL', 'ONE_TIME'],
-  ])('maps %s once for API and worker price readers', async (subscriptionKind, kind) => {
-    const findPricedOfPlan = jest.fn().mockResolvedValue({
-      subscriptionKind,
-      unitPriceMinor: 100n,
-      currency: 'VND',
-      reporting: { amountMinor: 4n, currency: 'USD' },
-      billingCycle: 'MONTHLY',
-      allowsMidTermReduction: false,
-    });
-    const service = new SubscriptionPriceService(
-      { findPricedOfPlan } as unknown as SubscriptionRepo,
-      {} as PlanReferencePriceRepo,
-    );
-    const tx = {} as DbTx;
-    expect(await service.priceOfPlan('plan', tx)).toEqual({
-      kind,
-      unitPrice: { amountMinor: 100n, currency: 'VND' },
-      reportingUnitPrice: { amountMinor: 4n, currency: 'USD' },
-      billingCycle: 'MONTHLY',
-      allowsMidTermReduction: false,
-      source: 'SUBSCRIPTION',
-    });
-    expect(findPricedOfPlan).toHaveBeenCalledWith('plan', tx, undefined);
-  });
+    ['TERM', 'RECURRING', 100n],
+    ['PERPETUAL', 'ONE_TIME', null],
+  ] as const)(
+    'maps %s once for API and worker price readers',
+    async (subscriptionKind, kind, monthlyUnitPriceMinor) => {
+      const findPricedOfPlan = jest.fn().mockResolvedValue({
+        subscriptionKind,
+        provisioningType: subscriptionKind === 'PERPETUAL' ? 'K4' : 'K2',
+        referenceCommitmentMonths: null,
+        unitPriceMinor: 100n,
+        monthlyUnitPriceMinor,
+        currency: 'VND',
+        reporting: { amountMinor: 4n, currency: 'USD' },
+        billingCycle: 'MONTHLY',
+        allowsMidTermReduction: false,
+      });
+      const service = new SubscriptionPriceService(
+        { findPricedOfPlan } as unknown as SubscriptionRepo,
+        {} as PlanReferencePriceRepo,
+      );
+      const tx = {} as DbTx;
+      expect(await service.priceOfPlan('plan', tx)).toEqual({
+        kind,
+        provisioningType: subscriptionKind === 'PERPETUAL' ? 'K4' : 'K2',
+        referenceCommitmentMonths: null,
+        unitPrice: { amountMinor: 100n, currency: 'VND' },
+        reportingUnitPrice: { amountMinor: 4n, currency: 'USD' },
+        monthlyPriceMinor: monthlyUnitPriceMinor,
+        billingCycle: 'MONTHLY',
+        allowsMidTermReduction: false,
+        source: 'SUBSCRIPTION',
+      });
+      expect(findPricedOfPlan).toHaveBeenCalledWith('plan', tx, undefined);
+    },
+  );
 
   it('keeps an absent price absent when the plan has no reference price either', async () => {
     const service = new SubscriptionPriceService(
@@ -66,9 +75,12 @@ describe('BR-MF1-06 shared catalog price facts', () => {
 
     it('prices a K1 or K2 plan with no priced subscription by the month', async () => {
       const tx = {} as DbTx;
-      const findPlanReferencePrice = jest
-        .fn()
-        .mockResolvedValue({ provisioningType: 'K2', amountMinor: 500_000n, currency: 'VND' });
+      const findPlanReferencePrice = jest.fn().mockResolvedValue({
+        provisioningType: 'K2',
+        amountMinor: 500_000n,
+        currency: 'VND',
+        referenceCommitmentMonths: 12,
+      });
       const service = new SubscriptionPriceService(
         { findPricedOfPlan: jest.fn().mockResolvedValue(null) } as unknown as SubscriptionRepo,
         { findOfPlan: findPlanReferencePrice } as unknown as PlanReferencePriceRepo,
@@ -76,8 +88,11 @@ describe('BR-MF1-06 shared catalog price facts', () => {
 
       expect(await service.priceOfPlan('plan', tx)).toEqual({
         kind: 'RECURRING',
+        provisioningType: 'K2',
+        referenceCommitmentMonths: 12,
         unitPrice: { amountMinor: 500_000n, currency: 'VND' },
         reportingUnitPrice: { amountMinor: 500_000n, currency: 'VND' },
+        monthlyPriceMinor: 500_000n,
         billingCycle: 'MONTHLY',
         allowsMidTermReduction: false,
         source: 'PLAN_REFERENCE',

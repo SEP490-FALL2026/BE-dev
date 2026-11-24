@@ -2,25 +2,6 @@ import type { BusinessDate } from '../../../core/business-date';
 import type { BaselineVersionRefusal } from '../budget/budget.errors';
 
 /**
- * The monthly price of one seat from the unit price in the reporting currency and the cycle it is paid in (`R-I03`): a year's price
- * divided by 12, a quarter's by 3, rounded to the nearest minor unit (half up). A cycle that is not one of those (`OTHER`) or a price
- * not known gives none.
- */
-export function monthlyUnitPrice(unitPriceMinor: bigint | null, billingCycle: string | null): bigint | null {
-  if (unitPriceMinor === null) return null;
-  switch (billingCycle) {
-    case 'MONTHLY':
-      return unitPriceMinor;
-    case 'QUARTERLY':
-      return (unitPriceMinor * 2n + 3n) / 6n;
-    case 'ANNUAL':
-      return (unitPriceMinor * 2n + 12n) / 24n;
-    default:
-      return null;
-  }
-}
-
-/**
  * The months of `year` a subscription runs, counting each month it touches: no end date means it runs to the end of the year, no start
  * date that it ran from the start; one that ends before the year or starts after it runs none (`R-I03`).
  */
@@ -91,10 +72,10 @@ export function subscriptionCost(
   year: number,
   today: BusinessDate,
   seatsHeld: number,
-  subscription: RenewalFacts & { unitPriceReportingMinor: bigint | null; billingCycle: string | null },
+  subscription: RenewalFacts & { monthlyPriceMinor: bigint | null },
   terminated = false,
 ): { monthlyMinor: bigint | null; months: number; costMinor: bigint | null } {
-  const monthlyMinor = monthlyUnitPrice(subscription.unitPriceReportingMinor, subscription.billingCycle);
+  const monthlyMinor = subscription.monthlyPriceMinor;
   const months = willRenew(today, subscription, terminated)
     ? 12
     : monthsRunning(year, subscription.startDate, endOf(subscription));

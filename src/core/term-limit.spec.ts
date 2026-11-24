@@ -1,4 +1,5 @@
 import {
+  calendarMonthsIn,
   checkTerm,
   checkTermMonths,
   effectiveEndOf,
@@ -339,5 +340,21 @@ describe('the months that begin in a year (R-39, QĐ-111j: a month belongs to th
   it('a cut term stops at the end: 10/11/2026 to 31/01/2027 is 2 months in 2026 and 1 in 2027', () => {
     expect(monthsBeginningIn({ start: '2026-11-10', end: '2027-01-31', year: 2026 })).toBe(2);
     expect(monthsBeginningIn({ start: '2026-11-10', end: '2027-01-31', year: 2027 })).toBe(1);
+  });
+});
+
+describe('W3-02: calendarMonthsIn (calendar months of a year with at least one held day)', () => {
+  it.each([
+    ['31/01 -> 15/03 in 2027 spans Jan, Feb, Mar', '2027-01-31', '2027-03-15', 2027, 3],
+    ['01/03 -> 31/03 in 2027 is 1 calendar month', '2027-03-01', '2027-03-31', 2027, 1],
+    ['21/11 with no end in 2026 runs to Dec (2 months)', '2026-11-21', null, 2026, 2],
+    ['21/11 with no end in 2027 covers all 12 months', '2026-11-21', null, 2027, 12],
+    ['cross-year 21/11/2026 -> 15/03/2027 in 2026', '2026-11-21', '2027-03-15', 2026, 2],
+    ['cross-year 21/11/2026 -> 15/03/2027 in 2027', '2026-11-21', '2027-03-15', 2027, 3],
+    ['year before start returns 0', '2026-11-21', null, 2025, 0],
+    ['year after lastHeldOn returns 0', '2026-11-21', '2027-03-15', 2028, 0],
+    ['lastHeldOn before start returns 0', '2026-10-15', '2026-10-01', 2026, 0],
+  ])('%s', (_label, start, lastHeldOn, year, expected) => {
+    expect(calendarMonthsIn({ start, lastHeldOn, year })).toBe(expected);
   });
 });

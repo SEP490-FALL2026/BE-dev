@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { formatAmount } from '../../../core/money/money';
-import { monthsBeginningIn, type TermRun } from '../../../core/term-limit';
+import { calendarMonthsIn, monthsBeginningIn, type TermRun } from '../../../core/term-limit';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { FinanceApi } from '../../finance/public/finance.api';
 import type { TaxEstimateBasis, TaxGroup } from '../../finance/public/finance.types';
@@ -44,9 +44,19 @@ export interface CostTerm {
 }
 
 /** The months of a preview, from the run its time of use would have if it began today: the months that begin this year and the next, and the cut. */
-export const costTermOf = (run: TermRun, year: number, currentMonths: number | null): CostTerm => ({
+export const costTermOf = (
+  run: TermRun,
+  year: number,
+  currentMonths: number | null,
+  provisioningType?: string,
+): CostTerm => ({
   currentMonths,
-  nextMonths: run.end === null ? 12 : monthsBeginningIn({ start: run.start, end: run.end, year: year + 1 }),
+  nextMonths:
+    run.end === null
+      ? 12
+      : provisioningType === 'K2'
+        ? calendarMonthsIn({ start: run.start, lastHeldOn: run.end, year: year + 1 })
+        : monthsBeginningIn({ start: run.start, end: run.end, year: year + 1 }),
   startedMonths: run.startedMonths,
   cutAt: run.cutAt,
 });
@@ -96,7 +106,13 @@ export class PricingViewService {
       months: pricing.amountMonths,
       monthlyPrice:
         pricing.kind === 'RECURRING' && pricing.unitPrice
-          ? money(monthlyPriceOf({ unitPrice: pricing.unitPrice, billingCycle: pricing.billingCycle }))
+          ? money(
+              monthlyPriceOf({
+                monthlyPriceMinor: pricing.monthlyPriceMinor,
+                unitPrice: pricing.unitPrice,
+                billingCycle: pricing.billingCycle,
+              }),
+            )
           : null,
       nextYearAmount: money(pricing.nextYearAmount),
     };

@@ -1,5 +1,11 @@
 import { termRunOf } from '../../../core/term-limit';
-import { pricingRecordFor, requestAmountOf, seatMonthlyOf, type PricingInput } from './pricing.policy';
+import {
+  annualVendorAmountOf,
+  pricingRecordFor,
+  requestAmountOf,
+  seatMonthlyOf,
+  type PricingInput,
+} from './pricing.policy';
 
 const SEAT = { amountMinor: 2000n, currency: 'USD' }; // 20.00 per seat per month
 
@@ -103,30 +109,24 @@ describe('BR-MF1-06: the amount of a request is the price of the months left of 
     expect(requestAmountOf(input({ checkDate: '2026-10-15', endDate: '2026-10-01' }))).toMatchObject({ months: 1 });
   });
 
-  it('BR-MF1-06d: an annual price is a twelfth of the year a month, rounded up once', () => {
+  it('W3-02: recurring price uses monthlyPriceMinor directly without division or ceil', () => {
     expect(
       requestAmountOf(
         input({
           billingCycle: 'ANNUAL',
-          unitPrice: { amountMinor: 240_000n, currency: 'USD' },
-          beneficiaries: 10,
-          checkDate: '2026-06-15',
+          unitPrice: { amountMinor: 1_000_001n, currency: 'VND' },
+          monthlyPriceMinor: 83_333n,
+          beneficiaries: 1,
+          checkDate: '2026-12-01',
         }),
       ),
-    ).toMatchObject({ months: 7, amount: { amountMinor: 1_400_000n } });
-    expect(
-      requestAmountOf(
-        input({ billingCycle: 'ANNUAL', unitPrice: { amountMinor: 1000n, currency: 'USD' }, checkDate: '2026-12-01' }),
-      ),
-    ).toMatchObject({ months: 1, amount: { amountMinor: 84n } });
-  });
-
-  it('BR-MF1-06d: a quarterly price is a third of the price a month', () => {
+    ).toMatchObject({ months: 1, amount: { amountMinor: 83_333n } });
     expect(
       requestAmountOf(
         input({
           billingCycle: 'QUARTERLY',
           unitPrice: { amountMinor: 300n, currency: 'USD' },
+          monthlyPriceMinor: 100n,
           checkDate: '2026-10-01',
         }),
       ),
@@ -281,17 +281,18 @@ describe('T-RQ2: the commitment is the price of a month times the months that be
     });
   });
 
-  it('the price of a month of an annual price is a twelfth, rounded up once, and the twelve months of next year keep it', () => {
+  it('uses monthlyPriceMinor directly for annual plans and preserves 12 months next year', () => {
     expect(
       requestAmountOf({
         kind: 'RECURRING',
-        unitPrice: dong(1_000n),
+        unitPrice: dong(999_996n),
+        monthlyPriceMinor: 83_333n,
         billingCycle: 'ANNUAL',
         beneficiaries: 1,
         checkDate: '2026-12-01',
         endDate: null,
       }),
-    ).toMatchObject({ months: 1, amount: { amountMinor: 84n }, nextYearAmount: { amountMinor: 1_000n } });
+    ).toMatchObject({ months: 1, amount: { amountMinor: 83_333n }, nextYearAmount: { amountMinor: 999_996n } });
   });
 });
 
@@ -342,17 +343,51 @@ describe('T-R38: a person with a term is cut at the end of the contract and each
   });
 });
 
-describe('seatMonthlyOf (RV-07, M-10: what one seat of a commitment costs a month)', () => {
-  it('is the cost held over its months and seats, rounded up', () => {
-    expect(seatMonthlyOf({ costMinor: 2_000_000n, kind: 'RECURRING', months: 10, seats: 1 })).toBe(200_000n);
-    expect(seatMonthlyOf({ costMinor: 2_100n, kind: 'RECURRING', months: 7, seats: 3 })).toBe(100n);
-    expect(seatMonthlyOf({ costMinor: 1_001n, kind: 'RECURRING', months: 10, seats: 1 })).toBe(101n);
+describe('W3-02: calendar months for K2, rolling months for K1, seatMonthlyOf, and K2 first-purchase annual amount', () => {
+  it.each([
+    ['K2 21/11/2026 no end -> 2m (1.000.000)', 'K2', '2026-11-21', null, 500_000n, 1, 2, 1_000_000n],
+    ['K2 31/01->15/03 calendar 3m (1.5M vs rolling 1M)', 'K2', '2027-01-31', '2027-03-15', 500_000n, 1, 3, 1_500_000n],
+    ['K2 01/03->31/03 = 1m (500.000)', 'K2', '2027-03-01', '2027-03-31', 500_000n, 1, 1, 500_000n],
+    ['K1 15/01 3m rolling = 3m (1.35M vs calendar 1.8M)', 'K1', '2027-01-15', '2027-04-14', 450_000n, 1, 3, 1_350_000n],
+  ] as const)('%s', (_label, provisioningType, checkDate, endDate, monthly, beneficiaries, months, expectedAmount) => {
+    const priced = requestAmountOf({
+      kind: 'RECURRING',
+      provisioningType,
+      unitPrice: { amountMinor: monthly, currency: 'VND' },
+      monthlyPriceMinor: monthly,
+      billingCycle: 'MONTHLY',
+      beneficiaries,
+      checkDate,
+      endDate,
+    });
+    expect(priced).toMatchObject({ status: 'PRICED', months, amount: { amountMinor: expectedAmount } });
   });
 
-  it('is null for a one-time price, no months, no seats or a cost of nothing', () => {
-    expect(seatMonthlyOf({ costMinor: 5_000n, kind: 'ONE_TIME', months: null, seats: 1 })).toBeNull();
-    expect(seatMonthlyOf({ costMinor: 5_000n, kind: 'RECURRING', months: 0, seats: 1 })).toBeNull();
-    expect(seatMonthlyOf({ costMinor: 5_000n, kind: 'RECURRING', months: 3, seats: 0 })).toBeNull();
-    expect(seatMonthlyOf({ costMinor: 0n, kind: 'RECURRING', months: 3, seats: 1 })).toBeNull();
+  it('seatMonthlyOf returns monthlyPriceMinor directly without reverse division', () => {
+    const base = { monthlyPriceMinor: 500_000n, kind: 'RECURRING' as const, months: 2 };
+    expect(seatMonthlyOf({ ...base, costMinor: 1_000_000n, seats: 1 })).toBe(500_000n);
+    // Mixed-end group (1.500.000 over max 2 months and 2 seats): must not divide 1.500.000 / 4 = 375.000.
+    expect(seatMonthlyOf({ ...base, costMinor: 1_500_000n, seats: 2 })).toBe(500_000n);
+    expect(seatMonthlyOf({ ...base, kind: 'ONE_TIME', months: null, costMinor: 5_000n, seats: 1 })).toBeNull();
+    expect(seatMonthlyOf({ ...base, months: 0, costMinor: 5_000n, seats: 1 })).toBeNull();
+    expect(seatMonthlyOf({ ...base, months: 3, costMinor: 0n, seats: 1 })).toBeNull();
+  });
+
+  it.each([
+    ['K2 referenceCommitmentMonths null -> 12 -> 6.000.000', 'K2', null, 6_000_000n],
+    ['K2 referenceCommitmentMonths 12 -> 6.000.000', 'K2', 12, 6_000_000n],
+    ['K2 referenceCommitmentMonths 1 -> null', 'K2', 1, null],
+    ['K1 referenceCommitmentMonths 1 -> null', 'K1', 1, null],
+  ] as const)('annualVendorAmountOf firstPurchaseOnly: %s', (_label, provisioningType, refCommitment, expected) => {
+    const result = annualVendorAmountOf({
+      kind: 'RECURRING',
+      unitPrice: { amountMinor: 500_000n, currency: 'VND' },
+      monthlyPriceMinor: 500_000n,
+      billingCycle: 'MONTHLY',
+      provisioningType,
+      referenceCommitmentMonths: refCommitment,
+      firstPurchaseOnly: true,
+    });
+    expect(result?.amountMinor ?? null).toBe(expected);
   });
 });

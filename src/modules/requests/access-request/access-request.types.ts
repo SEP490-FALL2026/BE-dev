@@ -46,6 +46,8 @@ export interface PricingRecord {
   amountMonths: number | null; // Months of term for calculation; BR-MF1-06
   amount: Money | null;
   unitPrice: Money | null;
+  /** The monthly price per seat in dong from `monthly_unit_price_minor`; populated in memory when priced, not persisted as a column. */
+  monthlyPriceMinor?: bigint | null;
   billingCycle: BillingCycleCode | null;
   /**
    * What the first year of a request to go on using would cost when it begins in the year after the day it is judged (`QĐ-109b`):

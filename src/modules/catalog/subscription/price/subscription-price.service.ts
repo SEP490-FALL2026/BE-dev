@@ -3,7 +3,7 @@ import type { BusinessDate } from '../../../../core/business-date';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import { SubscriptionRepo } from '../subscription.repo';
 import { PlanReferencePriceRepo } from './plan-reference-price.repo';
-import { referencePriceSourceOf, type PlanPriceFacts } from './subscription-price.policy';
+import { monthlyPriceOf, referencePriceSourceOf, type PlanPriceFacts } from './subscription-price.policy';
 
 /** The price source shared by request preview, repricing and worker routing; it never loads contracts or storage. */
 @Injectable()
@@ -27,10 +27,14 @@ export class SubscriptionPriceService {
 
     return (
       reference &&
-      referencePriceSourceOf(reference.provisioningType, {
-        amountMinor: reference.amountMinor,
-        currency: reference.currency,
-      })
+      referencePriceSourceOf(
+        reference.provisioningType,
+        {
+          amountMinor: reference.amountMinor,
+          currency: reference.currency,
+        },
+        reference.referenceCommitmentMonths,
+      )
     );
   }
 
@@ -44,8 +48,11 @@ export class SubscriptionPriceService {
 
     return {
       kind: priced.subscriptionKind === 'PERPETUAL' ? 'ONE_TIME' : 'RECURRING',
+      provisioningType: priced.provisioningType,
+      referenceCommitmentMonths: priced.referenceCommitmentMonths,
       unitPrice: { amountMinor: priced.unitPriceMinor, currency: priced.currency },
       reportingUnitPrice: priced.reporting,
+      monthlyPriceMinor: monthlyPriceOf({ monthlyUnitPriceMinor: priced.monthlyUnitPriceMinor ?? null }),
       billingCycle: priced.billingCycle,
       allowsMidTermReduction: priced.allowsMidTermReduction,
       source: 'SUBSCRIPTION',

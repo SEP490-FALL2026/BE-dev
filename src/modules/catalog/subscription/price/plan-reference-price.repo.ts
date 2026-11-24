@@ -16,10 +16,20 @@ export class PlanReferencePriceRepo {
   async findOfPlan(
     planId: string,
     tx?: DbTx,
-  ): Promise<{ provisioningType: string; amountMinor: bigint; currency: string } | null> {
+  ): Promise<{
+    provisioningType: string;
+    amountMinor: bigint;
+    currency: string;
+    referenceCommitmentMonths: 1 | 12 | null;
+  } | null> {
     const row = await (tx ?? this.prisma).plan.findUnique({
       where: { id: planId },
-      select: { provisioningType: true, referencePriceMinor: true, referencePriceCurrency: true },
+      select: {
+        provisioningType: true,
+        referencePriceMinor: true,
+        referencePriceCurrency: true,
+        referenceCommitmentMonths: true,
+      },
     });
     if (!row || row.referencePriceMinor === null || row.referencePriceMinor <= 0n) return null;
     if (row.referencePriceCurrency !== DONG) return null;
@@ -28,6 +38,10 @@ export class PlanReferencePriceRepo {
       provisioningType: row.provisioningType,
       amountMinor: row.referencePriceMinor,
       currency: DONG,
+      referenceCommitmentMonths:
+        row.referenceCommitmentMonths === 1 || row.referenceCommitmentMonths === 12
+          ? row.referenceCommitmentMonths
+          : null,
     };
   }
 

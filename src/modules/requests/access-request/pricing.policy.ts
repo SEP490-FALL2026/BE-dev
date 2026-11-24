@@ -2,7 +2,7 @@ import type { BillingCycleCode, MissingPriceReason, PricingRecord } from './acce
 import type { BusinessDate } from '../../../core/business-date';
 import { fiscalYearOf } from '../../../core/fiscal-year';
 import { MAX_AMOUNT_MINOR, type Money } from '../../../core/money/money';
-import { monthsBeginningIn } from '../../../core/term-limit';
+import { calendarMonthsIn, monthsBeginningIn } from '../../../core/term-limit';
 
 /**
  * What a request for paid software costs, as a pure calculation (`FR-3.2`, `BR-MF1-06`, `QĐ-109e`, `QĐ-111j`): the price of a month of
@@ -22,8 +22,12 @@ const CYCLE_MONTHS: Readonly<Record<Exclude<BillingCycleCode, 'OTHER'>, number>>
 export interface PricingInput {
   /** Pricing model: RECURRING (monthly/yearly) or ONE_TIME (perpetual license or key, `QĐ-106d`). */
   kind: 'RECURRING' | 'ONE_TIME';
+  /** Plan provisioning type (`K2` counts calendar months; `K1` and others keep rolling months). */
+  provisioningType?: 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
   /** The unit price per person per billing period of the plan; null when the plan has no priced subscription. */
   unitPrice: Money | null;
+  /** Monthly price per seat in dong from `monthly_unit_price_minor` (or plan reference); avoids re-dividing `unitPrice`. */
+  monthlyPriceMinor?: bigint | null;
   billingCycle: BillingCycleCode | null;
   beneficiaries: number;
   /**
@@ -45,6 +49,7 @@ export type Pricing =
       status: 'PRICED';
       amount: Money;
       unitPrice: Money;
+      monthlyPriceMinor?: bigint | null;
       billingCycle: BillingCycleCode;
       kind: 'RECURRING' | 'ONE_TIME';
       /** The months of the year the amount covers; null for a one-time price. 0 for a start in a year after the check date. */
@@ -55,14 +60,23 @@ export type Pricing =
     }
   | { status: 'MISSING'; reason: MissingPriceReason; budgetYear: number };
 
-/** Whole minor units, rounded up once (`R-B01`): the part of a price that is a fraction of a cent is paid in full. */
+/** Whole minor units, rounded up once (`R-B01`) for legacy callers without `monthlyPriceMinor` (quotes and line allocation). */
 const ceilDiv = (numerator: bigint, denominator: bigint): bigint => (numerator + denominator - 1n) / denominator;
 
+function legacySeatMonthlyOf(unitPrice?: Money | null, billingCycle?: BillingCycleCode | null): bigint | null {
+  if (!unitPrice || !billingCycle || billingCycle === 'OTHER') return null;
+
+  return monthlyPriceOf({ unitPrice, billingCycle })?.amountMinor ?? null;
+}
+
 /**
- * What one seat of a commitment costs a month, rounded up (`R-B01`): the cost of the year held over its months and its seats, kept on the
- * commitment for the release by day (`RV-07`, `M-10`). Null for a price that is not by the month (a one-time price) or a cost of nothing.
+ * What one seat of a commitment costs a month (`RV-07`, `M-10`): reads `monthlyPriceMinor` directly when provided (no reverse
+ * division of cost over months × seats), falling back to the stored monthly price of `unitPrice`/`billingCycle` only when absent.
  */
 export function seatMonthlyOf(input: {
+  monthlyPriceMinor?: bigint | null;
+  unitPrice?: Money | null;
+  billingCycle?: BillingCycleCode | null;
   costMinor: bigint;
   kind: 'RECURRING' | 'ONE_TIME' | null;
   months: number | null;
@@ -70,12 +84,25 @@ export function seatMonthlyOf(input: {
 }): bigint | null {
   if (input.kind !== 'RECURRING' || input.months === null || input.months <= 0 || input.seats <= 0) return null;
   if (input.costMinor <= 0n) return null;
+  const monthly =
+    input.monthlyPriceMinor !== undefined
+      ? input.monthlyPriceMinor
+      : legacySeatMonthlyOf(input.unitPrice, input.billingCycle);
 
-  return ceilDiv(input.costMinor, BigInt(input.months) * BigInt(input.seats));
+  return monthly !== null && monthly > 0n ? monthly : null;
 }
 
-/** What one person costs a month, rounded up, for showing only: the price of a recurring plan over the months of its billing cycle. */
-export function monthlyPriceOf(price: { unitPrice: Money; billingCycle: BillingCycleCode | null }): Money | null {
+/** What one person costs a month, reading `monthlyPriceMinor` directly when provided. */
+export function monthlyPriceOf(price: {
+  monthlyPriceMinor?: bigint | null;
+  unitPrice: Money;
+  billingCycle: BillingCycleCode | null;
+}): Money | null {
+  if (price.monthlyPriceMinor !== undefined) {
+    return price.monthlyPriceMinor === null
+      ? null
+      : { amountMinor: price.monthlyPriceMinor, currency: price.unitPrice.currency };
+  }
   if (price.billingCycle === null || price.billingCycle === 'OTHER') return null;
 
   return {
@@ -84,22 +111,37 @@ export function monthlyPriceOf(price: { unitPrice: Money; billingCycle: BillingC
   };
 }
 
+function isAnnualFirstPurchaseCommitment(price: {
+  billingCycle: BillingCycleCode | null;
+  provisioningType?: 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
+  referenceCommitmentMonths?: 1 | 12 | null;
+}): boolean {
+  if (price.provisioningType === 'K2') return (price.referenceCommitmentMonths ?? 12) === 12;
+  if (price.provisioningType !== undefined) return price.referenceCommitmentMonths === 12;
+
+  return price.billingCycle === 'ANNUAL';
+}
+
 /**
- * What one person costs a year at the vendor, whatever month the right begins in: the price of a year of a recurring plan, or the price
- * of the purchase for a one-time one (`P2-02`). Shown beside the amount of the months left, so the sender sees both.
+ * What one person costs a year at the vendor, whatever month the right begins in: twelve months of the monthly price of a recurring plan,
+ * or the price of the purchase for a one-time one (`P2-02`). When `firstPurchaseOnly` is true (`BR-MF1-07b`), a K2 plan returns the annual
+ * amount when its commitment (`referenceCommitmentMonths`, null read as 12) is 12 months.
  */
 export function annualVendorAmountOf(price: {
   kind: 'RECURRING' | 'ONE_TIME';
   unitPrice: Money;
+  monthlyPriceMinor?: bigint | null;
   billingCycle: BillingCycleCode | null;
+  provisioningType?: 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
+  referenceCommitmentMonths?: 1 | 12 | null;
+  firstPurchaseOnly?: boolean;
 }): Money | null {
-  if (price.kind === 'ONE_TIME') return price.unitPrice;
-  if (price.billingCycle === null || price.billingCycle === 'OTHER') return null;
+  if (price.kind === 'ONE_TIME') return price.firstPurchaseOnly ? null : price.unitPrice;
+  if (price.firstPurchaseOnly && !isAnnualFirstPurchaseCommitment(price)) return null;
+  const monthly = monthlyPriceOf(price);
+  if (monthly === null) return null;
 
-  return {
-    amountMinor: ceilDiv(price.unitPrice.amountMinor * 12n, BigInt(CYCLE_MONTHS[price.billingCycle])),
-    currency: price.unitPrice.currency,
-  };
+  return { amountMinor: monthly.amountMinor * 12n, currency: monthly.currency };
 }
 
 export function requestAmountOf(input: PricingInput): Pricing {
@@ -124,6 +166,7 @@ export function requestAmountOf(input: PricingInput): Pricing {
       status: 'PRICED',
       amount: { amountMinor: facts.amountMinor, currency: unitPrice.currency },
       unitPrice,
+      ...(input.monthlyPriceMinor !== undefined ? { monthlyPriceMinor: input.monthlyPriceMinor } : {}),
       billingCycle: facts.cycle,
       kind: input.kind,
       months: facts.months,
@@ -147,11 +190,17 @@ export function requestAmountOf(input: PricingInput): Pricing {
 
   if (input.billingCycle === null) return { status: 'MISSING', reason: 'NO_PRICED_SUBSCRIPTION', budgetYear: year };
   if (input.billingCycle === 'OTHER') return { status: 'MISSING', reason: 'CYCLE_UNKNOWN', budgetYear: year };
+  if (input.monthlyPriceMinor !== undefined && (input.monthlyPriceMinor === null || input.monthlyPriceMinor <= 0n)) {
+    return { status: 'MISSING', reason: 'NO_PRICED_SUBSCRIPTION', budgetYear: year };
+  }
 
   return recurringAmountOf({ ...input, unitPrice }, input.billingCycle, priced);
 }
 
-/** The months that begin in the year of the check date and in the year after, priced by the month of the plan (`QĐ-111j`, `QĐ-111k`, R-46). */
+/**
+ * The months of the check year and next year (`calendarMonthsIn` for `K2`, `monthsBeginningIn` for `K1`/others), priced directly by
+ * `monthlyPriceMinor` when provided (`QĐ-111j`, `QĐ-111k`, `QĐ-104k`(1), `QĐ-116an`, R-46).
+ */
 function recurringAmountOf(
   input: PricingInput & { unitPrice: Money },
   billingCycle: Exclude<BillingCycleCode, 'OTHER'>,
@@ -164,13 +213,20 @@ function recurringAmountOf(
 ): Pricing {
   const year = fiscalYearOf(input.checkDate);
   const cycleMonths = BigInt(CYCLE_MONTHS[billingCycle]);
+  const monthlyMinor = input.monthlyPriceMinor;
   const costOf = (months: number): bigint =>
-    ceilDiv(input.unitPrice.amountMinor * BigInt(months) * BigInt(input.beneficiaries), cycleMonths);
+    monthlyMinor !== undefined && monthlyMinor !== null
+      ? monthlyMinor * BigInt(months) * BigInt(input.beneficiaries)
+      : ceilDiv(input.unitPrice.amountMinor * BigInt(months) * BigInt(input.beneficiaries), cycleMonths);
   const start = input.from !== undefined && input.from > input.checkDate ? input.from : input.checkDate;
   const startYear = fiscalYearOf(start);
-  // A right with no end holds twelve months of the year after, whatever day it begins (R-46); one with an end, the months that begin then.
+  const countMonths = (inYear: number): number =>
+    input.provisioningType === 'K2'
+      ? calendarMonthsIn({ start, lastHeldOn: input.endDate, year: inYear })
+      : monthsBeginningIn({ start, end: input.endDate, year: inYear });
+  // A right with no end holds twelve months of the year after, whatever day it begins (R-46); one with an end, the months in that year.
   const monthsOf = (inYear: number): number =>
-    input.endDate === null && inYear > startYear ? 12 : monthsBeginningIn({ start, end: input.endDate, year: inYear });
+    input.endDate === null && inYear > startYear ? 12 : countMonths(inYear);
 
   // A right that begins in a year after the check date costs nothing in this one; its first year is shown, never held (`QĐ-109b`).
   if (startYear > year) {
@@ -178,7 +234,7 @@ function recurringAmountOf(
       amountMinor: 0n,
       cycle: billingCycle,
       months: 0,
-      nextYearAmountMinor: costOf(Math.max(1, monthsBeginningIn({ start, end: input.endDate, year: startYear }))),
+      nextYearAmountMinor: costOf(Math.max(1, countMonths(startYear))),
     });
   }
 
@@ -196,6 +252,7 @@ function recurringAmountOf(
 export interface RequestPriceInput extends Pick<PricingInput, 'beneficiaries' | 'checkDate' | 'endDate' | 'from'> {
   planId: string;
   free: boolean;
+  provisioningType?: 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
   /**
    * The last day of the right of each person it is for, when they do not all end on the same day: a person with a term is cut at the end of
    * the contract, the others are not (R-38). Seats that end on the same day cost the same, so each end is counted once. When given,
@@ -211,7 +268,9 @@ export interface RequestPriceInput extends Pick<PricingInput, 'beneficiaries' | 
 
 export interface RequestPlanPrice {
   kind: 'RECURRING' | 'ONE_TIME';
+  provisioningType?: 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
   unitPrice: Money;
+  monthlyPriceMinor?: bigint | null;
   billingCycle: BillingCycleCode;
   /** Where the price comes from (`QĐ-113a`); a price that does not say is taken to come from no subscription or reference. */
   source?: 'SUBSCRIPTION' | 'PLAN_REFERENCE';
@@ -240,7 +299,9 @@ function requestAmountsOf(input: RequestPriceInput, price: RequestPlanPrice): Pr
   const parts = [...byEnd].map(([endDate, beneficiaries]) =>
     requestAmountOf({
       kind: price.kind,
+      provisioningType: input.provisioningType ?? price.provisioningType,
       unitPrice: price.unitPrice,
+      monthlyPriceMinor: price.monthlyPriceMinor,
       billingCycle: price.billingCycle,
       beneficiaries,
       checkDate: input.checkDate,
@@ -274,40 +335,45 @@ function requestAmountsOf(input: RequestPriceInput, price: RequestPlanPrice): Pr
   };
 }
 
+const missingPricingRecord = (
+  missingReason: MissingPriceReason,
+  kind: 'RECURRING' | 'ONE_TIME' | null,
+  budgetYear: number,
+  expectedEndDate: BusinessDate | null,
+): PricingRecord => ({
+  status: 'MISSING',
+  missingReason,
+  kind,
+  budgetYear,
+  expectedEndDate,
+  amountMonths: null,
+  amount: null,
+  unitPrice: null,
+  billingCycle: null,
+  nextYearAmount: null,
+});
+
 /** The same stored pricing record for intake and worker repricing, from the same plan-price facts. */
 export function pricingRecordFor(input: RequestPriceInput, price: RequestPlanPrice | null): PricingRecord {
   const recordedEnd = input.endIsDerived === true || input.endsByPerson !== undefined ? null : input.endDate;
   if (input.free) return { ...NOT_APPLICABLE_PRICING, expectedEndDate: recordedEnd };
-  const kind = price?.kind ?? 'RECURRING';
-  const priced: Pricing = price
-    ? requestAmountsOf(input, { ...price, kind })
-    : { status: 'MISSING', reason: 'NO_PRICED_SUBSCRIPTION', budgetYear: fiscalYearOf(input.checkDate) };
-  if (priced.status === 'MISSING') {
-    return {
-      status: 'MISSING',
-      missingReason: priced.reason,
-      kind: price?.kind ?? null,
-      budgetYear: priced.budgetYear,
-      expectedEndDate: recordedEnd,
-      amountMonths: null,
-      amount: null,
-      unitPrice: null,
-      billingCycle: null,
-      nextYearAmount: null,
-    };
-  }
+  if (!price) return missingPricingRecord('NO_PRICED_SUBSCRIPTION', null, fiscalYearOf(input.checkDate), recordedEnd);
+  const priced = requestAmountsOf(input, { ...price, kind: price.kind });
+  if (priced.status === 'MISSING')
+    return missingPricingRecord(priced.reason, price.kind, priced.budgetYear, recordedEnd);
 
   return {
     status: 'PRICED',
     missingReason: null,
-    kind,
+    kind: price.kind,
     budgetYear: priced.budgetYear,
     expectedEndDate: recordedEnd,
     amountMonths: priced.months,
     amount: priced.amount,
     unitPrice: priced.unitPrice,
+    ...(priced.monthlyPriceMinor !== undefined ? { monthlyPriceMinor: priced.monthlyPriceMinor } : {}),
     billingCycle: priced.billingCycle,
     nextYearAmount: priced.nextYearAmount,
-    priceSource: price?.source ?? null,
+    priceSource: price.source,
   };
 }

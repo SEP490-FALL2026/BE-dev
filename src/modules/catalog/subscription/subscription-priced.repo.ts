@@ -26,7 +26,7 @@ export const livePricedOf = (): Prisma.SubscriptionWhereInput => ({
 });
 
 /** A K4 plan always carries its purchase price, paid once (`QĐ-106d`, review G23-04), whatever kind of subscription records it. */
-export const PLAN_KIND = { plan: { select: { provisioningType: true } } } as const;
+export const PLAN_KIND = { plan: { select: { provisioningType: true, referenceCommitmentMonths: true } } } as const;
 
 /** The priced subscriptions of a plan whose period runs on `on`: begun by it, not ended before it, not continued by a period begun by it. */
 export const pricedOn = (on: BusinessDate): Prisma.SubscriptionWhereInput => {
@@ -48,6 +48,7 @@ export const PRICE_FIELDS = {
   kind: true,
   unitPriceMinor: true,
   unitPriceCurrency: true,
+  monthlyUnitPriceMinor: true,
   priceReportingMinor: true,
   priceReportingCurrency: true,
   billingCycle: true,
@@ -73,3 +74,52 @@ export const withPriceSource = <
   reportingPriceMinor: row.priceReportingMinor,
   billingCycle: row.billingCycle ?? 'OTHER',
 });
+
+export interface PricedOfPlanResult {
+  subscriptionId: string;
+  subscriptionKind: 'TERM' | 'PERPETUAL';
+  provisioningType: 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
+  referenceCommitmentMonths: 1 | 12 | null;
+  unitPriceMinor: bigint;
+  monthlyUnitPriceMinor: bigint | null;
+  currency: string;
+  /** The unit price converted to the reporting currency when it was recorded; null when it was not converted. */
+  reporting: { amountMinor: bigint; currency: string } | null;
+  billingCycle: BillingCycle;
+  allowsMidTermReduction: boolean;
+}
+
+/** Maps a priced subscription row returned by `pickPriceSource` into plan price facts. */
+export function toPricedOfPlan(row: {
+  id: string;
+  kind: 'TERM' | 'PERPETUAL';
+  plan: { provisioningType: 'K1' | 'K2' | 'K3' | 'K4' | 'K5'; referenceCommitmentMonths: number | null };
+  unitPriceMinor: bigint | null;
+  monthlyUnitPriceMinor: bigint | null;
+  unitPriceCurrency: string | null;
+  priceReportingMinor: bigint | null;
+  priceReportingCurrency: string | null;
+  billingCycle: BillingCycle | null;
+  allowsMidTermReduction: boolean;
+}): PricedOfPlanResult | null {
+  if (row.unitPriceMinor === null || row.unitPriceCurrency === null) return null;
+
+  return {
+    subscriptionId: row.id,
+    subscriptionKind: row.plan.provisioningType === 'K4' ? 'PERPETUAL' : row.kind,
+    provisioningType: row.plan.provisioningType,
+    referenceCommitmentMonths:
+      row.plan.referenceCommitmentMonths === 1 || row.plan.referenceCommitmentMonths === 12
+        ? row.plan.referenceCommitmentMonths
+        : null,
+    unitPriceMinor: row.unitPriceMinor,
+    monthlyUnitPriceMinor: row.monthlyUnitPriceMinor,
+    currency: row.unitPriceCurrency,
+    reporting:
+      row.priceReportingMinor !== null && row.priceReportingCurrency !== null
+        ? { amountMinor: row.priceReportingMinor, currency: row.priceReportingCurrency }
+        : null,
+    billingCycle: row.billingCycle ?? 'OTHER',
+    allowsMidTermReduction: row.allowsMidTermReduction,
+  };
+}

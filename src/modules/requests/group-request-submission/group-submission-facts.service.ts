@@ -204,6 +204,7 @@ export class GroupSubmissionFactsService {
         ? await this.assessment.priceFor(tx, {
             planId: input.planId,
             free: false,
+            provisioningType: target.provisioningType,
             beneficiaries: lines.length,
             checkDate: today,
             endDate: null,

@@ -12,7 +12,12 @@ describe('QĐ-113a the reference price a request falls back to is one in dong ab
       referencePriceCurrency: 'VND',
     }).findOfPlan('plan');
 
-    expect(price).toEqual({ provisioningType: 'K2', amountMinor: 500_000n, currency: 'VND' });
+    expect(price).toEqual({
+      provisioningType: 'K2',
+      amountMinor: 500_000n,
+      currency: 'VND',
+      referenceCommitmentMonths: null,
+    });
   });
 
   it.each([

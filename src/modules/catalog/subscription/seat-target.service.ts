@@ -18,6 +18,7 @@ const ofPlan = (plan: PlanLookup): SeatTarget => ({
   applicationKind: plan.applicationKind,
   provisioningType: plan.provisioningType,
   keyBinding: plan.keyBinding,
+  referenceCommitmentMonths: plan.referenceCommitmentMonths,
   applicationStatus: plan.applicationStatus,
   status: null,
   missing: [],

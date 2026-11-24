@@ -4,8 +4,8 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { SubscriptionPoolService } from './pool/subscription-pool.service';
 import { SubscriptionGrantingRepo } from './subscription-granting.repo';
+import { monthlyPriceOf, type PlanPriceFacts } from './price/subscription-price.policy';
 import { SubscriptionPriceService } from './price/subscription-price.service';
-import type { PlanPriceFacts } from './price/subscription-price.policy';
 import { SubscriptionRepo } from './subscription.repo';
 import type {
   BaselineSubscription,
@@ -104,6 +104,7 @@ export class SubscriptionFactsService {
         amountMinor: record.priceSnapshot.reportingMinor,
         currency: record.priceSnapshot.reportingCurrency,
       },
+      monthlyPriceMinor: monthlyPriceOf(record),
       billingCycle: record.billingCycle ?? 'OTHER',
     };
   }

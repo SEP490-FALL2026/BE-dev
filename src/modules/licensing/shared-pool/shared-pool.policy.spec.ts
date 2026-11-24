@@ -65,9 +65,10 @@ describe('judgePurchase', () => {
 });
 
 describe('avoidedCostOf', () => {
-  const recurring = (amountMinor: bigint, billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER') => ({
+  const recurring = (monthlyPriceMinor: bigint | null, billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER') => ({
     kind: 'RECURRING' as const,
-    unitPrice: { amountMinor, currency: 'VND' },
+    unitPrice: { amountMinor: monthlyPriceMinor ?? 0n, currency: 'VND' },
+    monthlyPriceMinor,
     billingCycle,
   });
 
@@ -77,10 +78,19 @@ describe('avoidedCostOf', () => {
     ).toEqual({ provisioningType: 'K2', months: 6, unitMinor: 15n, amountMinor: 90n, currency: 'VND' });
   });
 
-  it('BR-MF1-09c: an annual price is put per month and rounded up to the minor unit', () => {
+  it('W3-02: reads monthlyPriceMinor directly from CatalogApi.getSubscriptionPrice without ceil', () => {
     expect(
-      avoidedCostOf({ provisioningType: 'K2', completedOn: '2026-01-02', price: recurring(1000n, 'ANNUAL') }),
-    ).toEqual({ provisioningType: 'K2', months: 12, unitMinor: 84n, amountMinor: 1008n, currency: 'VND' });
+      avoidedCostOf({
+        provisioningType: 'K2',
+        completedOn: '2026-01-02',
+        price: {
+          kind: 'RECURRING',
+          unitPrice: { amountMinor: 1_000_001n, currency: 'VND' },
+          monthlyPriceMinor: 83_333n,
+          billingCycle: 'ANNUAL',
+        },
+      }),
+    ).toEqual({ provisioningType: 'K2', months: 12, unitMinor: 83_333n, amountMinor: 999_996n, currency: 'VND' });
   });
 
   it('BR-MF1-09c: December counts one whole month', () => {
@@ -94,7 +104,12 @@ describe('avoidedCostOf', () => {
       avoidedCostOf({
         provisioningType: 'K4',
         completedOn: '2026-07-14',
-        price: { kind: 'ONE_TIME', unitPrice: { amountMinor: 250n, currency: 'VND' }, billingCycle: 'OTHER' },
+        price: {
+          kind: 'ONE_TIME',
+          unitPrice: { amountMinor: 250n, currency: 'VND' },
+          monthlyPriceMinor: null,
+          billingCycle: 'OTHER',
+        },
       }),
     ).toEqual({ provisioningType: 'K4', months: null, unitMinor: 250n, amountMinor: 250n, currency: 'VND' });
   });
@@ -108,6 +123,7 @@ describe('avoidedCostOf', () => {
           kind: 'RECURRING',
           unitPrice: { amountMinor: 1_500n, currency: 'USD' },
           reportingUnitPrice: { amountMinor: 375_000n, currency: 'VND' },
+          monthlyPriceMinor: 375_000n,
           billingCycle: 'MONTHLY',
         },
       }),
@@ -123,6 +139,7 @@ describe('avoidedCostOf', () => {
           kind: 'ONE_TIME',
           unitPrice: { amountMinor: 100n, currency: 'USD' },
           reportingUnitPrice: { amountMinor: 2_500_000n, currency: 'VND' },
+          monthlyPriceMinor: null,
           billingCycle: 'OTHER',
         },
       }),
@@ -135,8 +152,11 @@ describe('avoidedCostOf', () => {
     });
   });
 
-  it('BR-MF1-09c: nothing is recorded without a price, for a cycle that has no month, or for another kind of plan', () => {
+  it('BR-MF1-09c: nothing is recorded without a price, with null monthlyPriceMinor, for OTHER cycle, or for another kind of plan', () => {
     expect(avoidedCostOf({ provisioningType: 'K2', completedOn: '2026-07-14', price: null })).toBeNull();
+    expect(
+      avoidedCostOf({ provisioningType: 'K2', completedOn: '2026-07-14', price: recurring(null, 'ANNUAL') }),
+    ).toBeNull();
     expect(
       avoidedCostOf({ provisioningType: 'K2', completedOn: '2026-07-14', price: recurring(10n, 'OTHER') }),
     ).toBeNull();

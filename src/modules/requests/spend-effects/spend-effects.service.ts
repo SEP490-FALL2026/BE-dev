@@ -3,6 +3,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { BudgetsApi } from '../../budgets/public/budgets.api';
+import { CatalogApi } from '../../catalog/public/catalog.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { chargedCostCenterId } from '../access-request/access-request.policy';
 import { seatMonthlyOf } from '../access-request/pricing.policy';
@@ -26,6 +27,7 @@ export class SpendEffectsService {
     private readonly steps: SpendStepRepo,
     private readonly checkRepo: BudgetCheckRepo,
     private readonly budgets: BudgetsApi,
+    private readonly catalog: CatalogApi,
     private readonly audit: AuditApi,
     private readonly decisions: SpendDecisionRepo,
   ) {}
@@ -67,6 +69,13 @@ export class SpendEffectsService {
       return check;
     }
 
+    const monthlyPriceMinor =
+      request.pricing.monthlyPriceMinor !== undefined
+        ? request.pricing.monthlyPriceMinor
+        : request.planId !== null
+          ? (await this.catalog.getPlanPrice(request.planId, tx))?.monthlyPriceMinor
+          : undefined;
+
     await this.budgets.holdForRequest(tx, actor, {
       organizationId: request.organizationId,
       requestId: request.id,
@@ -76,6 +85,9 @@ export class SpendEffectsService {
       now,
       items: [{ year: year.year, amountMinor: year.costMinor }],
       seatMonthlyMinor: seatMonthlyOf({
+        monthlyPriceMinor,
+        unitPrice: request.pricing.unitPrice,
+        billingCycle: request.pricing.billingCycle,
         costMinor: year.costMinor,
         kind: request.pricing.kind,
         // The months of the amount are those of the year it was worked out for, the year of the check.

@@ -186,6 +186,7 @@ export class RequestFactsService {
     const pricing = await this.priceFor(tx, {
       planId: input.planId,
       free: policy.branch === 'INTERNAL_FREE',
+      provisioningType: target.provisioningType,
       beneficiaries: 1,
       checkDate: today,
       endDate: judged.term.end,

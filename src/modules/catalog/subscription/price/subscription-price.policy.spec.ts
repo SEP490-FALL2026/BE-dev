@@ -5,6 +5,7 @@ import {
   assertPriceInDong,
   isPricedInDong,
   monthlyCostOf,
+  monthlyPriceOf,
   referenceCycleOf,
   referencePriceSourceOf,
   uniformSnapshotOf,
@@ -99,46 +100,36 @@ describe('B1A-03: what a state lacks, so a change that would lower an active sub
   });
 });
 
-describe('monthlyCostOf (the price of a seat for a month, in dong, rounded up)', () => {
-  const priced = (amountMinor: bigint, billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER' | null) => ({
+describe('W3-02: monthlyPriceOf and monthlyCostOf read monthlyUnitPriceMinor directly without dividing', () => {
+  const priced = (
+    monthlyUnitPriceMinor: bigint | null,
+    billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER' | null,
+  ) => ({
     billingCycle,
-    priceSnapshot: null,
-    unitPrice: { amountMinor, currency: 'VND', recordedOn: '2026-01-05' },
+    monthlyUnitPriceMinor,
   });
 
-  it('is the price of a monthly plan as it is, and a quarter or a year over its months, rounded up', () => {
-    expect(monthlyCostOf(priced(200_000n, 'MONTHLY'))).toEqual({ monthlyPriceMinor: 200_000n, cycleMonths: 1 });
-    expect(monthlyCostOf(priced(1_000_000n, 'QUARTERLY'))).toEqual({ monthlyPriceMinor: 333_334n, cycleMonths: 3 });
-    expect(monthlyCostOf(priced(2_400_001n, 'ANNUAL'))).toEqual({ monthlyPriceMinor: 200_001n, cycleMonths: 12 });
+  it('monthlyPriceOf reads monthlyUnitPriceMinor directly and returns null when absent', () => {
+    expect(monthlyPriceOf({ monthlyUnitPriceMinor: 500_000n })).toBe(500_000n);
+    expect(monthlyPriceOf({ monthlyUnitPriceMinor: 83_333n })).toBe(83_333n);
+    expect(monthlyPriceOf({ monthlyUnitPriceMinor: null })).toBeNull();
   });
 
-  it('reads the price in the reporting currency when the subscription carries one', () => {
-    expect(
-      monthlyCostOf({
-        billingCycle: 'MONTHLY',
-        unitPrice: { amountMinor: 10n, currency: 'USD', recordedOn: '2026-01-05' },
-        priceSnapshot: {
-          rate: 1n,
-          rateDate: '2026-01-05',
-          rateSource: 'MANUAL',
-          reportingMinor: 250_000n,
-          reportingCurrency: 'VND',
-          exchangeRateId: null,
-        },
-      }),
-    ).toEqual({ monthlyPriceMinor: 250_000n, cycleMonths: 1 });
-  });
-
-  it('knows no price for another cycle, none, or a price that is not in dong and was never converted', () => {
-    expect(monthlyCostOf(priced(200_000n, 'OTHER'))).toEqual({ monthlyPriceMinor: null, cycleMonths: null });
-    expect(monthlyCostOf(priced(200_000n, null))).toEqual({ monthlyPriceMinor: null, cycleMonths: null });
-    expect(
-      monthlyCostOf({
-        billingCycle: 'MONTHLY',
-        priceSnapshot: null,
-        unitPrice: { amountMinor: 10n, currency: 'USD', recordedOn: '2026-01-05' },
-      }),
-    ).toEqual({ monthlyPriceMinor: null, cycleMonths: 1 });
+  it.each([
+    ['monthly 500.000', 500_000n, 'MONTHLY', { monthlyPriceMinor: 500_000n, cycleMonths: 1 }],
+    [
+      'annual rounded half-down (kills ceil 83.334)',
+      83_333n,
+      'ANNUAL',
+      { monthlyPriceMinor: 83_333n, cycleMonths: 12 },
+    ],
+    ['annual rounded half-up (kills floor 83.333)', 83_334n, 'ANNUAL', { monthlyPriceMinor: 83_334n, cycleMonths: 12 }],
+    ['quarterly stored directly', 333_333n, 'QUARTERLY', { monthlyPriceMinor: 333_333n, cycleMonths: 3 }],
+    ['null monthly price on monthly cycle', null, 'MONTHLY', { monthlyPriceMinor: null, cycleMonths: 1 }],
+    ['OTHER billing cycle', 500_000n, 'OTHER', { monthlyPriceMinor: null, cycleMonths: null }],
+    ['null billing cycle', 500_000n, null, { monthlyPriceMinor: null, cycleMonths: null }],
+  ] as const)('monthlyCostOf for %s', (_label, monthly, cycle, expected) => {
+    expect(monthlyCostOf(priced(monthly, cycle))).toEqual(expected);
   });
 });
 
@@ -146,10 +137,13 @@ describe('QĐ-113a: what the reference price of a plan stands for', () => {
   const price = { amountMinor: 500_000n, currency: 'VND' };
 
   it.each(['K1', 'K2'] as const)('is a recurring monthly price of a %s plan', (kind) => {
-    expect(referencePriceSourceOf(kind, price)).toEqual({
+    expect(referencePriceSourceOf(kind, price, 12)).toEqual({
       kind: 'RECURRING',
+      provisioningType: kind,
+      referenceCommitmentMonths: 12,
       unitPrice: price,
       reportingUnitPrice: price,
+      monthlyPriceMinor: 500_000n,
       billingCycle: 'MONTHLY',
       allowsMidTermReduction: false,
       source: 'PLAN_REFERENCE',
@@ -159,8 +153,10 @@ describe('QĐ-113a: what the reference price of a plan stands for', () => {
   it('is the one-time price of a K4 plan', () => {
     expect(referencePriceSourceOf('K4', price)).toEqual({
       kind: 'ONE_TIME',
+      provisioningType: 'K4',
       unitPrice: price,
       reportingUnitPrice: price,
+      monthlyPriceMinor: null,
       billingCycle: 'OTHER',
       allowsMidTermReduction: false,
       source: 'PLAN_REFERENCE',

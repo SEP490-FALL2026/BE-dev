@@ -1,7 +1,6 @@
 import {
   baselineVersionRefusal,
   estimatedCost,
-  monthlyUnitPrice,
   monthsRunning,
   inOrderOf,
   listedDepartments,
@@ -11,26 +10,6 @@ import {
 } from './baseline.policy';
 
 describe('the baseline of the budget (R-I03)', () => {
-  describe('the monthly price of a seat', () => {
-    it('is the price as it is for a monthly cycle, a twelfth for an annual one and a third for a quarterly one', () => {
-      expect(monthlyUnitPrice(1200n, 'MONTHLY')).toBe(1200n);
-      expect(monthlyUnitPrice(1200n, 'ANNUAL')).toBe(100n);
-      expect(monthlyUnitPrice(900n, 'QUARTERLY')).toBe(300n);
-    });
-
-    it('rounds half up to the minor unit', () => {
-      expect(monthlyUnitPrice(1206n, 'ANNUAL')).toBe(101n);
-      expect(monthlyUnitPrice(1205n, 'ANNUAL')).toBe(100n);
-      expect(monthlyUnitPrice(1n, 'ANNUAL')).toBe(0n);
-    });
-
-    it('is unknown for a price not known or a cycle that is neither', () => {
-      expect(monthlyUnitPrice(null, 'MONTHLY')).toBeNull();
-      expect(monthlyUnitPrice(1200n, 'OTHER')).toBeNull();
-      expect(monthlyUnitPrice(1200n, null)).toBeNull();
-    });
-  });
-
   describe('the months of the year a subscription runs', () => {
     it('is twelve with no end date, and for one that spans the year', () => {
       expect(monthsRunning(2027, null, null)).toBe(12);
@@ -100,10 +79,9 @@ describe('the baseline of the budget (R-I03)', () => {
   });
 });
 
-describe('the cost of one subscription over a year (R-I03)', () => {
+describe('the cost of one subscription over a year (R-I03, W3-02)', () => {
   const annual = {
-    unitPriceReportingMinor: 1200n,
-    billingCycle: 'ANNUAL',
+    monthlyPriceMinor: 100n,
     startDate: '2026-01-01',
     endDate: '2027-06-30',
   };
@@ -116,6 +94,32 @@ describe('the cost of one subscription over a year (R-I03)', () => {
       costMinor: 7200n,
     });
     expect(subscriptionCost(2027, '2026-11-09', 0, annual)).toEqual({ monthlyMinor: 100n, months: 12, costMinor: 0n });
+  });
+
+  it('W3-02: 2 idle seats at 375.000/month renewed for a full year cost 9.000.000 without re-dividing or rounding', () => {
+    expect(
+      subscriptionCost(2027, '2026-11-09', 2, {
+        monthlyPriceMinor: 375_000n,
+        startDate: '2026-01-01',
+        endDate: null,
+      }),
+    ).toEqual({
+      monthlyMinor: 375_000n,
+      months: 12,
+      costMinor: 9_000_000n,
+    });
+    // Non-round monthly minor price (83.333) is used directly rather than dividing 1.000.001 / 12 again.
+    expect(
+      subscriptionCost(2027, '2026-11-09', 1, {
+        monthlyPriceMinor: 83_333n,
+        startDate: '2026-01-01',
+        endDate: null,
+      }),
+    ).toEqual({
+      monthlyMinor: 83_333n,
+      months: 12,
+      costMinor: 999_996n,
+    });
   });
 
   it('counts only the months that remain for one that was ordered to end (Q-162)', () => {
@@ -135,7 +139,7 @@ describe('the cost of one subscription over a year (R-I03)', () => {
   });
 
   it('has no estimate when the price is not known', () => {
-    expect(subscriptionCost(2027, '2026-11-09', 6, { ...annual, unitPriceReportingMinor: null }).costMinor).toBeNull();
+    expect(subscriptionCost(2027, '2026-11-09', 6, { ...annual, monthlyPriceMinor: null }).costMinor).toBeNull();
   });
 
   it('BR-MF4-04: estimates cost with 3 cases (C4-04)', () => {
@@ -156,7 +160,6 @@ describe('the cost of one subscription over a year (R-I03)', () => {
       ...annual,
       endDate: '2026-11-09',
       startDate: '2026-06-01',
-      billingCycle: 'ANNUAL',
       hasSuccessor: false,
     };
     expect(subscriptionCost(2026, '2026-11-09', 3, endsToday, true)).toEqual({

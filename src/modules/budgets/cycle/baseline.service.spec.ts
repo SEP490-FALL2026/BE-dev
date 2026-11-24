@@ -10,6 +10,7 @@ const subscription = (index: number, patch: Partial<BaselineSubscription> = {}):
   provisioningType: 'K2',
   purchasedQuantity: 10,
   unitPriceReportingMinor: 100n,
+  monthlyPriceMinor: 100n,
   billingCycle: 'MONTHLY',
   startDate: '2026-01-01',
   endDate: null,
@@ -131,7 +132,7 @@ describe('BR-MF4-01 QĐ-103k: the line Unallocated - shared pool of the baseline
   });
 
   it('says when the price of an idle seat is not known and leaves it out of the total (F-074)', () => {
-    const other = subscription(1, { billingCycle: 'OTHER' });
+    const other = subscription(1, { billingCycle: 'OTHER', monthlyPriceMinor: null });
 
     const pool = line([other], new Map());
 

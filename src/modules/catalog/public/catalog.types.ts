@@ -30,6 +30,8 @@ export interface SeatTarget {
   provisioningType: 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
   /** How a K4 plan is bound once bought (to an account, to a machine by a key, or bundled with the machine); null for every other kind. */
   keyBinding: 'ACCOUNT' | 'DEVICE_KEY' | 'DEVICE_BUNDLED' | null;
+  /** Reference commitment months on a K1/K2 plan (`1 | 12`), or null when unset or for other kinds. */
+  referenceCommitmentMonths?: 1 | 12 | null;
   /** Whether the application of the plan is still in the catalog; a retired one takes no seat. */
   applicationStatus: 'APPROVED' | 'RETIRED';
   /** The state of the subscription; null for a plan that has none. A draft takes no seat (`US-04-03` AC-6). */
@@ -89,6 +91,8 @@ export interface SubscriptionPrice {
   unitPrice: { amountMinor: bigint; currency: string };
   /** The unit price converted to the reporting currency when it was recorded; null when it was not converted. */
   reportingUnitPrice: { amountMinor: bigint; currency: string } | null;
+  /** The monthly unit price per seat in dong from `monthly_unit_price_minor`; null for perpetual purchases or when unset. */
+  monthlyPriceMinor: bigint | null;
   /** `OTHER` for a perpetual purchase, which has no billing cycle. */
   billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER';
 }
@@ -204,6 +208,8 @@ export interface BaselineSubscription {
   purchasedQuantity: number | null;
   /** The unit price in the reporting currency as recorded when the price was; null when it has none. */
   unitPriceReportingMinor: bigint | null;
+  /** The monthly price per seat in dong from `monthly_unit_price_minor`; null when unset. */
+  monthlyPriceMinor: bigint | null;
   billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER' | null;
   startDate: string | null;
   endDate: string | null;

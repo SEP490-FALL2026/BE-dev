@@ -190,6 +190,25 @@ export function monthsBeginningIn(facts: { start: BusinessDate; end: BusinessDat
   }
 }
 
+/**
+ * The calendar months of `year` during which at least one day of a seat is held, from the month containing `start`
+ * through the month containing `lastHeldOn` (or December when `lastHeldOn` is null) (`QĐ-104k`(1)).
+ * Returns 0 when `start` is after `year`, `lastHeldOn` is before `year`, or `lastHeldOn < start`.
+ */
+export function calendarMonthsIn(facts: {
+  start: BusinessDate;
+  lastHeldOn: BusinessDate | null;
+  year: number;
+}): number {
+  const yearStart = `${facts.year}-01-01`;
+  const yearEnd = `${facts.year}-12-31`;
+  const first = facts.start > yearStart ? facts.start : yearStart;
+  const last = facts.lastHeldOn !== null && facts.lastHeldOn < yearEnd ? facts.lastHeldOn : yearEnd;
+  if (first > last || fiscalYearOf(first) !== facts.year || fiscalYearOf(last) !== facts.year) return 0;
+
+  return Number(last.slice(5, 7)) - Number(first.slice(5, 7)) + 1;
+}
+
 /** The limit when the term is longer than a request may ask for, or null when it is allowed. */
 export function checkTerm(facts: { months: number }): TermLimit | null {
   const limit = termLimitOf();

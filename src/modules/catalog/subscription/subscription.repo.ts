@@ -6,8 +6,17 @@ import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { BaselineSubscription } from '../public/catalog.types';
 import { pickPriceSource, type LivenessFacts } from './pool/subscription-pool.policy';
+import { monthlyPriceOf } from './price/subscription-price.policy';
 import { derivedMonthlyUnitPriceMinor } from './subscription.policy';
-import { livePricedOf, PLAN_KIND, PRICE_FIELDS, pricedOn, withPriceSource } from './subscription-priced.repo';
+import {
+  livePricedOf,
+  PLAN_KIND,
+  PRICE_FIELDS,
+  pricedOn,
+  toPricedOfPlan,
+  withPriceSource,
+  type PricedOfPlanResult,
+} from './subscription-priced.repo';
 import type {
   NewSubscription,
   OriginalPriceRecord,
@@ -359,20 +368,7 @@ export class SubscriptionRepo {
    * period that has begun by it, so a price recorded for a period that begins later is not used before its day. When no period
    * runs on the day (the period ended and its renewal is not recorded yet), the newest priced one as without `on`.
    */
-  async findPricedOfPlan(
-    planId: string,
-    tx?: DbTx,
-    on?: BusinessDate,
-  ): Promise<{
-    subscriptionId: string;
-    subscriptionKind: 'TERM' | 'PERPETUAL';
-    unitPriceMinor: bigint;
-    currency: string;
-    /** The unit price converted to the reporting currency when it was recorded; null when it was not converted. */
-    reporting: { amountMinor: bigint; currency: string } | null;
-    billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER';
-    allowsMidTermReduction: boolean;
-  } | null> {
+  async findPricedOfPlan(planId: string, tx?: DbTx, on?: BusinessDate): Promise<PricedOfPlanResult | null> {
     const db = tx ?? this.prisma;
     const select = { id: true, startDate: true, isPrimaryForPlan: true, ...PRICE_FIELDS, ...PLAN_KIND } as const;
     let row =
@@ -384,20 +380,8 @@ export class SubscriptionRepo {
     row ??= pickPriceSource(
       (await db.subscription.findMany({ where: { planId, ...livePricedOf() }, select })).map(withPriceSource),
     );
-    if (!row || row.unitPriceMinor === null || row.unitPriceCurrency === null) return null;
 
-    return {
-      subscriptionId: row.id,
-      subscriptionKind: row.plan.provisioningType === 'K4' ? 'PERPETUAL' : row.kind,
-      unitPriceMinor: row.unitPriceMinor,
-      currency: row.unitPriceCurrency,
-      reporting:
-        row.priceReportingMinor !== null && row.priceReportingCurrency !== null
-          ? { amountMinor: row.priceReportingMinor, currency: row.priceReportingCurrency }
-          : null,
-      billingCycle: row.billingCycle,
-      allowsMidTermReduction: row.allowsMidTermReduction,
-    };
+    return row ? toPricedOfPlan(row) : null;
   }
 
   /** The billing cycles of the main subscriptions pricing these plans, one per plan (`ONE_TIME` for a perpetual purchase); no department is asked. */
@@ -481,6 +465,7 @@ export class SubscriptionRepo {
         planId: true,
         purchasedQuantity: true,
         priceReportingMinor: true,
+        monthlyUnitPriceMinor: true,
         billingCycle: true,
         startDate: true,
         endDate: true,
@@ -499,6 +484,7 @@ export class SubscriptionRepo {
       provisioningType: row.plan.provisioningType,
       purchasedQuantity: row.purchasedQuantity,
       unitPriceReportingMinor: row.priceReportingMinor,
+      monthlyPriceMinor: monthlyPriceOf(row),
       billingCycle: row.billingCycle,
       startDate: row.startDate ? fromDateColumn(row.startDate) : null,
       endDate: row.endDate ? fromDateColumn(row.endDate) : null,
