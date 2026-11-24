@@ -133,7 +133,7 @@ describe('POST /api/v1/department-transfers/:id/revocations acting IT Admin enfo
         bySubstitute: true,
       });
     } finally {
-      if (substituteId) await endSubstitute(substituteId).expect(200);
+      if (substituteId) await endSubstitute(substituteId).expect(201);
       await h.ctx.sql.query(`UPDATE app_users SET status = 'ACTIVE' WHERE id = $1`, [itFin.account.appUserId]);
     }
   }, 240_000);

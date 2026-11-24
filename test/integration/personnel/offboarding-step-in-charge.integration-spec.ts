@@ -124,7 +124,7 @@ describe('offboarding technical steps acting IT Admin (H12) and Super Admin IT h
         expect(lockAudit?.after).toMatchObject({ employeeId: leaver.employeeId, bySubstitute: true });
         expect(revAudit?.after).toMatchObject({ count: 1, bySubstitute: true });
       } finally {
-        await endSubstitute(subId).expect(200);
+        await endSubstitute(subId).expect(201);
       }
     });
   });

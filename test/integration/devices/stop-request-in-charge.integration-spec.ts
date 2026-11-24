@@ -112,7 +112,7 @@ describe('stop request completion acting IT Admin enforcement (H13) (integration
       const completedAudit = events.find((e) => e.action === 'DEVICE_STOP_REQUEST.COMPLETED');
       expect(completedAudit?.after).toMatchObject({ state: 'COMPLETED', selfHandled: false, bySubstitute: true });
     } finally {
-      await endSubstitute(subId).expect(200);
+      await endSubstitute(subId).expect(201);
     }
   });
 
