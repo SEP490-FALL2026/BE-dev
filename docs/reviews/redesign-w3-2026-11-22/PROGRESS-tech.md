@@ -15,20 +15,20 @@ Tracker sống qua compact context. Người code đọc lại file này **đầ
 
 ## Gói
 
-| Gói  | Mục                                           | Trạng thái | sha | Lệnh kiểm + kết quả | FIX-TEST thêm | Ghi chú / chưa kiểm được |
-| ---- | --------------------------------------------- | ---------- | --- | ------------------- | ------------- | ------------------------ |
-| P9a  | W3-10, W3-13 — M4, module workspace           | chưa       |     |                     |               |                          |
+| Gói  | Mục                                              | Trạng thái | sha | Lệnh kiểm + kết quả | FIX-TEST thêm | Ghi chú / chưa kiểm được |
+| ---- | ------------------------------------------------ | ---------- | --- | ------------------- | ------------- | ------------------------ |
+| P9a  | W3-10, W3-13 — M4, module workspace              | chưa       |     |                     |               |                          |
 | P9b  | W3-11 (tech), W3-14 (khóa), W3-10 (gói), seed B2 | chưa       |     |                     |               |                          |
-| P11  | M5a, M5, repo dòng/sổ/lần mua/mục tiêu        | chưa       |     |                     |               |                          |
-| P12a | M6 (lô, 6 hàm), repo lô/khóa/phí              | chưa       |     |                     |               |                          |
-| P20b | chuyển code đợt 2 sang lô (K-B3)              | chưa       |     |                     |               |                          |
-| P12b | M7, repo phân bổ, cột `K1`                    | chưa       |     |                     |               |                          |
-| P21  | W3-27                                         | chưa       |     |                     |               |                          |
-| P14  | W3-24 (route lô, người phụ trách)             | chưa       |     |                     |               |                          |
-| P15  | W3-15 (route dòng)                            | chưa       |     |                     |               |                          |
-| P22a | W3-28 seed lô/K1/dòng khi khai                | chưa       |     |                     |               |                          |
-| P22b | W3-28 seed mua seat/bậc/gia hạn               | chưa       |     |                     |               |                          |
-| P23  | chốt đợt                                      | chưa       |     |                     |               |                          |
+| P11  | M5a, M5, repo dòng/sổ/lần mua/mục tiêu           | chưa       |     |                     |               |                          |
+| P12a | M6 (lô, 6 hàm), repo lô/khóa/phí                 | chưa       |     |                     |               |                          |
+| P20b | chuyển code đợt 2 sang lô (K-B3)                 | chưa       |     |                     |               |                          |
+| P12b | M7, repo phân bổ, cột `K1`                       | chưa       |     |                     |               |                          |
+| P21  | W3-27                                            | chưa       |     |                     |               |                          |
+| P14  | W3-24 (route lô, người phụ trách)                | chưa       |     |                     |               |                          |
+| P15  | W3-15 (route dòng)                               | chưa       |     |                     |               |                          |
+| P22a | W3-28 seed lô/K1/dòng khi khai                   | chưa       |     |                     |               |                          |
+| P22b | W3-28 seed mua seat/bậc/gia hạn                  | chưa       |     |                     |               |                          |
+| P23  | chốt đợt                                         | chưa       |     |                     |               |                          |
 
 Trạng thái: `chưa` · `đang làm` · `xong` (chỉ sau khi đối chiếu từng tiêu chí — LUẬT CỨNG 6) · `dừng hỏi`.
 

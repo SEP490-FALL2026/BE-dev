@@ -15,26 +15,26 @@ Tracker sống qua compact context. Người code đọc lại file này **đầ
 
 ## Gói
 
-| Gói  | Mục                                       | Trạng thái | sha | Lệnh kiểm + kết quả | FIX-TEST thêm | Ghi chú / chưa kiểm được |
-| ---- | ----------------------------------------- | ---------- | --- | ------------------- | ------------- | ------------------------ |
-| P1   | W3-01, W3-02 (ghi/đọc), W3-03 (thông báo) — M1   | chưa       |     |                     |               |                          |
-| P3   | M2, M3, repo tháng cam kết, tham số           | chưa       |     |                     |               |                          |
-| P2   | W3-02 (biz)                               | chưa       |     |                     |               |                          |
-| P4   | W3-07                                     | chưa       |     |                     |               |                          |
-| P5   | W3-04, W3-06, W3-01 (`unallocated`)       | chưa       |     |                     |               |                          |
-| P6   | W3-05                                     | chưa       |     |                     |               |                          |
-| P7   | W3-08                                     | chưa       |     |                     |               |                          |
-| P8   | W3-09                                     | chưa       |     |                     |               |                          |
-| P10  | W3-11 (biz), W3-12, W3-14, W3-03 (xóa)    | chưa       |     |                     |               |                          |
-| P16a | W3-16, W3-15 (chọn dòng), W3-18 (lối tắt) | chưa       |     |                     |               |                          |
-| P13a | W3-17                                     | chưa       |     |                     |               |                          |
-| P13b | W3-23                                     | chưa       |     |                     |               |                          |
-| P16b | W3-18, W3-20                              | chưa       |     |                     |               |                          |
-| P17  | W3-19                                     | chưa       |     |                     |               |                          |
-| P18  | W3-21                                     | chưa       |     |                     |               |                          |
-| P19  | W3-22                                     | chưa       |     |                     |               |                          |
-| P20  | W3-24 (biz), W3-25, W3-26                 | chưa       |     |                     |               |                          |
-| P23  | chốt đợt (rule, bảng khóa gộp)            | chưa       |     |                     |               |                          |
+| Gói  | Mục                                            | Trạng thái | sha | Lệnh kiểm + kết quả | FIX-TEST thêm | Ghi chú / chưa kiểm được |
+| ---- | ---------------------------------------------- | ---------- | --- | ------------------- | ------------- | ------------------------ |
+| P1   | W3-01, W3-02 (ghi/đọc), W3-03 (thông báo) — M1 | chưa       |     |                     |               |                          |
+| P3   | M2, M3, repo tháng cam kết, tham số            | chưa       |     |                     |               |                          |
+| P2   | W3-02 (biz)                                    | chưa       |     |                     |               |                          |
+| P4   | W3-07                                          | chưa       |     |                     |               |                          |
+| P5   | W3-04, W3-06, W3-01 (`unallocated`)            | chưa       |     |                     |               |                          |
+| P6   | W3-05                                          | chưa       |     |                     |               |                          |
+| P7   | W3-08                                          | chưa       |     |                     |               |                          |
+| P8   | W3-09                                          | chưa       |     |                     |               |                          |
+| P10  | W3-11 (biz), W3-12, W3-14, W3-03 (xóa)         | chưa       |     |                     |               |                          |
+| P16a | W3-16, W3-15 (chọn dòng), W3-18 (lối tắt)      | chưa       |     |                     |               |                          |
+| P13a | W3-17                                          | chưa       |     |                     |               |                          |
+| P13b | W3-23                                          | chưa       |     |                     |               |                          |
+| P16b | W3-18, W3-20                                   | chưa       |     |                     |               |                          |
+| P17  | W3-19                                          | chưa       |     |                     |               |                          |
+| P18  | W3-21                                          | chưa       |     |                     |               |                          |
+| P19  | W3-22                                          | chưa       |     |                     |               |                          |
+| P20  | W3-24 (biz), W3-25, W3-26                      | chưa       |     |                     |               |                          |
+| P23  | chốt đợt (rule, bảng khóa gộp)                 | chưa       |     |                     |               |                          |
 
 Trạng thái: `chưa` · `đang làm` · `xong` (chỉ sau khi đối chiếu từng tiêu chí — LUẬT CỨNG 6) · `dừng hỏi`.
 
