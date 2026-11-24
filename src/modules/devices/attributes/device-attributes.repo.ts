@@ -20,6 +20,8 @@ export interface DeviceRow {
 export interface DeviceCustodyContext {
   hasOpenReturnTask: boolean;
   openReturnTaskDepartmentId: string | null;
+  openReturnTaskId: string | null;
+  openReturnTaskEmployeeId: string | null;
   openRegistrationHolderId: string | null;
 }
 
@@ -52,12 +54,14 @@ export class DeviceAttributesRepo {
   async findCustodyContext(tx: DbTx, deviceId: string): Promise<DeviceCustodyContext> {
     const returnTask = await tx.deviceReturnTask.findFirst({
       where: { deviceId, state: 'OPEN' },
-      select: { departmentId: true },
+      select: { id: true, departmentId: true, employeeId: true },
     });
     if (returnTask) {
       return {
         hasOpenReturnTask: true,
         openReturnTaskDepartmentId: returnTask.departmentId,
+        openReturnTaskId: returnTask.id,
+        openReturnTaskEmployeeId: returnTask.employeeId,
         openRegistrationHolderId: null,
       };
     }
@@ -69,6 +73,8 @@ export class DeviceAttributesRepo {
     return {
       hasOpenReturnTask: false,
       openReturnTaskDepartmentId: null,
+      openReturnTaskId: null,
+      openReturnTaskEmployeeId: null,
       openRegistrationHolderId: registration?.holderEmployeeId ?? null,
     };
   }

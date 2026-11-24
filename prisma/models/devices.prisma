@@ -152,9 +152,9 @@ model DeviceCodeCounter {
   @@map("device_code_counters")
 }
 
-// The job of taking a machine back from a person who left (one for each holding). Who does it is worked out when read, from
+// The job of taking a machine back from a person who left (a holding can have several jobs over time, one open at a time). Who does it is worked out when read, from
 // `departmentId`, so a substitute named later takes the job over without any row being rewritten. The CHECKs, the partial unique index
-// and the guard trigger are SQL in the migration.
+// (one open job for a machine) and the guard trigger are SQL in the migration.
 model DeviceReturnTask {
   id                  String                 @id @default(uuid(7)) @db.Uuid
   organizationId      String                 @map("organization_id") @db.Uuid

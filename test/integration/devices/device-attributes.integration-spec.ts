@@ -11,11 +11,14 @@ import {
   DeviceStaleError,
   DeviceUpdateEmptyError,
 } from '../../../src/modules/devices/attributes/device-attributes.errors';
+import { toDeviceAttributesApiException } from '../../../src/modules/devices/attributes/device-attributes.http-errors';
 import { DeviceAttributesRepo } from '../../../src/modules/devices/attributes/device-attributes.repo';
 import { DeviceAttributesService } from '../../../src/modules/devices/attributes/device-attributes.service';
+import { EmployeeNotStartedError } from '../../../src/modules/organization/public/organization.errors';
 import { DeviceNotFoundError, DeviceNotInChargeError } from '../../../src/modules/devices/public/devices.errors';
 import type { IdentityAccessApi } from '../../../src/modules/identity-access/public/identity-access.api';
 import type { OrganizationReadApi } from '../../../src/modules/organization/public/organization-read.api';
+import { unplacedWorkKey } from '../../../src/modules/organization/public/organization.types';
 import { Barrier } from '../../support/concurrency-harness';
 import {
   type DisposableDatabase,
@@ -36,6 +39,8 @@ describe('the correction of the attributes of a machine (integration, real Postg
   let prisma: PrismaService;
   let service: DeviceAttributesService;
   let holderDept: Map<string, string>;
+  let unplacedDesignees: Map<string, string>;
+  let notStarted: Set<string>;
   let actingByDepartment: Map<string, { inCharge: string | null; substitute: string | null; actors: string[] }>;
   const events: AuditEventInput[] = [];
   const org = randomUUID();
@@ -103,6 +108,8 @@ describe('the correction of the attributes of a machine (integration, real Postg
     } as unknown as AuditApi;
     actingByDepartment = new Map();
     holderDept = new Map();
+    unplacedDesignees = new Map();
+    notStarted = new Set();
     const usable = new Set<string>();
     const organizationReads = {
       getOrganization: () => Promise.resolve({ id: org }),
@@ -112,6 +119,16 @@ describe('the correction of the attributes of a machine (integration, real Postg
       itAdminsActingFor: (deptIds: readonly string[]) =>
         Promise.resolve(
           new Map(deptIds.flatMap((d) => (actingByDepartment.has(d) ? [[d, actingByDepartment.get(d)!]] : []))),
+        ),
+      notStartedAmong: (ids: readonly string[]) => Promise.resolve(new Set(ids.filter((id) => notStarted.has(id)))),
+      itAdminsActingForUnplacedWork: (refs: readonly { workKind: 'DEVICE' | 'DEVICE_RETURN_TASK'; workId: string }[]) =>
+        Promise.resolve(
+          new Map(
+            refs.flatMap((ref) => {
+              const key = unplacedWorkKey(ref.workKind, ref.workId);
+              return unplacedDesignees.has(key) ? [[key, unplacedDesignees.get(key)!]] : [];
+            }),
+          ),
         ),
     } as unknown as OrganizationReadApi;
     const identity = {
@@ -283,5 +300,129 @@ describe('the correction of the attributes of a machine (integration, real Postg
     expect(events[0].after).toEqual({ hostname: 'SUB-OK', bySubstitute: true });
     holderDept.delete(holderId);
     actingByDepartment.delete(deptId);
+  });
+
+  describe('a machine whose holder has no department yet', () => {
+    const employeeOf = async (code: string) => {
+      const id = randomUUID();
+      await sql.query(
+        `INSERT INTO employees (id, organization_id, employee_code, full_name, work_email, normalized_work_email, employment_type, hire_date, updated_at)
+         VALUES ($1, $2, $3, 'Unplaced Holder', $4, $4, 'STAFF', '2025-01-01', now())`,
+        [id, org, code, `${code.toLowerCase()}@acme.vn`],
+      );
+
+      return id;
+    };
+    const asIt = (employeeId: string) =>
+      ({ appUserId: randomUUID(), employeeId, roles: ['IT_ADMIN'] }) as unknown as AuthenticatedPrincipal;
+
+    it('lets the IT Admin appointed for the device correct it and refuses any other IT Admin with DEVICE.NOT_IN_CHARGE', async () => {
+      const devId = await insertDevice('PC-26-0120');
+      const holderId = await employeeOf('E-ATTR-U1');
+      const designee = randomUUID();
+      await sql.query(
+        `INSERT INTO device_registrations (id, organization_id, device_id, holder_employee_id, valid_from, created_by_app_user_id)
+         VALUES (gen_random_uuid(), $1, $2, $3, '2026-11-24', $4)`,
+        [org, devId, holderId, randomUUID()],
+      );
+      unplacedDesignees.set(unplacedWorkKey('DEVICE', devId), designee);
+
+      const refused = service.change(asIt(randomUUID()), devId, {
+        expectedUpdatedAt: await versionOf(devId),
+        hostname: 'BLOCKED',
+      });
+      await expect(refused).rejects.toBeInstanceOf(DeviceNotInChargeError);
+      expect(toDeviceAttributesApiException(await refused.catch((error: Error) => error))).toMatchObject({
+        response: { code: 'DEVICE.NOT_IN_CHARGE' },
+      });
+
+      const updated = await service.change(asIt(designee), devId, {
+        expectedUpdatedAt: await versionOf(devId),
+        hostname: 'APPOINTED-OK',
+      });
+      expect(updated.hostname).toBe('APPOINTED-OK');
+      expect(events.at(-1)?.after).toEqual({ hostname: 'APPOINTED-OK', bySubstitute: true });
+    });
+
+    it('answers EMPLOYEE.NOT_STARTED, not DEVICE.NOT_IN_CHARGE, when the holder has only a future placement', async () => {
+      const devId = await insertDevice('PC-26-0122');
+      const holderId = await employeeOf('E-ATTR-U3');
+      await sql.query(
+        `INSERT INTO device_registrations (id, organization_id, device_id, holder_employee_id, valid_from, created_by_app_user_id)
+         VALUES (gen_random_uuid(), $1, $2, $3, '2026-11-24', $4)`,
+        [org, devId, holderId, randomUUID()],
+      );
+      notStarted.add(holderId);
+
+      const refused = service.change(asIt(randomUUID()), devId, {
+        expectedUpdatedAt: await versionOf(devId),
+        hostname: 'BLOCKED',
+      });
+
+      await expect(refused).rejects.toBeInstanceOf(EmployeeNotStartedError);
+      expect(toDeviceAttributesApiException(await refused.catch((error: Error) => error))).toMatchObject({
+        response: { code: 'EMPLOYEE.NOT_STARTED' },
+      });
+      notStarted.delete(holderId);
+    });
+
+    it('refuses the person who is leaving with the machine awaiting return of their own, whoever is in charge', async () => {
+      const devId = await insertDevice('PC-26-0123');
+      const holderId = await employeeOf('E-ATTR-U4');
+      const deptId = randomUUID();
+      const registrationId = randomUUID();
+      await sql.query(
+        `INSERT INTO device_registrations (id, organization_id, device_id, holder_employee_id, valid_from, created_by_app_user_id)
+         VALUES ($1, $2, $3, $4, '2026-11-24', $5)`,
+        [registrationId, org, devId, holderId, randomUUID()],
+      );
+      await sql.query(
+        `INSERT INTO device_return_tasks (id, organization_id, device_id, registration_id, employee_id, offboarding_case_id, department_id, due_on)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, gen_random_uuid(), $5, '2026-12-01')`,
+        [org, devId, registrationId, holderId, deptId],
+      );
+      actingByDepartment.set(deptId, { inCharge: holderId, substitute: null, actors: [holderId] });
+
+      const refused = service.change(asIt(holderId), devId, {
+        expectedUpdatedAt: await versionOf(devId),
+        hostname: 'BLOCKED',
+      });
+
+      await expect(refused).rejects.toBeInstanceOf(DeviceNotInChargeError);
+      expect(toDeviceAttributesApiException(await refused.catch((error: Error) => error))).toMatchObject({
+        response: { code: 'DEVICE.NOT_IN_CHARGE' },
+      });
+      actingByDepartment.delete(deptId);
+    });
+
+    it('reads the appointment of the open return task when the machine awaits return, not the one of the device', async () => {
+      const devId = await insertDevice('PC-26-0121');
+      const holderId = await employeeOf('E-ATTR-U2');
+      const registrationId = randomUUID();
+      const taskId = randomUUID();
+      const designee = randomUUID();
+      await sql.query(
+        `INSERT INTO device_registrations (id, organization_id, device_id, holder_employee_id, valid_from, created_by_app_user_id)
+         VALUES ($1, $2, $3, $4, '2026-11-24', $5)`,
+        [registrationId, org, devId, holderId, randomUUID()],
+      );
+      await sql.query(
+        `INSERT INTO device_return_tasks (id, organization_id, device_id, registration_id, employee_id, offboarding_case_id, due_on)
+         VALUES ($1, $2, $3, $4, $5, gen_random_uuid(), '2026-12-01')`,
+        [taskId, org, devId, registrationId, holderId],
+      );
+      unplacedDesignees.set(unplacedWorkKey('DEVICE', devId), designee);
+
+      await expect(
+        service.change(asIt(designee), devId, { expectedUpdatedAt: await versionOf(devId), hostname: 'WRONG-KIND' }),
+      ).rejects.toBeInstanceOf(DeviceNotInChargeError);
+
+      unplacedDesignees.set(unplacedWorkKey('DEVICE_RETURN_TASK', taskId), designee);
+      const updated = await service.change(asIt(designee), devId, {
+        expectedUpdatedAt: await versionOf(devId),
+        hostname: 'TASK-OK',
+      });
+      expect(updated.hostname).toBe('TASK-OK');
+    });
   });
 });

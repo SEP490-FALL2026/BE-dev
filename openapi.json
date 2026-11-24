@@ -32917,7 +32917,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The seats bought, the assignments occupying today in the organization calendar and the seats free; purchased and free are null while the subscription has no quantity.",
+            "description": "The seats bought, those taken today in the organization calendar (the assignments occupying and, for a lot of keys on machines, the open activations on machines) and the seats free; purchased and free are null while the subscription has no quantity.",
             "content": {
               "application/json": {
                 "schema": {
@@ -76149,12 +76149,12 @@
         },
         "responses": {
           "200": {
-            "description": "The machine as it is after the correction, with its new updatedAt. A correction that changes nothing is answered the same and not audited. The asset code never changes, whatever the kind becomes. One event of the audit trail (DEVICE.UPDATED) says what each field was and what it became.",
+            "description": "The machine as the detail of the register shows it after the correction, with its new updatedAt. A correction that changes nothing is answered the same and not audited. The asset code never changes, whatever the kind becomes. One event of the audit trail (DEVICE.UPDATED) says what each field was and what it became.",
             "content": {
               "application/json": {
                 "schema": {
                   "allOf": [
-                    { "$ref": "#/components/schemas/DeviceAttributesResponseDto" },
+                    { "$ref": "#/components/schemas/DeviceDetailResponseDto" },
                     { "properties": { "message": { "example": "DEVICE.UPDATED" } } }
                   ]
                 }
@@ -76215,7 +76215,7 @@
             }
           },
           "403": {
-            "description": "Only an IT Admin corrects a machine; an assigned machine or one awaiting return requires an acting IT Admin of the holder department (DEVICE.NOT_IN_CHARGE).",
+            "description": "Only an IT Admin corrects a machine; an assigned machine or one awaiting return requires an acting IT Admin of the holder department, and never the person who is leaving with it (DEVICE.NOT_IN_CHARGE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -76268,7 +76268,7 @@
             }
           },
           "409": {
-            "description": "The machine changed since it was read (DEVICE.STALE, details.currentUpdatedAt), it was voided (DEVICE.VOIDED) or taken out of use (DEVICE.ALREADY_RETIRED), or another machine has the serial number (DEVICE.SERIAL_TAKEN). Nothing is written.",
+            "description": "The machine changed since it was read (DEVICE.STALE, details.currentUpdatedAt), it was voided (DEVICE.VOIDED) or taken out of use (DEVICE.ALREADY_RETIRED), another machine has the serial number (DEVICE.SERIAL_TAKEN), or the holder has not started working in a department yet (EMPLOYEE.NOT_STARTED). Nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -76314,6 +76314,17 @@
                       "error": {
                         "code": "DEVICE.SERIAL_TAKEN",
                         "message": "The serial number is already used by another machine.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
                         "requestId": "req_example"
                       }
                     }
@@ -80259,6 +80270,27 @@
                       "error": {
                         "code": "INVALID_ACCESS_TOKEN",
                         "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin lists the software activations of the machines.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
                         "requestId": "req_example"
                       }
                     }
@@ -138624,34 +138656,6 @@
         "required": ["expectedUpdatedAt"],
         "minProperties": 2,
         "description": "The version of the machine and at least one field to correct.",
-        "additionalProperties": false
-      },
-      "DeviceAttributesResponseDto": {
-        "type": "object",
-        "properties": {
-          "success": { "type": "boolean", "enum": [true] },
-          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
-          "data": {
-            "type": "object",
-            "properties": {
-              "id": { "type": "string", "format": "uuid" },
-              "assetCode": { "type": "string" },
-              "hostname": { "type": "string" },
-              "os": { "type": "string" },
-              "deviceType": { "type": "string", "enum": ["LAP", "PC", "OTH"] },
-              "serialNumber": { "type": "string", "nullable": true },
-              "updatedAt": {
-                "type": "string",
-                "format": "date-time",
-                "description": "The version of the machine: the next correction names it as expectedUpdatedAt."
-              }
-            },
-            "required": ["id", "assetCode", "hostname", "os", "deviceType", "serialNumber", "updatedAt"],
-            "additionalProperties": false,
-            "nullable": true
-          }
-        },
-        "required": ["success", "message", "data"],
         "additionalProperties": false
       },
       "SignatureRecordBodyDto": {

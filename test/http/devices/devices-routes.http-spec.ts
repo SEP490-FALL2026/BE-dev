@@ -560,6 +560,17 @@ describe('company machine routes (http contract, no database)', () => {
       expect(registrations?.operationId).toBe('deviceRegistrationList');
       expect(parameters.sort()).toEqual(['id', 'page', 'pageSize']);
     });
+
+    it('answers the correction of a machine with the detail of the machine, like the other commands on it, and lists 403 for the activations', () => {
+      const update = document.paths?.[`/api/v1/devices/{id}`]?.patch;
+      const ok = JSON.stringify(update?.responses?.['200'] ?? null);
+      const activations = document.paths?.['/api/v1/device-activations']?.get;
+
+      expect(update?.operationId).toBe('deviceUpdate');
+      expect(ok).toContain('#/components/schemas/DeviceDetailResponseDto');
+      expect(Object.keys(update?.responses ?? {})).toEqual(expect.arrayContaining(['403', '404', '409', '422']));
+      expect(Object.keys(activations?.responses ?? {})).toContain('403');
+    });
   });
 
   describe('device return task routes', () => {
