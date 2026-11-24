@@ -37,6 +37,7 @@ import { NoticeRepo } from './notice/notice.repo';
 import { NoticeService } from './notice/notice.service';
 import { DevicesApi } from './public/devices.api';
 import { CollectorAllowlistHook } from './public/devices.extension-points';
+import { CollectorInstallationService } from './registry/collector-installation.service';
 import { RegistrationEndService } from './registry/registration-end.service';
 import { RegistryController } from './registry/registry.controller';
 import { RegistryQueryRepo } from './registry/registry-query.repo';
@@ -99,6 +100,7 @@ import { StopRequestSweepService } from './stop-request/stop-request-sweep.servi
     DeviceAttributesService,
     RegistrationEndService,
     SignatureRecordService,
+    CollectorInstallationService,
     AcknowledgementRepo,
     AcknowledgementService,
     StopRequestRepo,

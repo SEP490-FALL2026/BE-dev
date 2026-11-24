@@ -25,6 +25,7 @@ export class MyDevicesService {
         const state = acknowledgementStateOf(row);
         const blockedReason = acknowledgementBlock({
           registrationEnded: row.endedAt !== null,
+          collectorInstalled: row.collectorInstalled,
           signatureRecorded: row.signatureRecorded,
           currentNoticeId: current?.id ?? null,
           offeredNoticeId: null,

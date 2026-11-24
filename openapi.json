@@ -74498,7 +74498,14 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "enum": ["RETIRED", "UNREGISTERED", "COLLECTION_STOPPED", "ACTIVE", "AWAITING_ACKNOWLEDGEMENT"]
+              "enum": [
+                "RETIRED",
+                "UNREGISTERED",
+                "NO_COLLECTOR",
+                "COLLECTION_STOPPED",
+                "ACTIVE",
+                "AWAITING_ACKNOWLEDGEMENT"
+              ]
             }
           },
           {
@@ -76943,6 +76950,235 @@
         "tags": ["devices"]
       }
     },
+    "/api/v1/device-registrations/{id}/collector-installation": {
+      "post": {
+        "operationId": "deviceRegistrationCollectorEnable",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "responses": {
+          "201": {
+            "description": "Marks the open registration as having a collector installed and returns the updated device detail.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DeviceDetailResponseDto" },
+                    { "properties": { "message": { "example": "DEVICE_REGISTRATION.COLLECTOR_ENABLED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an acting IT Admin of the holder department may enable collector installation (DEVICE.NOT_IN_CHARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE.NOT_IN_CHARGE": {
+                    "summary": "Only an acting IT Admin of the holder department may change this device.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.NOT_IN_CHARGE",
+                        "message": "Only an acting IT Admin of the holder department may change this device.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The registration does not exist (DEVICE_REGISTRATION.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "DEVICE_REGISTRATION.NOT_FOUND": {
+                    "summary": "The registration does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE_REGISTRATION.NOT_FOUND",
+                        "message": "The registration does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The registration has ended (DEVICE_REGISTRATION.ENDED), collector installation is already enabled (DEVICE_REGISTRATION.COLLECTOR_ALREADY_INSTALLED), or the holder has left or is handing over (DEVICE.HOLDER_NOT_WORKING).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "DEVICE_REGISTRATION.ENDED": {
+                    "summary": "The registration has ended.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE_REGISTRATION.ENDED",
+                        "message": "The registration has ended.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE_REGISTRATION.COLLECTOR_ALREADY_INSTALLED": {
+                    "summary": "Collector installation is already enabled on this registration.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE_REGISTRATION.COLLECTOR_ALREADY_INSTALLED",
+                        "message": "Collector installation is already enabled on this registration.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE.HOLDER_NOT_WORKING": {
+                    "summary": "A machine is registered to a person who works here.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.HOLDER_NOT_WORKING",
+                        "message": "A machine is registered to a person who works here.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The id is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Enable collector installation on an open registration",
+        "tags": ["devices"]
+      }
+    },
     "/api/v1/me/device-registrations/{id}/acknowledgements": {
       "post": {
         "operationId": "myDeviceAcknowledgementCreate",
@@ -77042,7 +77278,7 @@
             }
           },
           "409": {
-            "description": "The registration has ended (DEVICE_REGISTRATION.ENDED), its signed notice is not kept yet (DEVICE_REGISTRATION.SIGNATURE_RECORD_MISSING), the version is not the one in force (DEVICE_ACKNOWLEDGEMENT.NOTICE_NOT_CURRENT) or it is acknowledged already (DEVICE_ACKNOWLEDGEMENT.ALREADY_ACKNOWLEDGED).",
+            "description": "The registration has ended (DEVICE_REGISTRATION.ENDED), has no collector installed (DEVICE_ACKNOWLEDGEMENT.COLLECTOR_NOT_INSTALLED), its signed notice is not kept yet (DEVICE_REGISTRATION.SIGNATURE_RECORD_MISSING), the version is not the one in force (DEVICE_ACKNOWLEDGEMENT.NOTICE_NOT_CURRENT) or it is acknowledged already (DEVICE_ACKNOWLEDGEMENT.ALREADY_ACKNOWLEDGED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -77054,6 +77290,17 @@
                       "error": {
                         "code": "DEVICE_REGISTRATION.ENDED",
                         "message": "The registration has ended.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE_ACKNOWLEDGEMENT.COLLECTOR_NOT_INSTALLED": {
+                    "summary": "Acknowledgement is not required when no collector is installed on this registration.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE_ACKNOWLEDGEMENT.COLLECTOR_NOT_INSTALLED",
+                        "message": "Acknowledgement is not required when no collector is installed on this registration.",
                         "requestId": "req_example"
                       }
                     }
@@ -77482,7 +77729,7 @@
             }
           },
           "409": {
-            "description": "The registration has ended (DEVICE_REGISTRATION.ENDED) or its signed notice is not kept yet (DEVICE_REGISTRATION.SIGNATURE_RECORD_MISSING).",
+            "description": "The registration has ended (DEVICE_REGISTRATION.ENDED), does not have collector installation enabled (DEVICE_REGISTRATION.COLLECTOR_NOT_INSTALLED), or its signed notice is not kept yet (DEVICE_REGISTRATION.SIGNATURE_RECORD_MISSING).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -77494,6 +77741,17 @@
                       "error": {
                         "code": "DEVICE_REGISTRATION.ENDED",
                         "message": "The registration has ended.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE_REGISTRATION.COLLECTOR_NOT_INSTALLED": {
+                    "summary": "Collector installation must be enabled on this registration before creating an enrollment code.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE_REGISTRATION.COLLECTOR_NOT_INSTALLED",
+                        "message": "Collector installation must be enabled on this registration before creating an enrollment code.",
                         "requestId": "req_example"
                       }
                     }
@@ -132108,14 +132366,28 @@
               },
               "state": {
                 "type": "string",
-                "enum": ["RETIRED", "UNREGISTERED", "COLLECTION_STOPPED", "ACTIVE", "AWAITING_ACKNOWLEDGEMENT"]
+                "enum": [
+                  "RETIRED",
+                  "UNREGISTERED",
+                  "NO_COLLECTOR",
+                  "COLLECTION_STOPPED",
+                  "ACTIVE",
+                  "AWAITING_ACKNOWLEDGEMENT"
+                ]
               },
               "collection": {
                 "type": "object",
                 "properties": {
                   "state": {
                     "type": "string",
-                    "enum": ["RETIRED", "UNREGISTERED", "COLLECTION_STOPPED", "ACTIVE", "AWAITING_ACKNOWLEDGEMENT"]
+                    "enum": [
+                      "RETIRED",
+                      "UNREGISTERED",
+                      "NO_COLLECTOR",
+                      "COLLECTION_STOPPED",
+                      "ACTIVE",
+                      "AWAITING_ACKNOWLEDGEMENT"
+                    ]
                   },
                   "lastAcceptedAt": {
                     "type": "string",
@@ -132313,7 +132585,14 @@
                     },
                     "state": {
                       "type": "string",
-                      "enum": ["RETIRED", "UNREGISTERED", "COLLECTION_STOPPED", "ACTIVE", "AWAITING_ACKNOWLEDGEMENT"]
+                      "enum": [
+                        "RETIRED",
+                        "UNREGISTERED",
+                        "NO_COLLECTOR",
+                        "COLLECTION_STOPPED",
+                        "ACTIVE",
+                        "AWAITING_ACKNOWLEDGEMENT"
+                      ]
                     },
                     "collection": {
                       "type": "object",
@@ -132323,6 +132602,7 @@
                           "enum": [
                             "RETIRED",
                             "UNREGISTERED",
+                            "NO_COLLECTOR",
                             "COLLECTION_STOPPED",
                             "ACTIVE",
                             "AWAITING_ACKNOWLEDGEMENT"
@@ -132696,7 +132976,7 @@
                     "endedAt": { "type": "string", "format": "date-time", "nullable": true },
                     "acknowledgementState": {
                       "type": "string",
-                      "enum": ["UNACKNOWLEDGED", "ACKNOWLEDGED", "STOPPED", "ENDED"]
+                      "enum": ["UNACKNOWLEDGED", "ACKNOWLEDGED", "STOPPED", "ENDED", "NOT_REQUIRED"]
                     },
                     "acknowledgedVersionNumber": {
                       "type": "integer",
@@ -132710,6 +132990,7 @@
                     "blockedReason": {
                       "type": "string",
                       "enum": [
+                        "COLLECTOR_NOT_INSTALLED",
                         "SIGNATURE_RECORD_MISSING",
                         "NOTICE_NOT_PUBLISHED",
                         "REGISTRATION_ENDED",

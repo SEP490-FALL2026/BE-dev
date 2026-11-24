@@ -92,3 +92,10 @@ export class DevicePlanNotBundledError extends Error {
     this.name = 'DevicePlanNotBundledError';
   }
 }
+
+export class DeviceCollectorAlreadyInstalledError extends Error {
+  constructor() {
+    super('Collector installation is already enabled on this registration.');
+    this.name = 'DeviceCollectorAlreadyInstalledError';
+  }
+}

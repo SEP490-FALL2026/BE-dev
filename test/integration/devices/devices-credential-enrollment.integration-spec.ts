@@ -202,4 +202,23 @@ describe('the enrollment code, the credential and its session (integration, real
     expect(h.codeOf(await h.session(first).expect(401))).toBe('DEVICE.CREDENTIAL_INVALID');
     await h.rotate(third).send({ extra: true }).expect(422);
   });
+
+  it('W2-07 (b), (c): refuses enrollment codes until collectorInstalled is enabled and BM-06 is kept', async () => {
+    const version = await notice();
+    const person = await holder();
+    const machine = await h.registered(person.employeeId, { collectorInstalled: false });
+    const regId = machine.registrationId as string;
+
+    expect(h.codeOf(await h.createCode(regId, { collectorKind: 'AI_COLLECTOR' }).expect(409))).toBe(
+      'DEVICE_REGISTRATION.COLLECTOR_NOT_INSTALLED',
+    );
+
+    await h.enableCollector(regId).expect(201);
+    expect(h.codeOf(await h.createCode(regId, { collectorKind: 'AI_COLLECTOR' }).expect(409))).toBe(
+      'DEVICE_REGISTRATION.SIGNATURE_RECORD_MISSING',
+    );
+
+    await h.recordSignature(regId, { documentId: await h.scan(), noticeVersionId: version.id }).expect(201);
+    await h.createCode(regId, { collectorKind: 'AI_COLLECTOR' }).expect(201);
+  });
 });

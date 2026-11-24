@@ -78,6 +78,7 @@ export interface DeviceExtras {
 const STATE_SQL = Prisma.sql`CASE
   WHEN d.retired_at IS NOT NULL THEN 'RETIRED'
   WHEN r.id IS NULL THEN 'UNREGISTERED'
+  WHEN NOT r.collector_installed THEN 'NO_COLLECTOR'
   WHEN r.collection_stopped_at IS NOT NULL THEN 'COLLECTION_STOPPED'
   WHEN r.acknowledged_from IS NOT NULL THEN 'ACTIVE'
   ELSE 'AWAITING_ACKNOWLEDGEMENT' END`;

@@ -21,7 +21,11 @@ export function toDeviceSummary(
   departments: ReadonlyMap<string, DepartmentBriefView>,
 ) {
   const registration = row.registrationId
-    ? { acknowledgedFrom: row.acknowledgedFrom, collectionStoppedAt: row.collectionStoppedAt }
+    ? {
+        collectorInstalled: row.collectorInstalled ?? false,
+        acknowledgedFrom: row.acknowledgedFrom,
+        collectionStoppedAt: row.collectionStoppedAt,
+      }
     : null;
 
   const state = collectionStateOf({ retiredAt: row.retiredAt, registration });

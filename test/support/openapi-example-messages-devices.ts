@@ -14,6 +14,7 @@ export const SUCCESS_MESSAGES_DEVICES: Readonly<Record<string, string>> = {
   deviceHolderChange: 'DEVICE.HOLDER_CHANGED',
   deviceIntakeRejectionList: 'DEVICE_INTAKE_REJECTION.LISTED',
   deviceList: 'DEVICE.LISTED',
+  deviceRegistrationCollectorEnable: 'DEVICE_REGISTRATION.COLLECTOR_ENABLED',
   deviceRegistrationList: 'DEVICE_REGISTRATION.LISTED',
   deviceRetire: 'DEVICE.RETIRED',
   deviceReturn: 'DEVICE.RETURNED',

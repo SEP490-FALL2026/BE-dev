@@ -48,6 +48,7 @@ describe('company machine routes (http contract, no database)', () => {
     ['post', `${DEVICES}/${ID}/condition-changes`, { condition: 'IN_REPAIR' }],
     ['post', `${DEVICES}/${ID}/retirements`, { reason: 'broken' }],
     ['post', `${REGISTRATIONS}/${ID}/signature-records`, { documentId: ID, noticeVersionId: ID }],
+    ['post', `${REGISTRATIONS}/${ID}/collector-installation`, undefined],
     ['post', NOTICES, NOTICE],
     ['get', '/api/v1/monitoring-notices/current', undefined],
     ['get', `${ME}/devices`, undefined],
@@ -97,6 +98,7 @@ describe('company machine routes (http contract, no database)', () => {
       await as(
         request(server).post(`${REGISTRATIONS}/${ID}/signature-records`).send({ documentId: ID, noticeVersionId: ID }),
       ),
+      await as(request(server).post(`${REGISTRATIONS}/${ID}/collector-installation`)),
     ]) {
       expect(response.status).toBe(403);
       expect(bodyOf(response).error.code).toBe('AUTHORIZATION.FORBIDDEN');
@@ -258,6 +260,12 @@ describe('company machine routes (http contract, no database)', () => {
     ],
     ['a retirement with no reason', 'post', `${DEVICES}/${ID}/retirements`, {}],
     ['a signed record with no version', 'post', `${REGISTRATIONS}/${ID}/signature-records`, { documentId: ID }],
+    [
+      'a collector enable on non-UUID registration id',
+      'post',
+      `${REGISTRATIONS}/not-a-uuid/collector-installation`,
+      undefined,
+    ],
   ] as const)('refuses %s with 422', async (_name, method, path, body) => {
     const call = request(app.getHttpServer())
       [method](path)

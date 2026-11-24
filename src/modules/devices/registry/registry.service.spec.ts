@@ -56,6 +56,7 @@ describe('RegistryService device intake (W2-03, H17, org-timezone year)', () => 
         validUntil: null,
         endedAt: null,
         endCause: null,
+        collectorInstalled: true,
         acknowledgedFrom: null,
         collectionStoppedAt: null,
       }),

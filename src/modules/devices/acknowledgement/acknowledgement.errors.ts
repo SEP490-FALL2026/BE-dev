@@ -21,3 +21,10 @@ export class DeviceSignatureRecordMissingError extends Error {
     this.name = 'DeviceSignatureRecordMissingError';
   }
 }
+
+export class DeviceAcknowledgementCollectorNotInstalledError extends Error {
+  constructor() {
+    super('Acknowledgement is not required when no collector is installed on this registration.');
+    this.name = 'DeviceAcknowledgementCollectorNotInstalledError';
+  }
+}

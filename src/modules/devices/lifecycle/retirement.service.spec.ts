@@ -52,6 +52,7 @@ describe('RetirementService', () => {
           validUntil: null,
           endedAt: null,
           endCause: null,
+          collectorInstalled: true,
           acknowledgedFrom: null,
           collectionStoppedAt: null,
           ...options.openRegistration,

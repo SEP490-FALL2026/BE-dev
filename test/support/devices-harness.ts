@@ -20,9 +20,9 @@ export interface DeviceWire {
   holder: { id: string; employeeCode: string; fullName: string } | null;
   registrationId: string | null;
   registeredFrom: string | null;
-  state: 'RETIRED' | 'UNREGISTERED' | 'COLLECTION_STOPPED' | 'ACTIVE' | 'AWAITING_ACKNOWLEDGEMENT';
+  state: 'RETIRED' | 'UNREGISTERED' | 'NO_COLLECTOR' | 'COLLECTION_STOPPED' | 'ACTIVE' | 'AWAITING_ACKNOWLEDGEMENT';
   collection: {
-    state: 'RETIRED' | 'UNREGISTERED' | 'COLLECTION_STOPPED' | 'ACTIVE' | 'AWAITING_ACKNOWLEDGEMENT';
+    state: 'RETIRED' | 'UNREGISTERED' | 'NO_COLLECTOR' | 'COLLECTION_STOPPED' | 'ACTIVE' | 'AWAITING_ACKNOWLEDGEMENT';
     lastAcceptedAt: string | null;
   };
   signatureRecorded: boolean;
@@ -64,7 +64,7 @@ export interface MyDeviceWire {
   registrationId: string;
   deviceId: string;
   assetCode: string;
-  acknowledgementState: 'UNACKNOWLEDGED' | 'ACKNOWLEDGED' | 'STOPPED' | 'ENDED';
+  acknowledgementState: 'UNACKNOWLEDGED' | 'ACKNOWLEDGED' | 'STOPPED' | 'ENDED' | 'NOT_REQUIRED';
   acknowledgedVersionNumber: number | null;
   signatureRecorded: boolean;
   canAcknowledge: boolean;
@@ -160,6 +160,10 @@ export class DevicesHarness extends DocumentHarness {
       .post(`/api/v1/device-registrations/${registrationId}/signature-records`)
       .set(this.as(account))
       .send(body);
+  enableCollector = (registrationId: string, account: ApiAccount = this.it1) =>
+    request(this.server())
+      .post(`/api/v1/device-registrations/${registrationId}/collector-installation`)
+      .set(this.as(account));
   publishNotice = (body: object) =>
     request(this.server()).post('/api/v1/monitoring-notice-versions').set(this.adminHeader()).send(body);
   currentNotice = (account: ApiAccount = this.employee) =>

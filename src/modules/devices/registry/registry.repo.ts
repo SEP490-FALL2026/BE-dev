@@ -28,6 +28,7 @@ export interface RegistrationRecord {
   validUntil: BusinessDate | null;
   endedAt: Date | null;
   endCause: DeviceRegistrationEndCause | null;
+  collectorInstalled: boolean;
   acknowledgedFrom: Date | null;
   collectionStoppedAt: Date | null;
 }
@@ -69,6 +70,7 @@ export function toRegistrationRecord(row: RegistrationRow): RegistrationRecord {
     validUntil: row.validUntil ? fromDateColumn(row.validUntil) : null,
     endedAt: row.endedAt,
     endCause: row.endCause,
+    collectorInstalled: row.collectorInstalled,
     acknowledgedFrom: row.acknowledgedFrom,
     collectionStoppedAt: row.collectionStoppedAt,
   };
@@ -236,6 +238,13 @@ export class RegistryRepo {
           ? { softwareRemoval: end.softwareRemoval.outcome, softwareRemovalNote: end.softwareRemoval.note }
           : {}),
       },
+    });
+  }
+
+  async enableCollector(tx: DbTx, id: string): Promise<void> {
+    await tx.deviceRegistration.update({
+      where: { id },
+      data: { collectorInstalled: true },
     });
   }
 

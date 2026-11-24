@@ -7,6 +7,7 @@ import { DeviceAssetCodeExhaustedError } from '../asset-code/asset-code.errors';
 import { DeviceNotFoundError, DeviceNotInChargeError } from '../public/devices.errors';
 import {
   DeviceAssetCodeTakenError,
+  DeviceCollectorAlreadyInstalledError,
   DeviceHandoverDateInvalidError,
   DeviceHandoverWithoutHolderError,
   DeviceHolderNotFoundError,
@@ -60,6 +61,9 @@ export function toRegistryApiException(error: unknown): unknown {
   }
   if (error instanceof DeviceRegistrationEndedError)
     return refuse(CONFLICT, 'DEVICE_REGISTRATION.ENDED', error.message);
+  if (error instanceof DeviceCollectorAlreadyInstalledError) {
+    return refuse(CONFLICT, 'DEVICE_REGISTRATION.COLLECTOR_ALREADY_INSTALLED', error.message);
+  }
 
   if (error instanceof DocumentAttachRefusedError) return toDocumentRefusal(error);
 
@@ -101,6 +105,7 @@ export const REGISTRY_ERROR_EXAMPLES = {
   SERIAL_TAKEN: example(new DeviceSerialTakenError()),
   REGISTRATION_OVERLAP: example(new DeviceRegistrationOverlapError()),
   REGISTRATION_ENDED: example(new DeviceRegistrationEndedError()),
+  COLLECTOR_ALREADY_INSTALLED: example(new DeviceCollectorAlreadyInstalledError()),
   DOCUMENT_NOT_FOUND: example(new DocumentAttachRefusedError('NOT_FOUND')),
   DOCUMENT_ALREADY_ATTACHED: example(new DocumentAttachRefusedError('ALREADY_ATTACHED')),
   DOCUMENT_NOT_READY: example(new DocumentAttachRefusedError('NOT_READY_TO_ATTACH')),
