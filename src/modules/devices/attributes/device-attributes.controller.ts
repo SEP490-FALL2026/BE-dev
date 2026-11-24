@@ -11,11 +11,9 @@ import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import {
-  DeviceAttributesBodyDto,
-  DeviceAttributesParamDto,
-  DeviceAttributesResponseDto,
-} from './device-attributes.dto';
+import { DeviceDetailResponseDto } from '../registry/registry.dto';
+import { RegistryQueryService } from '../registry/registry-query.service';
+import { DeviceAttributesBodyDto, DeviceAttributesParamDto } from './device-attributes.dto';
 import {
   DEVICE_ATTRIBUTES_ERROR_EXAMPLES as EXAMPLES,
   toDeviceAttributesApiException,
@@ -30,7 +28,10 @@ import { DeviceAttributesService } from './device-attributes.service';
 @ApiTags('devices')
 @Controller({ path: 'devices', version: '1' })
 export class DeviceAttributesController {
-  constructor(private readonly attributes: DeviceAttributesService) {}
+  constructor(
+    private readonly attributes: DeviceAttributesService,
+    private readonly queries: RegistryQueryService,
+  ) {}
 
   @Patch(':id')
   @RequireRoles('IT_ADMIN')
@@ -38,10 +39,10 @@ export class DeviceAttributesController {
     operationId: 'deviceUpdate',
     summary: 'Correct the name, system, serial number or kind of a machine',
   })
-  @ApiSuccessResponse(DeviceAttributesResponseDto, {
+  @ApiSuccessResponse(DeviceDetailResponseDto, {
     message: 'DEVICE.UPDATED',
     description:
-      'The machine as it is after the correction, with its new updatedAt. A correction that changes nothing is answered the same and not audited. The asset code never changes, whatever the kind becomes. One event of the audit trail (DEVICE.UPDATED) says what each field was and what it became.',
+      'The machine as the detail of the register shows it after the correction, with its new updatedAt. A correction that changes nothing is answered the same and not audited. The asset code never changes, whatever the kind becomes. One event of the audit trail (DEVICE.UPDATED) says what each field was and what it became.',
   })
   @ApiErrorResponses(
     UNAUTHENTICATED_RESPONSE,
@@ -88,7 +89,7 @@ export class DeviceAttributesController {
         expectedUpdatedAt: new Date(expectedUpdatedAt),
       });
 
-      return { ...device, updatedAt: device.updatedAt.toISOString() };
+      return await this.queries.get(device.id);
     } catch (error) {
       throw toDeviceAttributesApiException(error);
     }

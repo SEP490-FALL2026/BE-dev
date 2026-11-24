@@ -76138,12 +76138,12 @@
         },
         "responses": {
           "200": {
-            "description": "The machine as it is after the correction, with its new updatedAt. A correction that changes nothing is answered the same and not audited. The asset code never changes, whatever the kind becomes. One event of the audit trail (DEVICE.UPDATED) says what each field was and what it became.",
+            "description": "The machine as the detail of the register shows it after the correction, with its new updatedAt. A correction that changes nothing is answered the same and not audited. The asset code never changes, whatever the kind becomes. One event of the audit trail (DEVICE.UPDATED) says what each field was and what it became.",
             "content": {
               "application/json": {
                 "schema": {
                   "allOf": [
-                    { "$ref": "#/components/schemas/DeviceAttributesResponseDto" },
+                    { "$ref": "#/components/schemas/DeviceDetailResponseDto" },
                     { "properties": { "message": { "example": "DEVICE.UPDATED" } } }
                   ]
                 }
@@ -80259,6 +80259,27 @@
                       "error": {
                         "code": "INVALID_ACCESS_TOKEN",
                         "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin lists the software activations of the machines.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
                         "requestId": "req_example"
                       }
                     }
@@ -138624,34 +138645,6 @@
         "required": ["expectedUpdatedAt"],
         "minProperties": 2,
         "description": "The version of the machine and at least one field to correct.",
-        "additionalProperties": false
-      },
-      "DeviceAttributesResponseDto": {
-        "type": "object",
-        "properties": {
-          "success": { "type": "boolean", "enum": [true] },
-          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
-          "data": {
-            "type": "object",
-            "properties": {
-              "id": { "type": "string", "format": "uuid" },
-              "assetCode": { "type": "string" },
-              "hostname": { "type": "string" },
-              "os": { "type": "string" },
-              "deviceType": { "type": "string", "enum": ["LAP", "PC", "OTH"] },
-              "serialNumber": { "type": "string", "nullable": true },
-              "updatedAt": {
-                "type": "string",
-                "format": "date-time",
-                "description": "The version of the machine: the next correction names it as expectedUpdatedAt."
-              }
-            },
-            "required": ["id", "assetCode", "hostname", "os", "deviceType", "serialNumber", "updatedAt"],
-            "additionalProperties": false,
-            "nullable": true
-          }
-        },
-        "required": ["success", "message", "data"],
         "additionalProperties": false
       },
       "SignatureRecordBodyDto": {

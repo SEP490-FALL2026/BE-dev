@@ -112,11 +112,19 @@ export class DeviceActivationsController {
     message: 'DEVICE_ACTIVATION.LISTED',
     description: 'Lists device software activations with custody, condition, key status, and replacement flags.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, {
-    status: HttpStatus.UNPROCESSABLE_ENTITY,
-    description: 'The query parameters are invalid (VALIDATION_ERROR).',
-    examples: [VALIDATION_EXAMPLE],
-  })
+  @ApiErrorResponses(
+    ...AUTH_ERRORS,
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: 'Only an IT Admin lists the software activations of the machines.',
+      examples: [FORBIDDEN_EXAMPLE],
+    },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The query parameters are invalid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
+  )
   async list(@Query() query: DeviceActivationListQueryDto) {
     try {
       return await this.queries.list(query);

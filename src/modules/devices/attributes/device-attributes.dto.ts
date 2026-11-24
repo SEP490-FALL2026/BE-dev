@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 
 const text = (max: number) => z.string().trim().min(1).max(max);
@@ -28,18 +27,5 @@ export const deviceAttributesBodySchema = z
     description: 'The version of the machine and at least one field to correct.',
   });
 
-const deviceAttributesSchema = z.strictObject({
-  id: z.uuid(),
-  assetCode: z.string(),
-  hostname: z.string(),
-  os: z.string(),
-  deviceType: z.enum(['LAP', 'PC', 'OTH']),
-  serialNumber: z.string().nullable(),
-  updatedAt: z.iso
-    .datetime()
-    .meta({ description: 'The version of the machine: the next correction names it as expectedUpdatedAt.' }),
-});
-
 export class DeviceAttributesParamDto extends createZodDto(deviceAttributesParamSchema) {}
 export class DeviceAttributesBodyDto extends createZodDto(deviceAttributesBodySchema) {}
-export class DeviceAttributesResponseDto extends createZodDto(successEnvelopeSchema(deviceAttributesSchema)) {}
