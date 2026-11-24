@@ -198,7 +198,8 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   USAGE_SOURCE_STALE: ['applicationId', 'source', 'coverageTo', 'freshnessDays'],
   // MF-2 (`QĐ-110b`–`QĐ-110e`): the people and the days of a departure, how many rights wait. `DEPARTURE_ACCESS_BLOCKED` is told at the block moment, once for
   // each `audience`: `SUPER_ADMIN` to mark the person as left; `IT_ADMIN` to **block** the company account (item 1a of `BM-08`: reset the password of the
-  // mailbox and sign out every session; the mailbox is not locked yet, that is item 1b) and to open the revocation by `revocationDueOn`. `blockedOn` is the
+  // mailbox and sign out every session; the mailbox is not locked yet, that is item 1b) and to open the revocation by `revocationDueOn`;
+  // `SUPER_ADMIN_AND_IT_ADMIN` is the one notice of a Super Admin who must do both (no IT Admin of the department can act). `blockedOn` is the
   // first day the person is refused. `ACCOUNT_LOCK_OVERDUE` says item 1a of a departure blocked now was still not recorded at the end of the day `blockedOn`.
   REVOCATION_OVERDUE: ['caseId', 'employeeId', 'dueOn', 'rightCount'],
   DEPARTURE_ACCESS_BLOCKED: ['caseId', 'employeeId', 'departmentId', 'blockedOn', 'revocationDueOn', 'audience'],

@@ -94,4 +94,5 @@ export const DECISION_ERROR_EXAMPLES = {
   ALREADY_RETURNED: example(new GhostSeatAlreadyReturnedError()),
   TASK_IN_PROGRESS: example(new GhostSeatTaskInProgressError()),
   NOT_IN_CHARGE: example(new GhostSeatDecisionNotInChargeError()),
+  EMPLOYEE_NOT_STARTED: example(new EmployeeNotStartedError()),
 } as const;

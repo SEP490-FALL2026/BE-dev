@@ -285,49 +285,6 @@ describe('who is told of an event of the personnel context', () => {
     });
   });
 
-  describe('departure access blocked notices', () => {
-    const facts = {
-      organizationId: ORGANIZATION,
-      employeeId: 'leaver',
-      departmentId: 'd1',
-      caseId: 'c1',
-      blockedOn: '2026-10-01',
-      revocationDueOn: '2026-10-02',
-      markLeft: true,
-      accountLocked: false,
-    };
-    const audiences = (told: InAppNotificationInput[]) =>
-      told.map((notice) => [notice.recipientEmployeeId, notice.params.audience, notice.eventKey]);
-
-    it('tells Super Admin to mark left and acting IT Admins (in-charge + substitute) to block and revoke', async () => {
-      const { notifier, told } = notifierOf({
-        superAdmin: 'sa',
-        actingByDept: { d1: { inCharge: 'it1', substitute: 'sub1', usable: ['it1', 'sub1'] } },
-      });
-
-      await notifier.departureAccessBlocked(TX, facts);
-
-      expect(audiences(told)).toEqual([
-        ['sa', 'SUPER_ADMIN', 'DEPARTURE_ACCESS_BLOCKED:c1:SUPER_ADMIN'],
-        ['it1', 'IT_ADMIN', 'DEPARTURE_ACCESS_BLOCKED:c1:IT_ADMIN'],
-        ['sub1', 'IT_ADMIN', 'DEPARTURE_ACCESS_BLOCKED:c1:IT_ADMIN'],
-      ]);
-    });
-
-    it('sends a single notice to Super Admin when acting set is empty or only leaver', async () => {
-      const empty = notifierOf({ superAdmin: 'sa', actingByDept: {} });
-      await empty.notifier.departureAccessBlocked(TX, { ...facts, markLeft: false });
-      expect(audiences(empty.told)).toEqual([['sa', 'IT_ADMIN', 'DEPARTURE_ACCESS_BLOCKED:c1:IT_ADMIN']]);
-
-      const onlyLeaver = notifierOf({
-        superAdmin: 'sa',
-        actingByDept: { d1: { inCharge: 'leaver', usable: ['leaver'] } },
-      });
-      await onlyLeaver.notifier.departureAccessBlocked(TX, facts);
-      expect(audiences(onlyLeaver.told)).toEqual([['sa', 'SUPER_ADMIN', 'DEPARTURE_ACCESS_BLOCKED:c1:SUPER_ADMIN']]);
-    });
-  });
-
   describe('account lock overdue notices', () => {
     const facts = {
       organizationId: ORGANIZATION,

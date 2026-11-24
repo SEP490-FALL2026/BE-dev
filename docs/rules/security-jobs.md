@@ -124,7 +124,7 @@
   every open request of the person through `RequestsApi.cancelForBeneficiaryGone` with the scope `ALL_OPEN` (the ones whose grant is being
   carried out stay and the IT Admin is told), writes the audit event `OFFBOARDING_CASE.ACCESS_BLOCKED` (actor `SYSTEM`) and the line
   `ACCESS_BLOCKED` of the log of the case (no account and no ticket wrote it), and tells the Super Admin (only while the person is not yet
-  marked as left) and the IT Admin (`DEPARTURE_ACCESS_BLOCKED`, one key per audience). A deadline of revocation already on the case is never
+  marked as left) and the IT Admin (`DEPARTURE_ACCESS_BLOCKED`, one key per audience; a Super Admin who must also block the account is told once, with both tasks). A deadline of revocation already on the case is never
   changed; it is written only when the case has none. The same pass then tells the IT Admin and the Super Admin (`ACCOUNT_LOCK_OVERDUE`, key
   `ACCOUNT_LOCK_OVERDUE:<case>`, once for the case, with the audit event `OFFBOARDING_CASE.ACCOUNT_LOCK_OVERDUE`) when a departure blocked now
   has no lock of the company account from the day after it was recorded. It revokes nothing and opens no task. Run one by hand with
