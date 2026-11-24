@@ -112,7 +112,7 @@ describe('departure, transfer, and handover notifications', () => {
 
     const unplaced = notifierOf({ superAdmin: 'sa', actingByDept: {} });
     await unplaced.notifier.departureAccessBlocked(TX, { ...blocked, departmentId: null, accountLocked: false });
-    expect(recipients(unplaced.told, 'DEPARTURE_ACCESS_BLOCKED')).toEqual(['sa:SUPER_ADMIN']);
+    expect(recipients(unplaced.told, 'DEPARTURE_ACCESS_BLOCKED')).toEqual(['sa:SUPER_ADMIN_AND_IT_ADMIN']);
   });
 
   it('does not tell the person who left when they are the Super Admin', async () => {
@@ -262,5 +262,90 @@ describe('departure, transfer, and handover notifications', () => {
       },
     ]);
     expect(placed.told).toEqual([]);
+  });
+});
+
+describe('departure access blocked notices', () => {
+  const blockedFacts = {
+    organizationId: ORGANIZATION,
+    employeeId: 'leaver',
+    departmentId: 'd1',
+    caseId: 'c1',
+    blockedOn: '2026-10-01',
+    revocationDueOn: '2026-10-02',
+    markLeft: true,
+    accountLocked: false,
+  };
+  const audiences = (told: InAppNotificationInput[]) =>
+    told.map((notice) => [notice.recipientEmployeeId, notice.params.audience, notice.eventKey]);
+
+  it('tells Super Admin to mark left and acting IT Admins (in-charge + substitute) to block and revoke', async () => {
+    const { notifier, told } = notifierOf({
+      superAdmin: 'sa',
+      actingByDept: { d1: { inCharge: 'it1', substitute: 'sub1', usable: ['it1', 'sub1'] } },
+    });
+
+    await notifier.departureAccessBlocked(TX, blockedFacts);
+
+    expect(audiences(told)).toEqual([
+      ['sa', 'SUPER_ADMIN', 'DEPARTURE_ACCESS_BLOCKED:c1:SUPER_ADMIN'],
+      ['it1', 'IT_ADMIN', 'DEPARTURE_ACCESS_BLOCKED:c1:IT_ADMIN'],
+      ['sub1', 'IT_ADMIN', 'DEPARTURE_ACCESS_BLOCKED:c1:IT_ADMIN'],
+    ]);
+  });
+
+  it('sends one merged notice (mark left + block account + open revocation) to the Super Admin when no IT Admin can act', async () => {
+    const empty = notifierOf({ superAdmin: 'sa', actingByDept: {} });
+    await empty.notifier.departureAccessBlocked(TX, blockedFacts);
+    expect(audiences(empty.told)).toEqual([
+      ['sa', 'SUPER_ADMIN_AND_IT_ADMIN', 'DEPARTURE_ACCESS_BLOCKED:c1:SUPER_ADMIN_AND_IT_ADMIN'],
+    ]);
+    expect(empty.told[0].params).toEqual({
+      caseId: 'c1',
+      employeeId: 'leaver',
+      departmentId: 'd1',
+      blockedOn: '2026-10-01',
+      revocationDueOn: '2026-10-02',
+      audience: 'SUPER_ADMIN_AND_IT_ADMIN',
+    });
+
+    const onlyLeaver = notifierOf({
+      superAdmin: 'sa',
+      actingByDept: { d1: { inCharge: 'leaver', usable: ['leaver'] } },
+    });
+    await onlyLeaver.notifier.departureAccessBlocked(TX, blockedFacts);
+    expect(audiences(onlyLeaver.told)).toEqual([
+      ['sa', 'SUPER_ADMIN_AND_IT_ADMIN', 'DEPARTURE_ACCESS_BLOCKED:c1:SUPER_ADMIN_AND_IT_ADMIN'],
+    ]);
+  });
+
+  it('tells the Super Admin only to mark left when the account is already blocked and nobody else can act', async () => {
+    const { notifier, told } = notifierOf({ superAdmin: 'sa', actingByDept: {} });
+
+    await notifier.departureAccessBlocked(TX, { ...blockedFacts, accountLocked: true });
+
+    expect(audiences(told)).toEqual([['sa', 'SUPER_ADMIN', 'DEPARTURE_ACCESS_BLOCKED:c1:SUPER_ADMIN']]);
+  });
+
+  it('sends one merged notice when the Super Admin is also the acting IT Admin next to a substitute', async () => {
+    const { notifier, told } = notifierOf({
+      superAdmin: 'sa',
+      actingByDept: { d1: { inCharge: 'sa', substitute: 'sub1', usable: ['sa', 'sub1'] } },
+    });
+
+    await notifier.departureAccessBlocked(TX, blockedFacts);
+
+    expect(audiences(told)).toEqual([
+      ['sa', 'SUPER_ADMIN_AND_IT_ADMIN', 'DEPARTURE_ACCESS_BLOCKED:c1:SUPER_ADMIN_AND_IT_ADMIN'],
+      ['sub1', 'IT_ADMIN', 'DEPARTURE_ACCESS_BLOCKED:c1:IT_ADMIN'],
+    ]);
+  });
+
+  it('keeps the IT Admin notice for the Super Admin when the person is already marked left', async () => {
+    const { notifier, told } = notifierOf({ superAdmin: 'sa', actingByDept: {} });
+
+    await notifier.departureAccessBlocked(TX, { ...blockedFacts, markLeft: false });
+
+    expect(audiences(told)).toEqual([['sa', 'IT_ADMIN', 'DEPARTURE_ACCESS_BLOCKED:c1:IT_ADMIN']]);
   });
 });

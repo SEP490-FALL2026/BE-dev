@@ -23,7 +23,7 @@ interface Domain {
 }
 const VARIANT_DOMAINS: Readonly<Record<string, Domain>> = {
   'DEPARTMENT_SOFTWARE_PROPOSAL_DECIDED.decision': { values: ['ACCEPTED', 'REJECTED'] },
-  'DEPARTURE_ACCESS_BLOCKED.audience': { values: ['SUPER_ADMIN', 'IT_ADMIN'] },
+  'DEPARTURE_ACCESS_BLOCKED.audience': { values: ['SUPER_ADMIN', 'IT_ADMIN', 'SUPER_ADMIN_AND_IT_ADMIN'] },
   'LICENSE_EXPIRY_REMINDER.audience': { values: ['EMPLOYEE', 'HEAD', 'IT_ADMIN'] },
   'PERSONNEL_EVENT_RECORDED.eventKind': {
     // The nine values of the catalogue, and `DEPARTURE_MARKED_LEFT` of `PersonnelNotifierService` (kept: it has a sentence).

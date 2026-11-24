@@ -214,9 +214,11 @@ export class PersonnelNotifier {
    * The access of a person who is leaving is blocked from today (`QĐ-110b`, `QĐ-110d`, R-1): the system has ended the machines and closed the
    * open requests. The Super Admin is asked to mark the person as left (only while `markLeft`, a person already marked has nothing to mark),
    * and the IT Admin to **block** the company account (item 1a of `BM-08`: reset the password of the mailbox and sign out every session; the
-   * mailbox itself is not locked yet) and to open the revocation by `revocationDueOn`. One notice for each audience, once for the case. The IT
-   * Admin is not asked to block an account they already blocked (`accountLocked`: a case that was already blocked when this release started),
-   * and the person who left is never told as the Super Admin: their account is blocked.
+   * mailbox itself is not locked yet) and to open the revocation by `revocationDueOn`. One notice for each person, once for the case: the
+   * Super Admin who is also the IT Admin who must block the account (the department has no usable IT Admin, so the Super Admin answers for it)
+   * gets one notice with both tasks (`audience` `SUPER_ADMIN_AND_IT_ADMIN`), never two. The IT Admin is not asked to block an account they
+   * already blocked (`accountLocked`: a case that was already blocked when this release started), and the person who left is never told as
+   * the Super Admin: their account is blocked.
    */
   async departureAccessBlocked(
     tx: DbTx,
@@ -228,7 +230,7 @@ export class PersonnelNotifier {
       accountLocked: boolean;
     },
   ): Promise<void> {
-    const notice = (audience: 'SUPER_ADMIN' | 'IT_ADMIN'): NoticeParts => ({
+    const notice = (audience: 'SUPER_ADMIN' | 'IT_ADMIN' | 'SUPER_ADMIN_AND_IT_ADMIN'): NoticeParts => ({
       subject: { type: 'OFFBOARDING_CASE', id: input.caseId },
       params: {
         caseId: input.caseId,
@@ -240,17 +242,17 @@ export class PersonnelNotifier {
       },
       eventKey: `DEPARTURE_ACCESS_BLOCKED:${input.caseId}:${audience}`,
     });
+    const itAdmins = input.accountLocked ? [] : await this.itAdminsOrSuperAdminOfDeparture(tx, input);
     const notifiedSuperAdmin = input.markLeft
       ? await this.toSuperAdmin(
           tx,
           input.organizationId,
           'DEPARTURE_ACCESS_BLOCKED',
-          notice('SUPER_ADMIN'),
+          (superAdmin) => notice(itAdmins.includes(superAdmin) ? 'SUPER_ADMIN_AND_IT_ADMIN' : 'SUPER_ADMIN'),
           input.employeeId,
         )
       : null;
-    if (input.accountLocked) return;
-    for (const itAdmin of await this.itAdminsOrSuperAdminOfDeparture(tx, input)) {
+    for (const itAdmin of itAdmins) {
       if (itAdmin === notifiedSuperAdmin) continue;
       await this.tell(tx, input.organizationId, itAdmin, 'DEPARTURE_ACCESS_BLOCKED', notice('IT_ADMIN'));
     }
@@ -494,17 +496,26 @@ export class PersonnelNotifier {
     return written;
   }
 
-  /** The Super Admin, unless they are `exceptEmployeeId` (the person a departure is about: their account is blocked). */
+  /**
+   * The Super Admin, unless they are `exceptEmployeeId` (the person a departure is about: their account is blocked). The notice may depend on
+   * who the Super Admin is.
+   */
   private async toSuperAdmin(
     tx: DbTx,
     organizationId: string,
     code: InAppNotificationCode,
-    notice: NoticeParts,
+    notice: NoticeParts | ((superAdminEmployeeId: string) => NoticeParts),
     exceptEmployeeId?: string,
   ): Promise<string | null> {
     const holder = await this.identity.getSuperAdminHolder(tx);
     if (!holder || holder.employeeId === exceptEmployeeId) return null;
-    await this.tell(tx, organizationId, holder.employeeId, code, notice);
+    await this.tell(
+      tx,
+      organizationId,
+      holder.employeeId,
+      code,
+      typeof notice === 'function' ? notice(holder.employeeId) : notice,
+    );
 
     return holder.employeeId;
   }
