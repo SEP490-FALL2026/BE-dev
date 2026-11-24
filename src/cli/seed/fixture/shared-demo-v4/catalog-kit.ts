@@ -55,6 +55,9 @@ export const FUNCTIONAL_GROUPS: readonly (readonly [application: string, group: 
   ['skype', 'Liên lạc (email, chat, họp)'],
   ['confluence', 'Lập trình & kỹ thuật'],
   ['sublime', 'Lập trình & kỹ thuật'],
+  // The two software of the company machines (redesign wave 2, W2-25): the operating system that comes with a laptop, and Office bought per machine.
+  ['windows', 'Văn phòng & cộng tác'],
+  ['office', 'Văn phòng & cộng tác'],
   ['adobe', 'Thiết kế & sáng tạo'],
   ['claude', 'Trợ lý AI'],
   ['copilot', 'Trợ lý AI'],

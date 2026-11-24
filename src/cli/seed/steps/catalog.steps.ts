@@ -87,6 +87,7 @@ export function planBody(applicationId: string, plan: DemoPlan): Record<string, 
     ...(plan.revocationNote ? { revocationNote: plan.revocationNote } : {}),
     ...(plan.sharingPolicy ? { sharingPolicy: plan.sharingPolicy } : {}),
     ...(plan.hasAdminConsole !== undefined ? { hasAdminConsole: plan.hasAdminConsole } : {}),
+    ...(plan.keyBinding ? { keyBinding: plan.keyBinding } : {}),
     // QĐ-113a: the price before tax in dong of a paid plan, the one a request falls back to when no subscription of the plan has a price.
     ...(plan.referencePrice ? { referencePrice: { amount: plan.referencePrice, currency: 'VND' } } : {}),
   };
@@ -97,7 +98,14 @@ type PlanRow = { id: string; name: string } & Partial<Record<keyof DemoPlan, unk
 /** The fields of the fixture's plan that the existing one does not have (only those the fixture sets). */
 function planDifferences(plan: DemoPlan, row: PlanRow): string[] {
   // The pricing model is not compared: the system works it out from the kind of provisioning (B-5), whatever the fixture still says.
-  const keys = ['provisioningType', 'controlLevel', 'dataLossOnRemoval', 'sharingPolicy', 'hasAdminConsole'] as const;
+  const keys = [
+    'provisioningType',
+    'controlLevel',
+    'dataLossOnRemoval',
+    'sharingPolicy',
+    'hasAdminConsole',
+    'keyBinding',
+  ] as const;
 
   return keys.filter((key) => plan[key] !== undefined && row[key] !== plan[key]);
 }

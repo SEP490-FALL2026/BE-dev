@@ -33,6 +33,31 @@ describe('the steps of the shared dataset', () => {
     }
   });
 
+  // W2-25 (S-14): the order of the array is fixed, a `needs` alone does not hold the installation phase open.
+  describe('the company machines and their software (W2-25)', () => {
+    const at = (key: string) => keys.indexOf(key);
+
+    it('enters the keys with the activations they already had and the seven old machines before the baseline closes', () => {
+      expect(at('assets.keys')).toBeGreaterThan(-1);
+      expect(at('assets.keys')).toBeLessThan(at('devices.initial-records'));
+      expect(at('devices.initial-records')).toBeLessThan(at('catalog.baseline-close'));
+      expect(at('devices.notice')).toBeLessThan(at('devices.initial-records'));
+      expect(at('devices.allowlist')).toBeLessThan(at('devices.initial-records'));
+    });
+
+    it('keeps the rest of the machines (signatures, a change of holder, the machine taken out of use) after the initial records', () => {
+      expect(at('devices.registry')).toBeGreaterThan(at('devices.initial-records'));
+      expect(at('devices.registry')).toBeGreaterThan(at('catalog.baseline-close'));
+    });
+
+    it('hands the new machines to the two people who leave before their records of departure, and names the substitute after them', () => {
+      expect(at('devices.new-machines')).toBeGreaterThan(-1);
+      expect(at('devices.new-machines')).toBeLessThan(at('personnel.events'));
+      expect(at('devices.new-machines')).toBeLessThan(at('personnel.abrupt-departure'));
+      expect(at('personnel.department-substitutes')).toBeGreaterThan(at('personnel.events'));
+    });
+  });
+
   it('runs the rules of MF-5 after the usage is imported and the people moved, and the head decides after the rules', () => {
     expect(keys.indexOf('rules.first-run')).toBeGreaterThan(keys.indexOf('usage.imports'));
     expect(keys.indexOf('rules.first-run')).toBeGreaterThan(keys.indexOf('personnel.events'));

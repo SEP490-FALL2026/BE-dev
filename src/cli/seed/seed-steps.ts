@@ -8,7 +8,9 @@ import { CATALOG_EXTRA_STEPS } from './steps/catalog-extra.steps';
 import { CATALOG_STEPS } from './steps/catalog.steps';
 import { DEMO_STEPS } from './steps/demo.steps';
 import { DEMO_DOCUMENT_STEPS } from './steps/demo-documents.steps';
-import { DEVICE_STEPS } from './steps/devices.steps';
+import { DEVICE_INITIAL_STEPS, DEVICE_STEPS } from './steps/devices.steps';
+import { NEW_DEVICE_STEPS } from './steps/device-new.steps';
+import { DEPARTMENT_SUBSTITUTE_STEPS } from './steps/department-substitutes.steps';
 import { COLLECTOR_STEPS } from './steps/collector.steps';
 import { STOP_REQUEST_STEPS } from './steps/device-stops.steps';
 import { aiSteps } from './steps/ai.steps';
@@ -58,8 +60,11 @@ export function demoSteps(fixture: DemoFixture): DemoStep[] {
     ...CATALOG_STEPS,
     ...CATALOG_EXTRA_STEPS,
     pick('finance.tax-profile'),
-    ...BASELINE_STEPS,
+    // Before the baseline closes (S-14): the keys with the activations they already had, then the old machines that ran them. After it, the
+    // initial record and an import of activations already used are refused (the installation phase is over).
     ...ASSET_STEPS,
+    ...DEVICE_INITIAL_STEPS,
+    ...BASELINE_STEPS,
     ...SOFTWARE_LIST_STEPS,
     pick('budget.cycles'),
     ...budgetSteps(),
@@ -67,7 +72,10 @@ export function demoSteps(fixture: DemoFixture): DemoStep[] {
     ...RETURN_STEPS,
     ...SAAS_ISSUE_STEPS,
     ...extraSteps(),
+    // The machines handed to the two people who leave come before their records of departure, which look for an open registration to take back.
+    ...NEW_DEVICE_STEPS,
     ...PERSONNEL_STEPS,
+    ...DEPARTMENT_SUBSTITUTE_STEPS,
     ...NOTICE_STEPS,
     ...ABRUPT_DEPARTURE_STEPS,
     ...USAGE_STEPS,

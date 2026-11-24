@@ -28,6 +28,8 @@ async function keys(ctx: DemoRunContext): Promise<StepOutcome> {
       await ctx.api.call(admin, 'POST', '/license-keys/imports', {
         subscriptionId,
         keys: keyValues(spec.count, spec.subscription),
+        ...(spec.maxActivations !== undefined ? { maxActivations: spec.maxActivations } : {}),
+        ...(spec.initialActivationsUsed !== undefined ? { initialActivationsUsed: spec.initialActivationsUsed } : {}),
       });
       results.push({ status: 'done', label });
     }

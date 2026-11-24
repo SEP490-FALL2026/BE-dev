@@ -108,12 +108,18 @@ describe('shared dataset v4: the organization', () => {
 });
 
 describe('shared dataset v4: the catalog and the shared pool', () => {
-  it('has one subscription per plan of the catalog except the internal one, Skype (retired) and the K1 plan that has only a reference price (T6, QĐ-113a)', () => {
+  it('has one subscription per plan of the catalog except the internal one, Skype (retired), the K1 plan that has only a reference price (T6, QĐ-113a) and the plan bundled with the machine, which is never bought (W2-17)', () => {
     const plans = F.applications
       .flatMap((app) => app.plans)
-      .filter((p) => p.provisioningType !== 'K5' && p.key !== 'skype-online' && p.key !== 'grammarly-business');
+      .filter(
+        (p) =>
+          p.provisioningType !== 'K5' &&
+          p.key !== 'skype-online' &&
+          p.key !== 'grammarly-business' &&
+          p.keyBinding !== 'DEVICE_BUNDLED',
+      );
     expect(F.subscriptions.map((s) => s.plan).sort()).toEqual(plans.map((p) => p.key).sort());
-    expect(F.subscriptions).toHaveLength(30);
+    expect(F.subscriptions).toHaveLength(31);
   });
 
   it('gives every paid plan a reference price in dong: the monthly price of its subscription, the price of one key (K4), or a price of its own when it has no subscription (QĐ-113a)', () => {
@@ -123,8 +129,13 @@ describe('shared dataset v4: the catalog and the shared pool', () => {
         expect(declared.referencePrice).toBeUndefined();
         continue;
       }
-      // Skype is retired with no subscription and no price; every other paid plan has one.
+      // Skype is retired with no subscription and no price, and a plan bundled with the machine has neither (it is never bought); every other paid plan has one.
       if (declared.key === 'skype-online') continue;
+      if (declared.keyBinding === 'DEVICE_BUNDLED') {
+        expect(declared.referencePrice).toBeUndefined();
+        expect(subscription).toBeUndefined();
+        continue;
+      }
       expect(BigInt(declared.referencePrice!)).toBeGreaterThan(0n);
       if (!subscription) continue;
       const amount = BigInt(subscription.unitPrice.amount);
@@ -139,7 +150,7 @@ describe('shared dataset v4: the catalog and the shared pool', () => {
   it('has one K1 plan with no subscription but a reference price, and a request on it waiting for the spending approver (QĐ-113a, R59)', () => {
     const withoutSubscription = F.applications
       .flatMap((app) => app.plans)
-      .filter((p) => p.provisioningType !== 'K5' && p.key !== 'skype-online')
+      .filter((p) => p.provisioningType !== 'K5' && p.key !== 'skype-online' && p.keyBinding !== 'DEVICE_BUNDLED')
       .filter((p) => !F.subscriptions.some((s) => s.plan === p.key));
 
     expect(withoutSubscription.map((p) => p.key)).toEqual(['grammarly-business']);
@@ -175,18 +186,18 @@ describe('shared dataset v4: the catalog and the shared pool', () => {
     expect(F.people.filter((p) => p.account === 'IT_ADMIN').length).toBeGreaterThanOrEqual(2);
   });
 
-  it('holds 25 applications of 34 plans, named as they are sold, with none of the three the budget scenarios refuse (T4, S04)', () => {
-    expect(F.applications).toHaveLength(25);
-    expect(F.applications.flatMap((app) => app.plans)).toHaveLength(34);
-    expect(F.applications.filter((app) => app.kind === 'SAAS')).toHaveLength(23);
+  it('holds 27 applications of 36 plans, named as they are sold, with none of the three the budget scenarios refuse (T4, S04)', () => {
+    expect(F.applications).toHaveLength(27);
+    expect(F.applications.flatMap((app) => app.plans)).toHaveLength(36);
+    expect(F.applications.filter((app) => app.kind === 'SAAS')).toHaveLength(25);
     expect(F.applications.filter((app) => app.kind === 'INTERNAL')).toHaveLength(2);
     const names = F.applications.map((app) => app.name.toLowerCase());
     for (const refused of ['miro', 'whimsical', 'canva enterprise']) expect(names).not.toContain(refused);
-    expect(new Set(F.applications.map((app) => app.key)).size).toBe(25);
-    expect(new Set(F.applications.map((app) => app.name)).size).toBe(25);
+    expect(new Set(F.applications.map((app) => app.key)).size).toBe(27);
+    expect(new Set(F.applications.map((app) => app.name)).size).toBe(27);
     const planNames = F.applications.flatMap((app) => app.plans.map((p) => p.name));
-    expect(new Set(planNames).size).toBe(34);
-    expect(new Set(F.applications.flatMap((app) => app.plans.map((p) => p.key))).size).toBe(34);
+    expect(new Set(planNames).size).toBe(36);
+    expect(new Set(F.applications.flatMap((app) => app.plans.map((p) => p.key))).size).toBe(36);
   });
 
   it('gives each plan the kind of control and sharing its application needs, and a note to a plan that loses data (T4)', () => {

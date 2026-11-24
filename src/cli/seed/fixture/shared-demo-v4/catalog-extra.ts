@@ -75,6 +75,13 @@ export const EXTRA_APPLICATIONS: DemoApplication[] = [
     k4('visio-pro', 'Visio Professional', { hasAdminConsole: true, sharingPolicy: 'ALLOWED', vendorAdmin: 'NV-ITA3' }),
   ]),
   app('sublime', 'Sublime Text', 'Sublime HQ', [k4('sublime-license', 'Sublime Text License')]),
+  // W2-17, W2-25: a plan bundled with the machine (no purchase, no key) and a plan bought per machine, a key that runs on many (a cap of activations).
+  app('windows', 'Windows 11', 'Microsoft', [
+    k4('windows-11-pro-oem', 'Windows 11 Pro OEM', { keyBinding: 'DEVICE_BUNDLED' }),
+  ]),
+  app('office', 'Microsoft Office', 'Microsoft', [
+    k4('office-ltsc-2024', 'Office LTSC 2024', { keyBinding: 'DEVICE_KEY' }),
+  ]),
   app('hubspot', 'HubSpot Sales Hub', 'HubSpot', [k2('hubspot-starter', 'HubSpot Sales Hub Starter')], 'SAAS', 'HIGH'),
   {
     key: 'attendance',
@@ -164,6 +171,8 @@ export const EXTRA_SUBSCRIPTIONS: DemoSubscription[] = [
   k1Subscription('copilot-pro', '254000', '10'),
   perpetual('visio-pro', '13000000', 3),
   perpetual('sublime-license', '2500000', 2),
+  // 25 licenses bought once, run on machines through one key of 30 activations (W2-25).
+  perpetual('office-ltsc-2024', '3500000', 25),
   byMonth('hubspot-starter', '450000', 'NV-ITA1', 2, 1),
 ];
 

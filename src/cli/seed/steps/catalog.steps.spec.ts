@@ -279,6 +279,20 @@ describe('the body of a plan the dataset declares', () => {
     });
     expect(planBody('app-1', plan('hr-portal-access'))).not.toHaveProperty('referencePrice');
   });
+
+  it('writes the key binding of a K4 plan the fixture binds to the machine, the Windows bundled with it with no price, and none for the others (W2-17)', () => {
+    expect(planBody('app-1', plan('office-ltsc-2024'))).toMatchObject({
+      provisioningType: 'K4',
+      keyBinding: 'DEVICE_KEY',
+      referencePrice: { amount: '3500000', currency: 'VND' },
+    });
+    const windows = planBody('app-1', plan('windows-11-pro-oem'));
+    expect(windows).toMatchObject({ provisioningType: 'K4', keyBinding: 'DEVICE_BUNDLED' });
+    expect(windows).not.toHaveProperty('referencePrice');
+    expect(windows).not.toHaveProperty('hasAdminConsole');
+    expect(planBody('app-1', plan('jetbrains-all'))).not.toHaveProperty('keyBinding');
+    expect(planBody('app-1', plan('claude-team-standard'))).not.toHaveProperty('keyBinding');
+  });
 });
 
 describe('catalog.subscriptions step', () => {
