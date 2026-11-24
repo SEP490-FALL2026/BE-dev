@@ -17,6 +17,7 @@ import {
   ProvisioningContractEndedError,
   ProvisioningEvidenceRequiredError,
   ProvisioningPersonalAccountError,
+  ProvisioningPlanBoundToDeviceError,
   ProvisioningReasonRequiredError,
   ProvisioningResponsibleInvalidError,
   ProvisioningResponsibleNotInDepartmentError,
@@ -201,6 +202,9 @@ export function toProvisioningApiException(error: unknown): unknown {
   if (error instanceof ProvisioningNotInChargeError) {
     return refuse(HttpStatus.FORBIDDEN, 'PROVISIONING.NOT_IN_CHARGE', error.message);
   }
+  if (error instanceof ProvisioningPlanBoundToDeviceError) {
+    return refuse(CONFLICT, 'PROVISIONING.PLAN_BOUND_TO_DEVICE', error.message);
+  }
 
   return toLicensingApiException(error);
 }
@@ -272,6 +276,7 @@ export const PROVISIONING_ERROR_EXAMPLES = {
   KEY_NOT_IN_STORE: example(new LicenseKeyStateError('NOT_IN_STORE')),
   KEY_WITHDRAWN: example(new LicenseKeyStateError('WITHDRAWN')),
   KEY_SUBSCRIPTION_MISMATCH: example(new LicenseKeyStateError('SUBSCRIPTION_MISMATCH')),
+  PLAN_BOUND_TO_DEVICE: example(new ProvisioningPlanBoundToDeviceError()),
 } as const;
 
 /** The refusals of the grant of a seat, by status, after the request gate of G5 (`US-07-01`). */
@@ -294,6 +299,7 @@ export const PROVISIONING_GRANT_EXAMPLES = {
     example(new SeatApplicationRetiredError()),
     example(new AssignmentConflictError('SEAT_CAPACITY', 0, 2)),
     example(new PurchaseNotAllowedError(2, ['<subscription-id>'])),
+    example(new ProvisioningPlanBoundToDeviceError()),
   ],
   UNPROCESSABLE: [
     example(new GrantRequestRefusedError('BENEFICIARY_REQUIRED')),

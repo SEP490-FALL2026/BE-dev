@@ -10,8 +10,10 @@ import {
   AccessRequestNoDepartmentError,
   AccessRequestNotDraftError,
   AccessRequestNotFoundError,
+  AccessRequestPlanBoundToDeviceError,
   AccessRequestPlanNotFoundError,
   AccessRequestSuperAdminCannotRequestError,
+  isDeviceBoundKeyBinding,
 } from '../access-request/access-request.errors';
 import { mayRequest, policyFor } from '../access-request/access-request.policy';
 import { beneficiaryCountOfContent, contentOf, draftSnapshot, toContentJson } from './request-draft-content.mapper';
@@ -56,6 +58,7 @@ export class RequestDraftService {
       if (!unit) throw new AccessRequestNoDepartmentError();
       const [target] = await this.catalog.findPlanSeatTargets([body.planId], tx);
       if (!target) throw new AccessRequestPlanNotFoundError();
+      if (isDeviceBoundKeyBinding(target.keyBinding)) throw new AccessRequestPlanBoundToDeviceError();
 
       const saved = await this.drafts.insert(tx, {
         organizationId: employee.organizationId,

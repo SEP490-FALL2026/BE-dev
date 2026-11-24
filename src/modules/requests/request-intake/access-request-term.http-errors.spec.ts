@@ -1,6 +1,9 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
-import { AccessRequestTermRefusedError } from '../access-request/access-request.errors';
+import {
+  AccessRequestPlanBoundToDeviceError,
+  AccessRequestTermRefusedError,
+} from '../access-request/access-request.errors';
 import { toAccessRequestApiException } from '../access-request/access-request.http-errors';
 
 const answerOf = (error: unknown) => {
@@ -41,5 +44,12 @@ describe('ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE details', () => {
     expect(asked.status).toBe(HttpStatus.UNPROCESSABLE_ENTITY);
     expect(asked.body).not.toHaveProperty('details');
     expect(ended.body.details).toEqual({ contractEndDate: '2026-10-31' });
+  });
+
+  it('maps AccessRequestPlanBoundToDeviceError to 422 ACCESS_REQUEST.PLAN_BOUND_TO_DEVICE (W2-18)', () => {
+    const mapped = answerOf(new AccessRequestPlanBoundToDeviceError());
+
+    expect(mapped.status).toBe(HttpStatus.UNPROCESSABLE_ENTITY);
+    expect(mapped.body.code).toBe('ACCESS_REQUEST.PLAN_BOUND_TO_DEVICE');
   });
 });

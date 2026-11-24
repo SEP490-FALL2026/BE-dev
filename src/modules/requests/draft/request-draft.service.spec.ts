@@ -5,6 +5,7 @@ import { AuditApi } from '../../audit/public/audit.api';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { RequestSenderService } from '../request-intake/request-sender.service';
+import { AccessRequestPlanBoundToDeviceError } from '../access-request/access-request.errors';
 import { RequestDraftRepo, type DraftRow } from '../request-draft/request-draft.repo';
 import { RequestDraftService } from './request-draft.service';
 
@@ -173,4 +174,23 @@ describe('RequestDraftService.save', () => {
 
     expect(drafts.insert).not.toHaveBeenCalled();
   });
+
+  it.each(['DEVICE_KEY', 'DEVICE_BUNDLED'] as const)(
+    'refuses saving a draft for a %s plan with AccessRequestPlanBoundToDeviceError (W2-18)',
+    async (keyBinding) => {
+      catalog.findPlanSeatTargets.mockResolvedValue([
+        { planId: PLAN, applicationKind: 'LICENSED', provisioningType: 'K4', keyBinding },
+      ]);
+
+      await expect(
+        service.save(principal('e-owner'), {
+          kind: 'INDIVIDUAL',
+          planId: PLAN,
+          businessReason: 'Need AutoCAD',
+        } as never),
+      ).rejects.toBeInstanceOf(AccessRequestPlanBoundToDeviceError);
+
+      expect(drafts.insert).not.toHaveBeenCalled();
+    },
+  );
 });

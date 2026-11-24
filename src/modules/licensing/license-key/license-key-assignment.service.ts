@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { isCheckViolation } from '../../../infrastructure/database/unique-violation';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { CatalogApi } from '../../catalog/public/catalog.api';
-import { LicenseKeyNotFoundError } from '../public/licensing.errors';
+import { LicenseKeyNotFoundError, ProvisioningPlanBoundToDeviceError } from '../public/licensing.errors';
 import type { KeyDisposition } from '../public/licensing.types';
 import { licensingAuditEvent } from '../licensing-audit-event.mapper';
 import { assertAssignable } from './license-key.policy';
@@ -37,7 +38,14 @@ export class LicenseKeyAssignmentService {
     const key = await this.repo.lock(tx, input.licenseKeyId);
     if (!key) throw new LicenseKeyNotFoundError();
     assertAssignable(key, input.subscriptionId);
-    await this.repo.assign(tx, key.id, input.assignmentId);
+    try {
+      await this.repo.assign(tx, key.id, input.assignmentId);
+    } catch (error) {
+      if (isCheckViolation(error, 'license_key_assignment_plan_account')) {
+        throw new ProvisioningPlanBoundToDeviceError();
+      }
+      throw error;
+    }
     await this.audit.record(
       tx,
       licensingAuditEvent(actor, input.organizationId, 'LICENSE_KEY.ASSIGNED', 'LicenseKey', key.id, null, {

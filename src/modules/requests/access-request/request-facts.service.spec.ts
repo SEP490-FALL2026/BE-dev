@@ -5,7 +5,7 @@ import { LicensingApi } from '../../licensing/public/licensing.api';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
 import { FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import { AccessRequestPlanNotFoundError } from './access-request.errors';
+import { AccessRequestPlanBoundToDeviceError, AccessRequestPlanNotFoundError } from './access-request.errors';
 import { RequestFactsService, type AssessmentInput } from './request-facts.service';
 import { TransferGraceHoldContributions } from '../public/requests.extension-points';
 import { RoutingFactsService } from './routing-facts.service';
@@ -365,5 +365,24 @@ describe('RequestFactsService.assess', () => {
 
       expect(licensing.getSeatsHeldInPlans).toHaveBeenCalledWith('e-1', ['p-1'], { skip: 0, take: 1 }, tx);
     });
+
+    it.each(['DEVICE_KEY', 'DEVICE_BUNDLED'] as const)(
+      'refuses %s device-bound plans with AccessRequestPlanBoundToDeviceError (W2-18)',
+      async (keyBinding) => {
+        given(COST_CENTER, 'SAAS');
+        catalog.findPlanSeatTargets.mockResolvedValue([
+          {
+            planId: 'p-1',
+            applicationKind: 'LICENSED',
+            applicationStatus: 'APPROVED',
+            provisioningType: 'K4',
+            keyBinding,
+          },
+        ]);
+
+        await expect(service.assess(tx, input())).rejects.toBeInstanceOf(AccessRequestPlanBoundToDeviceError);
+        expect(organization.lockDepartmentShared).not.toHaveBeenCalled();
+      },
+    );
   });
 });

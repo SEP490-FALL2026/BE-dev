@@ -9,7 +9,9 @@ import { accessRequestAuditEvent } from '../access-request/access-request-audit-
 import {
   AccessRequestApplicationRetiredError,
   AccessRequestNotFoundError,
+  AccessRequestPlanBoundToDeviceError,
   AccessRequestPlanNotFoundError,
+  isDeviceBoundKeyBinding,
 } from '../access-request/access-request.errors';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
@@ -130,6 +132,7 @@ export class CatalogLinkService {
     const named = (await this.assessments.findProposal(requestId, tx))?.existingApplicationId ?? null;
     if (named !== null && named !== target.applicationId) throw new CatalogLinkApplicationMismatchError(named);
     if (target.applicationStatus === 'RETIRED') throw new AccessRequestApplicationRetiredError();
+    if (isDeviceBoundKeyBinding(target.keyBinding)) throw new AccessRequestPlanBoundToDeviceError();
 
     return target;
   }

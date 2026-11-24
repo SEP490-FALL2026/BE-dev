@@ -70,8 +70,12 @@ export class GroupRequestsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is invalid (VALIDATION_ERROR), or the sender is the spending approver (REQUEST_PARTY.INELIGIBLE).',
-      examples: [VALIDATION_EXAMPLE, GROUP_REQUEST_ERROR_EXAMPLES.REQUEST_PARTY_INELIGIBLE],
+        'The body is invalid (VALIDATION_ERROR), the plan is bound to a device (ACCESS_REQUEST.PLAN_BOUND_TO_DEVICE), or the sender is the spending approver (REQUEST_PARTY.INELIGIBLE).',
+      examples: [
+        VALIDATION_EXAMPLE,
+        GROUP_REQUEST_ERROR_EXAMPLES.PLAN_BOUND_TO_DEVICE,
+        GROUP_REQUEST_ERROR_EXAMPLES.REQUEST_PARTY_INELIGIBLE,
+      ],
     },
   )
   async check(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: GroupBodyDto) {
@@ -134,6 +138,7 @@ export class GroupRequestsController {
         'The body is invalid (VALIDATION_ERROR); the plan does not take a group (GROUP_REQUEST.PLAN_NOT_ELIGIBLE, with details.reason KIND_NOT_MULTI_SEAT for a plan that gives no account of its own to each person, NOT_PAID_SOFTWARE for internal software); too many people are named (GROUP_REQUEST.TOO_MANY_LINES), fewer than two different people (GROUP_REQUEST.TOO_FEW_LINES, with min), a time of use the plan refuses (ACCESS_REQUEST.TERM_REQUIRED, TERM_MONTHS_OUT_OF_RANGE or TERM_NOT_ASKED) or a person twice (GROUP_REQUEST.DUPLICATE_LINE); a person cannot be in it (GROUP_REQUEST.LINES_REFUSED, with each person and the reason); the sender is the spending approver (REQUEST_PARTY.INELIGIBLE), and a line that is the spending approver is refused as a line with the reason SPENDING_APPROVER, one that is a head of a department with the reason HEAD_IN_GROUP. Nothing is written.',
       examples: [
         VALIDATION_EXAMPLE,
+        GROUP_REQUEST_ERROR_EXAMPLES.PLAN_BOUND_TO_DEVICE,
         GROUP_REQUEST_ERROR_EXAMPLES.PLAN_NOT_ELIGIBLE,
         GROUP_REQUEST_ERROR_EXAMPLES.TOO_MANY_LINES,
         GROUP_REQUEST_ERROR_EXAMPLES.TOO_FEW_LINES,

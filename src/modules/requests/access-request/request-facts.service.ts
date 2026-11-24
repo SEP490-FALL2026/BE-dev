@@ -11,7 +11,9 @@ import { OrganizationReadApi } from '../../organization/public/organization-read
 import {
   AccessRequestApplicationRetiredError,
   AccessRequestNoDepartmentError,
+  AccessRequestPlanBoundToDeviceError,
   AccessRequestPlanNotFoundError,
+  isDeviceBoundKeyBinding,
 } from './access-request.errors';
 import { hasSpendStep, policyFor, proposalPolicy, type RequestPolicy } from './access-request.policy';
 import type { PricingRecord } from './access-request.types';
@@ -140,6 +142,7 @@ export class RequestFactsService {
     const [target] = await this.catalog.findPlanSeatTargets([input.planId], tx);
     if (!target) throw new AccessRequestPlanNotFoundError();
     if (target.applicationStatus === 'RETIRED') throw new AccessRequestApplicationRetiredError();
+    if (isDeviceBoundKeyBinding(target.keyBinding)) throw new AccessRequestPlanBoundToDeviceError();
 
     const policy = policyFor(target.applicationKind, input.settings.slaWorkingDays);
     // What the request is charged to is known only now that the branch is: no Cost Center, no charge, and no gate for what is free.

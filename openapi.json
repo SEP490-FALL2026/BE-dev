@@ -34586,7 +34586,7 @@
             }
           },
           "409": {
-            "description": "PROVISIONING.REQUEST_NOT_APPROVED, REQUEST_ENDED (the request was refused, withdrawn, cancelled or closed as failed; a request that was granted answers with its task instead, 201), REQUEST_NOT_IN_CATALOG (the software is not registered in the catalog yet), REQUEST_BOUNDARY_NOT_CHECKED and RESPONSIBLE_NOT_IN_DEPARTMENT (only for a request for a service account kept from the earlier releases: its boundary was not accepted, or the person who answers for it left its department or the company), TYPE_NOT_SUPPORTED (K3), BENEFICIARY_DEPARTED (the person has left, or a departure has blocked their access from today though they are not marked left yet: details.cause LEFT or ACCESS_BLOCKED, details.nextStep CANCEL_REQUEST), BENEFICIARY_NOT_STARTED (details.startsOn: the person joins later), CONTRACT_ENDED (details.contractEndDate: the contract of a contractor, freelancer or intern ended before today, so no seat is granted), PURCHASE_NOT_ALLOWED (a `purchase` was sent while the pool of the plan still has a free seat: details.freeSeats and details.subscriptionIds), SEAT_TARGET.APPLICATION_RETIRED, or LICENSE_ASSIGNMENT.SEAT_CAPACITY (the subscription has no free seat and no `purchase` was sent: details.freeSeatsInPool is how many seats the other subscriptions of the plan hold free). A refused purchase is kept in the audit trail with the free seats (PROVISIONING_TASK.PURCHASE_REFUSED).",
+            "description": "PROVISIONING.REQUEST_NOT_APPROVED, REQUEST_ENDED (the request was refused, withdrawn, cancelled or closed as failed; a request that was granted answers with its task instead, 201), REQUEST_NOT_IN_CATALOG (the software is not registered in the catalog yet), REQUEST_BOUNDARY_NOT_CHECKED and RESPONSIBLE_NOT_IN_DEPARTMENT (only for a request for a service account kept from the earlier releases: its boundary was not accepted, or the person who answers for it left its department or the company), TYPE_NOT_SUPPORTED (K3), PLAN_BOUND_TO_DEVICE (the K4 plan moved from ACCOUNT to a device-bound mode after the Request was submitted), BENEFICIARY_DEPARTED (the person has left, or a departure has blocked their access from today though they are not marked left yet: details.cause LEFT or ACCESS_BLOCKED, details.nextStep CANCEL_REQUEST), BENEFICIARY_NOT_STARTED (details.startsOn: the person joins later), CONTRACT_ENDED (details.contractEndDate: the contract of a contractor, freelancer or intern ended before today, so no seat is granted), PURCHASE_NOT_ALLOWED (a `purchase` was sent while the pool of the plan still has a free seat: details.freeSeats and details.subscriptionIds), SEAT_TARGET.APPLICATION_RETIRED, or LICENSE_ASSIGNMENT.SEAT_CAPACITY (the subscription has no free seat and no `purchase` was sent: details.freeSeatsInPool is how many seats the other subscriptions of the plan hold free). A refused purchase is kept in the audit trail with the free seats (PROVISIONING_TASK.PURCHASE_REFUSED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -34725,6 +34725,17 @@
                         "code": "PROVISIONING.PURCHASE_NOT_ALLOWED",
                         "message": "The pool still has 2 free seat(s) of this plan: grant one of them instead of buying.",
                         "details": { "freeSeats": 2, "subscriptionIds": ["<subscription-id>"] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PROVISIONING.PLAN_BOUND_TO_DEVICE": {
+                    "summary": "This plan is bound to a device, not a user account, and cannot be granted through a seat provisioning task.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PROVISIONING.PLAN_BOUND_TO_DEVICE",
+                        "message": "This plan is bound to a device, not a user account, and cannot be granted through a seat provisioning task.",
                         "requestId": "req_example"
                       }
                     }
@@ -35805,7 +35816,7 @@
             }
           },
           "409": {
-            "description": "PROVISIONING_TASK.NOT_MANUAL or NOT_IN_PROGRESS, or IS_REVOCATION (a revocation is completed by its own route); the key named is not free in the store (LICENSE_KEY.NOT_IN_STORE: another grant took it), was withdrawn from it (LICENSE_KEY.WITHDRAWN) or belongs to another purchase than the seat (LICENSE_KEY.SUBSCRIPTION_MISMATCH). Nothing is written.",
+            "description": "PROVISIONING_TASK.NOT_MANUAL or NOT_IN_PROGRESS, IS_REVOCATION (a revocation is completed by its own route), or PROVISIONING.PLAN_BOUND_TO_DEVICE (the K4 plan moved from ACCOUNT to a device-bound mode); the key named is not free in the store (LICENSE_KEY.NOT_IN_STORE: another grant took it), was withdrawn from it (LICENSE_KEY.WITHDRAWN) or belongs to another purchase than the seat (LICENSE_KEY.SUBSCRIPTION_MISMATCH). Nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -35839,6 +35850,17 @@
                       "error": {
                         "code": "PROVISIONING_TASK.IS_REVOCATION",
                         "message": "The task is not in a state that allows this: IS_REVOCATION.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PROVISIONING.PLAN_BOUND_TO_DEVICE": {
+                    "summary": "This plan is bound to a device, not a user account, and cannot be granted through a seat provisioning task.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PROVISIONING.PLAN_BOUND_TO_DEVICE",
+                        "message": "This plan is bound to a device, not a user account, and cannot be granted through a seat provisioning task.",
                         "requestId": "req_example"
                       }
                     }
@@ -44349,7 +44371,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid for its kind (VALIDATION_ERROR), or the sender, or a person of a group draft, is the spending approver (REQUEST_PARTY.INELIGIBLE). Nothing is saved.",
+            "description": "The body is invalid for its kind (VALIDATION_ERROR), the plan is bound to a device (ACCESS_REQUEST.PLAN_BOUND_TO_DEVICE), or the sender, or a person of a group draft, is the spending approver (REQUEST_PARTY.INELIGIBLE). Nothing is saved.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -44362,6 +44384,17 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.PLAN_BOUND_TO_DEVICE": {
+                    "summary": "A device-bound plan cannot be requested through an access request; record its activation on a device instead.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.PLAN_BOUND_TO_DEVICE",
+                        "message": "A device-bound plan cannot be requested through an access request; record its activation on a device instead.",
                         "requestId": "req_example"
                       }
                     }
@@ -44879,6 +44912,17 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.PLAN_BOUND_TO_DEVICE": {
+                    "summary": "A device-bound plan cannot be requested through an access request; record its activation on a device instead.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.PLAN_BOUND_TO_DEVICE",
+                        "message": "A device-bound plan cannot be requested through an access request; record its activation on a device instead.",
                         "requestId": "req_example"
                       }
                     }
@@ -45473,7 +45517,7 @@
             }
           },
           "422": {
-            "description": "The form is incomplete or invalid (VALIDATION_ERROR): the reason and the term are required. The sender is the spending approver (REQUEST_PARTY.INELIGIBLE, with the sender in details.employeeIds). A person who was already named in as many requests for new access this calendar week (Monday to Sunday, organization time zone; a request withdrawn or refused still counts) as the weekly limit allows is refused until the next Monday (ACCESS_REQUEST.OPEN_LIMIT_REACHED, details.limit and details.resetsOn; GH-2, BR-MF1-01f). The time of use follows the kind of the plan: 1 to 9 months for a plan bought by the month (ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE, TERM_REQUIRED when none is given), 1 to 12 for the others, none for a plan bought once (ACCESS_REQUEST.TERM_NOT_ASKED); a contractor, a freelancer or an intern gives the months and never a right with no end (ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED), and one whose contract ended before today gets no access (ACCESS_REQUEST.TERM_CONTRACT_ENDED, details.contractEndDate). Nothing is written.",
+            "description": "The form is incomplete or invalid (VALIDATION_ERROR): the reason and the term are required. The sender is the spending approver (REQUEST_PARTY.INELIGIBLE, with the sender in details.employeeIds). A device-bound plan cannot be requested through an access request (ACCESS_REQUEST.PLAN_BOUND_TO_DEVICE). A person who was already named in as many requests for new access this calendar week (Monday to Sunday, organization time zone; a request withdrawn or refused still counts) as the weekly limit allows is refused until the next Monday (ACCESS_REQUEST.OPEN_LIMIT_REACHED, details.limit and details.resetsOn; GH-2, BR-MF1-01f). The time of use follows the kind of the plan: 1 to 9 months for a plan bought by the month (ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE, TERM_REQUIRED when none is given), 1 to 12 for the others, none for a plan bought once (ACCESS_REQUEST.TERM_NOT_ASKED); a contractor, a freelancer or an intern gives the months and never a right with no end (ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED), and one whose contract ended before today gets no access (ACCESS_REQUEST.TERM_CONTRACT_ENDED, details.contractEndDate). Nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -45486,6 +45530,17 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.PLAN_BOUND_TO_DEVICE": {
+                    "summary": "A device-bound plan cannot be requested through an access request; record its activation on a device instead.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.PLAN_BOUND_TO_DEVICE",
+                        "message": "A device-bound plan cannot be requested through an access request; record its activation on a device instead.",
                         "requestId": "req_example"
                       }
                     }
@@ -46045,7 +46100,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR), or the caller is placed in no department (REQUEST_PARTY.INELIGIBLE, details.reason UNPLACED). A spending approver is not refused here: the answer is 200 with blockedBy and canSubmit false.",
+            "description": "The body is invalid (VALIDATION_ERROR), the plan is bound to a device (ACCESS_REQUEST.PLAN_BOUND_TO_DEVICE), or the caller is placed in no department (REQUEST_PARTY.INELIGIBLE, details.reason UNPLACED). A spending approver is not refused here: the answer is 200 with blockedBy and canSubmit false.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -46058,6 +46113,17 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.PLAN_BOUND_TO_DEVICE": {
+                    "summary": "A device-bound plan cannot be requested through an access request; record its activation on a device instead.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.PLAN_BOUND_TO_DEVICE",
+                        "message": "A device-bound plan cannot be requested through an access request; record its activation on a device instead.",
                         "requestId": "req_example"
                       }
                     }
@@ -49936,7 +50002,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR), or the plan is of another kind than the assessment concluded and the months of use the person gave do not fit it (ASSESSMENT.TERM_NOT_FIT_KIND, with details.provisioningType, termMonths, maxMonths and the reason: link a plan of a kind that takes them, or reject the request for the person to propose again), or the proposal is a short one that names an application of the catalog and the plan belongs to another application (ACCESS_REQUEST.CATALOG_LINK_APPLICATION_MISMATCH, with details.expectedApplicationId: only the plan of that application was assessed; a proposal of software that is new links to any plan), or the catalog no longer offers what the list of the department would hold (DEPARTMENT_SOFTWARE.NOT_IN_CATALOG). Nothing is written. A plan bought once takes no months: linking it clears any the person gave.",
+            "description": "The body is invalid (VALIDATION_ERROR), or the plan is bound to a device (ACCESS_REQUEST.PLAN_BOUND_TO_DEVICE), or the plan is of another kind than the assessment concluded and the months of use the person gave do not fit it (ASSESSMENT.TERM_NOT_FIT_KIND, with details.provisioningType, termMonths, maxMonths and the reason: link a plan of a kind that takes them, or reject the request for the person to propose again), or the proposal is a short one that names an application of the catalog and the plan belongs to another application (ACCESS_REQUEST.CATALOG_LINK_APPLICATION_MISMATCH, with details.expectedApplicationId: only the plan of that application was assessed; a proposal of software that is new links to any plan), or the catalog no longer offers what the list of the department would hold (DEPARTMENT_SOFTWARE.NOT_IN_CATALOG). Nothing is written. A plan bought once takes no months: linking it clears any the person gave.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -49949,6 +50015,17 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.PLAN_BOUND_TO_DEVICE": {
+                    "summary": "A device-bound plan cannot be requested through an access request; record its activation on a device instead.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.PLAN_BOUND_TO_DEVICE",
+                        "message": "A device-bound plan cannot be requested through an access request; record its activation on a device instead.",
                         "requestId": "req_example"
                       }
                     }
@@ -59279,7 +59356,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR), or the sender is the spending approver (REQUEST_PARTY.INELIGIBLE).",
+            "description": "The body is invalid (VALIDATION_ERROR), the plan is bound to a device (ACCESS_REQUEST.PLAN_BOUND_TO_DEVICE), or the sender is the spending approver (REQUEST_PARTY.INELIGIBLE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -59292,6 +59369,17 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.PLAN_BOUND_TO_DEVICE": {
+                    "summary": "A device-bound plan cannot be requested through an access request; record its activation on a device instead.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.PLAN_BOUND_TO_DEVICE",
+                        "message": "A device-bound plan cannot be requested through an access request; record its activation on a device instead.",
                         "requestId": "req_example"
                       }
                     }
@@ -59592,6 +59680,17 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.PLAN_BOUND_TO_DEVICE": {
+                    "summary": "A device-bound plan cannot be requested through an access request; record its activation on a device instead.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.PLAN_BOUND_TO_DEVICE",
+                        "message": "A device-bound plan cannot be requested through an access request; record its activation on a device instead.",
                         "requestId": "req_example"
                       }
                     }

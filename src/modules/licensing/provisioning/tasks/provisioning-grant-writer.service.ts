@@ -8,6 +8,7 @@ import { AssignmentService } from '../../assignment/assignment.service';
 import {
   AssignmentConflictError,
   GrantRequestRefusedError,
+  ProvisioningPlanBoundToDeviceError,
   ProvisioningSubscriptionError,
   SeatQuantityUnknownError,
   SeatTargetNotFoundError,
@@ -60,6 +61,9 @@ export class ProvisioningGrantWriter {
     const claimed = await this.gate.get().claimForGrant(tx, input.requestId, input.beneficiaryEmployeeId);
     if (claimed.status !== 'GRANTABLE') throw new GrantRequestRefusedError(claimed.status);
     if (!claimMatchesAnswer(claimed, answer)) throw new GrantRequestRefusedError('NOT_APPROVED');
+    if (plan.keyBinding === 'DEVICE_KEY' || plan.keyBinding === 'DEVICE_BUNDLED') {
+      throw new ProvisioningPlanBoundToDeviceError();
+    }
     const subscriptionId = await this.subscriptionOf(tx, plan, input.subscriptionId, today);
     await this.requireGrantable(tx, plan, input.subscriptionId, today);
     const target = await this.lockTarget(tx, plan, subscriptionId);
@@ -264,6 +268,9 @@ export class ProvisioningGrantWriter {
     const target = await this.catalog.lockSeatTarget(tx, subscriptionId ? { subscriptionId } : { planId: plan.planId });
     if (!target) throw new SeatTargetNotFoundError(subscriptionId ? 'SUBSCRIPTION' : 'PLAN');
     if (target.planId !== plan.planId) throw new ProvisioningSubscriptionError('PLAN_MISMATCH');
+    if (target.keyBinding === 'DEVICE_KEY' || target.keyBinding === 'DEVICE_BUNDLED') {
+      throw new ProvisioningPlanBoundToDeviceError();
+    }
     this.assignments.assertSeatTargetUsable(target);
     if (target.kind === 'SUBSCRIPTION' && target.purchasedQuantity === null) throw new SeatQuantityUnknownError();
 

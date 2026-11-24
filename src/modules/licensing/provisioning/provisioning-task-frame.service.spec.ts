@@ -1,11 +1,15 @@
+import { HttpStatus } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
+import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { NotificationsApi } from '../../notifications/public/notifications.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { ProvisioningPlanBoundToDeviceError } from '../public/licensing.errors';
 import { ProvisioningNotInChargeError } from './provisioning.errors';
+import { toProvisioningApiException } from './provisioning.http-errors';
 import { ProvisioningTaskFrame } from './provisioning-task-frame.service';
 import { ProvisioningTaskRepo } from './provisioning-task.repo';
 
@@ -209,6 +213,14 @@ describe('ProvisioningTaskFrame.work', () => {
       await expect(frame.work(itAdmin('e-it1'), 'task-1', { ...action, beforeLock })).rejects.toThrow();
 
       expect(beforeLock).not.toHaveBeenCalled();
+    });
+
+    it('maps ProvisioningPlanBoundToDeviceError to 409 PROVISIONING.PLAN_BOUND_TO_DEVICE (W2-18, S-4)', () => {
+      const mapped = toProvisioningApiException(new ProvisioningPlanBoundToDeviceError()) as ApiException;
+
+      expect(mapped).toBeInstanceOf(ApiException);
+      expect(mapped.getStatus()).toBe(HttpStatus.CONFLICT);
+      expect(mapped.getResponse()).toMatchObject({ code: 'PROVISIONING.PLAN_BOUND_TO_DEVICE' });
     });
   });
 });

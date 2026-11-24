@@ -2,7 +2,7 @@ import type { AuthenticatedPrincipal } from '../../../../infrastructure/security
 import type { CatalogApi } from '../../../catalog/public/catalog.api';
 import type { AssignmentService } from '../../assignment/assignment.service';
 import type { GrantRequestGateHook } from '../../public/licensing.extension-points';
-import { GrantRequestRefusedError } from '../../public/licensing.errors';
+import { GrantRequestRefusedError, ProvisioningPlanBoundToDeviceError } from '../../public/licensing.errors';
 import type { SharedPoolService } from '../../shared-pool/shared-pool.service';
 import type { IdentityAccessApi } from '../../../identity-access/public/identity-access.api';
 import type { RequestPartyEligibilityApi } from '../../../identity-access/public/request-party-eligibility.api';
@@ -63,6 +63,7 @@ function makeWriter(overrides: WriterOverrides = {}) {
     } as unknown as CatalogApi,
     { get: () => ({ claimForGrant }) } as unknown as GrantRequestGateHook,
     {
+      chooseSubscription: jest.fn(() => Promise.resolve('sub-1')),
       judgePurchase: jest.fn(() => Promise.resolve({ decision: { purchased: false }, stock: null })),
     } as unknown as SharedPoolService,
     {
@@ -333,4 +334,33 @@ describe('lock order in ProvisioningGrantWriter and ProvisioningHolderService', 
     );
     expect(insertAndClaim).toHaveBeenCalledWith(tx, actor, expect.objectContaining({ bySubstitute: true }));
   });
+
+  it.each(['DEVICE_KEY', 'DEVICE_BUNDLED'] as const)(
+    'refuses granting an old Request whose plan is now %s with ProvisioningPlanBoundToDeviceError (S-4)',
+    async (keyBinding) => {
+      const insertAndClaim = jest.fn();
+      const writer = makeWriter({
+        insertAndClaim,
+        lockSeatTarget: jest.fn(() =>
+          Promise.resolve({ kind: 'SUBSCRIPTION', planId: 'plan-1', provisioningType: 'K4', keyBinding }),
+        ),
+      });
+      const planned = {
+        answer: { seat: 'PERSONAL', employeeId: 'emp-1', planId: 'plan-1', departmentId: 'dept-1' },
+        plan: { planId: 'plan-1', provisioningType: 'K4', keyBinding: 'ACCOUNT' },
+        serviceIdentifier: null,
+        organization: { id: 'org-1' },
+        today: '2026-11-23',
+        inCharge: null,
+        maxAttempts: 3,
+        holderContractEnd: null,
+        holderHasTerm: false,
+      } as never;
+
+      await expect(writer.write(tx as never, actor, baseInput, planned)).rejects.toBeInstanceOf(
+        ProvisioningPlanBoundToDeviceError,
+      );
+      expect(insertAndClaim).not.toHaveBeenCalled();
+    },
+  );
 });

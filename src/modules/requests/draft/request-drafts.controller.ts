@@ -103,8 +103,8 @@ export class RequestDraftsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is invalid for its kind (VALIDATION_ERROR), or the sender, or a person of a group draft, is the spending approver (REQUEST_PARTY.INELIGIBLE). Nothing is saved.',
-      examples: [VALIDATION_EXAMPLE, EXAMPLES.REQUEST_PARTY_INELIGIBLE],
+        'The body is invalid for its kind (VALIDATION_ERROR), the plan is bound to a device (ACCESS_REQUEST.PLAN_BOUND_TO_DEVICE), or the sender, or a person of a group draft, is the spending approver (REQUEST_PARTY.INELIGIBLE). Nothing is saved.',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.PLAN_BOUND_TO_DEVICE, EXAMPLES.REQUEST_PARTY_INELIGIBLE],
     },
   )
   async save(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: DraftSaveBodyDto) {
@@ -173,6 +173,7 @@ export class RequestDraftsController {
         'The id is invalid (VALIDATION_ERROR), the sender is the spending approver (REQUEST_PARTY.INELIGIBLE), or the time of use the draft was saved with is refused: ACCESS_REQUEST.TERM_REQUIRED (a plan bought by the month, or a contractor, freelancer or intern, with no months), TERM_MONTHS_OUT_OF_RANGE (1 to 9 for a plan bought by the month, 1 to 12 for the others), TERM_NOT_ASKED (a plan bought once takes none) TERM_LONG_TERM_NOT_ALLOWED (no end for a contractor, freelancer or intern; for a group, that person is named on their own line) or TERM_CONTRACT_ENDED (the contract of a contractor, freelancer or intern ended before today, details.contractEndDate; for a group, on their own line). A group draft with fewer than two different people is refused as GROUP_REQUEST.TOO_FEW_LINES. A person who was already named in as many requests for new access this calendar week (Monday to Sunday, organization time zone; a request withdrawn or refused still counts) as the weekly limit allows is refused until the next Monday (ACCESS_REQUEST.OPEN_LIMIT_REACHED, details.limit and details.resetsOn; GH-2, BR-MF1-01f). Nothing changes: the draft stays, to be saved again with another time of use.',
       examples: [
         VALIDATION_EXAMPLE,
+        EXAMPLES.PLAN_BOUND_TO_DEVICE,
         EXAMPLES.REQUEST_PARTY_INELIGIBLE,
         ...TERM_ERROR_EXAMPLES,
         EXAMPLES.OPEN_LIMIT_REACHED,

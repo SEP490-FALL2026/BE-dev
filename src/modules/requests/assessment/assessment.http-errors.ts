@@ -11,6 +11,7 @@ import {
   AccessRequestApplicationRetiredError,
   AccessRequestNoDepartmentError,
   AccessRequestNotFoundError,
+  AccessRequestPlanBoundToDeviceError,
   AccessRequestPlanNotFoundError,
   AccessRequestSuperAdminCannotRequestError,
 } from '../access-request/access-request.errors';
@@ -152,6 +153,7 @@ export const ASSESSMENT_ERROR_EXAMPLES = {
   FINANCE_SETUP_INCOMPLETE: example(new FinanceSetupIncompleteError('<department-id>')),
   SUPER_ADMIN_CANNOT_REQUEST: example(new AccessRequestSuperAdminCannotRequestError()),
   PLAN_NOT_FOUND: example(new AccessRequestPlanNotFoundError()),
+  PLAN_BOUND_TO_DEVICE: example(new AccessRequestPlanBoundToDeviceError()),
   APPLICATION_RETIRED: example(new AccessRequestApplicationRetiredError()),
   OWN_REQUEST: example(new AssessmentRefusedError('OWN_REQUEST')),
   ASSESSMENT_NOT_IN_CHARGE: example(new AssessmentRefusedError('ASSESSMENT_NOT_IN_CHARGE')),

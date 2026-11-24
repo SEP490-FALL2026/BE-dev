@@ -28,6 +28,7 @@ import {
   AccessRequestNotRequesterError,
   AccessRequestNotAwaitingRevisionError,
   AccessRequestNotPriceableError,
+  AccessRequestPlanBoundToDeviceError,
   AccessRequestPlanNotFoundError,
 } from './access-request.errors';
 
@@ -59,6 +60,9 @@ export function toAccessRequestApiException(error: unknown): unknown {
   }
   if (error instanceof AccessRequestApplicationRetiredError) {
     return refuse(HttpStatus.CONFLICT, 'ACCESS_REQUEST.APPLICATION_RETIRED', error.message);
+  }
+  if (error instanceof AccessRequestPlanBoundToDeviceError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'ACCESS_REQUEST.PLAN_BOUND_TO_DEVICE', error.message);
   }
   if (error instanceof AccessRequestNoDepartmentError) {
     return refuse(HttpStatus.CONFLICT, 'ACCESS_REQUEST.NO_DEPARTMENT', error.message);
@@ -182,6 +186,7 @@ export const ACCESS_REQUEST_ERROR_EXAMPLES = {
   NOT_AWAITING_REVISION: example(new AccessRequestNotAwaitingRevisionError()),
   NOT_FOUND: example(new AccessRequestNotFoundError()),
   PLAN_NOT_FOUND: example(new AccessRequestPlanNotFoundError()),
+  PLAN_BOUND_TO_DEVICE: example(new AccessRequestPlanBoundToDeviceError()),
   APPLICATION_RETIRED: example(new AccessRequestApplicationRetiredError()),
   TERM_REQUIRED: example(new AccessRequestTermRefusedError('TERM_REQUIRED')),
   TERM_MONTHS_OUT_OF_RANGE: example(new AccessRequestTermRefusedError('TERM_MONTHS_OUT_OF_RANGE', null, 'K1')),

@@ -10,6 +10,7 @@ import {
   AccessRequestNoDepartmentError,
   AccessRequestNotFoundError,
   AccessRequestNotPriceableError,
+  AccessRequestPlanBoundToDeviceError,
   AccessRequestPlanNotFoundError,
   AccessRequestSuperAdminCannotRequestError,
   AccessRequestWithdrawalRefusedError,
@@ -110,6 +111,7 @@ const PERSON = '<employee-id>';
 /** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
 export const GROUP_REQUEST_ERROR_EXAMPLES = {
   PLAN_NOT_FOUND: example(new AccessRequestPlanNotFoundError()),
+  PLAN_BOUND_TO_DEVICE: example(new AccessRequestPlanBoundToDeviceError()),
   APPLICATION_RETIRED: example(new AccessRequestApplicationRetiredError()),
   NO_DEPARTMENT: example(new AccessRequestNoDepartmentError()),
   FINANCE_SETUP_INCOMPLETE: example(new FinanceSetupIncompleteError('<department-id>')),

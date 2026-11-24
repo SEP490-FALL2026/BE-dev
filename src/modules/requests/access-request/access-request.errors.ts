@@ -27,6 +27,20 @@ export class AccessRequestApplicationRetiredError extends Error {
   }
 }
 
+/** True when a K4 plan is bound to a device (`DEVICE_KEY` or `DEVICE_BUNDLED`) and cannot be requested in MF-1 (`W2-18`). */
+export const isDeviceBoundKeyBinding = (keyBinding: string | null | undefined): boolean =>
+  keyBinding === 'DEVICE_KEY' || keyBinding === 'DEVICE_BUNDLED';
+
+/** A device-bound plan (`DEVICE_KEY` or `DEVICE_BUNDLED`) is activated on a device, not requested through MF-1 (`W2-18`). */
+export class AccessRequestPlanBoundToDeviceError extends Error {
+  constructor() {
+    super(
+      'A device-bound plan cannot be requested through an access request; record its activation on a device instead.',
+    );
+    this.name = 'AccessRequestPlanBoundToDeviceError';
+  }
+}
+
 /** The person sending belongs to no department on the day: a request is charged to the Unit of a department (`INV-20`). */
 export class AccessRequestNoDepartmentError extends Error {
   constructor() {
