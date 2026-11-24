@@ -4,7 +4,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditApi } from '../../audit/public/audit.api';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import type { SeatTarget } from '../../catalog/public/catalog.types';
-import type { DepartmentSoftwareEntryResult } from '../../licensing/public/licensing-department-tools.types';
+import type { DepartmentSoftwareEntryResult } from '../../licensing/public/licensing-department-tools.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import {
   AccessRequestApplicationRetiredError,

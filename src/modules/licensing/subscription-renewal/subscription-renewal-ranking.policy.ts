@@ -1,5 +1,5 @@
 import type { BusinessDate } from '../../../core/business-date';
-import type { RenewalSeatUsage } from '../public/licensing-subscription-renewal.types';
+import type { RenewalSeatUsage } from '../public/licensing-renewal.types';
 import type { HeldSeat, SeatRankGroup } from './subscription-renewal.types';
 
 /** A personal seat of the subscription with what the ranking reads: whether its holder left, and the evidence of use if any. */

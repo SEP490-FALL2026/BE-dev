@@ -2,8 +2,10 @@ import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
-import { LicensingDepartmentToolsApi } from '../../licensing/public/licensing-department-tools.api';
-import type { DepartmentSoftwareEntryResult } from '../../licensing/public/licensing-department-tools.types';
+import {
+  LicensingDepartmentToolsApi,
+  type DepartmentSoftwareEntryResult,
+} from '../../licensing/public/licensing-department-tools.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { CatalogLinkRefusedError } from '../assessment/assessment.errors';
 

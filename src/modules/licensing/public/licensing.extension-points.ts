@@ -5,8 +5,7 @@ import { Hook } from '../../../core/extension/hook';
 import { Listeners } from '../../../core/extension/listeners';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import type { PendingRenewal } from './licensing-renewal.types';
-import type { RenewalFinancialReader, RenewalUsageReader } from './licensing-subscription-renewal.types';
+import type { PendingRenewal, RenewalFinancialReader, RenewalUsageReader } from './licensing-renewal.types';
 import type { SeatBaselineClosedHolder } from './licensing.types';
 import type {
   GrantOutcome,

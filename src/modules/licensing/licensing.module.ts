@@ -22,7 +22,7 @@ import { UsageFactsRepo } from './assignment/usage-facts.repo';
 import { RuleSeatsFactsService } from './assignment/rule-seats-facts.service';
 import { RuleSeatsRepo } from './assignment/rule-seats.repo';
 import { SharedPoolVacancyService } from './shared-pool/shared-pool-vacancy.service';
-import { AssignmentSeatOccupancy } from './assignment/assignment-seat-occupancy.listener';
+import { AssignmentSeatOccupancy } from './assignment/occupancy/assignment-seat-occupancy.listener';
 import { AssignmentServiceAccountReader } from './assignment/assignment-service-account.listener';
 import { AssignmentListService } from './assignment/assignment-list.service';
 import { AssignmentService } from './assignment/assignment.service';
@@ -86,6 +86,10 @@ import { LicensingSeatMonthApi } from './public/licensing-seat-month.api';
 import { AssignmentSeatMonthRepo } from './assignment/assignment-seat-month.repo';
 import { LicensingRenewalApi } from './public/licensing-renewal.api';
 import { LicensingSeatBaselineApi } from './public/licensing-seat-baseline.api';
+import { LicensingDeviceActivationApi } from './public/licensing-device-activation.api';
+import { DeviceActivationQueryService } from './device-activation/device-activation-query.service';
+import { DeviceActivationRepo } from './device-activation/device-activation.repo';
+import { DeviceActivationService } from './device-activation/device-activation.service';
 import { ProvisioningCancellationService } from './provisioning/grant-cancellation/provisioning-cancellation.service';
 import { ProvisioningDecisionService } from './provisioning/tasks/provisioning-decision.service';
 import { ProvisioningFailureService } from './provisioning/provisioning-failure.service';
@@ -339,6 +343,10 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     LicensingDepartmentToolsApi,
     LicensingRenewalApi,
     LicensingSeatBaselineApi,
+    DeviceActivationRepo,
+    DeviceActivationService,
+    DeviceActivationQueryService,
+    LicensingDeviceActivationApi,
   ],
   // Other modules read through the facade and bind the extension points; the capability services and the repos stay private.
   exports: [
@@ -352,6 +360,7 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     LicensingDepartmentToolsApi,
     LicensingRenewalApi,
     LicensingSeatBaselineApi,
+    LicensingDeviceActivationApi,
     GrantRequestGateHook,
     RevocationListeners,
     RenewalHoldHook,
