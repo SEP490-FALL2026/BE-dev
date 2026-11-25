@@ -105,3 +105,4 @@ export class LicenseLotPageResponseDto extends createZodDto(
 ) {}
 
 export type LicenseLotWire = z.infer<typeof lotDetailSchema>;
+export type LicenseLotSummaryWire = z.infer<typeof lotSchema>;

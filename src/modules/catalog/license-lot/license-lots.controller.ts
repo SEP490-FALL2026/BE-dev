@@ -21,7 +21,7 @@ import {
   UpdateLicenseLotBodyDto,
 } from './license-lot.dto';
 import { LICENSE_LOT_ERROR_EXAMPLES as EXAMPLES, toLicenseLotApiException } from './license-lot.http-errors';
-import { toLicenseLotWire } from './license-lot.mapper';
+import { toLicenseLotSummaryWire, toLicenseLotWire } from './license-lot.mapper';
 import { LicenseLotService } from './license-lot.service';
 import { LicenseLotResponsibleService } from './license-lot-responsible.service';
 
@@ -72,7 +72,7 @@ export class LicenseLotsController {
     try {
       const page = await this.lots.list(query);
 
-      return { ...page, items: page.items.map(toLicenseLotWire) };
+      return { ...page, items: page.items.map(toLicenseLotSummaryWire) };
     } catch (error) {
       throw toLicenseLotApiException(error);
     }

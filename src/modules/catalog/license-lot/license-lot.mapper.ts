@@ -1,10 +1,10 @@
 import { DONG, formatAmount } from '../../../core/money/money';
-import type { LicenseLotWire } from './license-lot.dto';
+import type { LicenseLotSummaryWire, LicenseLotWire } from './license-lot.dto';
 import type { LicenseLotDetail } from './license-lot.types';
 
 const dong = (minor: bigint) => ({ amount: formatAmount(minor, 0), currency: DONG });
 
-/** A lot as the routes answer it: money in dong as decimal text, dates as ISO text. */
+/** A lot as the detail routes answer it: money in dong as decimal text, dates as ISO text. */
 export function toLicenseLotWire(lot: LicenseLotDetail): LicenseLotWire {
   return {
     id: lot.id,
@@ -29,4 +29,15 @@ export function toLicenseLotWire(lot: LicenseLotDetail): LicenseLotWire {
       : null,
     updatedAt: lot.updatedAt.toISOString(),
   };
+}
+
+/** A lot as a page of the list shows it: the detail without the note, the request, the invoice and the quote in another currency. */
+export function toLicenseLotSummaryWire(lot: LicenseLotDetail): LicenseLotSummaryWire {
+  const detail: Partial<LicenseLotWire> = toLicenseLotWire(lot);
+  delete detail.note;
+  delete detail.requestId;
+  delete detail.invoiceActual;
+  delete detail.originalUnitPrice;
+
+  return detail as LicenseLotSummaryWire;
 }
