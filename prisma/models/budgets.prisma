@@ -370,6 +370,7 @@ model BudgetCommitment {
   seatMonths      SeatMonthCharge[]
   seatMonthReversals BudgetCommitmentSeatMonthReversal[]
   months          BudgetCommitmentMonth[]
+  licenseLotCharges LicenseLotCharge[]
 
   @@unique([requestId, year])
   @@index([costCenterId, year, state])
@@ -814,4 +815,28 @@ model BudgetThresholdAlert {
 
   @@unique([costCenterId, year, threshold, episode], map: "budget_threshold_alerts_episode_key")
   @@map("budget_threshold_alerts")
+}
+
+// What a lot cost that no invoice carries: a license left over in the store, given for the first time to a request (W3-25). One per key, written once.
+model LicenseLotCharge {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  licenseLotId   String   @map("license_lot_id") @db.Uuid
+  licenseKeyId   String   @unique @map("license_key_id") @db.Uuid
+  commitmentId   String?  @map("commitment_id") @db.Uuid
+  costCenterId   String   @map("cost_center_id") @db.Uuid
+  // The first day of the month the cost belongs to.
+  month          DateTime @db.Date
+  amountMinor    BigInt   @map("amount_minor")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  licenseLot   LicenseLot        @relation(fields: [licenseLotId], references: [id], onDelete: Restrict)
+  licenseKey   LicenseKey        @relation(fields: [licenseKeyId], references: [id], onDelete: Restrict)
+  commitment   BudgetCommitment? @relation(fields: [commitmentId], references: [id], onDelete: Restrict)
+  costCenter   CostCenter        @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+
+  @@index([licenseLotId])
+  @@index([costCenterId, month])
+  @@map("license_lot_charges")
 }

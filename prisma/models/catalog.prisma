@@ -256,6 +256,7 @@ model Plan {
   deviceActivations      DeviceActivation[]
   subscriptions          Subscription[]
   subscriptionLines      SubscriptionLine[]
+  licenseLots            LicenseLot[]
   usageRate              PlanUsageRate?
   terms                  PlanTerms?
   termOpinions           PlanTermOpinion[]
@@ -423,6 +424,7 @@ model Subscription {
   licenseKeys         LicenseKey[]
   contractLink        ContractSubscription?
   lines               SubscriptionLine[]
+  legacyLot           LicenseLot?
 
   @@index([planId])
   @@index([responsibleItAdminEmployeeId])
@@ -547,6 +549,7 @@ model Contract {
   vendor        Vendor?                @relation(fields: [vendorId], references: [id], onDelete: Restrict)
   documents     DocumentAttachment[]
   subscriptions ContractSubscription[]
+  licenseLots   LicenseLot[]
 
   @@unique([organizationId, numberKey])
   @@index([vendorId])
@@ -638,6 +641,7 @@ model Workspace {
   admins             WorkspaceAdmin[]
   subscriptions      Subscription[]
   subscriptionLines  SubscriptionLine[]
+  licenseLots        LicenseLot[]
 
   @@unique([organizationId, vendorId, normalizedName])
   @@index([vendorId])
@@ -756,4 +760,47 @@ model SeatChange {
   @@index([subscriptionLineId, effectiveOn])
   @@index([requestId])
   @@map("seat_changes")
+}
+
+// One purchase of licenses of a K4 plan (W3-24): its own count of licenses, price, purpose and who answers for it. A lot born from a perpetual
+// purchase has the id of that subscription. The checks, the partial unique index of the lot of a request and the triggers are SQL in the migration (ADR-0005).
+model LicenseLot {
+  id                           String    @id @default(uuid(7)) @db.Uuid
+  organizationId               String    @map("organization_id") @db.Uuid
+  planId                       String    @map("plan_id") @db.Uuid
+  workspaceId                  String?   @map("workspace_id") @db.Uuid
+  purchasedOn                  DateTime  @map("purchased_on") @db.Date
+  licenseCount                 Int       @map("license_count")
+  // The price of one license before tax, in dong; the original price is a note of what the vendor quoted (QĐ-111an).
+  unitPriceMinor               BigInt    @map("unit_price_minor")
+  originalUnitPriceMinor       BigInt?   @map("original_unit_price_minor")
+  originalCurrency             String?   @map("original_currency") @db.Char(3)
+  // What Finance confirmed the invoice of the lot at; set by the system.
+  invoiceActualMinor           BigInt?   @map("invoice_actual_minor")
+  // OPENING, REQUEST, REPLACEMENT or STOCK (a CHECK).
+  purpose                      String
+  // A value, not a foreign key: the request belongs to another module.
+  requestId                    String?   @map("request_id") @db.Uuid
+  contractId                   String?   @map("contract_id") @db.Uuid
+  responsibleItAdminEmployeeId String?   @map("responsible_it_admin_employee_id") @db.Uuid
+  legacySubscriptionId         String?   @unique @map("legacy_subscription_id") @db.Uuid
+  note                         String?
+  createdAt                    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization       Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  plan               Plan               @relation(fields: [planId], references: [id], onDelete: Restrict)
+  workspace          Workspace?         @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  contract           Contract?          @relation(fields: [contractId], references: [id], onDelete: Restrict)
+  responsibleItAdmin Employee?          @relation("LicenseLotInCharge", fields: [responsibleItAdminEmployeeId], references: [id], onDelete: Restrict)
+  legacySubscription Subscription?      @relation(fields: [legacySubscriptionId], references: [id], onDelete: Restrict)
+  keys               LicenseKey[]
+  charges            LicenseLotCharge[]
+  purchaseInvoices   PurchaseInvoice[]
+
+  @@index([planId])
+  @@index([workspaceId])
+  @@index([contractId])
+  @@index([responsibleItAdminEmployeeId])
+  @@map("license_lots")
 }

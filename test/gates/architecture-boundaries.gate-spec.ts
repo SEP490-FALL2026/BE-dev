@@ -92,6 +92,8 @@ const PRISMA_MODEL_OWNER: Readonly<Record<string, string>> = {
   SeatPurchase: 'catalog',
   SeatChange: 'catalog',
   SubscriptionLineTarget: 'licensing',
+  LicenseLot: 'catalog',
+  LicenseLotCharge: 'budgets',
   FunctionalGroup: 'catalog',
   Vendor: 'catalog',
   VendorGroup: 'catalog',

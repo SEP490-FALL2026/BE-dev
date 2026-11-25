@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import type { Client } from 'pg';
 
 /** The day `offset` days from today, as `YYYY-MM-DD` (UTC; the specs keep a month of margin against the zone of the organization). */
@@ -73,7 +73,12 @@ export async function lineWorld(sql: Client) {
     return { vendorId, workspaceId };
   };
 
-  const plan = async (vendorId: string, name: string, type: 'K2' | 'K3' = 'K2'): Promise<string> => {
+  const plan = async (
+    vendorId: string,
+    name: string,
+    type: 'K2' | 'K3' | 'K4' = 'K2',
+    binding: 'ACCOUNT' | 'DEVICE_KEY' | 'DEVICE_BUNDLED' | null = type === 'K4' ? 'ACCOUNT' : null,
+  ): Promise<string> => {
     const applicationId = randomUUID();
     await sql.query(
       `INSERT INTO applications (id, organization_id, kind, vendor_id, functional_group_id, name, normalized_name, responsible_it_admin_employee_id)
@@ -82,12 +87,57 @@ export async function lineWorld(sql: Client) {
     );
     const planId = randomUUID();
     await sql.query(
-      `INSERT INTO plans (id, organization_id, application_id, name, normalized_name, provisioning_type, pricing_model, control_level)
-       VALUES ($1, $2, $3, $4, lower($4), $5::"ProvisioningType", $6::"PricingModel", 'FULL'::"ControlLevel")`,
-      [planId, organizationId, applicationId, name, type, type === 'K2' ? 'PER_SEAT' : null],
+      `INSERT INTO plans (id, organization_id, application_id, name, normalized_name, provisioning_type, pricing_model, control_level, key_binding)
+       VALUES ($1, $2, $3, $4, lower($4), $5::"ProvisioningType", $6::"PricingModel", 'FULL'::"ControlLevel", $7::"PlanKeyBinding")`,
+      [planId, organizationId, applicationId, name, type, type === 'K2' ? 'PER_SEAT' : null, binding],
     );
 
     return planId;
+  };
+
+  /** A perpetual purchase (a subscription bought once) of a plan: active with its price, or a draft. */
+  const perpetual = async (
+    planId: string,
+    options: { status?: 'ACTIVE' | 'DRAFT'; quantity?: number | null; unitPriceMinor?: number | null } = {},
+  ): Promise<string> => {
+    const id = randomUUID();
+    const price = options.unitPriceMinor === undefined ? 1500000 : options.unitPriceMinor;
+    await sql.query(
+      `INSERT INTO subscriptions (id, organization_id, plan_id, kind, status, purchased_quantity, start_date, responsible_it_admin_employee_id,
+         unit_price_minor, unit_price_currency, price_recorded_on, price_rate, price_rate_date, price_rate_source, price_reporting_minor,
+         price_reporting_currency, updated_at)
+       VALUES ($1, $2, $3, 'PERPETUAL'::"SubscriptionKind", $4::"SubscriptionStatus", $5, '2026-09-01', $6,
+         $7::bigint, CASE WHEN $7::bigint IS NULL THEN NULL ELSE 'VND' END, CASE WHEN $7::bigint IS NULL THEN NULL ELSE '2026-09-01'::date END,
+         CASE WHEN $7::bigint IS NULL THEN NULL ELSE 1.0 END, CASE WHEN $7::bigint IS NULL THEN NULL ELSE '2026-09-01'::date END,
+         CASE WHEN $7::bigint IS NULL THEN NULL ELSE 'SAME_CURRENCY'::"PriceRateSource" END, $7::bigint,
+         CASE WHEN $7::bigint IS NULL THEN NULL ELSE 'VND' END, now())`,
+      [
+        id,
+        organizationId,
+        planId,
+        options.status ?? 'ACTIVE',
+        options.quantity === undefined ? 3 : options.quantity,
+        khoa,
+        price,
+      ],
+    );
+
+    return id;
+  };
+
+  /**
+   * A key in the vault of a subscription, as the import of wave 2 writes it (a lot born from the subscription takes it by the id). Before the
+   * migration of the lots the table has no cost column: pass `false` for `afterLots` then.
+   */
+  const key = async (subscriptionId: string, afterLots = true): Promise<string> => {
+    const id = randomUUID();
+    await sql.query(
+      `INSERT INTO license_keys (id, organization_id, subscription_id, ${afterLots ? 'cost_borne, ' : ''}fingerprint, masked, ciphertext, cipher_key_id,
+         imported_by_app_user_id) VALUES ($1, $2, $3, ${afterLots ? 'true, ' : ''}$4, '....1234', decode(repeat('ab', 40), 'hex'), 'k1', $5)`,
+      [id, organizationId, subscriptionId, randomBytes(32).toString('hex'), randomUUID()],
+    );
+
+    return id;
   };
 
   /** A period (a subscription) of a plan in a workspace; by default an active monthly one that began two months ago and ends in ten months. */
@@ -207,5 +257,5 @@ export async function lineWorld(sql: Client) {
     );
   };
 
-  return { organizationId, khoa, nam, person, vendor, plan, period, line, seat, adjust };
+  return { organizationId, khoa, nam, person, vendor, plan, period, perpetual, key, line, seat, adjust };
 }

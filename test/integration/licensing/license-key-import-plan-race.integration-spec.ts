@@ -90,9 +90,9 @@ describe('license key import and the kind of its plan, racing (integration, P28-
     const fingerprint = h.ctx.app.get(LicenseKeyCipher, { strict: false }).fingerprint(held);
     await holder.query('BEGIN');
     await holder.query(
-      `INSERT INTO license_keys (id, organization_id, subscription_id, fingerprint, masked, ciphertext, cipher_key_id,
+      `INSERT INTO license_keys (id, organization_id, subscription_id, cost_borne, fingerprint, masked, ciphertext, cipher_key_id,
          imported_by_app_user_id)
-       VALUES ($1, $2, $3, $4, 'HELD', decode(repeat('00', 29), 'hex'), 'k1', $5)`,
+       VALUES ($1, $2, $3, true, $4, 'HELD', decode(repeat('00', 29), 'hex'), 'k1', $5)`,
       [randomUUID(), h.seed.organizationId, other.subscriptionId, fingerprint, h.it1.appUserId],
     );
 

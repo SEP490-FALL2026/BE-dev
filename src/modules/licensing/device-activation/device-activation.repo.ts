@@ -89,20 +89,27 @@ export class DeviceActivationRepo {
         id: true,
         organizationId: true,
         subscriptionId: true,
+        licenseLotId: true,
         masked: true,
         withdrawnAt: true,
         maxActivations: true,
         initialActivationsUsed: true,
         subscription: { select: { planId: true } },
+        licenseLot: { select: { planId: true } },
       },
     });
     if (!row) return null;
 
+    // The purchase of a key is its lot, or its subscription for a key entered before lots (a lot born from a subscription has its id).
+    const purchaseId = row.licenseLotId ?? row.subscriptionId;
+    const plan = row.licenseLot ?? row.subscription;
+    if (purchaseId === null || plan === null) throw new Error('A license key belongs to a lot or a subscription.');
+
     return {
       id: row.id,
       organizationId: row.organizationId,
-      subscriptionId: row.subscriptionId,
-      planId: row.subscription.planId,
+      subscriptionId: purchaseId,
+      planId: plan.planId,
       masked: row.masked,
       withdrawnAt: row.withdrawnAt,
       maxActivations: row.maxActivations,
@@ -121,10 +128,11 @@ export class DeviceActivationRepo {
     if (licenseKeyIds.length === 0) return result;
     const rows = await (tx ?? this.prisma).licenseKey.findMany({
       where: { id: { in: [...licenseKeyIds] } },
-      select: { id: true, subscriptionId: true },
+      select: { id: true, subscriptionId: true, licenseLotId: true },
     });
     for (const row of rows) {
-      result.set(row.id, row.subscriptionId);
+      const purchaseId = row.licenseLotId ?? row.subscriptionId;
+      if (purchaseId !== null) result.set(row.id, purchaseId);
     }
 
     return result;

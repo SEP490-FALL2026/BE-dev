@@ -101,6 +101,7 @@ import { WorkspaceForSubscriptionService } from './workspace/workspace-for-subsc
 import { WorkspaceResponsibleService } from './workspace/workspace-responsible.service';
 import { WorkspaceService } from './workspace/workspace.service';
 import { WorkspaceRepo } from './workspace/workspace.repo';
+import { LicenseLotRepo } from './license-lot/license-lot.repo';
 import { SeatLedgerRepo } from './subscription-line/ledger/seat-ledger.repo';
 import { SeatPurchaseRepo } from './subscription-line/purchase/seat-purchase.repo';
 import { SubscriptionLineRepo } from './subscription-line/subscription-line.repo';
@@ -178,6 +179,7 @@ import { WorkspacesController } from './workspace/workspaces.controller';
     WorkspaceForSubscriptionService,
     WorkspaceRepo,
     SubscriptionLineRepo,
+    LicenseLotRepo,
     SeatLedgerRepo,
     SeatPurchaseRepo,
     WorkspaceApi,

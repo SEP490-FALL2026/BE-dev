@@ -1250,6 +1250,8 @@ model PurchaseInvoice {
   // The purchase of seats the invoice pays for (one open invoice per purchase), and the lines of the period when the vendor splits the invoice.
   seatPurchaseId      String?  @map("seat_purchase_id") @db.Uuid
   subscriptionLineIds String[] @map("subscription_line_ids") @db.Uuid
+  // The lot the invoice pays for (link kind LICENSE_LOT); one open invoice per lot.
+  licenseLotId        String?  @map("license_lot_id") @db.Uuid
 
   request         AccessRequest?            @relation(fields: [requestId], references: [id], onDelete: Restrict)
   resubmissionOf  PurchaseInvoice?          @relation("PurchaseInvoiceResubmission", fields: [resubmissionOfId], references: [id], onDelete: Restrict)
@@ -1257,6 +1259,7 @@ model PurchaseInvoice {
   documents       PurchaseInvoiceDocument[]
   discrepancyCase InvoiceDiscrepancyCase?
   seatPurchase    SeatPurchase?             @relation(fields: [seatPurchaseId], references: [id], onDelete: Restrict)
+  licenseLot      LicenseLot?               @relation(fields: [licenseLotId], references: [id], onDelete: Restrict)
 
   // The partial unique index of the open number, the checks and the trigger are SQL in the migration (ADR-0005).
   @@index([requestId, serviceMonth], map: "purchase_invoices_request_service_month_idx")

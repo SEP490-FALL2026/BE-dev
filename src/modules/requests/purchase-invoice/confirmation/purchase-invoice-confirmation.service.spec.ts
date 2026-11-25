@@ -62,6 +62,7 @@ function makeRow(over: Partial<PurchaseInvoiceRow> = {}): PurchaseInvoiceRow {
     expectedUnitPriceOriginalCurrency: 'VND',
     seatPurchaseId: null,
     subscriptionLineIds: [],
+    licenseLotId: null,
     ...over,
   };
 }

@@ -102,6 +102,7 @@ function makePurchaseRow(over: Partial<PurchaseInvoiceRow> = {}): PurchaseInvoic
     expectedUnitPriceOriginalCurrency: 'USD',
     seatPurchaseId: null,
     subscriptionLineIds: [],
+    licenseLotId: null,
     ...over,
   };
 }

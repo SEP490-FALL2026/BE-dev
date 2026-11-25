@@ -44,6 +44,7 @@ import { CommitmentService } from './commitment/commitment.service';
 import { SharedPoolLineAlertService } from './shared-pool-line/shared-pool-line-alert.service';
 import { SharedPoolLineFactsService } from './shared-pool-line/shared-pool-line-facts.service';
 import { SharedPoolLineRepo } from './shared-pool-line/shared-pool-line.repo';
+import { LicenseLotChargeRepo } from './shared-pool-line/license-lot-charge.repo';
 import { BudgetInvoicesController } from './invoice/budget-invoices.controller';
 import { BudgetCyclesController } from './cycle/budget-cycles.controller';
 import { BaselineService } from './cycle/baseline.service';
@@ -264,6 +265,7 @@ import { BudgetProposalTemplateListener } from './proposal/budget-proposal-templ
     CommitmentMonthFacadeService,
     CommitmentMonthSettlementService,
     SharedPoolLineRepo,
+    LicenseLotChargeRepo,
     SharedPoolLineFactsService,
     SharedPoolLineAlertService,
     RunningUncommittedRepo,

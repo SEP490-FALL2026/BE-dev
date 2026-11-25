@@ -307,7 +307,11 @@ enum LicenseKeyStatus {
 model LicenseKey {
   id                  String           @id @default(uuid()) @db.Uuid
   organizationId      String           @map("organization_id") @db.Uuid
-  subscriptionId      String           @map("subscription_id") @db.Uuid
+  // Null for a key of a lot that came from no subscription (W3-24); at least one of the two is set (CHECK license_keys_lot_or_subscription).
+  subscriptionId      String?          @map("subscription_id") @db.Uuid
+  licenseLotId        String?          @map("license_lot_id") @db.Uuid
+  // Who bears the cost of the key: false for a key bought for a request (its cost was charged then), true for the others. Set by the application, never by default; it only goes from false to true.
+  costBorne           Boolean          @map("cost_borne")
   fingerprint         String
   masked              String
   ciphertext          Bytes
@@ -328,12 +332,15 @@ model LicenseKey {
   updatedAt              DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  subscription      Subscription       @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+  subscription      Subscription?      @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+  licenseLot        LicenseLot?        @relation(fields: [licenseLotId], references: [id], onDelete: Restrict)
   assignment        LicenseAssignment? @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
   deviceActivations DeviceActivation[]
+  charge            LicenseLotCharge?
 
   @@unique([organizationId, fingerprint])
   @@index([subscriptionId, status])
+  @@index([licenseLotId, status])
   @@map("license_keys")
 }
 
