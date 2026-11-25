@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/business-date';
+import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 
@@ -24,6 +25,20 @@ export interface SubscriptionMonthSeatTotal {
   month: BusinessDate;
   amountMinor: bigint;
   appliedMinor: bigint;
+}
+
+export interface SubscriptionInvoiceVariance {
+  subscriptionId: string;
+  varianceMinor: bigint;
+  varianceInReviewMinor: bigint;
+}
+
+export interface MonthlyPoolSubscriptionFigure {
+  subscriptionId: string;
+  month: BusinessDate;
+  invoicedMinor: bigint;
+  allocatedMinor: bigint;
+  withoutCostCenterMinor: bigint;
 }
 
 /**
@@ -132,6 +147,81 @@ export class SharedPoolLineRepo {
       month: row.month,
       amountMinor: BigInt(row.amount_minor),
       appliedMinor: BigInt(row.applied_minor),
+    }));
+  }
+
+  async invoiceVariancesBySubscriptionMonth(
+    organizationId: string,
+    month: BusinessDate,
+    tx?: DbTx,
+  ): Promise<SubscriptionInvoiceVariance[]> {
+    const rows = await (tx ?? this.prisma).$queryRaw<
+      { subscription_id: string; variance: string; variance_in_review: string }[]
+    >`
+      SELECT i.subscription_id,
+             COALESCE(SUM(i.pool_variance_minor) FILTER (WHERE NOT (i.pool_variance_in_review AND r.invoice_id IS NULL)), 0)::text AS variance,
+             COALESCE(SUM(i.pool_variance_minor) FILTER (WHERE i.pool_variance_in_review AND r.invoice_id IS NULL), 0)::text AS variance_in_review
+        FROM invoices i
+        LEFT JOIN invoice_pool_variance_resolutions r ON r.invoice_id = i.id
+       WHERE i.organization_id = ${organizationId}::uuid
+         AND i.pool_variance_month = ${month}::date
+         AND i.pool_variance_minor IS NOT NULL
+         AND i.subscription_id IS NOT NULL
+       GROUP BY i.subscription_id
+       ORDER BY i.subscription_id ASC`;
+
+    return rows.map((row) => ({
+      subscriptionId: row.subscription_id,
+      varianceMinor: BigInt(row.variance),
+      varianceInReviewMinor: BigInt(row.variance_in_review),
+    }));
+  }
+
+  /** Monthly invoiced, allocated and without-cost-center totals per pool subscription. */
+  async monthlyFigures(
+    input: { from: BusinessDate; until: BusinessDate; invoicedIds: readonly string[]; only?: string },
+    tx?: DbTx,
+  ): Promise<MonthlyPoolSubscriptionFigure[]> {
+    const only = (column: string) =>
+      input.only ? Prisma.sql`AND ${Prisma.raw(column)} = ${input.only}::uuid` : Prisma.empty;
+    const rows = await (tx ?? this.prisma).$queryRaw<
+      {
+        subscription_id: string;
+        month: string;
+        invoiced: string;
+        allocated: string;
+        without_cost_center: string;
+      }[]
+    >`
+      SELECT COALESCE(i.subscription_id, a.subscription_id) AS subscription_id,
+             to_char(COALESCE(i.month, a.month), 'YYYY-MM-DD') AS month,
+             COALESCE(i.invoiced, 0)::text AS invoiced,
+             COALESCE(a.allocated, 0)::text AS allocated,
+             COALESCE(a.without_cost_center, 0)::text AS without_cost_center
+        FROM (SELECT subscription_id, service_month AS month, SUM(actual_cost_minor) AS invoiced
+                FROM invoices
+               WHERE subscription_id = ANY(${[...input.invoicedIds]}::uuid[])
+                 AND commitment_id IS NULL
+                 AND cost_center_id IS NULL
+                 AND service_month >= ${input.from}::date
+                 AND service_month < ${input.until}::date ${only('subscription_id')}
+               GROUP BY subscription_id, service_month) i
+        FULL JOIN (SELECT subscription_id,
+                          month,
+                          SUM(amount_minor) AS allocated,
+                          SUM(amount_minor) FILTER (WHERE cost_center_id IS NULL) AS without_cost_center
+                     FROM seat_month_charges
+                    WHERE month >= ${input.from}::date AND month < ${input.until}::date ${only('subscription_id')}
+                    GROUP BY subscription_id, month) a
+               ON a.subscription_id = i.subscription_id AND a.month = i.month
+       ORDER BY 1, 2`;
+
+    return rows.map((row) => ({
+      subscriptionId: row.subscription_id,
+      month: row.month,
+      invoicedMinor: BigInt(row.invoiced),
+      allocatedMinor: BigInt(row.allocated),
+      withoutCostCenterMinor: BigInt(row.without_cost_center),
     }));
   }
 }

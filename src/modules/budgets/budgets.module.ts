@@ -38,6 +38,8 @@ import { CommitmentMonthService } from './commitment/month/commitment-month.serv
 import { CommitmentMonthSettlementService } from './commitment/month/commitment-month-settlement.service';
 import { CommitmentMonthFacadeService } from './commitment/commitment-month-facade.service';
 import { CommitmentService } from './commitment/commitment.service';
+import { SharedPoolLineAlertService } from './shared-pool-line/shared-pool-line-alert.service';
+import { SharedPoolLineFactsService } from './shared-pool-line/shared-pool-line-facts.service';
 import { SharedPoolLineRepo } from './shared-pool-line/shared-pool-line.repo';
 import { BudgetInvoicesController } from './invoice/budget-invoices.controller';
 import { BudgetCyclesController } from './cycle/budget-cycles.controller';
@@ -110,7 +112,7 @@ import { BudgetReviewPriceService } from './review/budget-review-price.service';
 import { BudgetReviewQueryService } from './review/budget-review-query.service';
 import { BudgetReviewSnapshotService } from './review/budget-review-snapshot.service';
 import { BudgetReviewSignatureService } from './review/budget-review-signature.service';
-import { BudgetReviewReminderService } from './review/budget-review-reminder.service';
+import { BudgetReviewReminderService } from './review/reminder/budget-review-reminder.service';
 import { BudgetReviewSweeper } from './review/budget-review.job';
 import { SeatMonthChargesController } from './seat-month/seat-month-charges.controller';
 import { SeatMonthPoolService } from './seat-month/seat-month-pool.service';
@@ -259,6 +261,8 @@ import { BudgetProposalTemplateListener } from './proposal/budget-proposal-templ
     CommitmentMonthFacadeService,
     CommitmentMonthSettlementService,
     SharedPoolLineRepo,
+    SharedPoolLineFactsService,
+    SharedPoolLineAlertService,
     InvoiceService,
     PurchaseInvoiceRecorderService,
     OutOfProcessSpendRecorderService,

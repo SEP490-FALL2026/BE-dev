@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { fromDateColumn, type BusinessDate } from '../../../../core/business-date';
+import { addDays, fromDateColumn, type BusinessDate } from '../../../../core/business-date';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../../audit/public/audit.api';
@@ -11,12 +11,14 @@ import type {
   NextPeriodInput,
   PaymentScheduleFacts,
   PeriodAdjustment,
+  PoolAdjustmentWindows,
   RenewalPeriodFacts,
   SubscriptionPurchaseFacts,
 } from '../../public/subscription-period.types';
 import {
   adjustmentCommitmentOf,
   adjustmentPointOf,
+  earliestReducibleOn,
   redAlertOf,
   type AdjustmentWindows,
 } from '../obligation/subscription-obligation.policy';
@@ -149,14 +151,57 @@ export class SubscriptionPeriodService {
 
   /** What a purchase invoice reads of the subscriptions with these ids, the shared pool's included; an id that does not exist is absent. */
   async purchaseFacts(ids: readonly string[], tx?: DbTx): Promise<SubscriptionPurchaseFacts[]> {
-    return (await this.subscriptions.findMany(ids, tx)).map((record) => ({
-      subscriptionId: record.id,
-      planId: record.planId,
-      responsibleItAdminEmployeeId: record.responsibleItAdminEmployeeId,
-      purchasedQuantity: record.purchasedQuantity,
-      ...monthlyCostOf(record),
-      renewalDate: record.renewalDate,
-    }));
+    const records = await this.subscriptions.findMany(ids, tx);
+    const successors = await this.periods.successorPoolFactsOf(
+      records.map((record) => record.id),
+      tx,
+    );
+
+    return records.map((record) => {
+      const successor = successors.get(record.id);
+      const endExclusive = successor?.startDate ?? (record.endDate !== null ? addDays(record.endDate, 1) : null);
+
+      return {
+        subscriptionId: record.id,
+        planId: record.planId,
+        responsibleItAdminEmployeeId: record.responsibleItAdminEmployeeId,
+        kind: record.kind,
+        status: record.status,
+        provisioningType: record.planProvisioningType,
+        commitmentTermMonths: record.commitmentTermMonths,
+        billingCycle: record.billingCycle,
+        purchasedQuantity: record.purchasedQuantity,
+        ...monthlyCostOf(record),
+        startDate: record.startDate,
+        endDate: record.endDate,
+        endExclusive,
+        renewalDate: record.renewalDate,
+        noticeDeadline: record.noticeDeadline,
+        noticePeriodDays: record.noticePeriodDays,
+        autoRenew: record.autoRenew,
+        vendorMinimumSeats: record.vendorMinimumSeats,
+        nextPeriodPurchasedQuantity: successor?.purchasedQuantity ?? null,
+      };
+    });
+  }
+
+  /** Adjustment windows active for each subscription's period running on `referenceDay`. */
+  async adjustmentWindowsOf(
+    ids: readonly string[],
+    referenceDay: BusinessDate,
+    tx?: DbTx,
+  ): Promise<Map<string, PoolAdjustmentWindows>> {
+    const records = await this.subscriptions.findMany(ids, tx);
+
+    return this.windows.of(records, referenceDay, tx);
+  }
+
+  /** Earliest date on which a seat reduction asked on `day` can take effect for `subscriptionId`, or null when unavailable. */
+  async earliestReducibleOnFor(subscriptionId: string, day: BusinessDate, tx?: DbTx): Promise<BusinessDate | null> {
+    const record = await this.subscriptions.find(subscriptionId, tx);
+    if (!record) return null;
+
+    return earliestReducibleOn(record, day);
   }
 
   /** The period, locked `FOR UPDATE` until the caller's transaction ends (the lock a seat of it takes too); null if absent. */

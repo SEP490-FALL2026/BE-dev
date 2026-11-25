@@ -273,3 +273,20 @@ export function expiryReading(
     deadlineKind: point.kind,
   };
 }
+
+/**
+ * Earliest date on which a seat reduction asked on `today` can take effect (`Q-F`, R-LATE): before or on an annual
+ * cancellation deadline (or for any non-auto-renewing plan before it ends) it takes effect at the current period's end;
+ * once an auto-renewing annual deadline has passed it rolls to the next cycle's end; a monthly plan rolls to its next
+ * payment date. Null when no period exists or a non-renewing plan has already ended. Pure.
+ */
+export function earliestReducibleOn(input: AdjustmentInput, today: BusinessDate): BusinessDate | null {
+  const period = periodOf(input, today);
+  if (period === null) return null;
+  if (!input.autoRenew && input.endDate !== null && today > input.endDate) return null;
+  if (isByTheMonth(input)) return period.end;
+  if (!input.autoRenew) return today > period.end ? null : period.end;
+  if (today <= period.deadline) return period.end;
+
+  return addMonths(period.end, input.commitmentTermMonths ?? 12);
+}

@@ -1,4 +1,5 @@
 import { addDays, monthBoundsOf, type BusinessDate } from '../../../core/business-date';
+import { roundHalfAway as roundHalfAwayCore } from '../../../core/seat-month-cost';
 import type { HeldRange, PlacementPeriod, SeatMonthSegment } from './seat-month.types';
 
 /**
@@ -10,10 +11,7 @@ import type { HeldRange, PlacementPeriod, SeatMonthSegment } from './seat-month.
 
 /** `numerator ÷ denominator` rounded half away from zero; `denominator` is positive. */
 export function roundHalfAway(numerator: bigint, denominator: bigint): bigint {
-  const magnitude = numerator < 0n ? -numerator : numerator;
-  const rounded = (2n * magnitude + denominator) / (2n * denominator);
-
-  return numerator < 0n ? -rounded : rounded;
+  return roundHalfAwayCore(numerator, denominator);
 }
 
 const daysBetween = (from: BusinessDate, to: BusinessDate): number =>

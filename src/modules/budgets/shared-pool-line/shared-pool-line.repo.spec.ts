@@ -84,4 +84,13 @@ describe('SharedPoolLineRepo', () => {
       }),
     ).toEqual([{ subscriptionId: 'sub-1', month: '2027-01-01', amountMinor: 900_000n, appliedMinor: 500_000n }]);
   });
+
+  it('aggregates invoice pool variances by subscription for a month', async () => {
+    const { repo, queryRaw } = build();
+    queryRaw.mockResolvedValueOnce([{ subscription_id: 'sub-1', variance: '150000', variance_in_review: '50000' }]);
+
+    expect(await repo.invoiceVariancesBySubscriptionMonth('org-1', '2027-01-01')).toEqual([
+      { subscriptionId: 'sub-1', varianceMinor: 150_000n, varianceInReviewMinor: 50_000n },
+    ]);
+  });
 });

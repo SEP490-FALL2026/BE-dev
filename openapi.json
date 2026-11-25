@@ -134283,6 +134283,67 @@
                 "nullable": true
               },
               "sharedPoolOverReserve": { "type": "boolean", "nullable": true },
+              "sharedPoolLines": {
+                "type": "object",
+                "properties": {
+                  "idleCost": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false
+                  },
+                  "invoiceVariance": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false
+                  },
+                  "invoiceVarianceInReview": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false
+                  },
+                  "deviceLotPurchases": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false
+                  },
+                  "replacementKeys": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false
+                  },
+                  "total": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false
+                  },
+                  "reserve": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "overReserve": { "type": "boolean", "nullable": true }
+                },
+                "required": [
+                  "idleCost",
+                  "invoiceVariance",
+                  "invoiceVarianceInReview",
+                  "deviceLotPurchases",
+                  "replacementKeys",
+                  "total",
+                  "reserve",
+                  "overReserve"
+                ],
+                "additionalProperties": false,
+                "nullable": true
+              },
               "seatMonthsWithoutCostCenter": {
                 "type": "object",
                 "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
@@ -134300,6 +134361,7 @@
               "companySpent",
               "sharedPoolUnallocated",
               "sharedPoolOverReserve",
+              "sharedPoolLines",
               "seatMonthsWithoutCostCenter"
             ],
             "additionalProperties": false,
@@ -136139,12 +136201,77 @@
                       "additionalProperties": false,
                       "description": "What the seat-months of the month took of it."
                     },
+                    "idleCost": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "The cost of idle paid seats for the month; null when monthly price or purchased quantity is not known.",
+                      "nullable": true
+                    },
+                    "idleCostByLabel": {
+                      "type": "object",
+                      "properties": {
+                        "missedAdjustment": {
+                          "type": "object",
+                          "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        },
+                        "reducible": {
+                          "type": "object",
+                          "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        },
+                        "lockedUntil": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "object",
+                            "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": ["missedAdjustment", "reducible", "lockedUntil"],
+                      "additionalProperties": false,
+                      "description": "Breakdown of idle seat cost by adjustment-window label."
+                    },
+                    "invoiceVariance": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "Confirmed pool invoice variance assigned to the month."
+                    },
+                    "invoiceVarianceInReview": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "Pool invoice variance awaiting Finance review."
+                    },
+                    "deviceLotPurchases": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "Device-lot purchases booked to the shared pool in the month."
+                    },
+                    "replacementKeys": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "Replacement license keys booked to the shared pool in the month."
+                    },
                     "unallocated": {
                       "type": "object",
                       "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
                       "required": ["amount", "currency"],
                       "additionalProperties": false,
-                      "description": "The line \"not allocated, shared pool\": the seats paid for at the price of a month less the seat-months charged to departments (the invoices of the month less them when the seats or the price are not known)."
+                      "description": "Total shared-pool line for the month: sum of idle seat cost, invoice variances, device-lot purchases, and replacement keys when price and quantity are known, or invoiced amount less allocated seat-months otherwise."
                     },
                     "withoutCostCenter": {
                       "type": "object",
@@ -136152,9 +136279,30 @@
                       "required": ["amount", "currency"],
                       "additionalProperties": false,
                       "description": "The line \"not allocated to a Cost Center\": the part of the seat-months that fell to a department with no Cost Center yet. It is in no Cost Center and not in the line of the pool."
+                    },
+                    "flags": {
+                      "type": "object",
+                      "properties": { "NO_PRICE": { "type": "boolean" }, "NO_QUANTITY": { "type": "boolean" } },
+                      "required": ["NO_PRICE", "NO_QUANTITY"],
+                      "additionalProperties": false,
+                      "description": "Data-quality flags indicating missing monthly price or purchased seat quantity."
                     }
                   },
-                  "required": ["subscriptionId", "paid", "invoiced", "allocated", "unallocated", "withoutCostCenter"],
+                  "required": [
+                    "subscriptionId",
+                    "paid",
+                    "invoiced",
+                    "allocated",
+                    "idleCost",
+                    "idleCostByLabel",
+                    "invoiceVariance",
+                    "invoiceVarianceInReview",
+                    "deviceLotPurchases",
+                    "replacementKeys",
+                    "unallocated",
+                    "withoutCostCenter",
+                    "flags"
+                  ],
                   "additionalProperties": false
                 },
                 "description": "The line of the shared pool of each subscription with an invoice or a seat-month in the month (Finance only; empty for a manager)."
@@ -136282,6 +136430,68 @@
                     "type": "boolean",
                     "nullable": true
                   },
+                  "sharedPoolLines": {
+                    "type": "object",
+                    "properties": {
+                      "idleCost": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false
+                      },
+                      "invoiceVariance": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false
+                      },
+                      "invoiceVarianceInReview": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false
+                      },
+                      "deviceLotPurchases": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false
+                      },
+                      "replacementKeys": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false
+                      },
+                      "total": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false
+                      },
+                      "reserve": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      },
+                      "overReserve": { "type": "boolean", "nullable": true }
+                    },
+                    "required": [
+                      "idleCost",
+                      "invoiceVariance",
+                      "invoiceVarianceInReview",
+                      "deviceLotPurchases",
+                      "replacementKeys",
+                      "total",
+                      "reserve",
+                      "overReserve"
+                    ],
+                    "additionalProperties": false,
+                    "description": "Snapshot breakdown of the shared-pool line into idle seat cost, confirmed variances, variances in review, device-lot purchases, and replacement keys; null when not recorded.",
+                    "nullable": true
+                  },
                   "annualCeiling": {
                     "type": "object",
                     "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
@@ -136295,6 +136505,7 @@
                   "sharedPoolUnallocated",
                   "sharedPoolReserve",
                   "sharedPoolOverReserve",
+                  "sharedPoolLines",
                   "annualCeiling"
                 ],
                 "additionalProperties": false,
@@ -136425,6 +136636,68 @@
                           "type": "boolean",
                           "nullable": true
                         },
+                        "sharedPoolLines": {
+                          "type": "object",
+                          "properties": {
+                            "idleCost": {
+                              "type": "object",
+                              "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                              "required": ["amount", "currency"],
+                              "additionalProperties": false
+                            },
+                            "invoiceVariance": {
+                              "type": "object",
+                              "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                              "required": ["amount", "currency"],
+                              "additionalProperties": false
+                            },
+                            "invoiceVarianceInReview": {
+                              "type": "object",
+                              "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                              "required": ["amount", "currency"],
+                              "additionalProperties": false
+                            },
+                            "deviceLotPurchases": {
+                              "type": "object",
+                              "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                              "required": ["amount", "currency"],
+                              "additionalProperties": false
+                            },
+                            "replacementKeys": {
+                              "type": "object",
+                              "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                              "required": ["amount", "currency"],
+                              "additionalProperties": false
+                            },
+                            "total": {
+                              "type": "object",
+                              "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                              "required": ["amount", "currency"],
+                              "additionalProperties": false
+                            },
+                            "reserve": {
+                              "type": "object",
+                              "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                              "required": ["amount", "currency"],
+                              "additionalProperties": false,
+                              "nullable": true
+                            },
+                            "overReserve": { "type": "boolean", "nullable": true }
+                          },
+                          "required": [
+                            "idleCost",
+                            "invoiceVariance",
+                            "invoiceVarianceInReview",
+                            "deviceLotPurchases",
+                            "replacementKeys",
+                            "total",
+                            "reserve",
+                            "overReserve"
+                          ],
+                          "additionalProperties": false,
+                          "description": "Snapshot breakdown of the shared-pool line into idle seat cost, confirmed variances, variances in review, device-lot purchases, and replacement keys; null when not recorded.",
+                          "nullable": true
+                        },
                         "annualCeiling": {
                           "type": "object",
                           "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
@@ -136438,6 +136711,7 @@
                         "sharedPoolUnallocated",
                         "sharedPoolReserve",
                         "sharedPoolOverReserve",
+                        "sharedPoolLines",
                         "annualCeiling"
                       ],
                       "additionalProperties": false,
@@ -136587,6 +136861,68 @@
                         "type": "boolean",
                         "nullable": true
                       },
+                      "sharedPoolLines": {
+                        "type": "object",
+                        "properties": {
+                          "idleCost": {
+                            "type": "object",
+                            "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "invoiceVariance": {
+                            "type": "object",
+                            "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "invoiceVarianceInReview": {
+                            "type": "object",
+                            "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "deviceLotPurchases": {
+                            "type": "object",
+                            "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "replacementKeys": {
+                            "type": "object",
+                            "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "total": {
+                            "type": "object",
+                            "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "reserve": {
+                            "type": "object",
+                            "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false,
+                            "nullable": true
+                          },
+                          "overReserve": { "type": "boolean", "nullable": true }
+                        },
+                        "required": [
+                          "idleCost",
+                          "invoiceVariance",
+                          "invoiceVarianceInReview",
+                          "deviceLotPurchases",
+                          "replacementKeys",
+                          "total",
+                          "reserve",
+                          "overReserve"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Snapshot breakdown of the shared-pool line into idle seat cost, confirmed variances, variances in review, device-lot purchases, and replacement keys; null when not recorded.",
+                        "nullable": true
+                      },
                       "annualCeiling": {
                         "type": "object",
                         "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
@@ -136600,6 +136936,7 @@
                       "sharedPoolUnallocated",
                       "sharedPoolReserve",
                       "sharedPoolOverReserve",
+                      "sharedPoolLines",
                       "annualCeiling"
                     ],
                     "additionalProperties": false,

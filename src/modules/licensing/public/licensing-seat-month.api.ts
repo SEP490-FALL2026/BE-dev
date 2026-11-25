@@ -2,7 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { monthBoundsOf, type BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { CatalogApi } from '../../catalog/public/catalog.api';
+import { SubscriptionPeriodApi } from '../../catalog/public/subscription-period.api';
 import { AssignmentSeatMonthRepo } from '../assignment/assignment-seat-month.repo';
+import { SubscriptionRenewalRepo } from '../subscription-renewal/subscription-renewal.repo';
 import type { SeatOfMonth } from './licensing-seat-month.types';
 
 /**
@@ -15,6 +17,8 @@ export class LicensingSeatMonthApi {
   constructor(
     private readonly seats: AssignmentSeatMonthRepo,
     private readonly catalog: CatalogApi,
+    private readonly renewals: SubscriptionRenewalRepo,
+    private readonly periods: SubscriptionPeriodApi,
   ) {}
 
   /**
@@ -30,5 +34,41 @@ export class LicensingSeatMonthApi {
       .map((target) => target.planId);
 
     return this.seats.seatsOfPlans([...new Set(pools)], start, nextStart, tx, subscriptionId);
+  }
+
+  /**
+   * Next-period purchased seat counts confirmed on recorded renewal outcomes (`Q-F`), keyed by subscription id. Subscriptions
+   * whose renewal has no recorded outcome (or whose outcome did not confirm a reduction) are omitted so callers fall back to `q`.
+   */
+  async getNextPeriodQuantities(subscriptionIds: readonly string[], tx?: DbTx): Promise<Map<string, number>> {
+    const casesBySub = await this.renewals.ofSubscriptions(subscriptionIds, tx);
+    const nextIds: string[] = [];
+    const nextBySub = new Map<string, string>();
+    const result = new Map<string, number>();
+
+    for (const [subId, cases] of casesBySub) {
+      const latestOutcome = [...cases].reverse().find((c) => c.outcome !== null);
+      if (!latestOutcome?.outcome) continue;
+      if (latestOutcome.outcome.nextSubscriptionId !== null) {
+        nextBySub.set(subId, latestOutcome.outcome.nextSubscriptionId);
+        nextIds.push(latestOutcome.outcome.nextSubscriptionId);
+      } else if (latestOutcome.outcome.kind === 'AS_DECIDED' && latestOutcome.decision?.choice === 'CANCEL') {
+        result.set(subId, 0);
+      }
+    }
+
+    if (nextIds.length > 0) {
+      const qtyByNextId = new Map(
+        (await this.periods.getPurchaseFacts([...new Set(nextIds)], tx))
+          .filter((fact) => fact.purchasedQuantity !== null)
+          .map((fact) => [fact.subscriptionId, fact.purchasedQuantity as number]),
+      );
+      for (const [subId, nextId] of nextBySub) {
+        const qty = qtyByNextId.get(nextId);
+        if (qty !== undefined) result.set(subId, qty);
+      }
+    }
+
+    return result;
   }
 }

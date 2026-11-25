@@ -88,6 +88,22 @@ const periodSchema = z.strictObject({
         .boolean()
         .nullable()
         .meta({ description: 'Whether the line of the pool is above the reserve; null when there is no reserve.' }),
+      sharedPoolLines: z
+        .strictObject({
+          idleCost: moneyView,
+          invoiceVariance: moneyView,
+          invoiceVarianceInReview: moneyView,
+          deviceLotPurchases: moneyView,
+          replacementKeys: moneyView,
+          total: moneyView,
+          reserve: moneyView.nullable(),
+          overReserve: z.boolean().nullable(),
+        })
+        .nullable()
+        .meta({
+          description:
+            'Snapshot breakdown of the shared-pool line into idle seat cost, confirmed variances, variances in review, device-lot purchases, and replacement keys; null when not recorded.',
+        }),
       annualCeiling: moneyView.nullable(),
     })
     .nullable()

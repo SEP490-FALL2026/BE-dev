@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { pageOf } from '../../../core/application/pagination';
 import { BudgetFactsService, type MoneyView } from '../budget/budget-facts.service';
 import { SeatMonthRepo } from '../seat-month/seat-month.repo';
-import { SeatMonthPoolService } from '../seat-month/seat-month-pool.service';
+import { SharedPoolLineFactsService } from '../shared-pool-line/shared-pool-line-facts.service';
 import type { BudgetSummaryWire, TableRowWire } from '../budget/budget.dto';
 import { BudgetViewNumbersService, type BudgetViewNumbers } from './budget-view-numbers.service';
 import { budgetNumbers } from './budget-view.mapper';
@@ -28,7 +28,7 @@ export class BudgetTableViewService {
     private readonly numbers: BudgetViewNumbersService,
     private readonly facts: BudgetFactsService,
     private readonly seatMonths: SeatMonthRepo,
-    private readonly pool: SeatMonthPoolService,
+    private readonly poolFacts: SharedPoolLineFactsService,
   ) {}
 
   async table(query: { year?: number; page: number; pageSize: number }) {
@@ -95,17 +95,34 @@ export class BudgetTableViewService {
   ): Promise<
     Pick<
       BudgetSummaryWire,
-      'companySpent' | 'sharedPoolUnallocated' | 'sharedPoolOverReserve' | 'seatMonthsWithoutCostCenter'
+      | 'companySpent'
+      | 'sharedPoolUnallocated'
+      | 'sharedPoolOverReserve'
+      | 'seatMonthsWithoutCostCenter'
+      | 'sharedPoolLines'
     >
   > {
     const company = await this.seatMonths.yearTotals(year);
-    const unallocatedMinor = await this.pool.yearLineMinor(year);
+    const lines = await this.poolFacts.yearFigures(year);
+    const overReserve = reserveMinor === null ? null : lines.unallocatedMinor > reserveMinor;
 
     return {
       companySpent: money ? money(company.companyMinor) : null,
-      sharedPoolUnallocated: money ? money(unallocatedMinor) : null,
-      sharedPoolOverReserve: reserveMinor === null ? null : unallocatedMinor > reserveMinor,
+      sharedPoolUnallocated: money ? money(lines.unallocatedMinor) : null,
+      sharedPoolOverReserve: overReserve,
       seatMonthsWithoutCostCenter: money ? money(company.withoutCostCenterMinor) : null,
+      sharedPoolLines: money
+        ? {
+            idleCost: money(lines.idleCostMinor),
+            invoiceVariance: money(lines.invoiceVarianceMinor),
+            invoiceVarianceInReview: money(lines.invoiceVarianceInReviewMinor),
+            deviceLotPurchases: money(lines.deviceLotPurchasesMinor),
+            replacementKeys: money(lines.replacementKeysMinor),
+            total: money(lines.unallocatedMinor),
+            reserve: reserveMinor === null ? null : money(reserveMinor),
+            overReserve,
+          }
+        : null,
     };
   }
 

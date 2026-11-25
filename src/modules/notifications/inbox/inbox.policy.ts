@@ -118,6 +118,7 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   BUDGET_REVIEW_DUE: ['year', 'month'],
   BUDGET_REVIEW_SUMMARY: ['periodId', 'year', 'month', 'kind', 'greenCount', 'yellowCount', 'redCount', 'underCount'],
   BUDGET_SHARED_POOL_OVER_RESERVE: ['year', 'month'],
+  IDLE_SEAT_COST_RATIO_HIGH: ['subscriptionId', 'month', 'ratioPercent'],
   // The use of the budget of a Cost Center reached 80 or 100 percent of its base (`QĐ-111af`, RV-2): the Cost Center, the year and the threshold, never a figure.
   BUDGET_THRESHOLD_REACHED: ['costCenterId', 'year', 'threshold'],
   // The head of a department is reminded to explain a Cost Center of a quarterly review (`QĐ-111ah`, B-7): on the due day and every Monday until they explain or Finance signs.

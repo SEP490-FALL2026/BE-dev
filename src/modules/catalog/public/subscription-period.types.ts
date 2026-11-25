@@ -1,5 +1,12 @@
 import type { BusinessDate } from '../../../core/business-date';
 
+/** Days before payment/deadline that open adjustment points and the annual red alert. */
+export interface PoolAdjustmentWindows {
+  monthlyDays: number;
+  annualDays: number;
+  redAlertDaysAnnual: number;
+}
+
 /** Where the milestone of a term comes from (`US-04-03`): declared, inferred from the notice period, the end date, or missing. */
 export type PeriodNoticeSource = 'DECLARED' | 'INFERRED_UNCONFIRMED' | 'BY_END_DATE' | 'MISSING' | 'NOT_APPLICABLE';
 
@@ -114,11 +121,26 @@ export interface SubscriptionPurchaseFacts {
   planId: string;
   /** The IT Admin who answers for the subscription; null when it names none (`QĐ-103v`(4)). */
   responsibleItAdminEmployeeId: string | null;
+  kind: 'TERM' | 'PERPETUAL';
+  status: 'DRAFT' | 'ACTIVE';
+  provisioningType: 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
+  commitmentTermMonths: 1 | 12 | null;
+  billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER' | null;
   purchasedQuantity: number | null;
   /** What one seat costs a month in dong from `monthly_unit_price_minor`; null when unset or non-periodic. */
   monthlyPriceMinor: bigint | null;
   /** The months a payment pays for (1, 3 or 12); null for another cycle or none. */
   cycleMonths: number | null;
+  startDate: BusinessDate | null;
+  endDate: BusinessDate | null;
+  /** Exclusive end of the period for shared-pool day counting: successor start date, else day after endDate, else null. */
+  endExclusive: BusinessDate | null;
   /** The day the period renews; null when none is set. */
   renewalDate: BusinessDate | null;
+  noticeDeadline: BusinessDate | null;
+  noticePeriodDays: number | null;
+  autoRenew: boolean;
+  vendorMinimumSeats: number | null;
+  /** Purchased quantity recorded on a direct successor subscription, if one already exists. */
+  nextPeriodPurchasedQuantity: number | null;
 }

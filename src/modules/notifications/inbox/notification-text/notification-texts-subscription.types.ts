@@ -198,4 +198,14 @@ export const SUBSCRIPTION_TEXTS = {
         '{changedByEmployeeId:name} reduced the seats of subscription {subscriptionId:name} from {fromQuantity} to {toQuantity}.',
     },
   },
+  IDLE_SEAT_COST_RATIO_HIGH: {
+    vi: {
+      title: 'Chi phí seat trống vượt ngưỡng 10 %',
+      message: 'Chi phí seat trống của {subscriptionId:name} tháng {month} là {ratioPercent} %, vượt 10 %.',
+    },
+    en: {
+      title: 'Idle seat cost exceeds 10 %',
+      message: 'The idle seat cost of {subscriptionId:name} in {month} is {ratioPercent} %, exceeding 10 %.',
+    },
+  },
 } satisfies Partial<Record<InAppNotificationCode, NotificationTexts>>;

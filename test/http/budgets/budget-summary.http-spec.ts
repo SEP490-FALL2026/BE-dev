@@ -35,6 +35,7 @@ const SUMMARY = {
   companySpent: null,
   sharedPoolUnallocated: null,
   sharedPoolOverReserve: null,
+  sharedPoolLines: null,
   seatMonthsWithoutCostCenter: null,
 };
 
@@ -95,5 +96,32 @@ describe('GET /budgets/summary (HTTP contract, no database)', () => {
     expect(body.message).toBe('BUDGET.SUMMARY_FETCHED');
     expect(body.data).toEqual(SUMMARY);
     expect(summary).toHaveBeenCalledWith(2027);
+  });
+
+  it('returns broken-down sharedPoolLines when cycle figures exist', async () => {
+    const withPool = {
+      ...SUMMARY,
+      sharedPoolReserve: { amount: '12000000', currency: 'VND' },
+      sharedPoolUnallocated: { amount: '12100000', currency: 'VND' },
+      sharedPoolOverReserve: true,
+      sharedPoolLines: {
+        idleCost: { amount: '8100000', currency: 'VND' },
+        invoiceVariance: { amount: '3500000', currency: 'VND' },
+        invoiceVarianceInReview: { amount: '500000', currency: 'VND' },
+        deviceLotPurchases: { amount: '0', currency: 'VND' },
+        replacementKeys: { amount: '0', currency: 'VND' },
+        total: { amount: '12100000', currency: 'VND' },
+        reserve: { amount: '12000000', currency: 'VND' },
+        overReserve: true,
+      },
+    };
+    summary.mockResolvedValueOnce(withPool);
+
+    const response = await request(app.getHttpServer())
+      .get('/api/v1/budgets/summary?year=2027')
+      .set('Authorization', bearer(principal(['FINANCE'])))
+      .expect(200);
+
+    expect(bodyOf(response).data).toEqual(withPool);
   });
 });

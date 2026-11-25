@@ -1,6 +1,6 @@
 import type { BudgetFactsService } from '../budget/budget-facts.service';
 import type { ReferenceFigures } from '../budget/version.repo';
-import { SeatMonthPoolService } from '../seat-month/seat-month-pool.service';
+import { SharedPoolLineFactsService } from '../shared-pool-line/shared-pool-line-facts.service';
 import { SeatMonthRepo } from '../seat-month/seat-month.repo';
 import { BudgetTableViewService } from './budget-table-view.service';
 import type { BudgetViewRepo } from './budget-view.repo';
@@ -55,7 +55,16 @@ function serviceOver(
     {
       yearTotals: jest.fn().mockResolvedValue({ companyMinor: 0n, withoutCostCenterMinor: 0n }),
     } as unknown as SeatMonthRepo,
-    { yearLineMinor: jest.fn().mockResolvedValue(0n) } as unknown as SeatMonthPoolService,
+    {
+      yearFigures: jest.fn().mockResolvedValue({
+        idleCostMinor: 0n,
+        invoiceVarianceMinor: 0n,
+        invoiceVarianceInReviewMinor: 0n,
+        deviceLotPurchasesMinor: 0n,
+        replacementKeysMinor: 0n,
+        unallocatedMinor: 0n,
+      }),
+    } as unknown as SharedPoolLineFactsService,
   );
 }
 

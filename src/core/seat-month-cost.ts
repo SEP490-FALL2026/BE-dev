@@ -17,6 +17,14 @@ const parts = (day: BusinessDate): { year: number; month: number; day: number } 
 const divideHalfUp = (numerator: bigint, denominator: bigint): bigint =>
   (2n * numerator + denominator) / (2n * denominator);
 
+/** `numerator ÷ denominator` rounded half away from zero; `denominator` is positive. */
+export function roundHalfAway(numerator: bigint, denominator: bigint): bigint {
+  const magnitude = numerator < 0n ? -numerator : numerator;
+  const rounded = (2n * magnitude + denominator) / (2n * denominator);
+
+  return numerator < 0n ? -rounded : rounded;
+}
+
 /** What the days of the month of `day` before it cost: the price a month times the days before `day` over the days of the month. Day 1 costs nothing. */
 export function monthCostBefore(monthlyMinor: bigint, day: BusinessDate): bigint {
   const { year, month, day: dayOfMonth } = parts(day);
