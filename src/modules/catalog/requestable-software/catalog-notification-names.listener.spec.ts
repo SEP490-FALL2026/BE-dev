@@ -3,6 +3,7 @@ import { NotificationNameContributions } from '../../notifications/public/notifi
 import { ApplicationRepo } from '../catalog-entry/application.repo';
 import { PlanRepo } from '../plan/plan.repo';
 import { SubscriptionRepo } from '../subscription/subscription.repo';
+import { WorkspaceRepo } from '../workspace/workspace.repo';
 import { CatalogNotificationNamesListener } from './catalog-notification-names.listener';
 
 const FIRST = '0198a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a01';
@@ -17,6 +18,7 @@ describe('CatalogNotificationNamesListener', () => {
   const applications = { namesOf: jest.fn() };
   const plans = { namesOf: jest.fn() };
   const subscriptions = { labelsOf: jest.fn() };
+  const workspaces = { namesOf: jest.fn() };
   let contributions: NotificationNameContributions;
 
   async function listener(): Promise<CatalogNotificationNamesListener> {
@@ -27,6 +29,7 @@ describe('CatalogNotificationNamesListener', () => {
         { provide: ApplicationRepo, useValue: applications },
         { provide: PlanRepo, useValue: plans },
         { provide: SubscriptionRepo, useValue: subscriptions },
+        { provide: WorkspaceRepo, useValue: workspaces },
         { provide: NotificationNameContributions, useValue: contributions },
       ],
     }).compile();
@@ -49,6 +52,7 @@ describe('CatalogNotificationNamesListener', () => {
     applications.namesOf.mockImplementation(table('Figma', 'Slack'));
     plans.namesOf.mockImplementation(table('Figma – Professional', 'Slack – Pro'));
     subscriptions.labelsOf.mockImplementation(table('Figma – Professional', 'Slack – Business'));
+    workspaces.namesOf.mockImplementation(table('Anthropic', 'Anthropic EU'));
   });
 
   it('binds the notification name registry and adds itself to it when the module starts', async () => {
@@ -61,14 +65,15 @@ describe('CatalogNotificationNamesListener', () => {
     expect(contributions.all()).toEqual([instance]);
   });
 
-  it('names applications, plans and subscriptions', async () => {
-    expect([...(await listener()).kinds].sort()).toEqual(['APPLICATION', 'PLAN', 'SUBSCRIPTION']);
+  it('names applications, plans, subscriptions and workspaces', async () => {
+    expect([...(await listener()).kinds].sort()).toEqual(['APPLICATION', 'PLAN', 'SUBSCRIPTION', 'WORKSPACE']);
   });
 
   it.each([
     ['APPLICATION', () => applications.namesOf, [FIRST, 'Figma']],
     ['PLAN', () => plans.namesOf, [FIRST, 'Figma – Professional']],
     ['SUBSCRIPTION', () => subscriptions.labelsOf, [FIRST, 'Figma – Professional']],
+    ['WORKSPACE', () => workspaces.namesOf, [FIRST, 'Anthropic']],
   ] as const)('asks only the table of %s, once, for the distinct well-formed ids', async (kind, read, entry) => {
     const instance = await listener();
 
@@ -77,7 +82,9 @@ describe('CatalogNotificationNamesListener', () => {
     expect([...names]).toEqual([entry]);
     expect(read()).toHaveBeenCalledTimes(1);
     expect((read().mock.calls as unknown[][])[0]?.[0]).toEqual([FIRST, MISSING]);
-    for (const other of [applications.namesOf, plans.namesOf, subscriptions.labelsOf].filter((fn) => fn !== read())) {
+    for (const other of [applications.namesOf, plans.namesOf, subscriptions.labelsOf, workspaces.namesOf].filter(
+      (fn) => fn !== read(),
+    )) {
       expect(other).not.toHaveBeenCalled();
     }
   });

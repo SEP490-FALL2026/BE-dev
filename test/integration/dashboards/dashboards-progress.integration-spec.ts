@@ -26,6 +26,7 @@ interface Progress {
     transfers: Record<'inGrace' | 'graceEndingSoon' | 'revoking' | 'revocationFailed', SectionWire>;
     seatsReturned: Record<'thisMonth' | 'reusedThisMonth', SectionWire>;
     plansBelowVendorAdminMinimum: SectionWire;
+    workspacesBelowVendorAdminMinimum: SectionWire;
   };
 }
 

@@ -27,6 +27,8 @@ export interface PoolTermsInput {
   commitmentTermMonths: number | null;
   /** The subscription is becoming active with this write: a new one that is complete, or a draft that was just completed. */
   activating: boolean;
+  /** The subscription stays active after this write (including updates on an already active subscription). */
+  active?: boolean;
   /** How the seats are counted and the payment day of a subscription counted by its members (W3-11); left out, the rules of a fixed count apply. */
   seatCounting?: SeatCounting | undefined;
   renewalDate?: string | null | undefined;
@@ -97,7 +99,9 @@ function assertMembersTerms(input: PoolTermsInput): void {
   if (input.commitmentTermMonths !== null && input.commitmentTermMonths !== 1) {
     throw new SubscriptionMembersMonthlyOnlyError();
   }
-  if (input.activating && (input.renewalDate ?? null) === null) throw new SubscriptionMembersPaymentDayRequiredError();
+  if ((input.activating || input.active) && (input.renewalDate ?? null) === null) {
+    throw new SubscriptionMembersPaymentDayRequiredError();
+  }
 }
 
 /** An active subscription names the IT Admin who answers for it (`QĐ-103v`(4)). */
@@ -238,6 +242,7 @@ function compareStart(a: string | null, b: string | null): number {
 export interface LivenessFacts {
   id: string;
   planId: string;
+  workspaceId?: string | null;
   status: 'DRAFT' | 'ACTIVE';
   kind: SubscriptionKind;
   endDate: string | null;
@@ -264,6 +269,31 @@ export function liveIdsByPlan(rows: readonly LivenessFacts[], today: string): Ma
   }
 
   return live;
+}
+
+const workspacePlanKey = (workspaceId: string | null | undefined, planId: string): string =>
+  `${workspaceId ?? ''}:${planId}`;
+
+/** The live subscriptions keyed by `(workspaceId, planId)`, each list in the order given (W3-14). */
+export function liveIdsByWorkspacePlan(rows: readonly LivenessFacts[], today: string): Map<string, string[]> {
+  const live = new Map<string, string[]>();
+  for (const row of rows) {
+    if (!isLiveSubscription(row, today)) continue;
+    const key = workspacePlanKey(row.workspaceId, row.planId);
+    live.set(key, [...(live.get(key) ?? []), row.id]);
+  }
+
+  return live;
+}
+
+/** The other live subscriptions of `(workspaceId, planId)` than `selfId` (W3-14). */
+export function liveWorkspaceSiblingsOf(
+  live: ReadonlyMap<string, readonly string[]>,
+  workspaceId: string | null | undefined,
+  planId: string,
+  selfId: string | null,
+) {
+  return (live.get(workspacePlanKey(workspaceId, planId)) ?? []).filter((id) => id !== selfId);
 }
 
 /** The other live subscriptions of the plan than `selfId` (a subscription being written has none yet: pass null). */

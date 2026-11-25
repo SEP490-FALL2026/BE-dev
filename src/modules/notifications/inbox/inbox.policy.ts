@@ -222,6 +222,7 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   DEPARTMENT_SOFTWARE_PROPOSAL_DECIDED: ['proposalId', 'departmentId', 'applicationId', 'planId', 'decision', 'reason'],
   // The admins a plan keeps at the vendor (`QĐ-110k`): how many are left; and a subscription that gained seats (`QĐ-110v`).
   VENDOR_ADMINS_BELOW_MINIMUM: ['planId', 'applicationId', 'adminCount'],
+  WORKSPACE_ADMIN_NOT_WORKING: ['workspaceId', 'employeeId', 'workingAdminCount'],
   DEPARTMENT_WITHOUT_HEAD: ['departmentId', 'waitingCount'],
   SUBSCRIPTION_SEATS_INCREASED: ['subscriptionId', 'fromQuantity', 'toQuantity', 'requestId', 'changedByEmployeeId'],
   SUBSCRIPTION_SEATS_REDUCED: ['subscriptionId', 'fromQuantity', 'toQuantity', 'changedByEmployeeId'],

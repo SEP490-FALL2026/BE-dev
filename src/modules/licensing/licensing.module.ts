@@ -152,6 +152,7 @@ import { SeatBaselineService } from './seat-baseline/seat-baseline.service';
 import { StockSummaryController } from './stock-summary/stock-summary.controller';
 import { StockSummaryQueryService } from './stock-summary/stock-summary-query.service';
 import { RenewalAlertsService } from './subscription-renewal/alerts/renewal-alerts.service';
+import { WorkspaceAdminAlertService } from './subscription-renewal/alerts/workspace-admin-alert.service';
 import { RenewalDeadlineService } from './subscription-renewal/deadline/renewal-deadline.service';
 import { RenewalOutcomeService } from './subscription-renewal/outcome/renewal-outcome.service';
 import { RenewalSavingsService } from './subscription-renewal/savings/renewal-savings.service';
@@ -316,6 +317,7 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     RenewalRecordService,
     RenewalOutcomeService,
     RenewalAlertsService,
+    WorkspaceAdminAlertService,
     RenewalDeadlineService,
     RenewalViewService,
     SubscriptionRenewalSweepService,

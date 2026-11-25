@@ -252,4 +252,25 @@ export class WorkspaceRepo {
   subscriptionCountsOf(ids: readonly string[]): Promise<Map<string, number>> {
     return Promise.resolve(new Map(ids.map((id) => [id, 0])));
   }
+
+  /** Display names keyed by id for these workspaces (absent ids are omitted). */
+  async namesOf(ids: readonly string[], tx?: DbTx): Promise<Map<string, string>> {
+    if (ids.length === 0) return new Map();
+    const rows = await (tx ?? this.prisma).workspace.findMany({
+      where: { id: { in: [...ids] } },
+      select: { id: true, name: true },
+    });
+
+    return new Map(rows.map((row) => [row.id, row.name]));
+  }
+
+  /** Every workspace with its vendor and administrators, in display order. */
+  async findAllWithAdmins(tx?: DbTx): Promise<WorkspaceRecord[]> {
+    const rows = await (tx ?? this.prisma).workspace.findMany({
+      include: WITH_PARTS,
+      orderBy: ORDER,
+    });
+
+    return rows.map(toRecord);
+  }
 }

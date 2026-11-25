@@ -219,4 +219,16 @@ export const SUBSCRIPTION_TEXTS = {
         'An invoice for {subscriptionId:name} differed due to exchange rate or card fees; please update the monthly price.',
     },
   },
+  WORKSPACE_ADMIN_NOT_WORKING: {
+    vi: {
+      title: 'Quản trị viên workspace thôi làm việc',
+      message:
+        '{employeeId:name} trên workspace {workspaceId:name} không còn là IT Admin đang làm việc; hiện còn {workingAdminCount} quản trị viên đang làm việc.',
+    },
+    en: {
+      title: 'Workspace admin no longer working',
+      message:
+        '{employeeId:name} on workspace {workspaceId:name} is no longer a working IT Admin; {workingAdminCount} working admin(s) remain.',
+    },
+  },
 } satisfies Partial<Record<InAppNotificationCode, NotificationTexts>>;

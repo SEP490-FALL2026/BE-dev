@@ -54,6 +54,7 @@ function build(
   const sendDue = jest.fn<Promise<number>, [subject: Written]>().mockResolvedValue(1);
   const dataQualityWarning = jest.fn<Promise<number>, [subject: Written]>().mockResolvedValue(1);
   const recordPassedRenewalDay = jest.fn<Promise<boolean>, [subject: Written]>().mockResolvedValue(true);
+  const workspaceAdminSweep = jest.fn<Promise<number>, [organizationId: string]>().mockResolvedValue(0);
   const service = new SubscriptionRenewalSweepService(
     { listAdjustmentSubjects: jest.fn().mockResolvedValue(subjects) } as unknown as SubscriptionPeriodApi,
     { ofSubscriptions, endingAmong, deadlineEventsOf } as unknown as SubscriptionRenewalRepo,
@@ -63,11 +64,20 @@ function build(
       businessToday: jest.fn(() => Promise.resolve(TODAY.value)),
     } as unknown as OrganizationReadApi,
     { countFor } as unknown as RenewalSeatsNeededService,
-    { sendDue, dataQualityWarning } as unknown as RenewalAlertsService,
+    { sendDue, dataQualityWarning, sweepWorkspaceAdmins: workspaceAdminSweep } as unknown as RenewalAlertsService,
     { recordPassedRenewalDay } as unknown as RenewalDeadlineService,
   );
 
-  return { service, ofSubscriptions, sharedPeople, countFor, sendDue, dataQualityWarning, recordPassedRenewalDay };
+  return {
+    service,
+    ofSubscriptions,
+    sharedPeople,
+    countFor,
+    sendDue,
+    dataQualityWarning,
+    recordPassedRenewalDay,
+    workspaceAdminSweep,
+  };
 }
 
 const sweep = (service: SubscriptionRenewalSweepService) => service.sweep(new Date('2026-11-10T05:00:00.000Z'));
@@ -229,5 +239,13 @@ describe('the pass over the points of adjustment (SBF-20 §4.5)', () => {
     } finally {
       error.mockRestore();
     }
+  });
+
+  it('runs the workspace admin alert sweep even when no renewal subjects are due (W3-12)', async () => {
+    const { service, workspaceAdminSweep } = build([]);
+    workspaceAdminSweep.mockResolvedValue(2);
+
+    expect(await sweep(service)).toEqual({ told: 2, deadlineEvents: 0, failed: 0 });
+    expect(workspaceAdminSweep).toHaveBeenCalledWith('org');
   });
 });

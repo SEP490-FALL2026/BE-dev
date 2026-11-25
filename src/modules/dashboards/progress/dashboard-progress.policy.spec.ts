@@ -15,6 +15,7 @@ const facts: ProgressFacts = {
   },
   seats: { returned: 6, reused: 3 },
   plansBelowMinimum: 2,
+  workspacesBelowMinimum: 1,
 };
 
 describe('progressOf (SPEC P21)', () => {
@@ -64,5 +65,6 @@ describe('progressOf (SPEC P21)', () => {
     expect(progress.seatsReturned.thisMonth.count).toBe(6);
     expect(progress.seatsReturned.reusedThisMonth.count).toBe(3);
     expect(progress.plansBelowVendorAdminMinimum.count).toBe(2);
+    expect(progress.workspacesBelowVendorAdminMinimum.count).toBe(1);
   });
 });

@@ -59,4 +59,7 @@ export const progressSectionsShape = {
   plansBelowVendorAdminMinimum: section(
     'The plans in use that need admins at the vendor (`K2`, or `K4` with an admin console) with fewer than two of the recorded ones still working as IT Admins, or none recorded: the plans whose subscriptions raise `vendorAdminsBelowMinimum` in `subscriptionList`. Across the company.',
   ),
+  workspacesBelowVendorAdminMinimum: section(
+    'The workspaces in use with fewer than two administrators still working as IT Admins across the company.',
+  ),
 };

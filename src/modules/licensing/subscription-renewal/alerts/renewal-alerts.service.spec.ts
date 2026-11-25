@@ -3,6 +3,7 @@ import type { AuditApi } from '../../../audit/public/audit.api';
 import type { PeriodAdjustment, RenewalPeriodFacts } from '../../../catalog/public/subscription-period.types';
 import type { RenewalNotifier } from '../subscription-renewal-notifier.service';
 import { RenewalAlertsService, type AlertSubject } from './renewal-alerts.service';
+import type { WorkspaceAdminAlertService } from './workspace-admin-alert.service';
 
 const adjustment: PeriodAdjustment = {
   kind: 'NOTICE_DEADLINE',
@@ -24,6 +25,7 @@ function build(told?: string[]) {
     { tell } as unknown as RenewalNotifier,
     { record } as unknown as AuditApi,
     { run: (work: (tx: unknown) => unknown) => work({}) } as unknown as TransactionRunner,
+    { sweep: jest.fn().mockResolvedValue(0) } as unknown as WorkspaceAdminAlertService,
   );
 
   return { service, tell, record };

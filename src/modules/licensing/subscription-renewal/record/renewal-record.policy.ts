@@ -16,13 +16,12 @@ export interface RecordRefusal {
 
 /** Why a subscription has no renewal (`details.reason` of `NOT_RENEWABLE`). */
 export type NotRenewableReason =
-  'PERPETUAL' | 'INTERNAL' | 'NOT_POOL_TERM' | 'NOT_ACTIVE' | 'ALREADY_CONTINUED' | 'CANCELLED';
+  'PERPETUAL' | 'INTERNAL' | 'NOT_POOL_TERM' | 'NOT_ACTIVE' | 'ALREADY_CONTINUED' | 'CANCELLED' | 'MEMBER_COUNTED';
 
 /**
  * The reason a subscription has no point of adjustment (`SBF-20` §4.1), the first of the list: a perpetual purchase, internal software, a
- * term that is not a workspace of the shared pool (`K1` has no point, `FR-1.12`(9)), a draft, a period a later one continues, a subscription the
- * company recorded as cancelled (`ending`: the catalog still shows it until it is closed, whatever period its payment day rolls into, `A1C-02`).
- * Null when it has.
+ * term that is not a workspace of the shared pool (`K1` has no point, `FR-1.12`(9)), a draft, a period a later one continues, a subscription
+ * counted by its members (`MEMBER_COUNTED`), or a subscription the company recorded as cancelled (`ending`). Null when it has.
  */
 function notRenewableReason(period: RenewalPeriodFacts, ending: boolean): NotRenewableReason | null {
   if (period.kind === 'PERPETUAL') return 'PERPETUAL';
@@ -31,6 +30,7 @@ function notRenewableReason(period: RenewalPeriodFacts, ending: boolean): NotRen
   if (period.status !== 'ACTIVE') return 'NOT_ACTIVE';
 
   if (period.renewedById !== null) return 'ALREADY_CONTINUED';
+  if (period.seatCounting === 'MEMBERS') return 'MEMBER_COUNTED';
 
   return ending ? 'CANCELLED' : null;
 }

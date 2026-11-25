@@ -3,6 +3,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import type { AuditApi } from '../../audit/public/audit.api';
 import { WorkspaceNotFoundError, WorkspaceRequiredError, WorkspaceVendorMismatchError } from './workspace.errors';
 import type { WorkspaceRepo } from './workspace.repo';
+import type { WorkspaceViewService } from './workspace-view.service';
 import { WorkspaceForSubscriptionService } from './workspace-for-subscription.service';
 import type { WorkspaceRecord } from './workspace.types';
 
@@ -32,11 +33,16 @@ describe('WorkspaceForSubscriptionService', () => {
       insertIfAbsent: jest.fn().mockResolvedValue(options.made === undefined ? 'ws-new' : options.made),
     } as unknown as WorkspaceRepo;
     const audit = { record: jest.fn().mockResolvedValue(undefined) } as unknown as AuditApi;
+    const views = {
+      workingAdminCount: jest.fn().mockResolvedValue(2),
+      workingAdminsAmong: jest.fn().mockResolvedValue(new Set()),
+    } as unknown as WorkspaceViewService;
 
     return {
-      service: new WorkspaceForSubscriptionService(repo, audit),
+      service: new WorkspaceForSubscriptionService(repo, audit, views),
       repo: repo as unknown as Record<string, jest.Mock>,
       audit: audit as unknown as { record: jest.Mock },
+      views: views as unknown as Record<string, jest.Mock>,
       order,
     };
   }

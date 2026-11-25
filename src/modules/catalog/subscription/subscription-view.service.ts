@@ -19,10 +19,10 @@ import {
 } from './obligation/subscription-obligation.policy';
 import { alertDates, deriveNotice, missingData, noticeInputOf, noticeWarnings } from './subscription.policy';
 import { isPricedInDong } from './price/subscription-price.policy';
-import { liveIdsByPlan, liveSiblingsOf, poolWarnings, vendorAdminFlags } from './pool/subscription-pool.policy';
+import { poolWarnings, vendorAdminFlags } from './pool/subscription-pool.policy';
 import { SubscriptionLotResponsibleService } from './responsible/subscription-lot-responsible.service';
 import { SubscriptionGrantingRepo } from './subscription-granting.repo';
-import { SubscriptionRepo } from './subscription.repo';
+import { WorkspaceForSubscriptionService } from '../workspace/workspace-for-subscription.service';
 import { SubscriptionWindowsService } from './subscription-windows.service';
 import type {
   DeadlineKind,
@@ -33,7 +33,6 @@ import type {
   VendorAdminView,
 } from './subscription.types';
 
-type LiveOfPlans = { byPlan: Map<string, string[]>; has: (id: string) => boolean };
 type SeatCounts = ReadonlyMap<string, { occupied: number; inRevocation: number }>;
 
 /** Where a subscription stands against its point of adjustment today (`QĐ-111o`). */
@@ -42,12 +41,6 @@ export interface ExpiryReadingView {
   daysLeft: number | null;
   deadlineKind: DeadlineKind | null;
 }
-
-/** The most live subscriptions of one plan an answer names: duplicates exist only while the seat baseline is open, a few at most. */
-const MERGE_CANDIDATES_MAX = 20;
-
-const mergeCandidatesOf = (live: LiveOfPlans, record: SubscriptionRecord): string[] =>
-  live.has(record.id) ? liveSiblingsOf(live.byPlan, record.planId, record.id).slice(0, MERGE_CANDIDATES_MAX) : [];
 
 /** The seats of a shared pool: only a K2 plan has them (a key, a personal right and an internal tool are counted by what they are, `IA-2`). */
 const seatsOfPool = (record: SubscriptionRecord, counts: SeatCounts): SubscriptionView['seats'] => {
@@ -87,9 +80,6 @@ const alertsOf = (
   };
 };
 
-const mergeWarnings = (mergeCandidateIds: readonly string[]): 'SHOULD_MERGE'[] =>
-  mergeCandidateIds.length > 0 ? ['SHOULD_MERGE'] : [];
-
 const monthlyUnitPriceWire = (minor: bigint | null | undefined) =>
   minor !== null && minor !== undefined ? { amount: formatAmount(minor, 0), currency: 'VND' } : null;
 
@@ -102,13 +92,13 @@ const monthlyUnitPriceWire = (minor: bigint | null | undefined) =>
 export class SubscriptionViewService {
   constructor(
     private readonly finance: FinanceApi,
-    private readonly subscriptions: SubscriptionRepo,
     private readonly organizationReads: OrganizationReadApi,
     private readonly planFacts: PlanFactsService,
     private readonly occupancy: SeatOccupancyHook,
     private readonly periods: SubscriptionGrantingRepo,
     private readonly windows: SubscriptionWindowsService,
     private readonly lotFacts: SubscriptionLotResponsibleService,
+    private readonly workspaces: WorkspaceForSubscriptionService,
   ) {}
 
   /**
@@ -247,7 +237,6 @@ export class SubscriptionViewService {
       ).map((estimate, index) => [priced[index].id, estimate]),
     );
 
-    const live = await this.liveOfPooledPlans(records);
     const vendorAdmins = await this.vendorAdminsOf(records);
     const today = await this.organizationReads.businessToday();
     const seatCounts = await this.seatsOf(records, today);
@@ -267,8 +256,6 @@ export class SubscriptionViewService {
     });
     const views: SubscriptionView[] = [];
     for (const record of records) {
-      // The rule against a second live subscription of a K2 or K4 plan: answered at every phase of the baseline, so the IT Admin sees what to fold (`QĐ-104k`(3)).
-      const mergeCandidateIds = mergeCandidatesOf(live, record);
       const notice = deriveNotice(noticeInputOf(record));
       const missing = missingData({
         kind: record.kind,
@@ -337,8 +324,8 @@ export class SubscriptionViewService {
         ...adjustment(record),
         noticeDeadline: { value: notice.deadline, source: notice.source },
         alerts: alertsOf(points.get(record.id) ?? null, record, windows.get(record.id)),
-        warnings: [...noticeWarnings(notice.source), ...poolWarnings(record), ...mergeWarnings(mergeCandidateIds)],
-        mergeCandidateIds,
+        warnings: [...noticeWarnings(notice.source), ...poolWarnings(record)],
+        mergeCandidateIds: [],
         ...vendorAdmins(record),
         taxProfile: { status: group ? 'DECLARED' : 'MISSING', group },
         taxEstimate,
@@ -350,51 +337,82 @@ export class SubscriptionViewService {
     return views;
   }
 
-  /** Which of these subscriptions are live and which live subscriptions their plans have (only K2 and K4 plans, one read for all). */
-  private async liveOfPooledPlans(records: readonly SubscriptionRecord[]) {
-    const rows = await this.subscriptions.findLivenessOfPooledPlans([
-      ...new Set(records.map((record) => record.planId)),
-    ]);
-    const byPlan = liveIdsByPlan(rows, await this.organizationReads.businessToday());
-    const ids = new Set([...byPlan.values()].flat());
-
-    return { byPlan, has: (id: string) => ids.has(id) };
-  }
-
   /**
-   * Who administers the plan of each record at the vendor, read for all of them at once (`QĐ-110k`, `QĐ-110u`): the profiles of the plans that need
-   * admins, the names of the people and which of them still work as an IT Admin. A plan that needs none answers empty and quiet; a plan that
-   * needs them and has no profile (a subscription older than the rule) answers empty with both flags raised.
+   * Who administers the workspace (or legacy plan profile when `workspace` is null) of each record at the vendor (`QĐ-110k`, `QĐ-110u`, W3-12):
+   * the names of the people and which of them work now as an IT Admin. A plan that needs none answers empty and quiet.
    */
   private async vendorAdminsOf(records: readonly SubscriptionRecord[]) {
     const needing = records.filter((record) =>
       needsVendorAdmins(record.planProvisioningType, record.planHasAdminConsole),
     );
-    const profiles = await this.planFacts.vendorAdminsOf([...new Set(needing.map((record) => record.planId))]);
+    const workspaceIds = [...new Set(needing.flatMap((record) => (record.workspace ? [record.workspace.id] : [])))];
+    const legacyPlanIds = [...new Set(needing.filter((r) => r.workspace === null).map((r) => r.planId))];
+    const [wsList, legacyProfiles] = await Promise.all([
+      workspaceIds.length > 0 ? this.workspaces.findMany(workspaceIds) : Promise.resolve([]),
+      legacyPlanIds.length > 0
+        ? this.planFacts.vendorAdminsOf(legacyPlanIds)
+        : Promise.resolve(new Map() as Awaited<ReturnType<PlanFactsService['vendorAdminsOf']>>),
+    ]);
+    const wsById = new Map(wsList.map((ws) => [ws.id, ws]));
     const ids = [
-      ...new Set([...profiles.values()].flatMap((profile) => profile.members.map((member) => member.employeeId))),
+      ...new Set([
+        ...wsList.flatMap((ws) => ws.admins.map((admin) => admin.employeeId)),
+        ...[...legacyProfiles.values()].flatMap((profile) => profile.members.map((member) => member.employeeId)),
+      ]),
     ];
-    const usable = await this.planFacts.workingAdminsAmong(ids);
+    const usable =
+      workspaceIds.length > 0
+        ? await this.workspaces.workingAdminsAmong(ids)
+        : await this.planFacts.workingAdminsAmong(ids);
     const people = new Map((await this.organizationReads.getEmployees(ids)).map((employee) => [employee.id, employee]));
 
-    return (record: SubscriptionRecord) => {
-      const needs = needsVendorAdmins(record.planProvisioningType, record.planHasAdminConsole);
-      const profile = needs ? profiles.get(record.planId) : undefined;
-      const admins: VendorAdminView[] = (profile?.members ?? []).map((member) => ({
-        employeeId: member.employeeId,
-        employeeCode: people.get(member.employeeId)?.employeeCode ?? '',
-        fullName: people.get(member.employeeId)?.fullName ?? '',
-        role: member.role,
-        working: usable.has(member.employeeId),
-      }));
-      const ownerAccountEmail = profile?.ownerAccountEmail ?? null;
+    return (record: SubscriptionRecord) => this.vendorAdminViewFor(record, wsById, legacyProfiles, usable, people);
+  }
+
+  private vendorAdminViewFor(
+    record: SubscriptionRecord,
+    wsById: ReadonlyMap<string, Awaited<ReturnType<WorkspaceForSubscriptionService['findMany']>>[number]>,
+    legacyProfiles: Awaited<ReturnType<PlanFactsService['vendorAdminsOf']>>,
+    usable: ReadonlySet<string>,
+    people: ReadonlyMap<string, { employeeCode: string; fullName: string }>,
+  ) {
+    const needs = needsVendorAdmins(record.planProvisioningType, record.planHasAdminConsole);
+    const source = this.adminSourceFor(record, needs, wsById, legacyProfiles);
+    const admins: VendorAdminView[] = source.members.map((member) => {
+      const person = people.get(member.employeeId);
 
       return {
-        vendorAdmins: admins,
-        ownerAccountEmail,
-        adminNote: profile?.adminNote ?? null,
-        ...vendorAdminFlags({ needs, admins, ownerAccountEmail }),
+        employeeId: member.employeeId,
+        employeeCode: person?.employeeCode ?? '',
+        fullName: person?.fullName ?? '',
+        role: member.role,
+        working: usable.has(member.employeeId),
       };
+    });
+
+    return {
+      vendorAdmins: admins,
+      ownerAccountEmail: source.ownerAccountEmail,
+      adminNote: source.adminNote,
+      ...vendorAdminFlags({ needs, admins, ownerAccountEmail: source.ownerAccountEmail }),
+    };
+  }
+
+  private adminSourceFor(
+    record: SubscriptionRecord,
+    needs: boolean,
+    wsById: ReadonlyMap<string, Awaited<ReturnType<WorkspaceForSubscriptionService['findMany']>>[number]>,
+    legacyProfiles: Awaited<ReturnType<PlanFactsService['vendorAdminsOf']>>,
+  ) {
+    if (!needs) return { members: [], ownerAccountEmail: null, adminNote: null };
+    const ws = record.workspace ? wsById.get(record.workspace.id) : undefined;
+    if (ws) return { members: ws.admins, ownerAccountEmail: ws.ownerAccountEmail, adminNote: ws.adminNote };
+    const legacy = !record.workspace ? legacyProfiles.get(record.planId) : undefined;
+
+    return {
+      members: legacy?.members ?? [],
+      ownerAccountEmail: legacy?.ownerAccountEmail ?? null,
+      adminNote: legacy?.adminNote ?? null,
     };
   }
 }

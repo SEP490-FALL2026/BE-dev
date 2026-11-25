@@ -30,9 +30,12 @@ describe('W3-11 (QĐ-115g): a subscription counted by the members the vendor cou
     );
   });
 
-  it('refuses an active subscription with no payment day, and lets a draft have none', () => {
+  it('refuses an active subscription with no payment day, refuses clearing it while active, and lets a draft have none', () => {
     expect(() => assertPoolTerms(members({ renewalDate: null }))).toThrow(SubscriptionMembersPaymentDayRequiredError);
     expect(() => assertPoolTerms(members({ renewalDate: undefined }))).toThrow(
+      SubscriptionMembersPaymentDayRequiredError,
+    );
+    expect(() => assertPoolTerms(members({ activating: false, active: true, renewalDate: null }))).toThrow(
       SubscriptionMembersPaymentDayRequiredError,
     );
     expect(() => assertPoolTerms(members({ renewalDate: null, activating: false }))).not.toThrow();

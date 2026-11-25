@@ -28063,7 +28063,7 @@
             }
           },
           "409": {
-            "description": "The plan is a K2 or K4 plan, another subscription of it is live (a draft, or active and not continued by a later period, not ended) and the seat baseline is closed: add seats to that one or renew it instead (SUBSCRIPTION.DUPLICATE_PLAN, details.subscriptionIds, nothing is written). While the baseline is open the write is accepted and the answer says SHOULD_MERGE in warnings.",
+            "description": "The plan is a K2 or K4 plan and another live subscription (a draft, or active and not continued by a later period, not ended) already exists in the same workspace: add seats to that one, renew it, or choose a different workspace instead (SUBSCRIPTION.DUPLICATE_PLAN, details.subscriptionIds, nothing is written).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -29401,7 +29401,7 @@
             }
           },
           "409": {
-            "description": "The plan is a K2 or K4 plan, another subscription of it is live (a draft, or active and not continued by a later period, not ended) and the seat baseline is closed: add seats to that one or renew it instead (SUBSCRIPTION.DUPLICATE_PLAN, details.subscriptionIds, nothing is written). While the baseline is open the write is accepted and the answer says SHOULD_MERGE in warnings.",
+            "description": "The plan is a K2 or K4 plan and another live subscription (a draft, or active and not continued by a later period, not ended) already exists in the same workspace: add seats to that one, renew it, or choose a different workspace instead (SUBSCRIPTION.DUPLICATE_PLAN, details.subscriptionIds, nothing is written).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -46792,12 +46792,12 @@
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
                   "SUBSCRIPTION_RENEWAL.NOT_RENEWABLE": {
-                    "summary": "Only a live shared-pool term has an adjustment point (details.reason: PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED, CANCELLED).",
+                    "summary": "Only a fixed-seat live shared-pool term has an adjustment point (details.reason: PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED, CANCELLED, MEMBER_COUNTED).",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "SUBSCRIPTION_RENEWAL.NOT_RENEWABLE",
-                        "message": "Only a live shared-pool term has an adjustment point (details.reason: PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED, CANCELLED).",
+                        "message": "Only a fixed-seat live shared-pool term has an adjustment point (details.reason: PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED, CANCELLED, MEMBER_COUNTED).",
                         "details": { "reason": "ALREADY_CONTINUED" },
                         "requestId": "req_example"
                       }
@@ -47201,18 +47201,18 @@
             }
           },
           "409": {
-            "description": "The subscription has no point of adjustment: a perpetual purchase, internal software, a term that is not a workspace of the shared pool (a key or a one-time license), a draft, a period already continued or a subscription already recorded as cancelled (SUBSCRIPTION_RENEWAL.NOT_RENEWABLE, details.reason PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED or CANCELLED); a cancellation decided before the one-write rule still waits for its outcome (SUBSCRIPTION_RENEWAL.ALREADY_PROPOSED, details.renewalId: the IT Admin records its outcome first); no date gives its point and its contract data must be completed first (SUBSCRIPTION_RENEWAL.CONTRACT_DATA_INCOMPLETE).",
+            "description": "The subscription has no point of adjustment: a perpetual purchase, internal software, a term that is not a workspace of the shared pool (a key or a one-time license), a draft, a period already continued, a subscription counted by its members, or a subscription already recorded as cancelled (SUBSCRIPTION_RENEWAL.NOT_RENEWABLE, details.reason PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED, MEMBER_COUNTED or CANCELLED); a cancellation decided before the one-write rule still waits for its outcome (SUBSCRIPTION_RENEWAL.ALREADY_PROPOSED, details.renewalId: the IT Admin records its outcome first); no date gives its point and its contract data must be completed first (SUBSCRIPTION_RENEWAL.CONTRACT_DATA_INCOMPLETE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
                   "SUBSCRIPTION_RENEWAL.NOT_RENEWABLE": {
-                    "summary": "Only a live shared-pool term has an adjustment point (details.reason: PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED, CANCELLED).",
+                    "summary": "Only a fixed-seat live shared-pool term has an adjustment point (details.reason: PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED, CANCELLED, MEMBER_COUNTED).",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "SUBSCRIPTION_RENEWAL.NOT_RENEWABLE",
-                        "message": "Only a live shared-pool term has an adjustment point (details.reason: PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED, CANCELLED).",
+                        "message": "Only a fixed-seat live shared-pool term has an adjustment point (details.reason: PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED, CANCELLED, MEMBER_COUNTED).",
                         "details": { "reason": "ALREADY_CONTINUED" },
                         "requestId": "req_example"
                       }
@@ -152597,6 +152597,37 @@
                     "additionalProperties": false,
                     "description": "The plans in use that need admins at the vendor (`K2`, or `K4` with an admin console) with fewer than two of the recorded ones still working as IT Admins, or none recorded: the plans whose subscriptions raise `vendorAdminsBelowMinimum` in `subscriptionList`. Across the company."
                   },
+                  "workspacesBelowVendorAdminMinimum": {
+                    "type": "object",
+                    "properties": {
+                      "state": {
+                        "type": "string",
+                        "enum": ["COUNTED", "AT_SOURCE", "NOT_AVAILABLE"],
+                        "description": "COUNTED: count is how many, in the scope of the caller. AT_SOURCE: the rows are listed by sourceOperationId in the same scope and are not counted here. NOT_AVAILABLE: the data has no source yet; reason says why. A section that is not counted is never shown as zero."
+                      },
+                      "count": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991,
+                        "description": "Set only when state is COUNTED.",
+                        "nullable": true
+                      },
+                      "sourceOperationId": {
+                        "description": "The operation that lists the rows of the section; null when there is none yet.",
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "reason": {
+                        "type": "string",
+                        "enum": ["FINANCE_FIGURES_NOT_DELIVERED", "USAGE_DATA_NOT_DELIVERED", "NO_DATA_SOURCE", null],
+                        "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
+                        "nullable": true
+                      }
+                    },
+                    "required": ["state", "count", "sourceOperationId", "reason"],
+                    "additionalProperties": false,
+                    "description": "The workspaces in use with fewer than two administrators still working as IT Admins across the company."
+                  },
                   "grantTasks": {
                     "type": "object",
                     "properties": {
@@ -153037,6 +153068,7 @@
                   "transfers",
                   "seatsReturned",
                   "plansBelowVendorAdminMinimum",
+                  "workspacesBelowVendorAdminMinimum",
                   "grantTasks",
                   "revocationTasks",
                   "discrepancies",
@@ -153583,6 +153615,37 @@
                     "additionalProperties": false,
                     "description": "The plans in use that need admins at the vendor (`K2`, or `K4` with an admin console) with fewer than two of the recorded ones still working as IT Admins, or none recorded: the plans whose subscriptions raise `vendorAdminsBelowMinimum` in `subscriptionList`. Across the company."
                   },
+                  "workspacesBelowVendorAdminMinimum": {
+                    "type": "object",
+                    "properties": {
+                      "state": {
+                        "type": "string",
+                        "enum": ["COUNTED", "AT_SOURCE", "NOT_AVAILABLE"],
+                        "description": "COUNTED: count is how many, in the scope of the caller. AT_SOURCE: the rows are listed by sourceOperationId in the same scope and are not counted here. NOT_AVAILABLE: the data has no source yet; reason says why. A section that is not counted is never shown as zero."
+                      },
+                      "count": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991,
+                        "description": "Set only when state is COUNTED.",
+                        "nullable": true
+                      },
+                      "sourceOperationId": {
+                        "description": "The operation that lists the rows of the section; null when there is none yet.",
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "reason": {
+                        "type": "string",
+                        "enum": ["FINANCE_FIGURES_NOT_DELIVERED", "USAGE_DATA_NOT_DELIVERED", "NO_DATA_SOURCE", null],
+                        "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
+                        "nullable": true
+                      }
+                    },
+                    "required": ["state", "count", "sourceOperationId", "reason"],
+                    "additionalProperties": false,
+                    "description": "The workspaces in use with fewer than two administrators still working as IT Admins across the company."
+                  },
                   "congestion": {
                     "type": "object",
                     "properties": {
@@ -153837,6 +153900,7 @@
                   "transfers",
                   "seatsReturned",
                   "plansBelowVendorAdminMinimum",
+                  "workspacesBelowVendorAdminMinimum",
                   "congestion",
                   "backgroundJobs",
                   "approverConfiguration",

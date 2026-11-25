@@ -5,7 +5,8 @@ import { Contributions } from '../../../core/extension/contributions';
  * What `notifications` opens to other modules. A notification sentence names an entity by a display name that
  * the owning module supplies at read time (`NotificationNameSource`); the kinds a sentence can name are fixed here, once.
  */
-export type NameKind = 'REQUEST' | 'EMPLOYEE' | 'DEPARTMENT' | 'COST_CENTER' | 'APPLICATION' | 'PLAN' | 'SUBSCRIPTION';
+export type NameKind =
+  'REQUEST' | 'EMPLOYEE' | 'DEPARTMENT' | 'COST_CENTER' | 'APPLICATION' | 'PLAN' | 'SUBSCRIPTION' | 'WORKSPACE';
 
 /** The module that owns the table of some kinds answers for their display names, in one query per kind. */
 export interface NotificationNameSource {

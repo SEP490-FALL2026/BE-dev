@@ -136,7 +136,7 @@ const INVALID_UPDATE = {
 const DUPLICATE_PLAN_CONFLICT = {
   status: HttpStatus.CONFLICT,
   description:
-    'The plan is a K2 or K4 plan, another subscription of it is live (a draft, or active and not continued by a later period, not ended) and the seat baseline is closed: add seats to that one or renew it instead (SUBSCRIPTION.DUPLICATE_PLAN, details.subscriptionIds, nothing is written). While the baseline is open the write is accepted and the answer says SHOULD_MERGE in warnings.',
+    'The plan is a K2 or K4 plan and another live subscription (a draft, or active and not continued by a later period, not ended) already exists in the same workspace: add seats to that one, renew it, or choose a different workspace instead (SUBSCRIPTION.DUPLICATE_PLAN, details.subscriptionIds, nothing is written).',
   examples: [SUBSCRIPTION_ERROR_EXAMPLES.DUPLICATE_PLAN],
 } as const;
 

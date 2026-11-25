@@ -70,6 +70,12 @@ export class SubscriptionRenewalSweepService {
     const result: SweepResult = { told: 0, deadlineEvents: 0, failed: 0 };
     const organization = await this.organizationReads.getOrganization();
     if (!organization) return result;
+    try {
+      result.told += await this.alerts.sweepWorkspaceAdmins(organization.id);
+    } catch (error) {
+      result.failed += 1;
+      this.logger.error(`Workspace admin alert sweep failed: ${describeForOperator(error)}`);
+    }
     const today = await this.organizationReads.businessToday(now);
     const subjects = await this.periods.listAdjustmentSubjects();
     if (subjects.length === 0) return result;

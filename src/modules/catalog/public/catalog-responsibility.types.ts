@@ -31,3 +31,12 @@ export interface ResponsibilitiesTransferred {
   /** The lots of licenses the IT Admin answered for (W3-24); they change hands in the same transaction, after the subscriptions. */
   licenseLotIds: string[];
 }
+
+/** A workspace with administrators who are no longer working as IT Admins, for the hourly alert sweep (W3-12). */
+export interface WorkspaceNotWorkingAdmins {
+  workspaceId: string;
+  organizationId: string;
+  responsibleItAdminEmployeeId: string | null;
+  workingAdminCount: number;
+  notWorkingAdminEmployeeIds: string[];
+}

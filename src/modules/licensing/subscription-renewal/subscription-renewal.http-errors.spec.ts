@@ -12,6 +12,7 @@ describe('NOT_RENEWABLE message (F4)', () => {
       NOT_ACTIVE: true,
       ALREADY_CONTINUED: true,
       CANCELLED: true,
+      MEMBER_COUNTED: true,
     };
     const exception = toRenewalApiException(new RenewalError('NOT_RENEWABLE', { reason: 'CANCELLED' })) as ApiException;
     const message = (exception.getResponse() as { message: string }).message;

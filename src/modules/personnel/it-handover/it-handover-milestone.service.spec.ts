@@ -6,21 +6,33 @@ import { ItHandoverMilestoneService } from './it-handover-milestone.service';
 const TX = {} as DbTx;
 
 describe('ItHandoverMilestoneService', () => {
-  it('passes usable subscription IT Admins of each plan left without admin to vendorAdminsGone', async () => {
-    const usableSubscriptionItAdminsOfPlan = jest.fn().mockResolvedValue(['it-sub-1', 'it-sub-2']);
+  it('notifies per workspace via workspaceAdminNotWorking when an admin reaches departure milestone', async () => {
     const catalog = {
       vendorAdminRolesOf: jest.fn().mockResolvedValue([
-        { planId: 'plan-1', applicationId: 'app-1', role: 'OWNER', othersWorking: 0 },
-        { planId: 'plan-2', applicationId: 'app-2', role: 'ADMIN', othersWorking: 1 },
+        {
+          planId: 'plan-1',
+          applicationId: 'app-1',
+          role: 'OWNER',
+          othersWorking: 0,
+          workspaceId: 'ws-1',
+          responsibleItAdminEmployeeId: 'it-resp-1',
+        },
+        {
+          planId: 'plan-2',
+          applicationId: 'app-2',
+          role: 'ADMIN',
+          othersWorking: 1,
+          workspaceId: 'ws-2',
+          responsibleItAdminEmployeeId: 'it-resp-2',
+        },
       ]),
-      usableSubscriptionItAdminsOfPlan,
       countResponsibilitiesOf: jest
         .fn()
         .mockResolvedValue(new Map([['leaver', { subscriptions: 1, applications: 0 }]])),
     } as unknown as CatalogResponsibilityApi;
-    const vendorAdminsGone = jest.fn().mockResolvedValue(2);
+    const workspaceAdminNotWorking = jest.fn().mockResolvedValue(1);
     const itHandoverPending = jest.fn().mockResolvedValue(1);
-    const notifier = { vendorAdminsGone, itHandoverPending } as unknown as PersonnelNotifier;
+    const notifier = { workspaceAdminNotWorking, itHandoverPending } as unknown as PersonnelNotifier;
     const service = new ItHandoverMilestoneService(catalog, notifier);
 
     const told = await service.reached(TX, {
@@ -31,15 +43,20 @@ describe('ItHandoverMilestoneService', () => {
     });
 
     expect(told).toBe(1);
-    expect(usableSubscriptionItAdminsOfPlan).toHaveBeenCalledTimes(1);
-    expect(usableSubscriptionItAdminsOfPlan).toHaveBeenCalledWith('plan-1', TX);
-    expect(vendorAdminsGone).toHaveBeenCalledWith(TX, {
+    expect(workspaceAdminNotWorking).toHaveBeenCalledTimes(2);
+    expect(workspaceAdminNotWorking).toHaveBeenNthCalledWith(1, TX, {
       organizationId: 'org-1',
-      planId: 'plan-1',
-      applicationId: 'app-1',
-      sourceId: 'case-1',
-      responsibleItAdminEmployeeIds: ['it-sub-1', 'it-sub-2'],
-      leavingEmployeeId: 'leaver',
+      workspaceId: 'ws-1',
+      employeeId: 'leaver',
+      responsibleItAdminEmployeeId: 'it-resp-1',
+      workingAdminCount: 0,
+    });
+    expect(workspaceAdminNotWorking).toHaveBeenNthCalledWith(2, TX, {
+      organizationId: 'org-1',
+      workspaceId: 'ws-2',
+      employeeId: 'leaver',
+      responsibleItAdminEmployeeId: 'it-resp-2',
+      workingAdminCount: 1,
     });
     expect(itHandoverPending).toHaveBeenCalledTimes(1);
   });

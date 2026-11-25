@@ -21,9 +21,10 @@ import {
   assertResponsibleNamed,
   assertVendorAdminsRecorded,
   defaultResponsibleOf,
+  isLiveSubscription,
   isPooledPlan,
-  liveIdsByPlan,
-  liveSiblingsOf,
+  liveIdsByWorkspacePlan,
+  liveWorkspaceSiblingsOf,
 } from './subscription-pool.policy';
 import { SubscriptionSeatIncreaseService } from '../seat-increase/subscription-seat-increase.service';
 import { WorkspaceForSubscriptionService } from '../../workspace/workspace-for-subscription.service';
@@ -66,6 +67,7 @@ export interface PoolChangeInput {
   /** How the seats are counted and the payment day: a write that names them is judged by the members rules (W3-11). */
   seatCounting?: SeatCounting;
   renewalDate?: string | null;
+  workspaceId?: string;
 }
 
 /** A change of a subscription as the pool judges it: who writes, in which organization, and the state the write leaves. */
@@ -158,6 +160,7 @@ export class SubscriptionPoolService {
       renewalDate?: string | null | undefined;
     },
     activating: boolean,
+    active: boolean = activating,
   ): void {
     assertPoolTerms({
       kind,
@@ -165,6 +168,7 @@ export class SubscriptionPoolService {
       billingCycle: state.billingCycle,
       commitmentTermMonths: state.commitmentTermMonths,
       activating,
+      active,
       seatCounting: state.seatCounting,
       renewalDate: state.renewalDate,
     });
@@ -188,77 +192,88 @@ export class SubscriptionPoolService {
       responsibleItAdminEmployeeId: string | null;
       seatCounting?: SeatCounting | undefined;
       renewalDate?: string | null | undefined;
+      workspaceId?: string | null | undefined;
     },
     continuesPeriod: boolean,
     organizationId: string,
   ): Promise<void> {
     this.assert(plan, kind, state, true);
     await this.requireItAdmin(state.responsibleItAdminEmployeeId as string, tx);
-    if (!continuesPeriod) await this.assertVendorAdmins(tx, plan, organizationId);
+    if (!continuesPeriod) await this.assertVendorAdmins(tx, plan, organizationId, state.workspaceId ?? null);
   }
 
   /**
-   * A plan that needs admins at the vendor (`K2`, or `K4` with an admin console) is activated, or its pool made, only when at least two
-   * distinct recorded IT Admins are still working once the seat baseline phase is closed (or when no baseline hook is bound); while the
-   * baseline phase is open it is let through. The plan is locked by the caller. Throws SubscriptionVendorAdminsRequiredError.
+   * A plan the company administers at the vendor (K2, or K4 with an admin console) needs at least two working IT Admins recorded on its
+   * workspace before a new subscription of it becomes active (`QĐ-110k`, `QĐ-110u`, `QĐ-114ae`, W3-12). While the seat baseline phase is open
+   * the gate lets it through with a flag on the read. Throws SubscriptionVendorAdminsRequiredError.
    */
-  async assertVendorAdmins(tx: DbTx, plan: LockedPlan, organizationId: string): Promise<void> {
+  async assertVendorAdmins(
+    tx: DbTx,
+    plan: LockedPlan,
+    organizationId: string,
+    workspaceId: string | null,
+  ): Promise<void> {
     const needs = needsVendorAdmins(plan.provisioningType, plan.hasAdminConsole);
     if (!needs) return;
     // Nobody to say the baseline is still open: take it as closed, so nothing is let through by accident.
     const closed = !this.baselinePhase.isBound() || (await this.baselinePhase.get().isClosed(tx, organizationId));
     if (!closed) return;
-    const profile = (await this.planFacts.vendorAdminsOf([plan.id], tx)).get(plan.id);
-    const memberIds = [...new Set(profile?.members.map((member) => member.employeeId) ?? [])];
-    const working = await this.planFacts.workingAdminsAmong(memberIds, tx);
+    const given = workspaceId === null ? 0 : await this.workspaces.workingAdminCount(tx, workspaceId);
     assertVendorAdminsRecorded({
       needs,
-      given: working.size,
+      given,
       planId: plan.id,
     });
   }
 
   /**
-   * Judges a change of a subscription: the rules of the pool apply to a write that makes a draft active or touches the
-   * commitment or the cycle; data older than the rules is otherwise left as it is. A write that
-   * makes the subscription the one that prices its plan takes the flag off the others of the plan (the caller holds the plan
-   * locked `FOR UPDATE`). Throws the errors of `assert` and SubscriptionPrimaryNotEligibleError.
+   * The rules of the shared pool on an update (`QĐ-103e`, R-E01, R-G01, `QĐ-115g`, W3-14): activating a draft checks the whole state;
+   * an update to an already active subscription only checks the commitment, cycle, and member rules when it touches them, and checks for
+   * a duplicate live subscription in the destination workspace when `workspaceId` changes.
    */
   async judgeChange(tx: DbTx, change: PoolChange): Promise<void> {
     const { plan, current, state, input, organizationId } = change;
     const activating = current.status === 'DRAFT' && state.status === 'ACTIVE';
-    // Changing only the person who answers does not judge a commitment and cycle the write did not touch (F-009).
-    const touches =
-      input.billingCycle !== undefined ||
-      input.commitmentTermMonths !== undefined ||
-      input.seatCounting !== undefined ||
-      input.renewalDate !== undefined;
     if (activating) {
       await this.assertActivation(tx, plan, current.kind, state, current.renewedFromId !== null, organizationId);
-    } else if (touches) this.assert(plan, current.kind, state, false);
+    } else if (this.touchesPoolTerms(input)) {
+      this.assert(plan, current.kind, state, false, state.status === 'ACTIVE');
+    }
+    const targetWorkspaceId = state.workspaceId ?? null;
+    if (input.workspaceId !== undefined && targetWorkspaceId !== (current.workspace?.id ?? null)) {
+      await this.assertNoLiveDuplicate(tx, plan, current.id, targetWorkspaceId);
+    }
     if (input.isPrimaryForPlan) await this.makePrimary(tx, change);
   }
 
+  // Changing only the person who answers does not judge a commitment and cycle the write did not touch (F-009).
+  private touchesPoolTerms(input: PoolChangeInput): boolean {
+    return (
+      input.billingCycle !== undefined ||
+      input.commitmentTermMonths !== undefined ||
+      input.seatCounting !== undefined ||
+      input.renewalDate !== undefined
+    );
+  }
+
   /**
-   * A second live subscription of a K2 or K4 plan (`QĐ-104k`(3), R-E02): while the seat baseline is open it is let through (the read answers
-   * `SHOULD_MERGE`), once closed it is refused. The caller holds the plan `FOR UPDATE`, so two writes of the plan take turns. A renewal is
-   * never a duplicate: the period it continues is no longer live. `selfId` is the subscription being completed, none for a new one. Throws
-   * SubscriptionDuplicatePlanError.
+   * No second live subscription of a K2 or K4 plan in the same workspace, even while the seat baseline phase is open (`QĐ-116ag`, W3-14).
+   * The caller holds the workspace `FOR UPDATE` (tier 5b) and the plan `FOR UPDATE` / `FOR SHARE`, so concurrent writes serialize cleanly.
+   * Throws SubscriptionDuplicatePlanError.
    */
   async assertNoLiveDuplicate(
     tx: DbTx,
     plan: LockedPlan,
     selfId: string | null,
-    organizationId: string,
+    workspaceId: string | null,
   ): Promise<void> {
     if (!isPooledPlan(plan.provisioningType)) return;
     const today = await this.organizationReads.businessToday(new Date(), tx);
     const rows = await this.subscriptions.findLivenessOfPooledPlans([plan.id], tx);
-    const siblings = liveSiblingsOf(liveIdsByPlan(rows, today), plan.id, selfId);
-    if (siblings.length === 0) return;
-    // Nobody to say the baseline is still open: take it as closed, so nothing is let through by accident.
-    const closed = !this.baselinePhase.isBound() || (await this.baselinePhase.get().isClosed(tx, organizationId));
-    if (closed) throw new SubscriptionDuplicatePlanError(siblings);
+    if (selfId !== null && !rows.some((row) => row.id === selfId && isLiveSubscription(row, today))) return;
+    const live = liveIdsByWorkspacePlan(rows, today);
+    const siblings = liveWorkspaceSiblingsOf(live, workspaceId, plan.id, selfId);
+    if (siblings.length > 0) throw new SubscriptionDuplicatePlanError(siblings);
   }
 
   /**

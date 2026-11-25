@@ -62,6 +62,8 @@ export interface RenewalPeriodFacts {
   renewedFromId: string | null;
   /** The period that continues this one, once a renewal recorded it; null while none does. */
   renewedById: string | null;
+  /** How the seats of the period are counted (`FIXED` vs `MEMBERS`, W3-11). */
+  seatCounting?: 'FIXED' | 'MEMBERS';
 }
 
 /** The new period the IT Admin records from what the vendor confirmed (`US-11-05` AC-11): a term of the same plan and owner. */

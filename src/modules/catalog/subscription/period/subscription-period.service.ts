@@ -98,6 +98,7 @@ function factsOf(
     adjustment: adjustmentOf(record, today, windows),
     renewedFromId: record.renewedFromId,
     renewedById,
+    seatCounting: record.seatCounting,
   };
 }
 

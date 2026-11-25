@@ -14,7 +14,13 @@ export class SubscriptionPeriodRepo {
    */
   async listAdjustmentSubjectIds(limit: number): Promise<string[]> {
     const rows = await this.prisma.subscription.findMany({
-      where: { kind: 'TERM', status: 'ACTIVE', renewedBy: null, plan: { provisioningType: 'K2' } },
+      where: {
+        kind: 'TERM',
+        status: 'ACTIVE',
+        renewedBy: null,
+        seatCounting: 'FIXED',
+        plan: { provisioningType: 'K2' },
+      },
       select: { id: true },
       orderBy: { id: 'asc' },
       take: limit,

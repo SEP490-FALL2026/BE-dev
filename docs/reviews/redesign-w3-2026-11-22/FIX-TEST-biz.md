@@ -24,3 +24,4 @@ Danh sách các test http / integration / flow cũ khẳng định hành vi cũ,
 - **B M1:** gộp nhãn theo đoạn liền, lệch ≤ 1 đ.
 - **B M7, M-4/M3:** code chết.
 - **B M2:** sửa chữ SPEC: `flags` là object (`D-7` đúng).
+| P10   | `test/integration/catalog/subscription-duplicate-workspace` (`test/integration/catalog/subscription-duplicate-plan.integration-spec.ts`, `test/integration/catalog/subscription-vendor-admins-http.integration-spec.ts`) | Kỳ vọng cũ `SHOULD_MERGE` khi baseline còn mở hoặc gắn cổng/profile theo `plan_workspace_profiles` của gói | Theo W3-12 và W3-14, cổng ≥ 2 admin kiểm trên `workspace` (`SubscriptionPoolService.assertVendorAdmins`) và trùng `(workspace, plan)` bị chặn `409 SUBSCRIPTION.DUPLICATE_PLAN` ngay cả khi baseline đang mở (bỏ `SHOULD_MERGE`); hai suite cũ chờ dọn ở lượt dọn test cuối đợt. |

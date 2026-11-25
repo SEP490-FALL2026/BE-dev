@@ -238,7 +238,7 @@ export class SubscriptionService {
     const plan = await this.plans.lockExclusive(tx, input.planId);
     if (!plan) throw new SubscriptionPlanNotFoundError();
     if (plan.applicationStatus === 'RETIRED') throw new SubscriptionApplicationRetiredError();
-    await this.poolRules.assertNoLiveDuplicate(tx, plan, null, organizationId);
+    await this.poolRules.assertNoLiveDuplicate(tx, plan, null, workspaceId);
     const commitmentTermMonths =
       input.commitmentTermMonths ?? (input.kind === 'TERM' ? (plan.referenceCommitmentMonths ?? undefined) : undefined);
     const state = {
@@ -255,7 +255,7 @@ export class SubscriptionService {
     const priced = await this.pricing.priceToday(tx, money);
     const complete = subscriptionStatusOf(plan, input.kind, { ...state, ...priced });
     this.poolRules.assert(plan, input.kind, state, complete === 'ACTIVE');
-    if (complete === 'ACTIVE') await this.poolRules.assertVendorAdmins(tx, plan, organizationId);
+    if (complete === 'ACTIVE') await this.poolRules.assertVendorAdmins(tx, plan, organizationId, workspaceId);
     const created = await this.subscriptions.insert(tx, {
       organizationId,
       planId: plan.id,
@@ -322,7 +322,7 @@ export class SubscriptionService {
         current.renewedFromId !== null,
         organizationId,
       );
-      await this.poolRules.assertNoLiveDuplicate(tx, plan, id, organizationId);
+      await this.poolRules.assertNoLiveDuplicate(tx, plan, id, state.workspaceId);
 
       // A draft renewal period takes the flag that prices the plan from the period it continues, now that it is active (F-012).
       const takesPrimary = await this.poolRules.takePrimaryFromPrevious(tx, actor, organizationId, current);

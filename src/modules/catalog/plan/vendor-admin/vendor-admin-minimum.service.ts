@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import { PlanFactsService } from '../plan-facts.service';
+import type { WorkspaceNotWorkingAdmins } from '../../public/catalog-responsibility.types';
 import { WorkspaceRepo } from '../../workspace/workspace.repo';
 import { PlanRepo } from '../plan.repo';
 import { MIN_VENDOR_ADMINS } from '../plan-vendor-admins.policy';
@@ -30,6 +31,31 @@ export class VendorAdminMinimumService {
     const working = await this.facts.workingAdminsAmong(everyone, tx);
 
     return workspaces.filter((workspace) => workingAdminCount(workspace.admins, working) < MIN_VENDOR_ADMINS).length;
+  }
+
+  /** Workspaces that currently list at least one administrator who is not a working IT Admin (W3-12). */
+  async workspacesWithNotWorkingAdmins(tx?: DbTx): Promise<WorkspaceNotWorkingAdmins[]> {
+    const workspaces = await this.workspaces.findAllWithAdmins(tx);
+    if (workspaces.length === 0) return [];
+    const everyone = [...new Set(workspaces.flatMap((ws) => ws.admins.map((admin) => admin.employeeId)))];
+    const working = await this.facts.workingAdminsAmong(everyone, tx);
+
+    return workspaces.flatMap((ws) => {
+      const notWorkingAdminEmployeeIds = ws.admins
+        .filter((admin) => !working.has(admin.employeeId))
+        .map((admin) => admin.employeeId);
+      if (notWorkingAdminEmployeeIds.length === 0) return [];
+
+      return [
+        {
+          workspaceId: ws.id,
+          organizationId: ws.organizationId,
+          responsibleItAdminEmployeeId: ws.responsibleItAdminEmployeeId,
+          workingAdminCount: workingAdminCount(ws.admins, working),
+          notWorkingAdminEmployeeIds,
+        },
+      ];
+    });
   }
 
   async countPlansBelowMinimum(tx?: DbTx): Promise<number> {

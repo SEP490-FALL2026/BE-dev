@@ -34,6 +34,7 @@ const SECTION_KEYS = {
     'termsToReview',
     'transfers',
     'unconfirmedDevices',
+    'workspacesBelowVendorAdminMinimum',
   ],
   superAdmin: [
     'accountCandidates',
@@ -48,6 +49,7 @@ const SECTION_KEYS = {
     'seatsReturned',
     'superAdminRole',
     'transfers',
+    'workspacesBelowVendorAdminMinimum',
   ],
 };
 

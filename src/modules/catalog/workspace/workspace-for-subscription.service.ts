@@ -6,6 +6,8 @@ import { searchKey } from '../vendor-dictionary/vendor-matcher.policy';
 import { catalogAuditEvent } from '../catalog-audit-event.mapper';
 import { WorkspaceNotFoundError, WorkspaceRequiredError, WorkspaceVendorMismatchError } from './workspace.errors';
 import { WorkspaceRepo } from './workspace.repo';
+import type { WorkspaceRecord } from './workspace.types';
+import { WorkspaceViewService } from './workspace-view.service';
 
 /** What a write of a subscription knows of its plan when it asks which workspace the subscription is held in. */
 export interface WorkspaceTarget {
@@ -28,7 +30,25 @@ export class WorkspaceForSubscriptionService {
   constructor(
     private readonly repo: WorkspaceRepo,
     private readonly audit: AuditApi,
+    private readonly views: WorkspaceViewService,
   ) {}
+
+  /** How many administrators of this workspace work now as IT Admins (reused by subscription & lot gates, W3-12 / W3-24). */
+  async workingAdminCount(tx: DbTx, workspaceId: string): Promise<number> {
+    const workspace = await this.repo.find(workspaceId, tx);
+
+    return workspace ? this.views.workingAdminCount(workspace, tx) : 0;
+  }
+
+  /** Reads these workspaces (with their administrators) in one query by id order. */
+  findMany(ids: readonly string[], tx?: DbTx): Promise<WorkspaceRecord[]> {
+    return this.repo.findMany(ids, tx);
+  }
+
+  /** Which of these employee ids work now as IT Admins (`QĐ-110k`). */
+  workingAdminsAmong(employeeIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
+    return this.views.workingAdminsAmong(employeeIds, tx);
+  }
 
   /**
    * The workspace the subscription is held in, locked until the transaction ends; null for a plan that needs none and names none. Throws

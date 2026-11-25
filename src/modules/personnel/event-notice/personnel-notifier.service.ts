@@ -384,34 +384,40 @@ export class PersonnelNotifier {
     return written ? 1 : 0;
   }
 
-  /** Notifies active subscription IT Admins of the plan (or the usable Super Admin fallback) when a plan loses its last working vendor admin. */
-  async vendorAdminsGone(
+  /**
+   * Notifies the usable IT Admin responsible for `workspaceId` (if different from `employeeId`), or the usable Super Admin fallback,
+   * once per `(workspace, admin)` when an administrator stops working (W3-12).
+   */
+  async workspaceAdminNotWorking(
     tx: DbTx,
     input: {
       organizationId: string;
-      planId: string;
-      applicationId: string;
-      sourceId: string;
-      responsibleItAdminEmployeeIds: readonly string[];
-      leavingEmployeeId?: string;
+      workspaceId: string;
+      employeeId: string;
+      responsibleItAdminEmployeeId: string | null;
+      workingAdminCount: number;
     },
   ): Promise<number> {
-    let recipients = [...new Set(input.responsibleItAdminEmployeeIds.filter((id) => id !== input.leavingEmployeeId))];
-    if (recipients.length === 0) {
-      const superAdmin = await this.identity.findUsableSuperAdminEmployeeId(tx);
-      recipients = superAdmin !== null && superAdmin !== input.leavingEmployeeId ? [superAdmin] : [];
+    const notice: NoticeParts = {
+      subject: { type: 'WORKSPACE', id: input.workspaceId },
+      params: {
+        workspaceId: input.workspaceId,
+        employeeId: input.employeeId,
+        workingAdminCount: input.workingAdminCount,
+      },
+      eventKey: `WORKSPACE_ADMIN_NOT_WORKING:${input.workspaceId}:${input.employeeId}`,
+    };
+    const responsible = input.responsibleItAdminEmployeeId;
+    if (responsible !== null && responsible !== input.employeeId) {
+      const usable = await this.identity.findUsableItAdminEmployeeIds([responsible], tx);
+      if (usable.has(responsible)) {
+        return (await this.tell(tx, input.organizationId, responsible, 'WORKSPACE_ADMIN_NOT_WORKING', notice)) ? 1 : 0;
+      }
     }
-    let told = 0;
-    for (const recipient of recipients) {
-      const written = await this.tell(tx, input.organizationId, recipient, 'VENDOR_ADMINS_BELOW_MINIMUM', {
-        subject: { type: 'PLAN', id: input.planId },
-        params: { planId: input.planId, applicationId: input.applicationId, adminCount: 0 },
-        eventKey: `VENDOR_ADMINS_BELOW_MINIMUM:${input.planId}:${input.sourceId}`,
-      });
-      if (written) told += 1;
-    }
+    const superAdmin = await this.identity.findUsableSuperAdminEmployeeId(tx);
+    if (superAdmin === null || superAdmin === input.employeeId) return 0;
 
-    return told;
+    return (await this.tell(tx, input.organizationId, superAdmin, 'WORKSPACE_ADMIN_NOT_WORKING', notice)) ? 1 : 0;
   }
 
   /** The IT Admin who took everything a leaving IT Admin answered for is told how many of each are theirs now (SPEC P5). */

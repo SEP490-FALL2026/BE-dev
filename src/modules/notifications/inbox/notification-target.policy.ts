@@ -108,6 +108,7 @@ export const TARGET_BY_CODE: Readonly<Partial<Record<InAppNotificationCode, Rout
   DEVICE_RETURN_WAITING: route('deviceReturnTaskList'),
   UNPLACED_WORK_WAITING: route('unplacedWorkDesignationList'),
   UNPLACED_WORK_DESIGNATED: route('unplacedWorkDesignationList'),
+  WORKSPACE_ADMIN_NOT_WORKING: route('workspaceGet', { id: 'workspaceId' }),
 };
 
 /**
@@ -150,6 +151,7 @@ export const ROUTE_READERS: Readonly<Record<string, readonly string[]>> = {
   unplacedWorkDesignationList: ['SUPER_ADMIN', 'IT_ADMIN'],
   usageSourceList: ['IT_ADMIN'],
   vendorAccountDiscrepancyList: ['IT_ADMIN'],
+  workspaceGet: ['IT_ADMIN', 'FINANCE', 'SUPER_ADMIN'],
 };
 
 /** Where a reader who may not read a route goes instead, tried in order; `selfOnly` is for a notice about the reader (their own record). */
@@ -195,6 +197,7 @@ export const TARGET_BY_SUBJECT_TYPE: Readonly<Record<string, RouteRef>> = {
   SPEND_BATCH: route('spendBatchGet', { id: 'subject' }),
   SUBSCRIPTION: route('subscriptionGet', { id: 'subject' }),
   SUBSCRIPTION_RENEWAL: route('subscriptionRenewalGet', { id: 'subject' }),
+  WORKSPACE: route('workspaceGet', { id: 'subject' }),
 };
 
 /** The spellings that were written before `subject.type` became `UPPER_SNAKE`; hold rows and old notices still carry them. */

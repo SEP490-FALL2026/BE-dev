@@ -39,6 +39,7 @@ export const NAME_KIND_BY_KEY: Readonly<Record<string, NameKind>> = {
   suggestedPlanId: 'PLAN',
   alternativePlanId: 'PLAN',
   subscriptionId: 'SUBSCRIPTION',
+  workspaceId: 'WORKSPACE',
 };
 
 /**
@@ -54,4 +55,5 @@ export const NAME_FALLBACK: Readonly<Record<NameKind, Readonly<Record<Notificati
   APPLICATION: { vi: '(không rõ tên)', en: '(unnamed)' },
   PLAN: { vi: '(không rõ tên)', en: '(unnamed)' },
   SUBSCRIPTION: { vi: '(không rõ tên)', en: '(unnamed)' },
+  WORKSPACE: { vi: '(không rõ tên)', en: '(unnamed)' },
 };
