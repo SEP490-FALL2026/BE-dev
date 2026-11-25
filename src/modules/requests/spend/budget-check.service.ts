@@ -258,6 +258,7 @@ export class BudgetCheckService {
           reserveMinor: found.reserveMinor,
           heldMinor: found.heldMinor,
           spentMinor: found.spentMinor,
+          runningUncommittedMinor: found.runningUncommittedMinor,
         }
       : null;
   }

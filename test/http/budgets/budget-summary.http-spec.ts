@@ -25,6 +25,7 @@ const SUMMARY = {
       spent: { amount: '200', currency: 'VND' },
       remaining: { amount: '500', currency: 'VND' },
       pendingSpend: { amount: '0', currency: 'VND' },
+      runningUncommitted: { amount: '0', currency: 'VND' },
       remainingBase: { amount: '400', currency: 'VND' },
       remainingWithReserve: { amount: '500', currency: 'VND' },
       costCenterCount: 2,
@@ -123,5 +124,28 @@ describe('GET /budgets/summary (HTTP contract, no database)', () => {
       .expect(200);
 
     expect(bodyOf(response).data).toEqual(withPool);
+  });
+
+  it('includes non-zero runningUncommitted deducted from remaining summary amounts', async () => {
+    const withRunning = {
+      ...SUMMARY,
+      totals: {
+        VND: {
+          ...SUMMARY.totals.VND,
+          runningUncommitted: { amount: '120', currency: 'VND' },
+          remaining: { amount: '380', currency: 'VND' },
+          remainingBase: { amount: '280', currency: 'VND' },
+          remainingWithReserve: { amount: '380', currency: 'VND' },
+        },
+      },
+    };
+    summary.mockResolvedValueOnce(withRunning);
+
+    const response = await request(app.getHttpServer())
+      .get('/api/v1/budgets/summary?year=2027')
+      .set('Authorization', bearer(principal(['FINANCE'])))
+      .expect(200);
+
+    expect(bodyOf(response).data).toEqual(withRunning);
   });
 });

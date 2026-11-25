@@ -18,6 +18,8 @@ export interface YearBudgetFacts {
   heldMinor: bigint;
   /** What has become an expense in the year. */
   spentMinor: bigint;
+  /** Estimated remaining-year cost of active K2 seats not backed by a HELD commitment in this Cost Center. */
+  runningUncommittedMinor: bigint;
 }
 
 export interface MonthSliceInput {

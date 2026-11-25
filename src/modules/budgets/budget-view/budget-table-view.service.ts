@@ -16,6 +16,7 @@ interface SummarySums {
   committed: bigint;
   spent: bigint;
   pendingSpend: bigint;
+  runningUncommitted: bigint;
   costCenterCount: number;
   overBudgetCount: number;
 }
@@ -128,7 +129,7 @@ export class BudgetTableViewService {
 
   private async summaryTotal(currency: string, sum: SummarySums) {
     const money = await this.facts.formatter(currency);
-    const used = sum.committed + sum.spent + sum.pendingSpend;
+    const used = sum.committed + sum.spent + sum.pendingSpend + sum.runningUncommitted;
     return {
       currency,
       base: money(sum.base),
@@ -143,6 +144,7 @@ export class BudgetTableViewService {
       committed: money(sum.committed),
       spent: money(sum.spent),
       pendingSpend: money(sum.pendingSpend),
+      runningUncommitted: money(sum.runningUncommitted),
       remaining: money(sum.total + sum.adjustment - used),
       remainingBase: money(sum.base + sum.adjustment - used),
       remainingWithReserve: money(sum.total + sum.adjustment - used),
@@ -169,6 +171,7 @@ const emptySums = (): SummarySums => ({
   committed: 0n,
   spent: 0n,
   pendingSpend: 0n,
+  runningUncommitted: 0n,
   costCenterCount: 0,
   overBudgetCount: 0,
 });
@@ -181,10 +184,8 @@ function addToSummary(sum: SummarySums, row: BudgetViewFigures, numbers: BudgetV
   sum.committed += numbers.committed;
   sum.spent += numbers.spent;
   sum.pendingSpend += numbers.pendingSpend;
+  sum.runningUncommitted += numbers.runningUncommitted;
   sum.costCenterCount += 1;
-  if (
-    row.totalMinor !== null &&
-    row.totalMinor + (row.adjustmentMinor ?? 0n) < numbers.committed + numbers.spent + numbers.pendingSpend
-  )
-    sum.overBudgetCount += 1;
+  const used = numbers.committed + numbers.spent + numbers.pendingSpend + numbers.runningUncommitted;
+  if (row.totalMinor !== null && row.totalMinor + (row.adjustmentMinor ?? 0n) < used) sum.overBudgetCount += 1;
 }

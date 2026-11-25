@@ -5,6 +5,7 @@ import { InvoiceRepo } from '../budget/invoice.repo';
 import { CommitmentService } from '../commitment/commitment.service';
 import { OutOfProcessSpendRecorderService } from '../invoice/out-of-process-spend-recorder.service';
 import { PurchaseInvoiceRecorderService } from '../invoice/purchase-invoice-recorder.service';
+import { RunningUncommittedFactsService } from '../running-uncommitted/running-uncommitted-facts.service';
 import type {
   CommittedAmount,
   CommitmentHoldInput,
@@ -38,11 +39,19 @@ export class BudgetsApi {
     private readonly purchaseInvoices: PurchaseInvoiceRecorderService,
     private readonly outOfProcessSpends: OutOfProcessSpendRecorderService,
     private readonly invoices: InvoiceRepo,
+    private readonly runningUncommitted: RunningUncommittedFactsService,
   ) {}
 
   /** The current budget of each of the years; a year without one is absent from the map, which is not a budget of nothing. */
-  yearFacts(costCenterId: string, years: readonly number[], tx?: DbTx): Promise<Map<number, YearBudgetFacts>> {
-    return this.facts.yearFacts(costCenterId, years, tx);
+  async yearFacts(costCenterId: string, years: readonly number[], tx?: DbTx): Promise<Map<number, YearBudgetFacts>> {
+    const facts = await this.facts.yearFacts(costCenterId, years, tx);
+    if (facts.size === 0) return facts;
+    const running = await this.runningUncommitted.ofCostCenterYears(costCenterId, [...facts.keys()], tx);
+    for (const [year, entry] of facts) {
+      facts.set(year, { ...entry, runningUncommittedMinor: running.get(year) ?? 0n });
+    }
+
+    return facts;
   }
 
   /**

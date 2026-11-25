@@ -133972,6 +133972,12 @@
                     "required": ["amount", "currency"],
                     "additionalProperties": false
                   },
+                  "runningUncommitted": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false
+                  },
                   "remainingBase": {
                     "type": "object",
                     "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
@@ -134056,6 +134062,7 @@
                   "committed",
                   "spent",
                   "pendingSpend",
+                  "runningUncommitted",
                   "remainingBase",
                   "remainingWithReserve",
                   "overBudget",
@@ -134258,6 +134265,12 @@
                       "required": ["amount", "currency"],
                       "additionalProperties": false
                     },
+                    "runningUncommitted": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
                     "remainingBase": {
                       "type": "object",
                       "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
@@ -134283,6 +134296,7 @@
                     "spent",
                     "remaining",
                     "pendingSpend",
+                    "runningUncommitted",
                     "remainingBase",
                     "remainingWithReserve",
                     "costCenterCount",
@@ -134506,6 +134520,12 @@
                       "required": ["amount", "currency"],
                       "additionalProperties": false
                     },
+                    "runningUncommitted": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
                     "remainingBase": {
                       "type": "object",
                       "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
@@ -134550,6 +134570,7 @@
                     "committed",
                     "spent",
                     "pendingSpend",
+                    "runningUncommitted",
                     "remainingBase",
                     "remainingWithReserve",
                     "overBudget",

@@ -1,14 +1,33 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { BudgetFactsRepo } from '../budget/budget-facts.repo';
+import type { YearBudgetFacts } from './budgets.types';
+
+export interface RunningUncommittedReader {
+  ofCostCenterYears(costCenterId: string, years: readonly number[], tx?: DbTx): Promise<Map<number, bigint>>;
+}
 
 /** Read-only budget figures for the shared three-outcome check; never grants or releases a commitment. */
 @Injectable()
 export class BudgetsReadApi {
+  private runningUncommitted: RunningUncommittedReader | null = null;
+
   constructor(private readonly facts: BudgetFactsRepo) {}
 
-  yearFacts(costCenterId: string, years: readonly number[], tx?: DbTx) {
-    return this.facts.yearFacts(costCenterId, years, tx);
+  /** Registers the live running-uncommitted reader when `BudgetsModule` initializes in the API graph. */
+  registerRunningUncommitted(reader: RunningUncommittedReader): void {
+    this.runningUncommitted = reader;
+  }
+
+  async yearFacts(costCenterId: string, years: readonly number[], tx?: DbTx): Promise<Map<number, YearBudgetFacts>> {
+    const facts = await this.facts.yearFacts(costCenterId, years, tx);
+    if (facts.size === 0 || this.runningUncommitted === null) return facts;
+    const running = await this.runningUncommitted.ofCostCenterYears(costCenterId, [...facts.keys()], tx);
+    for (const [year, entry] of facts) {
+      facts.set(year, { ...entry, runningUncommittedMinor: running.get(year) ?? 0n });
+    }
+
+    return facts;
   }
 
   /**

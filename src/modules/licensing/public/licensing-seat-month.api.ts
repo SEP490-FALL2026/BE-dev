@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { monthBoundsOf, type BusinessDate } from '../../../core/business-date';
+import { addDays, monthBoundsOf, type BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { SubscriptionPeriodApi } from '../../catalog/public/subscription-period.api';
 import { AssignmentSeatMonthRepo } from '../assignment/assignment-seat-month.repo';
 import { SubscriptionRenewalRepo } from '../subscription-renewal/subscription-renewal.repo';
-import type { SeatOfMonth } from './licensing-seat-month.types';
+import type { SeatInForce, SeatOfMonth } from './licensing-seat-month.types';
 
 /**
  * The licensing facade for the cost of a month of the seats of the shared pool (`SM-1`, `QĐ-103k`): which seats of a `K2` plan were in force on
@@ -28,12 +28,32 @@ export class LicensingSeatMonthApi {
    */
   async getSeatsOfMonth(month: BusinessDate, tx?: DbTx, subscriptionId?: string): Promise<SeatOfMonth[]> {
     const { start, nextStart } = monthBoundsOf(month);
+    const pools = await this.k2PlansTouching(start, nextStart, tx, subscriptionId);
+
+    return this.seats.seatsOfPlans(pools, start, nextStart, tx, subscriptionId);
+  }
+
+  /**
+   * The seats of K2 pool subscriptions that are in force on `day` (`heldFrom <= day && (heldUntil === null || day < heldUntil)`).
+   */
+  async getSeatsInForceOn(day: BusinessDate, tx?: DbTx): Promise<SeatInForce[]> {
+    const pools = await this.k2PlansTouching(day, addDays(day, 1), tx);
+
+    return this.seats.seatsInForceOfPlans(pools, day, tx);
+  }
+
+  private async k2PlansTouching(
+    start: BusinessDate,
+    nextStart: BusinessDate,
+    tx?: DbTx,
+    subscriptionId?: string,
+  ): Promise<string[]> {
     const planIds = await this.seats.planIdsTouching(start, nextStart, tx, subscriptionId);
     const pools = (await this.catalog.findPlanSeatTargets(planIds, tx))
       .filter((target) => target.provisioningType === 'K2')
       .map((target) => target.planId);
 
-    return this.seats.seatsOfPlans([...new Set(pools)], start, nextStart, tx, subscriptionId);
+    return [...new Set(pools)];
   }
 
   /**

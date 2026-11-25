@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/business-date';
+import { addDays, fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/business-date';
 import { seatHeldRange } from '../../../core/seat-month-cost';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { SeatOfMonth } from '../public/licensing-seat-month.types';
+import type { SeatInForce, SeatOfMonth } from '../public/licensing-seat-month.types';
 import { AssignmentChainRepo } from './assignment-chain.repo';
 
 /**
@@ -45,6 +45,49 @@ export class AssignmentSeatMonthRepo {
     tx?: DbTx,
     subscriptionId?: string,
   ): Promise<SeatOfMonth[]> {
+    const held = await this.loadHeldSeats(planIds, start, nextStart, tx, subscriptionId);
+
+    return held.map(({ row, heldRange, requestId }) => ({
+      assignmentId: row.id,
+      subscriptionId: row.subscriptionId,
+      planId: row.planId,
+      employeeId: row.employeeId,
+      kind: row.kind,
+      owningDepartmentId: row.owningDepartmentId,
+      heldFrom: heldRange.from,
+      heldUntil: heldRange.until,
+      requestId,
+    }));
+  }
+
+  /**
+   * The seats of these plans that are in force on `day` (`heldFrom <= day && (heldUntil === null || day < heldUntil)`),
+   * with source, holder, owning department, and resolved chain request id.
+   */
+  async seatsInForceOfPlans(planIds: readonly string[], day: BusinessDate, tx?: DbTx): Promise<SeatInForce[]> {
+    const held = await this.loadHeldSeats(planIds, day, addDays(day, 1), tx);
+
+    return held.map(({ row, heldRange, requestId }) => ({
+      assignmentId: row.id,
+      subscriptionId: row.subscriptionId,
+      planId: row.planId,
+      requestId,
+      source: row.source,
+      kind: row.kind,
+      employeeId: row.employeeId,
+      owningDepartmentId: row.owningDepartmentId,
+      heldFrom: heldRange.from,
+      heldUntil: heldRange.until,
+    }));
+  }
+
+  private async loadHeldSeats(
+    planIds: readonly string[],
+    start: BusinessDate,
+    nextStart: BusinessDate,
+    tx?: DbTx,
+    subscriptionId?: string,
+  ) {
     if (planIds.length === 0) return [];
     const db = tx ?? this.prisma;
     const rows = await db.licenseAssignment.findMany({
@@ -82,14 +125,8 @@ export class AssignmentSeatMonthRepo {
 
       return [
         {
-          assignmentId: row.id,
-          subscriptionId: row.subscriptionId,
-          planId: row.planId,
-          employeeId: row.employeeId,
-          kind: row.kind,
-          owningDepartmentId: row.owningDepartmentId,
-          heldFrom: held.from,
-          heldUntil: held.until,
+          row: { ...row, subscriptionId: row.subscriptionId },
+          heldRange: held,
           requestId: requestOf.get(row.id) ?? null,
         },
       ];

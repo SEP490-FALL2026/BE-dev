@@ -1,5 +1,8 @@
 import { BudgetsReadFacadeModule } from './budgets-read-facade.module';
-import { Module } from '@nestjs/common';
+import { Module, type OnModuleInit } from '@nestjs/common';
+import { BudgetsReadApi } from './public/budgets-read.api';
+import { RunningUncommittedFactsService } from './running-uncommitted/running-uncommitted-facts.service';
+import { RunningUncommittedRepo } from './running-uncommitted/running-uncommitted.repo';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { ObjectStorageModule } from '../../infrastructure/object-storage/object-storage.module';
 import { AuditModule } from '../audit/audit.module';
@@ -263,6 +266,8 @@ import { BudgetProposalTemplateListener } from './proposal/budget-proposal-templ
     SharedPoolLineRepo,
     SharedPoolLineFactsService,
     SharedPoolLineAlertService,
+    RunningUncommittedRepo,
+    RunningUncommittedFactsService,
     InvoiceService,
     PurchaseInvoiceRecorderService,
     OutOfProcessSpendRecorderService,
@@ -277,4 +282,13 @@ import { BudgetProposalTemplateListener } from './proposal/budget-proposal-templ
     PurchaseInvoiceFactsHook,
   ],
 })
-export class BudgetsModule {}
+export class BudgetsModule implements OnModuleInit {
+  constructor(
+    private readonly budgetsRead: BudgetsReadApi,
+    private readonly runningUncommitted: RunningUncommittedFactsService,
+  ) {}
+
+  onModuleInit(): void {
+    this.budgetsRead.registerRunningUncommitted(this.runningUncommitted);
+  }
+}

@@ -57,6 +57,7 @@ export interface YearBudget {
   reserveMinor: bigint;
   heldMinor: bigint;
   spentMinor: bigint;
+  runningUncommittedMinor?: bigint;
 }
 
 /** What the request costs in its one year, in the reporting currency, with the budget of that year and what waits to be decided. */
@@ -137,7 +138,9 @@ function withoutBudget(slice: YearSlice): YearResult {
 
 /** The year with a budget: both levels of what is left, and the code (`INSUFFICIENT_BUDGET` is being over the reserve). */
 function judgeYear(slice: YearSlice, budget: YearBudget): YearResult {
-  const remainingBase = budget.baseMinor - budget.spentMinor - budget.heldMinor - slice.pendingMinor;
+  const runningUncommitted = budget.runningUncommittedMinor ?? 0n;
+  const remainingBase =
+    budget.baseMinor - budget.spentMinor - budget.heldMinor - runningUncommitted - slice.pendingMinor;
   const remainingWithReserve = remainingBase + budget.reserveMinor;
   const over = slice.costMinor > 0n && slice.costMinor > remainingWithReserve;
 

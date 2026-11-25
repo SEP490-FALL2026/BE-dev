@@ -51,6 +51,7 @@ export class BudgetFactsRepo {
         adjustmentMinor,
         heldMinor: held?.held ?? 0n,
         spentMinor: held?.spent ?? 0n,
+        runningUncommittedMinor: 0n,
       });
     }
 

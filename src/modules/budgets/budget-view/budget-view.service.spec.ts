@@ -40,6 +40,7 @@ function serviceOver(
                 committed: held.get(key)?.held ?? 0n,
                 spent: held.get(key)?.spent ?? 0n,
                 pendingSpend: 0n,
+                runningUncommitted: 0n,
                 priorPeriodAdjustment: 0n,
               },
             ];
@@ -98,6 +99,7 @@ describe('BR-MF4-05 BudgetTableViewService.summary', () => {
       spent: { amount: '350', currency: 'VND' },
       remaining: { amount: '450', currency: 'VND' },
       pendingSpend: { amount: '0', currency: 'VND' },
+      runningUncommitted: { amount: '0', currency: 'VND' },
       remainingBase: { amount: '300', currency: 'VND' },
       remainingWithReserve: { amount: '450', currency: 'VND' },
       costCenterCount: 2,
@@ -153,5 +155,54 @@ describe('BR-MF4-05 BudgetTableViewService.summary', () => {
     const { totals } = await serviceOver([], new Map()).summary(2031);
 
     expect(totals).toEqual({});
+  });
+
+  it('deducts runningUncommitted from summary remaining figures and overBudgetCount', async () => {
+    const repo = {
+      rows: jest.fn().mockResolvedValue([{ ...figures(CC_A, 'VND', 900n, 100n), versionId: 'version', number: 1 }]),
+    } as unknown as BudgetViewRepo;
+    const numbers = {
+      adjustmentOf: jest.fn().mockResolvedValue(0n),
+      totals: jest
+        .fn()
+        .mockResolvedValue(
+          new Map([
+            [
+              `${CC_A}:2027`,
+              { committed: 300n, spent: 200n, pendingSpend: 0n, runningUncommitted: 550n, priorPeriodAdjustment: 0n },
+            ],
+          ]),
+        ),
+      cycle: jest.fn().mockResolvedValue(null),
+      lastInvoice: jest.fn().mockResolvedValue(null),
+    } as unknown as BudgetViewNumbersService;
+    const service = new BudgetTableViewService(
+      repo,
+      numbers,
+      {
+        formatter: (currency: string) => Promise.resolve((minor: bigint) => ({ amount: minor.toString(), currency })),
+      } as unknown as BudgetFactsService,
+      {
+        yearTotals: jest.fn().mockResolvedValue({ companyMinor: 0n, withoutCostCenterMinor: 0n }),
+      } as unknown as SeatMonthRepo,
+      {
+        yearFigures: jest.fn().mockResolvedValue({
+          idleCostMinor: 0n,
+          invoiceVarianceMinor: 0n,
+          invoiceVarianceInReviewMinor: 0n,
+          deviceLotPurchasesMinor: 0n,
+          replacementKeysMinor: 0n,
+          unallocatedMinor: 0n,
+        }),
+      } as unknown as SharedPoolLineFactsService,
+    );
+
+    const { totals } = await service.summary(2027);
+
+    expect(totals.VND.runningUncommitted).toEqual({ amount: '550', currency: 'VND' });
+    expect(totals.VND.remainingBase).toEqual({ amount: '-150', currency: 'VND' });
+    expect(totals.VND.remainingWithReserve).toEqual({ amount: '-50', currency: 'VND' });
+    expect(totals.VND.remaining).toEqual({ amount: '-50', currency: 'VND' });
+    expect(totals.VND.overBudgetCount).toBe(1);
   });
 });
