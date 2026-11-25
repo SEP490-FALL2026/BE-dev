@@ -165,25 +165,20 @@ export function isEligiblePoolPeriod(record: {
 }
 
 /**
- * Net shared-pool `unallocated` line of one subscription-month: when `idleCostMinor` is known, it is the sum of idle seat
- * cost plus invoice variances, device-lot purchases and replacement keys; when price or quantity is missing, falls back to
- * `invoicedMinor - allocatedMinor`. Pure.
+ * Net shared-pool `unallocated` line of one subscription-month: idle seat cost (0n when price or quantity is missing)
+ * plus invoice variances, device-lot purchases and replacement keys. Pure.
  */
 export function unallocatedMinorOf(input: {
   idleCostMinor: bigint | null;
-  invoicedMinor: bigint;
-  allocatedMinor: bigint;
+  invoicedMinor?: bigint;
+  allocatedMinor?: bigint;
   invoiceVarianceMinor?: bigint;
   invoiceVarianceInReviewMinor?: bigint;
   deviceLotPurchasesMinor?: bigint;
   replacementKeysMinor?: bigint;
 }): bigint {
-  if (input.idleCostMinor === null) {
-    return input.invoicedMinor - input.allocatedMinor;
-  }
-
   return (
-    input.idleCostMinor +
+    (input.idleCostMinor ?? 0n) +
     (input.invoiceVarianceMinor ?? 0n) +
     (input.invoiceVarianceInReviewMinor ?? 0n) +
     (input.deviceLotPurchasesMinor ?? 0n) +

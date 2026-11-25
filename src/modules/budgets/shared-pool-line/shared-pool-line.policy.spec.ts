@@ -199,4 +199,25 @@ describe('shared-pool-line.policy: W3-04 idle cost & pool reserve boundaries', (
       }),
     ).toBe(cost.idleCostMinor);
   });
+
+  it('FIX-B1 F4 (B-I1): contributes 0n for null idleCostMinor instead of invoiced - allocated fallback', () => {
+    expect(
+      unallocatedMinorOf({
+        idleCostMinor: null,
+        invoicedMinor: 10_000_000n,
+        allocatedMinor: 0n,
+        invoiceVarianceMinor: 10_000_000n,
+      }),
+    ).toBe(10_000_000n);
+
+    expect(
+      unallocatedMinorOf({
+        idleCostMinor: null,
+        invoicedMinor: 1_000_000n,
+        allocatedMinor: 300_000n,
+        invoiceVarianceMinor: 200_000n,
+        invoiceVarianceInReviewMinor: 50_000n,
+      }),
+    ).toBe(250_000n);
+  });
 });

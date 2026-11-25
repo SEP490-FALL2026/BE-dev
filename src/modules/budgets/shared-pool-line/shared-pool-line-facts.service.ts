@@ -201,7 +201,7 @@ export class SharedPoolLineFactsService {
     for (const month of endedMonths) {
       const lines = await this.linesOfMonth(month, only, MAX_YEAR_SUBSCRIPTIONS, tx);
       for (const line of lines) {
-        idleCostMinor += line.idleCostMinor ?? line.invoicedMinor - line.allocatedMinor;
+        idleCostMinor += line.idleCostMinor ?? 0n;
         onlyVarianceMinor += line.invoiceVarianceMinor;
         onlyVarianceInReviewMinor += line.invoiceVarianceInReviewMinor;
       }

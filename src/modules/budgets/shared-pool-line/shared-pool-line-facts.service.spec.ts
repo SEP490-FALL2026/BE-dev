@@ -133,7 +133,44 @@ describe('SharedPoolLineFactsService', () => {
     expect(line.flags).toEqual(['NO_PRICE']);
     expect(line.invoiceVarianceMinor).toBe(200_000n);
     expect(line.invoiceVarianceInReviewMinor).toBe(50_000n);
-    expect(line.unallocatedMinor).toBe(700_000n);
+    expect(line.unallocatedMinor).toBe(250_000n);
+  });
+
+  it('FIX-B1 F4 (B-I1): missing price with 10M confirmed invoice yields 10M year total (not 20M) and matches monthly line', async () => {
+    const { service, periods, licensing, poolRepo, organizationReads } = build();
+    organizationReads.businessToday.mockResolvedValue('2026-12-05');
+    licensing.getSeatsOfMonth.mockImplementation((month: string) =>
+      Promise.resolve(month === '2026-11-01' ? [seat('sub-no-price')] : []),
+    );
+    periods.getPurchaseFacts.mockResolvedValue([fact({ subscriptionId: 'sub-no-price', monthlyPriceMinor: null })]);
+    poolRepo.invoiceVariancesBySubscriptionMonth.mockImplementation((_orgId: string, month: string) =>
+      Promise.resolve(
+        month === '2026-11-01'
+          ? [{ subscriptionId: 'sub-no-price', varianceMinor: 10_000_000n, varianceInReviewMinor: 0n }]
+          : [],
+      ),
+    );
+    poolRepo.invoiceVariancesTotals.mockResolvedValue({ varianceMinor: 10_000_000n, varianceInReviewMinor: 0n });
+    poolRepo.monthlyFigures.mockResolvedValue([
+      {
+        subscriptionId: 'sub-no-price',
+        month: '2026-11-01',
+        invoicedMinor: 10_000_000n,
+        allocatedMinor: 0n,
+        withoutCostCenterMinor: 0n,
+      },
+    ]);
+
+    const [novLine] = await service.linesOfMonth('2026-11-01', undefined, 100);
+    const yearTotals = await service.yearFigures(2026, 11);
+    const onlyTotals = await service.yearFigures(2026, 11, 'sub-no-price');
+
+    expect(novLine.flags).toEqual(['NO_PRICE']);
+    expect(novLine.idleCostMinor).toBeNull();
+    expect(novLine.unallocatedMinor).toBe(10_000_000n);
+    expect(yearTotals.idleCostMinor).toBe(0n);
+    expect(yearTotals.unallocatedMinor).toBe(10_000_000n);
+    expect(onlyTotals.unallocatedMinor).toBe(novLine.unallocatedMinor);
   });
 
   it('aggregates year sub-lines through ended months including org-wide invoice variances', async () => {
