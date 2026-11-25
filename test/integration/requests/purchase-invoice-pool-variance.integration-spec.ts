@@ -246,7 +246,7 @@ describe('K2 pool expected figures & SBF-11a variance over PostgreSQL (integrati
         .send({
           outcome: 'EXCHANGE_RATE_LINE_PRICE_UPDATED',
           reason: 'Vendor updated billing rate and FX',
-          differenceAmount: { amount: '0', currency: 'VND' },
+          differenceAmount: { amount: '0' },
         })
         .expect(201),
     );

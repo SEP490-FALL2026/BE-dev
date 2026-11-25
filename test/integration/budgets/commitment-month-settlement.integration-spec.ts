@@ -79,6 +79,29 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
     );
   }
 
+  async function createSnapshotCheck(requestId: string, costCenterId: string, amountMinor: bigint): Promise<string> {
+    const check = await prisma().requestBudgetCheck.create({
+      data: {
+        organizationId: h.seed.organizationId,
+        requestId,
+        number: 1,
+        trigger: 'SPEND_DECISION',
+        route: 'SPEND_APPROVAL',
+        staleCostEvidence: false,
+        planLineOverdue: false,
+        periodClosed: false,
+        offPlan: false,
+        outcome: 'WITHIN_BASE',
+        blockReasons: [],
+        costCenterId,
+        currency: 'VND',
+        bindingTotalMinor: amountMinor,
+      },
+      select: { id: true },
+    });
+    return check.id;
+  }
+
   async function createHeldK2(input: {
     unit: Unit;
     planId: string;
@@ -108,30 +131,13 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
       );
       return { requestId, commitmentId: res.created[0].commitmentId };
     }
-    const check = await prisma().requestBudgetCheck.create({
-      data: {
-        organizationId: h.seed.organizationId,
-        requestId,
-        number: 1,
-        trigger: 'SPEND_DECISION',
-        route: 'SPEND_APPROVAL',
-        staleCostEvidence: false,
-        planLineOverdue: false,
-        periodClosed: false,
-        offPlan: false,
-        outcome: 'WITHIN_BASE',
-        blockReasons: [],
-        costCenterId: input.unit.department.unitId,
-        currency: 'VND',
-        bindingTotalMinor: input.amountMinor,
-      },
-    });
+    const snapshotCheckId = await createSnapshotCheck(requestId, input.unit.department.unitId, input.amountMinor);
     const [held] = await runner().run((tx) =>
       budgets().holdForRequest(tx, actor(), {
         organizationId: h.seed.organizationId,
         requestId,
         costCenterId: input.unit.department.unitId,
-        snapshotCheckId: check.id,
+        snapshotCheckId,
         currency: 'VND',
         now: NOW,
         items: [{ year: input.year, amountMinor: input.amountMinor }],
@@ -178,6 +184,8 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
         status: 'COMPLETED',
         requestId: input.requestId,
         createdByAppUserId: h.it1.appUserId,
+        claimedByAppUserId: h.it1.appUserId,
+        claimedAt: NOW,
         completedByAppUserId: h.it1.appUserId,
         completedAt: NOW,
         evidence: 'done',
@@ -333,8 +341,13 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
 
   it("Ca C, C', F, F6 & Q-G: December MONTH_END + legacy K2 YEAR_END_SEAT_MONTHS feed January priorYearReleasedMinor", async () => {
     const priorYear = h.year - 1;
-    const unit = await newUnitWithBudget(priorYear);
-    await h.budgetFor(unit, { total: 100_000_000, year: h.year });
+    const unit = await newUnitWithBudget(h.year);
+    await h.ctx.sql.query(
+      `INSERT INTO budget_versions (id, organization_id, cost_center_id, year, number, kind, state, origin, base_minor, reserve_minor, total_minor,
+          currency, created_by_employee_id, sent_by_employee_id, sent_at)
+       VALUES (gen_random_uuid(), $1, $2, $3, 1, 'INITIAL', 'APPROVED', 'ADJUSTMENT'::"BudgetVersionOrigin", 100000000, 0, 100000000, 'VND', $4, $4, now())`,
+      [h.seed.organizationId, unit.department.unitId, priorYear, h.finance.employeeId],
+    );
     const k2 = await newK2Pool(STD);
     const k1Plan = await h.planOf(await h.subscription(10, 'K1'));
     const k4Plan = await h.planOf(await h.subscription(10, 'K4'));
@@ -347,12 +360,13 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
       months: [{ month: `${priorYear}-12-01`, seatCount: 1 }],
     });
     const reqLegacyK2 = await h.paidRequest(unit, k2.planId);
+    const legacyCheckId = await createSnapshotCheck(reqLegacyK2, unit.department.unitId, 1_000_000n);
     const [legacyK2] = await runner().run((tx) =>
       budgets().holdForRequest(tx, actor(), {
         organizationId: h.seed.organizationId,
         requestId: reqLegacyK2,
         costCenterId: unit.department.unitId,
-        snapshotCheckId: randomUUID(),
+        snapshotCheckId: legacyCheckId,
         currency: 'VND',
         now: NOW,
         items: [{ year: priorYear, amountMinor: 1_000_000n }],
@@ -364,24 +378,26 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
       data: { appliedMinor: 700_000n },
     });
     const reqK1 = await h.paidRequest(unit, k1Plan);
+    const k1CheckId = await createSnapshotCheck(reqK1, unit.department.unitId, 500_000n);
     const [k1Row] = await runner().run((tx) =>
       budgets().holdForRequest(tx, actor(), {
         organizationId: h.seed.organizationId,
         requestId: reqK1,
         costCenterId: unit.department.unitId,
-        snapshotCheckId: randomUUID(),
+        snapshotCheckId: k1CheckId,
         currency: 'VND',
         now: NOW,
         items: [{ year: priorYear, amountMinor: 500_000n }],
       }),
     );
     const reqK4 = await h.paidRequest(unit, k4Plan);
+    const k4CheckId = await createSnapshotCheck(reqK4, unit.department.unitId, 500_000n);
     const [k4Row] = await runner().run((tx) =>
       budgets().holdForRequest(tx, actor(), {
         organizationId: h.seed.organizationId,
         requestId: reqK4,
         costCenterId: unit.department.unitId,
-        snapshotCheckId: randomUUID(),
+        snapshotCheckId: k4CheckId,
         currency: 'VND',
         now: NOW,
         items: [{ year: priorYear, amountMinor: 500_000n }],
