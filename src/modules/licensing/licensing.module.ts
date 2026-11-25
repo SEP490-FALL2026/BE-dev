@@ -150,6 +150,7 @@ import { StockSummaryQueryService } from './stock-summary/stock-summary-query.se
 import { RenewalAlertsService } from './subscription-renewal/alerts/renewal-alerts.service';
 import { RenewalDeadlineService } from './subscription-renewal/deadline/renewal-deadline.service';
 import { RenewalOutcomeService } from './subscription-renewal/outcome/renewal-outcome.service';
+import { RenewalSavingsService } from './subscription-renewal/savings/renewal-savings.service';
 import { RenewalRecordService } from './subscription-renewal/record/renewal-record.service';
 import { RenewalRecordTrail } from './subscription-renewal/record/renewal-record-trail.service';
 import { RenewalNotifier } from './subscription-renewal/subscription-renewal-notifier.service';
@@ -296,6 +297,7 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     SubscriptionRenewalRepo,
     SubscriptionRenewalSeatRepo,
     RenewalSavingsRepo,
+    RenewalSavingsService,
     RenewalPartiesService,
     RenewalRankingService,
     RenewalSeatsNeededService,

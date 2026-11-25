@@ -8,7 +8,7 @@ import type { PlanStock } from '../public/licensing.types';
 import type { SubscriptionOccupancy } from './shared-pool-capacity.repo';
 import { SharedPoolAvoidedCostRepo } from './shared-pool-avoided-cost.repo';
 import { SharedPoolCapacityRepo } from './shared-pool-capacity.repo';
-import { avoidedCostOf, judgePurchase, type PoolStock, type PurchaseDecision } from './shared-pool.policy';
+import { judgePurchase, type PoolStock, type PurchaseDecision } from './shared-pool.policy';
 
 const idOf = (subscription: PoolSubscription): string => subscription.subscriptionId;
 
@@ -196,42 +196,9 @@ export class SharedPoolService {
   }
 
   /**
-   * Records the cost avoided when the task of a grant taken from the pool is completed (`BR-MF1-09c`): the caller calls it only for a K2 or K4
-   * grant with nothing bought for it; once for the task, and only when its subscription has a price. Changes no commitment or budget.
+   * Records the pre-computed cost avoided when a pool grant task completes (`W3-09`, `B1-R8`), once per task.
    */
-  async recordAvoided(
-    tx: DbTx,
-    input: {
-      organizationId: string;
-      completedOn: BusinessDate;
-      task: {
-        id: string;
-        assignmentId: string;
-        requestId: string;
-        planId: string;
-        subscriptionId: string | null;
-        provisioningType: 'K2' | 'K4';
-      };
-    },
-  ): Promise<void> {
-    const { task } = input;
-    if (task.subscriptionId === null) return;
-
-    const cost = avoidedCostOf({
-      provisioningType: task.provisioningType,
-      completedOn: input.completedOn,
-      price: await this.catalog.getSubscriptionPrice(task.subscriptionId, tx),
-    });
-    if (cost === null) return;
-
-    await this.avoidedCosts.record(tx, {
-      organizationId: input.organizationId,
-      provisioningTaskId: task.id,
-      assignmentId: task.assignmentId,
-      requestId: task.requestId,
-      planId: task.planId,
-      recordedOn: input.completedOn,
-      cost,
-    });
+  recordAvoidedCost(tx: DbTx, taskId: string, amount: { amountMinor: bigint; currency: string }): Promise<void> {
+    return this.avoidedCosts.recordForTask(tx, taskId, amount);
   }
 }

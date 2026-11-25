@@ -88,25 +88,13 @@ export class ProvisioningGrantCompletion {
     // From the pool means taken from a free seat or key: a K2 or K4 grant with nothing bought for it (`BR-MF1-09c`).
     const fromPool = pooled && task.purchase === null;
     await this.gate.get().reportOutcome(tx, task.requestId, 'COMPLETED', task.assignment.employeeId, {
+      taskId: task.id,
       fromPool,
       provisioningType,
       grantedOn: completedOn,
       assignmentId: task.assignmentId,
       effectiveFrom: granted.effectiveFrom,
       expectedEndDate: granted.expectedEndDate,
-    });
-    if (!fromPool) return;
-    await this.sharedPool.recordAvoided(tx, {
-      organizationId,
-      completedOn,
-      task: {
-        id: task.id,
-        assignmentId: task.assignmentId,
-        requestId: task.requestId,
-        planId: task.assignment.planId,
-        subscriptionId: task.assignment.subscriptionId,
-        provisioningType,
-      },
     });
   }
 }

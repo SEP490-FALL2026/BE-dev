@@ -110,4 +110,75 @@ describe('RenewalOutcomeService', () => {
     );
     expect(businessToday).not.toHaveBeenCalled();
   });
+
+  it('W3-09: writes realisedSavings = null when IT Admin confirms AS_DECIDED outcome with a cheaper nextPeriod (deferred to invoice)', async () => {
+    const tx = {};
+    const recordOutcome = jest.fn().mockResolvedValue({
+      id: 'ren-1',
+      organizationId: 'org-1',
+      subscriptionId: 'sub-1',
+      decision: { choice: 'REDUCE' },
+      outcome: {
+        kind: 'AS_DECIDED',
+        note: null,
+        recordedByEmployeeId: 'e-it',
+        recordedAt: new Date('2026-12-01T00:00:00Z'),
+        vendorFollowUpOpen: false,
+        nextSubscriptionId: 'sub-2',
+        realisedSavings: null,
+      },
+      lateFlaggedAt: null,
+    });
+    const recordNextPeriod = jest.fn().mockResolvedValue({
+      subscriptionId: 'sub-2',
+      status: 'ACTIVE',
+      purchasedQuantity: 11,
+      unitPrice: { amountMinor: 6_000_000n, currency: 'VND' },
+      billingCycle: 'ANNUAL',
+      startDate: '2027-07-01',
+      endDate: '2028-06-30',
+    });
+    const service = new RenewalOutcomeService(
+      { recordOutcome } as unknown as SubscriptionRenewalRepo,
+      { notEndedBy: jest.fn().mockResolvedValue([]) } as unknown as SubscriptionRenewalSeatRepo,
+      { carry: jest.fn().mockResolvedValue(0) } as unknown as AssignmentService,
+      { recordNextPeriod } as unknown as SubscriptionPeriodApi,
+      {} as unknown as RenewalPartiesService,
+      {} as unknown as OrganizationReadApi,
+      { record: jest.fn().mockResolvedValue(undefined) } as unknown as AuditApi,
+      {} as unknown as TransactionRunner,
+    );
+
+    await service.recordIn(
+      tx as never,
+      actor,
+      {
+        record: { id: 'ren-1', subscriptionId: 'sub-1', state: 'DECIDED', decision: { choice: 'REDUCE' } } as never,
+        decision: { choice: 'REDUCE', quantity: 11 } as never,
+        period: {
+          subscriptionId: 'sub-1',
+          purchasedQuantity: 12,
+          unitPrice: { amountMinor: 6_000_000n, currency: 'VND' },
+          billingCycle: 'ANNUAL',
+          startDate: '2026-07-01',
+          endDate: '2027-06-30',
+        } as never,
+      },
+      {
+        outcome: 'AS_DECIDED',
+        nextPeriod: { startDate: '2027-07-01', purchasedQuantity: 11 } as never,
+      },
+      { today: '2026-12-01', now: new Date('2026-12-01T00:00:00Z') },
+    );
+
+    expect(recordOutcome).toHaveBeenCalledWith(
+      tx,
+      'ren-1',
+      expect.objectContaining({
+        kind: 'AS_DECIDED',
+        nextSubscriptionId: 'sub-2',
+        realisedSavings: null,
+      }),
+    );
+  });
 });

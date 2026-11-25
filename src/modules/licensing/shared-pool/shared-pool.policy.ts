@@ -1,4 +1,3 @@
-import type { BusinessDate } from '../../../core/business-date';
 import { PurchaseNotAllowedError, PurchaseNotApplicableError, PurchaseReasonRequiredError } from './shared-pool.errors';
 
 type ProvisioningType = 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
@@ -42,43 +41,9 @@ export function judgePurchase(input: {
 /** What a seat granted from the pool would have cost had it been bought instead: the cost avoided, recorded once (`BR-MF1-09c`). */
 export interface AvoidedCost {
   provisioningType: 'K2' | 'K4';
-  /** The months of the cost for a K2 seat; null for a K4 key, whose price is paid once. */
+  /** Unused after `W3-09` (stored as null for new rows); retained on row writer for schema compatibility (`D-12`). */
   months: number | null;
   unitMinor: bigint;
   amountMinor: bigint;
   currency: string;
-}
-
-/**
- * The cost avoided by the grant of a seat or key taken from the pool (`BR-MF1-09c`, `QĐ-106e`, `QĐ-108d`), in the reporting currency:
- * a K2 seat reads `monthlyPriceMinor` directly from `CatalogApi.getSubscriptionPrice` (without re-dividing or `ceil`) for the months left
- * of the year counted from the whole month of the grant; a K4 key is its purchase price. Null when the plan is of another kind, or the
- * subscription has no monthly price in a cycle that can be put per month.
- */
-export function avoidedCostOf(input: {
-  provisioningType: ProvisioningType;
-  completedOn: BusinessDate;
-  price: {
-    kind: 'RECURRING' | 'ONE_TIME';
-    unitPrice: { amountMinor: bigint; currency: string };
-    reportingUnitPrice?: { amountMinor: bigint; currency: string } | null;
-    monthlyPriceMinor: bigint | null;
-    billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER';
-  } | null;
-}): AvoidedCost | null {
-  const { price } = input;
-  if (price === null) return null;
-  const { amountMinor, currency } = price.reportingUnitPrice ?? price.unitPrice;
-  if (input.provisioningType === 'K4') {
-    if (price.kind !== 'ONE_TIME') return null;
-
-    return { provisioningType: 'K4', months: null, unitMinor: amountMinor, amountMinor, currency };
-  }
-  if (input.provisioningType !== 'K2' || price.kind !== 'RECURRING' || price.billingCycle === 'OTHER') return null;
-  if (price.monthlyPriceMinor === null) return null;
-
-  const months = 13 - Number(input.completedOn.slice(5, 7));
-  const unitMinor = price.monthlyPriceMinor;
-
-  return { provisioningType: 'K2', months, unitMinor, amountMinor: unitMinor * BigInt(months), currency };
 }

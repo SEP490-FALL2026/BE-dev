@@ -17,6 +17,7 @@ import { OperatingParametersModule } from '../operating-parameters/operating-par
 import { NotificationsModule } from '../notifications/notifications.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { AccessRequestGrantGate } from './grant/access-request-grant.listener';
+import { GrantSettlementService } from './grant/grant-settlement.service';
 import { SeatReleaseRepo } from './grant/seat-release.repo';
 import { SeatReleaseService } from './grant/seat-release.service';
 import { SeatRevocationHook } from './grant/seat-revocation.listener';
@@ -213,6 +214,7 @@ import { PurchaseInvoicePlanService } from './purchase-invoice/purchase-invoice-
 import { PurchaseInvoiceFacts } from './purchase-invoice/purchase-invoice-facts.listener';
 import { PurchaseInvoiceMissingPeriodsQueryService } from './purchase-invoice/purchase-invoice-missing-periods-query.service';
 import { PurchaseInvoiceQueryService } from './purchase-invoice/purchase-invoice-query.service';
+import { ConfirmationSettlementService } from './purchase-invoice/confirmation/confirmation-settlement.service';
 import { PurchaseInvoiceConfirmationService } from './purchase-invoice/confirmation/purchase-invoice-confirmation.service';
 import { PurchaseInvoiceDecisionsController } from './purchase-invoice/purchase-invoice-decisions.controller';
 import { PurchaseInvoiceRepo } from './purchase-invoice/purchase-invoice.repo';
@@ -337,6 +339,7 @@ import { PurchaseInvoicesController } from './purchase-invoice/purchase-invoices
     CostCenterOpenRequestsReader,
     RequestsApi,
     SimilarSeatsService,
+    GrantSettlementService,
     AccessRequestGrantGate,
     // The release by day of the money held for a seat: when its revocation is completed, and before a late K2 grant (`RV-07`, `M-10`).
     SeatReleaseRepo,
@@ -401,6 +404,7 @@ import { PurchaseInvoicesController } from './purchase-invoice/purchase-invoices
     PurchaseInvoiceQueryService,
     PurchaseInvoiceMissingPeriodsQueryService,
     PurchaseInvoiceFacts,
+    ConfirmationSettlementService,
     PurchaseInvoiceConfirmationService,
     // The case of an invoice that differs (`SBF-11a`): opened when Finance signs, read and closed here, and the extension point a suspicion is sent on through.
     InvoiceDiscrepancyRepo,

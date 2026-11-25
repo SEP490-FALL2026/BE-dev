@@ -5,10 +5,12 @@ import type { BudgetsApi } from '../../../budgets/public/budgets.api';
 import type { PurchaseInvoiceRecordInput } from '../../../budgets/public/budgets.types';
 import type { NotificationsApi } from '../../../notifications/public/notifications.api';
 import type { OperatingParametersApi } from '../../../operating-parameters/public/operating-parameters.api';
+import type { LicensingApi } from '../../../licensing/public/licensing.api';
 import type { InvoiceDiscrepancyOpeningService } from '../../invoice-discrepancy/invoice-discrepancy-opening.service';
 import type { PurchaseInvoicePlanService } from '../purchase-invoice-plan.service';
 import { PurchaseInvoiceRefusedError } from '../purchase-invoice.errors';
 import type { PurchaseInvoiceRepo, PurchaseInvoiceRow } from '../purchase-invoice.repo';
+import { ConfirmationSettlementService } from './confirmation-settlement.service';
 import { PurchaseInvoiceConfirmationService } from './purchase-invoice-confirmation.service';
 
 const TX = {} as DbTx;
@@ -100,9 +102,14 @@ function build(
     },
   );
   const getValue = jest.fn().mockResolvedValue(opts.threshold ?? 5);
+  const recordRealisedSaving = jest.fn().mockResolvedValue({ recorded: false });
   const runner = {
     run: jest.fn((work: (tx: DbTx) => Promise<unknown>) => work(TX)),
   } as unknown as TransactionRunner;
+  const settlement = new ConfirmationSettlementService(
+    { open: openDiscrepancy } as unknown as InvoiceDiscrepancyOpeningService,
+    { recordRealisedSaving } as unknown as LicensingApi,
+  );
 
   const service = new PurchaseInvoiceConfirmationService(
     runner,
@@ -110,12 +117,12 @@ function build(
     { recordPurchaseInvoice } as unknown as BudgetsApi,
     { notifyInApp: jest.fn().mockResolvedValue(true) } as unknown as NotificationsApi,
     { record: jest.fn().mockResolvedValue(undefined) } as unknown as AuditApi,
-    { open: openDiscrepancy } as unknown as InvoiceDiscrepancyOpeningService,
+    settlement,
     { poolExpectationFactsOf, poolSubscriptionOfRequest: jest.fn() } as unknown as PurchaseInvoicePlanService,
     { getValue } as unknown as OperatingParametersApi,
   );
 
-  return { service, recordPurchaseInvoice, openDiscrepancy, getValue, poolExpectationFactsOf };
+  return { service, recordPurchaseInvoice, openDiscrepancy, recordRealisedSaving, getValue, poolExpectationFactsOf };
 }
 
 describe('PurchaseInvoiceConfirmationService (W3-05)', () => {
@@ -275,5 +282,68 @@ describe('PurchaseInvoiceConfirmationService (W3-05)', () => {
 
     await expect(service.confirm(ACTOR, 'pi-1')).rejects.toEqual(new PurchaseInvoiceRefusedError('SAME_PERSON'));
     expect(recordPurchaseInvoice).not.toHaveBeenCalled();
+  });
+
+  it('W3-09: records realised saving when SUBSCRIPTION RENEWAL/PERIOD invoice confirms cleanly without SBF-11a', async () => {
+    const row = makeRow({ linkKind: 'SUBSCRIPTION', subscriptionId: 'sub-1', label: 'RENEWAL', netMinor: 66_000_000n });
+    const { service, recordRealisedSaving, openDiscrepancy } = build({ row });
+
+    await service.confirm(ACTOR, 'pi-1');
+
+    expect(openDiscrepancy).not.toHaveBeenCalled();
+    expect(recordRealisedSaving).toHaveBeenCalledTimes(1);
+    const [callTx, callInput] = recordRealisedSaving.mock.calls[0] as [DbTx, Record<string, unknown>];
+    expect(callTx).toBe(TX);
+    expect(callInput).toMatchObject({
+      newPeriodId: 'sub-1',
+      invoiceId: 'inv-1',
+      serviceMonth: '2027-07-01',
+    });
+    expect(callInput.now).toBeInstanceOf(Date);
+
+    const periodRow = makeRow({
+      linkKind: 'SUBSCRIPTION',
+      subscriptionId: 'sub-2',
+      label: 'PERIOD',
+      netMinor: 66_000_000n,
+    });
+    const periodRun = build({ row: periodRow });
+    await periodRun.service.confirm(ACTOR, 'pi-1');
+    expect(periodRun.recordRealisedSaving).toHaveBeenCalledWith(
+      TX,
+      expect.objectContaining({ newPeriodId: 'sub-2', invoiceId: 'inv-1', serviceMonth: '2027-07-01' }),
+    );
+  });
+
+  it('W3-09: defers realised saving when confirm opens an SBF-11a discrepancy case (PRICE_QUANTITY_EXCEPTION or EXPECTED_AMOUNT)', async () => {
+    const variance = build({ row: makeRow({ netMinor: 69_500_000n, matchResult: 'MATCHED' }) });
+    await variance.service.confirm(ACTOR, 'pi-1');
+    expect(variance.openDiscrepancy).toHaveBeenCalledTimes(1);
+    expect(variance.recordRealisedSaving).not.toHaveBeenCalled();
+
+    const pq = build({
+      row: makeRow({
+        netMinor: 66_000_000n,
+        matchResult: 'PRICE_QUANTITY_EXCEPTION',
+        quantity: 10,
+        expectedQuantity: 11,
+      }),
+    });
+    await pq.service.confirm(ACTOR, 'pi-1');
+    expect(pq.openDiscrepancy).toHaveBeenCalledTimes(1);
+    expect(pq.recordRealisedSaving).not.toHaveBeenCalled();
+  });
+
+  it('W3-09: does not trigger realised saving for REQUEST or ADJUSTMENT invoices', async () => {
+    const req = build({
+      row: makeRow({ linkKind: 'REQUEST', requestId: 'req-1', subscriptionId: null }),
+      poolFacts: { isK2: false },
+    });
+    await req.service.confirm(ACTOR, 'pi-1');
+    expect(req.recordRealisedSaving).not.toHaveBeenCalled();
+
+    const adj = build({ row: makeRow({ label: 'NEW_PURCHASE', netMinor: 66_000_000n }) });
+    await adj.service.confirm(ACTOR, 'pi-1');
+    expect(adj.recordRealisedSaving).not.toHaveBeenCalled();
   });
 });

@@ -2,7 +2,6 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
-import { BudgetsApi } from '../../budgets/public/budgets.api';
 import { GrantRequestGateHook, type GrantRequestGate } from '../../licensing/public/licensing.extension-points';
 import type {
   GrantOutcome,
@@ -14,6 +13,7 @@ import { GroupGrantService } from '../group-request/group-grant.service';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { grantAnswerFor } from './grant.policy';
+import { GrantSettlementService } from './grant-settlement.service';
 import { releasesAllOnPoolGrant } from './pool-grant-release.policy';
 import { RequestOutcomeService } from '../outcome/request-outcome.service';
 import { SeatReleaseService } from './seat-release.service';
@@ -36,7 +36,7 @@ export class AccessRequestGrantGate implements GrantRequestGate, OnModuleInit {
   constructor(
     private readonly repo: AccessRequestRepo,
     private readonly audit: AuditApi,
-    private readonly budgets: BudgetsApi,
+    private readonly settlement: GrantSettlementService,
     private readonly group: GroupGrantService,
     private readonly outcomes: RequestOutcomeService,
     private readonly seats: SeatReleaseService,
@@ -136,14 +136,17 @@ export class AccessRequestGrantGate implements GrantRequestGate, OnModuleInit {
     // A grant the IT Admin closed as failed spends nothing: what was held goes back to the budget in the same transaction
     // (US-06-06 AC-3). A grant that is only retrying is not reported here, so its commitment stays held (AC-7).
     if (outcome === 'FAILED') {
-      await this.budgets.releaseForRequest(tx, { requestId: request.id, reason: 'GRANT_FAILED', now });
+      await this.settlement.release(tx, { requestId: request.id, reason: 'GRANT_FAILED', now });
     }
     // A K4 key taken from the pool spends nothing: all that was held for its price goes back (`QĐ-106d`).
     if (releasesAllOnPoolGrant(outcome, facts)) {
-      await this.budgets.releaseForRequest(tx, { requestId: request.id, reason: 'GRANTED_FROM_POOL', now });
+      await this.settlement.release(tx, { requestId: request.id, reason: 'GRANTED_FROM_POOL', now });
     }
     // A K2 seat granted after its commitment began gives back the days before the grant, in the same transaction (`M-10`).
-    if (outcome === 'COMPLETED' && facts) await this.seats.afterGrant(tx, request.id, facts, now);
+    if (outcome === 'COMPLETED' && facts) {
+      await this.seats.afterGrant(tx, request.id, facts, now);
+      await this.settlement.recordPoolGrantAvoidedCost(tx, request, facts);
+    }
     // The seat is real, or the request ended without one: the contexts that follow what became of it hear it here.
     if (outcome === 'COMPLETED') await this.outcomes.granted(tx, request, request.beneficiaryEmployeeIds, now);
     else await this.outcomes.ended(tx, request, request.beneficiaryEmployeeIds, now);
@@ -159,7 +162,10 @@ export class AccessRequestGrantGate implements GrantRequestGate, OnModuleInit {
   ): Promise<void> {
     if (employeeId === undefined) return;
     await this.group.report(tx, request, outcome, employeeId);
-    if (outcome === 'COMPLETED' && facts) await this.seats.afterGrant(tx, request.id, facts, new Date());
+    if (outcome === 'COMPLETED' && facts) {
+      await this.seats.afterGrant(tx, request.id, facts, new Date());
+      await this.settlement.recordPoolGrantAvoidedCost(tx, request, facts);
+    }
   }
 
   async isWithdrawing(tx: DbTx, requestId: string, employeeId?: string): Promise<boolean> {
@@ -187,7 +193,7 @@ export class AccessRequestGrantGate implements GrantRequestGate, OnModuleInit {
       withdrawnByEmployeeId: request.withdrawal.requestedByEmployeeId,
     });
     // The grant is cancelled and spends nothing: what was held for the request goes back (US-05-08 AC-9).
-    await this.budgets.releaseForRequest(tx, { requestId: request.id, reason: 'REQUEST_WITHDRAWN', now });
+    await this.settlement.release(tx, { requestId: request.id, reason: 'REQUEST_WITHDRAWN', now });
     await this.outcomes.ended(tx, request, request.beneficiaryEmployeeIds, now);
 
     return true;

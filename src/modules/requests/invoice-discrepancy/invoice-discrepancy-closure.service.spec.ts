@@ -5,6 +5,7 @@ import type { BudgetsApi } from '../../budgets/public/budgets.api';
 import type { SubscriptionPeriodApi } from '../../catalog/public/subscription-period.api';
 import type { FinanceApi } from '../../finance/public/finance.api';
 import type { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
+import type { LicensingApi } from '../../licensing/public/licensing.api';
 import type { NotificationsApi } from '../../notifications/public/notifications.api';
 import type { InvoiceDiscrepancyReferralListeners } from '../public/requests.extension-points';
 import { InvoiceDiscrepancyClosureService } from './invoice-discrepancy-closure.service';
@@ -62,17 +63,24 @@ function build(
     usableItAdmins?: string[];
     superAdmin?: string | null;
     recordedSubscriptionId?: string | null;
+    invoiceMeta?: { invoiceId: string | null; label: string } | null;
   } = {},
 ) {
   const row = opts.row ?? makeCaseRow();
   const lock = jest.fn().mockResolvedValue(row);
   const markClosed = jest.fn().mockResolvedValue(true);
   const find = jest.fn().mockResolvedValue({ ...row, state: 'CLOSED' });
+  const findInvoiceMeta = jest
+    .fn()
+    .mockResolvedValue(opts.invoiceMeta === undefined ? { invoiceId: 'inv-1', label: 'RENEWAL' } : opts.invoiceMeta);
   const markPoolVarianceResolved = jest.fn().mockResolvedValue(true);
   const purchaseInvoiceInfo = jest.fn().mockResolvedValue({
     subscriptionId: opts.recordedSubscriptionId ?? row.purchaseInvoice.subscriptionId,
     poolFigures: null,
   });
+  const recordRealisedSaving = jest
+    .fn()
+    .mockResolvedValue({ recorded: true, amountMinor: 6_000_000n, currency: 'VND' });
   const emit = jest.fn().mockResolvedValue(undefined);
   const notifyInApp = jest.fn().mockResolvedValue(true);
   const getPurchaseFacts = jest.fn().mockResolvedValue([
@@ -95,7 +103,7 @@ function build(
   } as unknown as TransactionRunner;
   const service = new InvoiceDiscrepancyClosureService(
     runner,
-    { lock, markClosed, find } as unknown as InvoiceDiscrepancyRepo,
+    { lock, markClosed, find, findInvoiceMeta } as unknown as InvoiceDiscrepancyRepo,
     {
       parseMoney: jest.fn(({ amount }: { amount: string }) => Promise.resolve({ amountMinor: BigInt(amount) })),
     } as unknown as FinanceApi,
@@ -103,9 +111,10 @@ function build(
     { emit } as unknown as InvoiceDiscrepancyReferralListeners,
     { markPoolVarianceResolved, purchaseInvoiceInfo } as unknown as BudgetsApi,
     notifier,
+    { recordRealisedSaving } as unknown as LicensingApi,
   );
 
-  return { service, markClosed, markPoolVarianceResolved, emit, notifyInApp };
+  return { service, markClosed, markPoolVarianceResolved, emit, notifyInApp, recordRealisedSaving };
 }
 
 describe('InvoiceDiscrepancyClosureService (W3-05)', () => {
@@ -213,5 +222,46 @@ describe('InvoiceDiscrepancyClosureService (W3-05)', () => {
       }),
     ).rejects.toEqual(new InvoiceDiscrepancyRefusedError('DIFFERENCE_INVALID'));
     expect(markClosed).not.toHaveBeenCalled();
+  });
+
+  it('W3-09: records realised saving when closing an SBF-11a discrepancy on a SUBSCRIPTION RENEWAL/PERIOD invoice', async () => {
+    const { service, recordRealisedSaving } = build({
+      invoiceMeta: { invoiceId: 'inv-first', label: 'RENEWAL' },
+    });
+
+    await service.close(ACTOR, 'case-1', {
+      outcome: 'EXPLAINED',
+      reason: 'Vendor surcharge accepted',
+      differenceAmount: '3500000',
+    });
+
+    expect(recordRealisedSaving).toHaveBeenCalledTimes(1);
+    const [callTx, callInput] = recordRealisedSaving.mock.calls[0] as [DbTx, Record<string, unknown>];
+    expect(callTx).toBe(TX);
+    expect(callInput).toMatchObject({
+      newPeriodId: 'sub-1',
+      invoiceId: 'inv-first',
+      serviceMonth: '2027-07-01',
+    });
+    expect(callInput.now).toBeInstanceOf(Date);
+  });
+
+  it('W3-09: does not record realised saving when closing non-SUBSCRIPTION or non-RENEWAL/PERIOD discrepancy', async () => {
+    const req = build({
+      row: makeCaseRow({
+        purchaseInvoice: {
+          ...makeCaseRow().purchaseInvoice,
+          linkKind: 'REQUEST',
+          requestId: 'req-1',
+          subscriptionId: null,
+        },
+      }),
+    });
+    await req.service.close(ACTOR, 'case-1', { outcome: 'EXPLAINED', reason: 'ok', differenceAmount: '0' });
+    expect(req.recordRealisedSaving).not.toHaveBeenCalled();
+
+    const adj = build({ invoiceMeta: { invoiceId: 'inv-1', label: 'NEW_PURCHASE' } });
+    await adj.service.close(ACTOR, 'case-1', { outcome: 'EXPLAINED', reason: 'ok', differenceAmount: '0' });
+    expect(adj.recordRealisedSaving).not.toHaveBeenCalled();
   });
 });

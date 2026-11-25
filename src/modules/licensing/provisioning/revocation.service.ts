@@ -41,6 +41,10 @@ export class RevocationService {
     private readonly queries: RevocationReadRepo,
   ) {}
 
+  selfExecutionMode(actor: AuthenticatedPrincipal, beneficiaryEmployeeId: string) {
+    return this.frame.selfExecutionMode(actor, beneficiaryEmployeeId);
+  }
+
   /**
    * Opens the revocation of a personal seat, or adds the reason to the one it has. Throws RevocationRefusedError,
    * AssignmentNotFoundError, AssignmentNotOpenError, and SeatTargetNotFoundError.

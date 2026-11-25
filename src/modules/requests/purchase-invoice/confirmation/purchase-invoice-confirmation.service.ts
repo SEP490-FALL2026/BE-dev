@@ -7,17 +7,15 @@ import { BudgetsApi } from '../../../budgets/public/budgets.api';
 import { PurchaseInvoiceRecordRefusedError } from '../../../budgets/public/budgets.errors';
 import { NotificationsApi } from '../../../notifications/public/notifications.api';
 import { OperatingParametersApi } from '../../../operating-parameters/public/operating-parameters.api';
-import { InvoiceDiscrepancyOpeningService } from '../../invoice-discrepancy/invoice-discrepancy-opening.service';
-import type { InvoiceDiscrepancyMismatch } from '../../invoice-discrepancy/invoice-discrepancy.types';
 import { firstOfMonth } from '../labels/purchase-invoice-labels.policy';
 import {
   evaluatePoolInvoiceExpectation,
   type PoolInvoiceExpectationResult,
 } from '../pool-expectation/purchase-invoice-pool-expectation.policy';
-import { mismatchesOfRow } from '../purchase-invoice-match.policy';
 import { PurchaseInvoicePlanService } from '../purchase-invoice-plan.service';
 import { PurchaseInvoiceRefusedError } from '../purchase-invoice.errors';
 import { PurchaseInvoiceRepo, type PurchaseInvoiceRow } from '../purchase-invoice.repo';
+import { ConfirmationSettlementService } from './confirmation-settlement.service';
 
 const VARIANCE_THRESHOLD_PARAM = 'K2_INVOICE_VARIANCE_THRESHOLD_PERCENT';
 
@@ -38,7 +36,7 @@ export class PurchaseInvoiceConfirmationService {
     private readonly budgets: BudgetsApi,
     private readonly notifications: NotificationsApi,
     private readonly audit: AuditApi,
-    private readonly discrepancies: InvoiceDiscrepancyOpeningService,
+    private readonly settlement: ConfirmationSettlementService,
     private readonly plans: PurchaseInvoicePlanService,
     private readonly operatingParameters: OperatingParametersApi,
   ) {}
@@ -64,7 +62,7 @@ export class PurchaseInvoiceConfirmationService {
         booking: recorded.booking,
         ...(await this.selfSigned(tx, actor, row)),
       });
-      await this.openDiscrepancyIfNeeded(tx, actor, row, now, poolExpectation?.exceedsThreshold ?? false);
+      await this.settlement.settle(tx, actor, row, recorded.invoiceId, poolExpectation?.exceedsThreshold ?? false, now);
       await this.tell(tx, row, 'PURCHASE_INVOICE_CONFIRMED');
 
       return (await this.invoices.find(id, tx)) as PurchaseInvoiceRow;
@@ -87,27 +85,6 @@ export class PurchaseInvoiceConfirmationService {
       nonDeductibleTaxMinor: row.nonDeductibleTaxMinor,
       thresholdPercent,
       varianceMonth,
-    });
-  }
-
-  private async openDiscrepancyIfNeeded(
-    tx: DbTx,
-    actor: AuthenticatedPrincipal,
-    row: PurchaseInvoiceRow,
-    now: Date,
-    exceedsPoolThreshold: boolean,
-  ): Promise<void> {
-    const base: InvoiceDiscrepancyMismatch[] =
-      row.matchResult === 'PRICE_QUANTITY_EXCEPTION' ? mismatchesOfRow(row) : [];
-    const mismatches: InvoiceDiscrepancyMismatch[] = exceedsPoolThreshold
-      ? [...new Set<InvoiceDiscrepancyMismatch>([...base, 'EXPECTED_AMOUNT'])]
-      : base;
-    if (mismatches.length === 0) return;
-    await this.discrepancies.open(tx, actor, {
-      organizationId: row.organizationId,
-      purchaseInvoiceId: row.id,
-      mismatches,
-      now,
     });
   }
 

@@ -469,6 +469,8 @@ export interface RevocationCompletedFacts {
  * used) and the assignment it made.
  */
 export interface GrantOutcomeFacts {
+  /** Provisioning grant task id (`W3-09`); present when reported by `ProvisioningGrantCompletion`. */
+  taskId?: string;
   fromPool: boolean;
   provisioningType: ProvisioningKind;
   grantedOn: BusinessDate;

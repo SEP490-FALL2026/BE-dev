@@ -21,7 +21,7 @@ import type {
   RenewalOutcomeKind,
   RenewalRecord,
 } from '../subscription-renewal.types';
-import { checkOutcome, realisedSavingsOf } from './renewal-outcome.policy';
+import { checkOutcome } from './renewal-outcome.policy';
 
 export interface RecordOutcomeInput {
   outcome: RenewalOutcomeKind;
@@ -55,12 +55,11 @@ export interface RecordedOutcome {
   carried: number;
 }
 
-/** What the outcome writes: who and when, the follow-up left open unless as decided, the new period and the savings it shows. */
+/** What the outcome writes: who and when, the follow-up left open unless as decided, and the new period (savings deferred to first invoice confirm). */
 function outcomeWriteOf(
   actor: AuthenticatedPrincipal,
   input: RecordOutcomeInput,
   now: Date,
-  period: RenewalPeriodFacts,
   next: RenewalPeriodFacts | null,
 ): OutcomeWrite {
   return {
@@ -71,11 +70,7 @@ function outcomeWriteOf(
     recordedAt: now,
     vendorFollowUpOpen: input.outcome !== 'AS_DECIDED',
     nextSubscriptionId: next?.subscriptionId ?? null,
-    realisedSavings: realisedSavingsOf({
-      outcome: input.outcome,
-      old: { ...period, quantity: period.purchasedQuantity },
-      next: next && { ...next, quantity: next.purchasedQuantity },
-    }),
+    realisedSavings: null,
   };
 }
 
@@ -138,7 +133,7 @@ export class RenewalOutcomeService {
     const recorded = await this.repo.recordOutcome(
       tx,
       record.id,
-      outcomeWriteOf(actor, input, when.now, period, next?.period ?? null),
+      outcomeWriteOf(actor, input, when.now, next?.period ?? null),
     );
     await this.trail(tx, actor, record, recorded, next?.carried ?? 0, extras.audit ?? {});
 

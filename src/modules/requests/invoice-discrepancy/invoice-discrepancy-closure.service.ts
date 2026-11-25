@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
+import { fromDateColumn } from '../../../core/business-date';
+import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { BudgetsApi } from '../../budgets/public/budgets.api';
 import { FinanceApi } from '../../finance/public/finance.api';
+import { LicensingApi } from '../../licensing/public/licensing.api';
 import { InvoiceDiscrepancyReferralListeners } from '../public/requests.extension-points';
 import { closureRefusal, isReferred } from './invoice-discrepancy-closure.policy';
 import { InvoiceDiscrepancyNotifierService } from './invoice-discrepancy-notifier.service';
@@ -28,6 +30,7 @@ export class InvoiceDiscrepancyClosureService {
     private readonly referrals: InvoiceDiscrepancyReferralListeners,
     private readonly budgets: BudgetsApi,
     private readonly notifier: InvoiceDiscrepancyNotifierService,
+    private readonly licensing: LicensingApi,
   ) {}
 
   /** Throws InvoiceDiscrepancyRefusedError (NOT_FOUND, ALREADY_CLOSED, DIFFERENCE_INVALID) and the money errors of `core/money`. */
@@ -70,6 +73,7 @@ export class InvoiceDiscrepancyClosureService {
         correlationId: actor.sessionId,
       });
       if (isReferred(input.outcome)) await this.referrals.emit(tx, referralOf(row, closing));
+      await this.recordDeferredRealisedSaving(tx, row, now);
       if (input.outcome === 'EXCHANGE_RATE_LINE_PRICE_UPDATED') {
         const subscriptionId =
           row.purchaseInvoice.subscriptionId ??
@@ -86,6 +90,19 @@ export class InvoiceDiscrepancyClosureService {
       }
 
       return (await this.cases.find(id, tx)) as InvoiceDiscrepancyRow;
+    });
+  }
+
+  private async recordDeferredRealisedSaving(tx: DbTx, row: InvoiceDiscrepancyRow, now: Date): Promise<void> {
+    const invoice = row.purchaseInvoice;
+    if (invoice.linkKind !== 'SUBSCRIPTION' || invoice.subscriptionId === null) return;
+    const meta = await this.cases.findInvoiceMeta(tx, row.purchaseInvoiceId);
+    if (!meta?.invoiceId || (meta.label !== 'RENEWAL' && meta.label !== 'PERIOD')) return;
+    await this.licensing.recordRealisedSaving(tx, {
+      newPeriodId: invoice.subscriptionId,
+      invoiceId: meta.invoiceId,
+      serviceMonth: fromDateColumn(invoice.serviceMonth),
+      now,
     });
   }
 }
