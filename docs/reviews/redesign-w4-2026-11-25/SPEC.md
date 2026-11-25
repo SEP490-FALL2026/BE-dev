@@ -478,7 +478,7 @@ Route cũ giữ đường dẫn, `operationId`; chỉ thêm trường, trừ ch�
 | `accessRequestResubmit`                                      | **Phá vỡ:** thân bắt buộc `{ replyNote }` (1…1000); thiếu ⟹ 422 `VALIDATION_ERROR`; summary bỏ chữ "one-step"                    | Ô ghi chú bắt buộc                 |
 | `spendBatchSubmit` (POST `/spend-batches`)                   | thân thêm `replyNotes?`; `stopReason` thêm `REPLY_NOTE_REQUIRED`; 422 `SPEND.REPLY_NOTE_NOT_IN_BATCH`; mục cùng phiếu xử lý theo thứ tự phiếu, kết quả theo thứ tự xử lý | Ô ghi chú cho mục bị trả về; khớp kết quả theo `requestId` |
 | `accessRequestGet`                                           | thêm `ticket`, `latestReply`                                                                                                     | Liên kết phiếu, hiện ghi chú       |
-| `myRequestList` (GET `/me/access-requests`), `needDecisionList`, `spendApprovalList` | thêm `ticket` ở mỗi mục                                                                                                   | Nhóm theo phiếu                    |
+| `meAccessRequestList` (GET `/me/access-requests`), `needDecisionList`, `spendApprovalList` | thêm `ticket` ở mỗi mục                                                                                                   | Nhóm theo phiếu                    |
 | `accessRequestWithdraw`                                      | _(nếu OQ-W4-2 = A)_ trưởng phòng rút được Request ở hàng đợi trình; mã lỗi không đổi                                             | Nút rút ở hàng đợi trình           |
 
 Không đổi: route Request đơn, Request nhóm, lô chi (ngoài dòng trên), cấp phát.
@@ -551,7 +551,7 @@ Ca diệt đột biến (chạy tay một lần, ghi PROGRESS): đổi `≥` th�
 ### 11.2. Fixture đúng QĐ-118 (bài học `FIX-PLAN-W2`)
 
 Mọi integration/http dựng tổ chức **đủ**: phòng `P-DES` có trưởng phòng `H1`, **IT phụ trách** `IT1` (`RequestHarness.setItAdminInCharge`,
-`test/support/request-harness.ts:298`), phòng còn lại giao `IT2` (`handOthersToSecondItAdmin`, `test/support/second-it-admin.ts`); Cost Center hiện hành
+`test/support/request-harness.ts:299`), phòng còn lại giao `IT2` (`handOthersToSecondItAdmin`, `test/support/second-it-admin.ts`); Cost Center hiện hành
 + ngân sách năm có số cơ sở/dự phòng ghi rõ trong test; Người duyệt chi `C1` có vai; nhân viên có `employment_type`, lần xếp phòng hợp lệ (không chỉ tương
 lai). Ca "phòng không có trưởng phòng" bỏ trưởng phòng nhưng **giữ** IT phụ trách. Ca làm thay IT tạo qua HTTP `POST /departments/{id}/it-substitutes`
 (mẫu `test/integration/licensing/provisioning-in-charge.integration-spec.ts:25-33`). Helper trả `undefined` sau 403 là dấu hiệu fixture thiếu IT — sửa
