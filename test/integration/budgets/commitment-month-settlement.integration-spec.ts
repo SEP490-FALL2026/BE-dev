@@ -474,7 +474,11 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
     await runner().run((tx) => slices().reverseApplied(tx, cD.commitmentId, `${h.year}-03-01`, 100_000n));
     await prisma().budgetCommitment.update({
       where: { id: cD.commitmentId },
-      data: { appliedMinor: { decrement: 100_000n }, state: 'HELD' },
+      data: {
+        appliedMinor: { decrement: 100_000n },
+        seatMonthReversedMinor: { increment: 100_000n },
+        state: 'HELD',
+      },
     });
     expect((await settlements().settleMonth(h.seed.organizationId, `${h.year}-03-01`, NOW)).releasedMinor).toBe(
       100_000n,
@@ -523,33 +527,25 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
   it('Ca H: concurrent settleMonth vs chargeMonth with 2 connections + Barrier x20 completes with 0 40P01 deadlocks', async () => {
     const unit = await newUnitWithBudget(h.year);
     const { subscriptionId, planId } = await newK2Pool(STD);
-    const personId = await staffSinceYearStart(unit, 'STAFF-H');
     const month: BusinessDate = `${h.year}-06-01`;
-    const { requestId, commitmentId } = await createHeldK2({
-      unit,
-      planId,
-      year: h.year,
-      amountMinor: STD,
-      months: [{ month, seatCount: 1 }],
-    });
-    await addPoolSeat({
-      subscriptionId,
-      planId,
-      employeeId: personId,
-      requestId,
-      validFrom: month,
-    });
 
     const lockOrgMonth = slices().lockOrganizationMonth.bind(slices());
     const lockSubMonth = seatMonthRepo().lockMonthOf.bind(seatMonthRepo());
     for (let round = 0; round < 20; round += 1) {
-      await prisma().budgetCommitmentMonth.update({
-        where: { commitmentId_month: { commitmentId, month: new Date(`${month}T00:00:00.000Z`) } },
-        data: { appliedMinor: 0n, releasedMinor: 0n, settledAt: null },
+      const personId = await staffSinceYearStart(unit, `STAFF-H-${round}`);
+      const { requestId, commitmentId } = await createHeldK2({
+        unit,
+        planId,
+        year: h.year,
+        amountMinor: STD,
+        months: [{ month, seatCount: 1 }],
       });
-      await prisma().budgetCommitment.update({
-        where: { id: commitmentId },
-        data: { appliedMinor: 0n, releasedMinor: 0n, state: 'HELD' },
+      await addPoolSeat({
+        subscriptionId,
+        planId,
+        employeeId: personId,
+        requestId,
+        validFrom: month,
       });
 
       const barrier = new Barrier(2);
