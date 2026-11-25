@@ -518,7 +518,7 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
     expect(releaseOnLateGrant({ monthlyMinor: STD, grantedOn: `${h.year}-01-10`, firstMonth: 1 })).toBe(145_161n);
   });
 
-  it('Ca H: concurrent settleMonth vs chargeMonth with 2 connections + Barrier x20 completes with 0 40P01 deadlocks', async () => {
+  it('Ca H: concurrent settleMonth vs chargeMonth with >=2 commitments + Barrier x20 and error isolation', async () => {
     const unit = await newUnitWithBudget(h.year);
     const { subscriptionId, planId } = await newK2Pool(STD);
     const month: BusinessDate = `${h.year}-06-01`;
@@ -526,8 +526,16 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
     const lockOrgMonth = slices().lockOrganizationMonth.bind(slices());
     const lockSubMonth = seatMonthRepo().lockMonthOf.bind(seatMonthRepo());
     for (let round = 0; round < 20; round += 1) {
-      const personId = await staffSinceYearStart(unit, `STAFF-H-${round}`);
-      const { requestId, commitmentId } = await createHeldK2({
+      const personA = await staffSinceYearStart(unit, `STAFF-H-${round}-A`);
+      const personB = await staffSinceYearStart(unit, `STAFF-H-${round}-B`);
+      const cA = await createHeldK2({
+        unit,
+        planId,
+        year: h.year,
+        amountMinor: STD,
+        months: [{ month, seatCount: 1 }],
+      });
+      const cB = await createHeldK2({
         unit,
         planId,
         year: h.year,
@@ -537,15 +545,26 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
       await addPoolSeat({
         subscriptionId,
         planId,
-        employeeId: personId,
-        requestId,
+        employeeId: personA,
+        requestId: cA.requestId,
+        validFrom: month,
+      });
+      await addPoolSeat({
+        subscriptionId,
+        planId,
+        employeeId: personB,
+        requestId: cB.requestId,
         validFrom: month,
       });
 
       const barrier = new Barrier(2);
+      let firstSettleLock = true;
       const s1 = jest.spyOn(slices(), 'lockOrganizationMonth').mockImplementation(async (tx, org, m) => {
         await lockOrgMonth(tx, org, m);
-        await barrier.wait();
+        if (firstSettleLock) {
+          firstSettleLock = false;
+          await barrier.wait();
+        }
       });
       const s2 = jest.spyOn(seatMonthRepo(), 'lockMonthOf').mockImplementation(async (tx, sub, m) => {
         await lockSubMonth(tx, sub, m);
@@ -560,8 +579,42 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
         s1.mockRestore();
         s2.mockRestore();
       }
-      const snap = await commitmentSnapshot(commitmentId);
-      expect(snap.row.appliedMinor + snap.row.releasedMinor).toBeLessThanOrEqual(STD);
+      for (const id of [cA.commitmentId, cB.commitmentId]) {
+        const snap = await commitmentSnapshot(id);
+        expect(snap.row.appliedMinor + snap.row.releasedMinor).toBeLessThanOrEqual(STD);
+      }
     }
+
+    // FIX-B1 F3: one commitment violating a DB CHECK does not block settling the other commitment in the same month.
+    const isoMonth: BusinessDate = `${h.year}-07-01`;
+    const cFail = await createHeldK2({
+      unit,
+      planId,
+      year: h.year,
+      amountMinor: STD,
+      months: [{ month: isoMonth, seatCount: 1 }],
+    });
+    const cOk = await createHeldK2({
+      unit,
+      planId,
+      year: h.year,
+      amountMinor: STD,
+      months: [{ month: isoMonth, seatCount: 1 }],
+    });
+    const origAddReleased = slices().addReleased.bind(slices());
+    const failSpy = jest.spyOn(slices(), 'addReleased').mockImplementation(async (tx, id, m, delta) => {
+      if (id === cFail.commitmentId) {
+        return origAddReleased(tx, id, m, delta + 1n);
+      }
+      return origAddReleased(tx, id, m, delta);
+    });
+    try {
+      const isoRes = await settlements().settleMonth(h.seed.organizationId, isoMonth, NOW);
+      expect(isoRes.settledCommitments).toBe(1);
+    } finally {
+      failSpy.mockRestore();
+    }
+    expect((await commitmentSnapshot(cFail.commitmentId)).row.state).toBe('HELD');
+    expect((await commitmentSnapshot(cOk.commitmentId)).row.state).toBe('RELEASED');
   });
 });
