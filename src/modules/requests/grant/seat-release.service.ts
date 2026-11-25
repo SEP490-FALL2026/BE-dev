@@ -14,10 +14,11 @@ import { OrganizationReadApi } from '../../organization/public/organization-read
 import type { TransferReleaseInput, TransferReleaseResult } from '../public/requests.types';
 import {
   givenAtTransfer,
+  k1RevocationOutcome,
+  k1TransferReleaseBreakdown,
   lateGrantBreakdown,
   releasesBeforeGrant,
   revocationBreakdown,
-  revocationEndsOn,
   transferReleaseEndsOn,
   transferReleaseReference,
   type SeatCoverage,
@@ -55,7 +56,8 @@ export class SeatReleaseService {
   async afterRevocation(tx: DbTx, task: RevocationTaskFacts, now: Date): Promise<void> {
     const completed = task.completed;
     if (task.status !== 'COMPLETED' || completed === undefined) return;
-    const endsOn = revocationEndsOn(completed);
+    const outcome = k1RevocationOutcome(completed);
+    const endsOn = outcome.endsOn;
     if (endsOn === null) return;
     const coverages = await this.repo.coverageOf(tx, {
       requestIds: completed.grantRequestId === null ? [] : [completed.grantRequestId],
@@ -66,13 +68,19 @@ export class SeatReleaseService {
         endDate: completed.grantedEndDate,
       },
     });
+    const k1PaidThrough =
+      completed.provisioningType === 'K1' && completed.personalCommitmentMonths === 12 ? outcome.paidThroughOn : null;
     await this.give(tx, coverages, now, {
       reason: 'REVOKED',
       reference: `revocationTask:${task.id}`,
-      breakdownOf: (commitment, coverage, currentYear) =>
-        givenAtTransfer(commitment, completed.chainAssignmentIds)
-          ? { amountMinor: 0n, months: [] }
-          : revocationBreakdown({ commitment, coverage, endsOn, currentYear }),
+      breakdownOf: (commitment, coverage, currentYear) => {
+        if (givenAtTransfer(commitment, completed.chainAssignmentIds)) return { amountMinor: 0n, months: [] };
+        if (k1PaidThrough !== null && commitment.year <= fiscalYearOf(k1PaidThrough)) {
+          return { amountMinor: 0n, months: [] };
+        }
+
+        return revocationBreakdown({ commitment, coverage, endsOn, currentYear });
+      },
     });
   }
 
@@ -92,6 +100,7 @@ export class SeatReleaseService {
     );
     for (const chain of chains) {
       const kind = priced.find((right) => right.assignmentId === chain.assignmentId)?.provisioningType;
+      if (kind === 'K1' && chain.personalCommitmentMonths === 12) continue;
       const endsOn = kind === undefined ? null : transferReleaseEndsOn(kind, input.effectiveOn);
       if (endsOn === null) continue;
       const coverages = await this.repo.coverageOf(tx, {
@@ -135,10 +144,19 @@ export class SeatReleaseService {
     await this.give(tx, coverages, input.now, {
       reason: 'TRANSFER_EFFECTIVE',
       reference: transferReleaseReference(REGRANT_REFERENCE, input.assignmentId),
-      breakdownOf: (commitment, coverage, currentYear) =>
-        givenAtTransfer(commitment, chain.chainAssignmentIds)
-          ? { amountMinor: 0n, months: [] }
-          : revocationBreakdown({ commitment, coverage, endsOn, currentYear }),
+      breakdownOf: (commitment, coverage, currentYear) => {
+        if (givenAtTransfer(commitment, chain.chainAssignmentIds)) return { amountMinor: 0n, months: [] };
+        if (input.provisioningType === 'K1' && chain.personalCommitmentMonths === 12 && chain.billingAnchorOn) {
+          return k1TransferReleaseBreakdown({
+            commitment,
+            billingAnchorOn: chain.billingAnchorOn,
+            endedOn: input.endedOn,
+            currentYear,
+          });
+        }
+
+        return revocationBreakdown({ commitment, coverage, endsOn, currentYear });
+      },
     });
   }
 

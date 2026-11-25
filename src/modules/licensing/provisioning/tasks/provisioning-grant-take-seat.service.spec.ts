@@ -19,24 +19,28 @@ const actor = {
 } as unknown as AuthenticatedPrincipal;
 
 function makeWriter(overrides: {
-  provisioningType: 'K1' | 'K2';
+  provisioningType: 'K1' | 'K2' | 'K4';
   subscriptionLineId?: string | null;
+  referenceCommitmentMonths?: 1 | 12 | null;
   purchased?: boolean;
   replacesAssignmentId?: string | null;
 }) {
   const buyForItems = jest.fn().mockResolvedValue({ purchase: { id: 'pur-1', code: 'MUA-000001' }, changes: [] });
   const incrementLegacyPoolSeat = jest.fn().mockResolvedValue(6);
+  const createFromRequest = jest.fn().mockResolvedValue({ id: 'asg-1' });
+  const isPlanTarget = overrides.provisioningType === 'K1';
   const lockSeatTarget = jest.fn().mockResolvedValue({
-    kind: 'SUBSCRIPTION',
-    subscriptionId: 'sub-1',
+    kind: isPlanTarget ? 'PLAN' : 'SUBSCRIPTION',
+    subscriptionId: isPlanTarget ? null : 'sub-1',
     subscriptionLineId: overrides.subscriptionLineId ?? null,
     planId: 'plan-1',
     provisioningType: overrides.provisioningType,
     keyBinding: null,
+    referenceCommitmentMonths: overrides.referenceCommitmentMonths ?? null,
     applicationStatus: 'APPROVED',
-    status: 'ACTIVE',
+    status: isPlanTarget ? null : 'ACTIVE',
     missing: [],
-    purchasedQuantity: 10,
+    purchasedQuantity: isPlanTarget ? null : 10,
     allowsMidTermReduction: false,
   });
 
@@ -52,7 +56,7 @@ function makeWriter(overrides: {
     } as unknown as ProvisioningHolderService,
     {
       assertSeatTargetUsable: jest.fn(),
-      createFromRequest: jest.fn().mockResolvedValue({ id: 'asg-1' }),
+      createFromRequest,
     } as unknown as AssignmentService,
     {
       findSeatTarget: jest.fn().mockResolvedValue({ planId: 'plan-1', status: 'ACTIVE' }),
@@ -89,7 +93,7 @@ function makeWriter(overrides: {
     { buyForItems } as unknown as SeatLedgerApi,
   );
 
-  return { writer, buyForItems, incrementLegacyPoolSeat, lockSeatTarget };
+  return { writer, buyForItems, incrementLegacyPoolSeat, lockSeatTarget, createFromRequest };
 }
 
 describe('ProvisioningGrantWriter.takeSeat (W3-18 K2 shortcut + K1 legacy)', () => {
@@ -127,15 +131,47 @@ describe('ProvisioningGrantWriter.takeSeat (W3-18 K2 shortcut + K1 legacy)', () 
     expect(incrementLegacyPoolSeat).not.toHaveBeenCalled();
   });
 
-  it('K1 non-carry grant retains legacy seat increment without calling SeatLedgerApi.buyForItems', async () => {
-    const { writer, buyForItems, incrementLegacyPoolSeat } = makeWriter({
+  it('P13a W3-17: K1 grants without subscription, skips incrementLegacyPoolSeat, and records personalCommitmentMonths & billingAnchorOn', async () => {
+    const { writer, buyForItems, incrementLegacyPoolSeat, lockSeatTarget, createFromRequest } = makeWriter({
       provisioningType: 'K1',
+      referenceCommitmentMonths: 12,
       purchased: false,
     });
 
     await writer.write(tx, actor, { requestId: 'req-1', beneficiaryEmployeeId: 'emp-1' }, {
       answer: { seat: 'PERSONAL', employeeId: 'emp-1', planId: 'plan-1', departmentId: 'dept-1' },
-      plan: { planId: 'plan-1', provisioningType: 'K1', keyBinding: null },
+      plan: { planId: 'plan-1', provisioningType: 'K1', keyBinding: null, referenceCommitmentMonths: 12 },
+      serviceIdentifier: null,
+      organization: { id: 'org-1' },
+      today: '2026-11-05',
+      inCharge: null,
+      maxAttempts: 3,
+      holderContractEnd: null,
+      holderHasTerm: false,
+    } as never);
+
+    expect(lockSeatTarget).toHaveBeenCalledWith(tx, { planId: 'plan-1' });
+    expect(incrementLegacyPoolSeat).not.toHaveBeenCalled();
+    expect(buyForItems).not.toHaveBeenCalled();
+    expect(createFromRequest).toHaveBeenCalledWith(
+      tx,
+      actor,
+      expect.objectContaining({
+        personalCommitmentMonths: 12,
+        billingAnchorOn: '2026-11-05',
+      }),
+    );
+  });
+
+  it('K4 purchase retains legacy incrementLegacyPoolSeat until P20', async () => {
+    const { writer, buyForItems, incrementLegacyPoolSeat } = makeWriter({
+      provisioningType: 'K4',
+      purchased: true,
+    });
+
+    await writer.write(tx, actor, { requestId: 'req-1', beneficiaryEmployeeId: 'emp-1', purchase: {} }, {
+      answer: { seat: 'PERSONAL', employeeId: 'emp-1', planId: 'plan-1', departmentId: 'dept-1' },
+      plan: { planId: 'plan-1', provisioningType: 'K4', keyBinding: 'ACCOUNT' },
       serviceIdentifier: null,
       organization: { id: 'org-1' },
       today: '2026-11-21',

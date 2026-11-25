@@ -147,4 +147,38 @@ describe('the potential saving of a seat (FR-4.15, R-J09, US-10-04 AC-3, DA6-31,
     expect(potentialSavingOf({ provisioningType: 'K2', price: price(null, 'ANNUAL') })).toBeNull();
     expect(potentialSavingOf({ provisioningType: 'K2', price: price(15n, 'OTHER') })).toBeNull();
   });
+
+  it('W3-17 Case 7: K1 annual saves monthly x 12 from paidThroughOn + 1 with NEXT_BILLING; K1 monthly saves monthly x 1 from next billing date', () => {
+    expect(
+      potentialSavingOf({
+        provisioningType: 'K1',
+        price: price(450_000n, 'MONTHLY'),
+        commitmentTermMonths: 12,
+        billingAnchorOn: '2026-11-05',
+        today: '2027-03-20',
+      }),
+    ).toEqual({
+      monthlyAmountMinor: '450000',
+      amountAtPointMinor: '5400000',
+      currency: 'VND',
+      realisableOn: '2027-11-05',
+      realisableAt: 'NEXT_BILLING',
+    });
+
+    expect(
+      potentialSavingOf({
+        provisioningType: 'K1',
+        price: price(450_000n, 'MONTHLY'),
+        commitmentTermMonths: 1,
+        billingAnchorOn: '2026-11-05',
+        today: '2027-03-20',
+      }),
+    ).toEqual({
+      monthlyAmountMinor: '450000',
+      amountAtPointMinor: '450000',
+      currency: 'VND',
+      realisableOn: '2027-04-05',
+      realisableAt: 'NEXT_BILLING',
+    });
+  });
 });

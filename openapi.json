@@ -50205,6 +50205,29 @@
                       }
                     }
                   },
+                  "ACCESS_REQUEST.K1_ANNUAL_TERM_FIXED": {
+                    "summary": "This K1 annual-commitment plan requires a fixed term of 12 months.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.K1_ANNUAL_TERM_FIXED",
+                        "message": "This K1 annual-commitment plan requires a fixed term of 12 months.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.K1_ANNUAL_CONTRACT_TOO_SHORT": {
+                    "summary": "The person’s contract ends before the 12-month K1 annual commitment completes.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.K1_ANNUAL_CONTRACT_TOO_SHORT",
+                        "message": "The person’s contract ends before the 12-month K1 annual commitment completes.",
+                        "details": { "contractEndDate": "2027-03-31" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
                   "ACCESS_REQUEST.OPEN_LIMIT_REACHED": {
                     "summary": "The person was already named in as many requests for new access this week as they may.",
                     "value": {
@@ -50842,6 +50865,29 @@
                         "code": "ACCESS_REQUEST.TERM_CONTRACT_ENDED",
                         "message": "The contract of the person ended before the time of use begins: no access is given beyond it.",
                         "details": { "contractEndDate": "2026-10-31" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.K1_ANNUAL_TERM_FIXED": {
+                    "summary": "This K1 annual-commitment plan requires a fixed term of 12 months.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.K1_ANNUAL_TERM_FIXED",
+                        "message": "This K1 annual-commitment plan requires a fixed term of 12 months.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.K1_ANNUAL_CONTRACT_TOO_SHORT": {
+                    "summary": "The person’s contract ends before the 12-month K1 annual commitment completes.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.K1_ANNUAL_CONTRACT_TOO_SHORT",
+                        "message": "The person’s contract ends before the 12-month K1 annual commitment completes.",
+                        "details": { "contractEndDate": "2027-03-31" },
                         "requestId": "req_example"
                       }
                     }
@@ -60515,6 +60561,29 @@
                         "code": "ACCESS_REQUEST.TERM_CONTRACT_ENDED",
                         "message": "The contract of the person ended before the time of use begins: no access is given beyond it.",
                         "details": { "contractEndDate": "2026-10-31" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.K1_ANNUAL_TERM_FIXED": {
+                    "summary": "This K1 annual-commitment plan requires a fixed term of 12 months.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.K1_ANNUAL_TERM_FIXED",
+                        "message": "This K1 annual-commitment plan requires a fixed term of 12 months.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.K1_ANNUAL_CONTRACT_TOO_SHORT": {
+                    "summary": "The person’s contract ends before the 12-month K1 annual commitment completes.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.K1_ANNUAL_CONTRACT_TOO_SHORT",
+                        "message": "The person’s contract ends before the 12-month K1 annual commitment completes.",
+                        "details": { "contractEndDate": "2027-03-31" },
                         "requestId": "req_example"
                       }
                     }
@@ -129706,6 +129775,8 @@
                       "TERM_NOT_ASKED",
                       "TERM_LONG_TERM_NOT_ALLOWED",
                       "TERM_CONTRACT_ENDED",
+                      "K1_ANNUAL_TERM_FIXED",
+                      "K1_ANNUAL_CONTRACT_TOO_SHORT",
                       null
                     ],
                     "nullable": true

@@ -53,8 +53,7 @@ export class ProvisioningGrantWriter {
     input: GrantInput,
     planned: Planned,
   ): Promise<ProvisioningTaskRecord> {
-    const { answer, plan, serviceIdentifier, organization, today, inCharge, maxAttempts } = planned;
-    const { holderContractEnd, holderHasTerm } = planned;
+    const { answer, plan, organization, today, inCharge, maxAttempts } = planned;
     const { bySubstitute, lockedRevocation } = await this.lockAndAuthorize(tx, actor, answer);
     // The request is locked and moved to "being carried out" here, in the transaction of the grant: a second grant of
     // the same request finds it no longer grantable, and a request that changed since the read above is refused.
@@ -84,16 +83,12 @@ export class ProvisioningGrantWriter {
       requestId: input.requestId,
       beneficiaryEmployeeId: claimed.employeeId,
     });
-    const holder = await this.holderOf(tx, actor, { input, answer, claimed, serviceIdentifier, today });
-    const assignment = await this.assignments.createFromRequest(tx, actor, {
-      organizationId: organization.id,
-      requestId: input.requestId,
-      departmentId: answer.seat === 'SERVICE' ? answer.serviceAccount.departmentId : answer.departmentId,
+    const { holder, assignment } = await this.createGrantAssignment(tx, actor, {
+      input,
+      planned,
+      claimed,
       target,
-      holder,
-      effectiveFrom: today,
-      expectedEndDate: this.endOfSeat(claimed, today, { contractEnd: holderContractEnd, hasTerm: holderHasTerm }),
-      replacesAssignmentId: replaced,
+      replaced,
     });
 
     return this.grantTasks.insertAndClaim(tx, actor, {
@@ -108,6 +103,42 @@ export class ProvisioningGrantWriter {
       selfExecuted: holder.selfExecuted,
       bySubstitute,
     });
+  }
+
+  private async createGrantAssignment(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    facts: {
+      input: GrantInput;
+      planned: Planned;
+      claimed: Extract<GrantRequestAnswer, { status: 'GRANTABLE' }>;
+      target: SeatTarget;
+      replaced: string | null;
+    },
+  ) {
+    const { input, planned, claimed, target, replaced } = facts;
+    const { answer, serviceIdentifier, organization, today, holderContractEnd, holderHasTerm } = planned;
+    const holder = await this.holderOf(tx, actor, { input, answer, claimed, serviceIdentifier, today });
+    const k1Terms = await this.k1GrantFields(
+      tx,
+      target,
+      replaced,
+      today,
+      this.endOfSeat(claimed, today, { contractEnd: holderContractEnd, hasTerm: holderHasTerm }),
+    );
+    const assignment = await this.assignments.createFromRequest(tx, actor, {
+      organizationId: organization.id,
+      requestId: input.requestId,
+      departmentId: answer.seat === 'SERVICE' ? answer.serviceAccount.departmentId : answer.departmentId,
+      target,
+      holder,
+      effectiveFrom: today,
+      expectedEndDate: k1Terms.expectedEndDate,
+      replacesAssignmentId: replaced,
+      ...(k1Terms.k1Fields ?? {}),
+    });
+
+    return { holder, assignment };
   }
 
   private async lockAndAuthorize(tx: DbTx, actor: AuthenticatedPrincipal, answer: Planned['answer']) {
@@ -171,6 +202,7 @@ export class ProvisioningGrantWriter {
     named: string | undefined,
     today: string,
   ): Promise<string | undefined> {
+    if (plan.provisioningType === 'K1') return undefined;
     if (named !== undefined || plan.provisioningType === 'K5') return named;
     const chosen = await this.sharedPool.chooseLine(tx, {
       planId: plan.planId,
@@ -188,7 +220,7 @@ export class ProvisioningGrantWriter {
    * Throws ProvisioningSubscriptionError (`NOT_GRANTABLE`).
    */
   private async requireGrantable(tx: DbTx, plan: SeatTarget, named: string | undefined, today: string): Promise<void> {
-    if (named === undefined || plan.provisioningType === 'K5') return;
+    if (named === undefined || plan.provisioningType === 'K5' || plan.provisioningType === 'K1') return;
     const grantable = await this.sharedPool.grantableOf(tx, plan.planId, today);
     if (grantable.some((subscription) => subscription.subscriptionId === named)) return;
     const target = await this.catalog.findSeatTarget({ subscriptionId: named }, tx);
@@ -211,9 +243,9 @@ export class ProvisioningGrantWriter {
       today: string;
     },
   ): Promise<void> {
-    const { plan, target, purchased, stock, carriesOn } = facts;
-    if (target.subscriptionId === null) return;
-    if ((plan.provisioningType === 'K1' && !carriesOn) || purchased) {
+    const { plan, target, purchased, stock } = facts;
+    if (target.subscriptionId === null || plan.provisioningType === 'K1') return;
+    if (purchased) {
       if (plan.provisioningType === 'K2' && target.subscriptionLineId) {
         await this.seatLedger.buyForItems(
           tx,
@@ -232,6 +264,42 @@ export class ProvisioningGrantWriter {
     if (stock !== null && stock.freeBySubscription.get(target.subscriptionId) === 0) {
       throw new AssignmentConflictError('SEAT_CAPACITY', 0, stock.free);
     }
+  }
+
+  private async k1GrantFields(
+    tx: DbTx,
+    target: SeatTarget,
+    replaced: string | null,
+    today: string,
+    defaultEndDate: string | null,
+  ): Promise<{
+    expectedEndDate: string | null;
+    k1Fields: { personalCommitmentMonths: 1 | 12; billingAnchorOn: string } | null;
+  }> {
+    if (target.provisioningType !== 'K1') {
+      return { expectedEndDate: defaultEndDate, k1Fields: null };
+    }
+    const replacedTerms =
+      replaced !== null && typeof this.replacements.k1TermsOfReplaced === 'function'
+        ? await this.replacements.k1TermsOfReplaced(tx, replaced)
+        : null;
+    if (replacedTerms?.personalCommitmentMonths === 12) {
+      return {
+        expectedEndDate: replacedTerms.expectedEndDate ?? defaultEndDate,
+        k1Fields: {
+          personalCommitmentMonths: 12,
+          billingAnchorOn: replacedTerms.billingAnchorOn ?? today,
+        },
+      };
+    }
+
+    return {
+      expectedEndDate: defaultEndDate,
+      k1Fields: {
+        personalCommitmentMonths: target.referenceCommitmentMonths ?? 1,
+        billingAnchorOn: today,
+      },
+    };
   }
 
   /** The person or the service account the seat is for: a service account has the identifier and the responsible person the IT Admin gave. */

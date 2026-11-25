@@ -12,6 +12,10 @@ export interface AssignmentFacts {
   effectiveFrom: BusinessDate;
   validUntil: BusinessDate | null;
   expectedEndDate: BusinessDate | null;
+  /** Personal commitment months (`1 | 12`) for subscription-free K1 rights; null otherwise. */
+  personalCommitmentMonths?: 1 | 12 | null;
+  /** Billing anchor date (`YYYY-MM-DD`) for subscription-free K1 rights; null otherwise. */
+  billingAnchorOn?: BusinessDate | null;
   /** Not ended, not failed and not cancelled. */
   open: boolean;
   /** The first day of the records that follow one another without a break up to this one (itself when it follows none). */

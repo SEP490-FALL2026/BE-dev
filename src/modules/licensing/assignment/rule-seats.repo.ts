@@ -17,6 +17,8 @@ const OPEN_SEAT_COLUMNS = {
   owningDepartmentId: true,
   expectedEndDate: true,
   validUntil: true,
+  personalCommitmentMonths: true,
+  billingAnchorOn: true,
   plan: { select: { applicationId: true, provisioningType: true, pricingModel: true } },
   provisioningTasks: {
     where: { kind: 'REVOKE', status: { notIn: ['CLOSED_FAILED', 'CANCELLED'] } },
@@ -84,6 +86,11 @@ export class RuleSeatsRepo {
         pricingModel: row.plan.pricingModel,
         employeeId: row.employeeId,
         expectedEndDate: row.expectedEndDate ? fromDateColumn(row.expectedEndDate) : null,
+        personalCommitmentMonths:
+          row.personalCommitmentMonths === 1 || row.personalCommitmentMonths === 12
+            ? row.personalCommitmentMonths
+            : null,
+        billingAnchorOn: row.billingAnchorOn ? fromDateColumn(row.billingAnchorOn) : null,
         liveRevocation,
         terminatingUntil: terminating && row.validUntil ? fromDateColumn(row.validUntil) : null,
       };

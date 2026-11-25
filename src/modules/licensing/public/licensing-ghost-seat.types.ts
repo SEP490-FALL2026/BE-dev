@@ -40,6 +40,10 @@ export interface RuleSeat {
   pricingModel: 'PER_SEAT' | 'FLAT_RATE' | 'CONCURRENT' | 'CONSUMPTION' | 'PER_HOST' | null;
   employeeId: string;
   expectedEndDate: BusinessDate | null;
+  /** Personal commitment months (`1 | 12`) for subscription-free K1 rights; null/undefined otherwise. */
+  personalCommitmentMonths?: 1 | 12 | null;
+  /** Rolling billing anchor date for subscription-free K1 rights; null/undefined otherwise. */
+  billingAnchorOn?: BusinessDate | null;
   /** The revocation of the seat that is not completed yet (queued, retrying, in progress, failed); null when there is none. */
   liveRevocation: RuleSeatRevocation | null;
   /** The K1 seat whose renewal is cancelled and whose access runs on to this day (`QĐ-77l`); null otherwise. */

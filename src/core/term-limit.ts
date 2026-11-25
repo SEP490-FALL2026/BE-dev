@@ -38,13 +38,18 @@ export type TermKind = 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
 /** The most months a request for `K1` asks for: a plan bought by the month is not a plan to keep (`QĐ-106b`, `QĐ-111i`). */
 export const K1_TERM_LIMIT_MONTHS = 9;
 
+/** The fixed commitment length in months for an annual K1 plan (`QĐ-116d`, `W3-17`). */
+export const K1_ANNUAL_COMMITMENT_MONTHS = 12;
+
 /** Why the time of use a request gives is refused (`QĐ-111i`, `FR-2.8`, `INV-07`). */
 export type TermRefusal =
   | 'TERM_REQUIRED'
   | 'TERM_MONTHS_OUT_OF_RANGE'
   | 'TERM_NOT_ASKED'
   | 'TERM_LONG_TERM_NOT_ALLOWED'
-  | 'TERM_CONTRACT_ENDED';
+  | 'TERM_CONTRACT_ENDED'
+  | 'K1_ANNUAL_TERM_FIXED'
+  | 'K1_ANNUAL_CONTRACT_TOO_SHORT';
 
 /**
  * Whether the time of use is asked for a kind of grant, and how long it may be: `K1` asks 1 to 9 months and takes no right without an end;
@@ -62,10 +67,15 @@ export const termRuleOf = (kind: TermKind): { asked: boolean; maxMonths: number;
  * _Dùng lâu dài_, undefined when the form says nothing; a person with a term (a contractor, a freelancer, an intern) gives the months and
  * is never granted a right with no end (`INV-07`): saying nothing is a missing field, null is a refused answer.
  */
+const isK1Annual = (facts: { kind: TermKind; referenceCommitmentMonths?: number | null }): boolean =>
+  facts.kind === 'K1' && facts.referenceCommitmentMonths === K1_ANNUAL_COMMITMENT_MONTHS;
+
 export function checkTermMonths(facts: {
   kind: TermKind;
   termMonths: number | null | undefined;
   fixedTermPerson: boolean;
+  /** Plan reference commitment in months (`12` = K1 annual commitment; `1`/null = monthly). */
+  referenceCommitmentMonths?: number | null;
   /**
    * The end of the contract of the person is known. A plan bought once asks no months, so the seat of a person with a term can end only
    * there (`INV-07`): without it the right would have no end, which is refused as any right with no end for them.
@@ -82,8 +92,22 @@ export function checkTermMonths(facts: {
    */
   contractEndDate?: BusinessDate | null;
   termStart?: BusinessDate;
+  /** Override minimum contract end date (e.g. paidThroughOn during K1 annual transfer-grace replacement). */
+  requiredEndDate?: BusinessDate;
 }): TermRefusal | null {
   if (contractEnded(facts)) return 'TERM_CONTRACT_ENDED';
+  if (isK1Annual(facts)) return checkK1AnnualTerm(facts);
+
+  return checkStandardTerm(facts);
+}
+
+function checkStandardTerm(facts: {
+  kind: TermKind;
+  termMonths: number | null | undefined;
+  fixedTermPerson: boolean;
+  contractEndKnown?: boolean;
+  renewing?: boolean;
+}): TermRefusal | null {
   const rule = termRuleOf(facts.kind);
   const { termMonths } = facts;
   if (!rule.asked) {
@@ -98,6 +122,23 @@ export function checkTermMonths(facts: {
   }
 
   return checkNoMonths(rule.longTermAllowed, termMonths, facts.fixedTermPerson);
+}
+
+/** Annual K1 requires exactly 12 months (`K1_ANNUAL_TERM_FIXED`) and a contract lasting through the commitment period (`K1_ANNUAL_CONTRACT_TOO_SHORT`). */
+function checkK1AnnualTerm(facts: {
+  termMonths: number | null | undefined;
+  contractEndDate?: BusinessDate | null;
+  termStart?: BusinessDate;
+  requiredEndDate?: BusinessDate;
+}): TermRefusal | null {
+  if (facts.termMonths !== K1_ANNUAL_COMMITMENT_MONTHS) return 'K1_ANNUAL_TERM_FIXED';
+  const { contractEndDate, termStart } = facts;
+  if (contractEndDate !== undefined && contractEndDate !== null && termStart !== undefined) {
+    const requiredEnd = facts.requiredEndDate ?? termEndOf(termStart, K1_ANNUAL_COMMITMENT_MONTHS);
+    if (contractEndDate < requiredEnd) return 'K1_ANNUAL_CONTRACT_TOO_SHORT';
+  }
+
+  return null;
 }
 
 /** Whether the contract of a person with a term ended before the day the term begins: no day of the right is left to give. */
@@ -234,3 +275,35 @@ export const renewalEndOf = (facts: { previousEnd: BusinessDate; today: Business
  */
 export const effectiveEndOf = (facts: { start: BusinessDate; months: number }): BusinessDate =>
   termEndOf(facts.start, facts.months);
+
+/**
+ * Last day of the K1 rolling commitment period covering `asOf` (`billingAnchorOn + k * commitmentMonths - 1 day`, smallest `k >= 1`).
+ */
+export function k1PaidThroughOn(
+  billingAnchorOn: BusinessDate,
+  asOf: BusinessDate,
+  commitmentMonths: 1 | 12 = 12,
+): BusinessDate {
+  for (let period = 1; ; period += 1) {
+    const end = termEndOf(billingAnchorOn, commitmentMonths * period);
+    if (end >= asOf) return end;
+  }
+}
+
+/**
+ * Next billing anchor date on or after `asOf` (`billingAnchorOn + n months >= asOf`, smallest `n >= 1`).
+ */
+export function k1NextBillingOn(billingAnchorOn: BusinessDate, asOf: BusinessDate): BusinessDate {
+  for (let month = 1; ; month += 1) {
+    const day = addMonths(billingAnchorOn, month);
+    if (day >= asOf) return day;
+  }
+}
+
+/**
+ * First day of the next monthly billing cycle strictly after the rolling cycle containing `asOf` (e.g. transfer on `2027-03-20`
+ * anchored `2026-11-05`: running cycle `05/03–04/04` stays with the old department, remaining starts `2027-04-05`).
+ */
+export function k1RemainingBillingStart(billingAnchorOn: BusinessDate, asOf: BusinessDate): BusinessDate {
+  return addDays(k1PaidThroughOn(billingAnchorOn, asOf, 1), 1);
+}

@@ -25,6 +25,7 @@ const ofPlan = (plan: PlanLookup): SeatTarget => ({
   provisioningType: plan.provisioningType,
   keyBinding: plan.keyBinding,
   referenceCommitmentMonths: plan.referenceCommitmentMonths,
+  monthlyUnitPriceMinor: plan.referencePriceMinor ?? null,
   applicationStatus: plan.applicationStatus,
   status: null,
   missing: [],
@@ -110,6 +111,11 @@ export class SeatTargetService {
     tx?: DbTx,
   ): Promise<SeatTarget | null> {
     const targetPlanId = requestedPlanId ?? subscription.planId;
+    if (subscription.planProvisioningType === 'K1') {
+      const plan = locked && tx ? await this.plans.lockShared(tx, targetPlanId) : await this.plans.find(targetPlanId);
+
+      return plan ? ofPlan(plan) : null;
+    }
     const lineFacts =
       subscription.planProvisioningType === 'K2'
         ? await this.resolveK2Line(subscription, targetPlanId, servingOn, locked, tx)

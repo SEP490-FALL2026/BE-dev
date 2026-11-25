@@ -56,18 +56,19 @@ export class RenewalRequestWriter {
     },
   ): Promise<RenewalSubmitted> {
     const { body, facts, now } = input;
-    const termMonths = renewalTermMonthsOf(body);
+    const rawTermMonths = renewalTermMonthsOf(body);
 
     const assessed = await this.assessment.assess(tx, {
       employeeId: facts.employeeId,
       requesterEmployeeId: actor.employeeId,
       planId: facts.planId,
-      termMonths,
+      termMonths: body.longTerm !== true && body.extensionMonths === undefined ? undefined : rawTermMonths,
       termStart: input.termStart,
       now,
       settings: input.settings,
       lockDepartment: true,
     });
+    const termMonths = renewalTermMonthsOf(body, assessed.target);
     if (assessed.termRefusal !== null) {
       throw new AccessRequestTermRefusedError(
         assessed.termRefusal,

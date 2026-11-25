@@ -17,6 +17,7 @@ import type { BillingCycle, SubscriptionKind } from './subscription.types';
  */
 export const livePricedOf = (): Prisma.SubscriptionWhereInput => ({
   status: 'ACTIVE',
+  closedAt: null,
   unitPriceMinor: { not: null },
   unitPriceCurrency: DONG,
   AND: [
@@ -37,6 +38,7 @@ export const pricedOn = (on: BusinessDate): Prisma.SubscriptionWhereInput => {
 
   return {
     status: 'ACTIVE',
+    closedAt: null,
     unitPriceMinor: { not: null },
     unitPriceCurrency: DONG,
     AND: [
@@ -139,6 +141,7 @@ export const livePricedLineOf = (): Prisma.SubscriptionLineWhereInput => ({
   OR: [{ closedOn: null }, { closedOn: { gte: new Date(new Date().toISOString().slice(0, 10)) } }],
   subscription: {
     status: 'ACTIVE',
+    closedAt: null,
     AND: [
       { OR: [{ renewedBy: null }, { renewedBy: { is: { status: { not: 'ACTIVE' } } } }] },
       { OR: [{ billingCycle: { not: null } }, { kind: 'PERPETUAL' }] },
@@ -158,6 +161,7 @@ export const pricedLineOn = (on: BusinessDate): Prisma.SubscriptionLineWhereInpu
       {
         subscription: {
           status: 'ACTIVE',
+          closedAt: null,
           AND: [
             { OR: [{ billingCycle: { not: null } }, { kind: 'PERPETUAL' }] },
             { OR: [{ startDate: null }, { startDate: { lte: day } }] },

@@ -6,6 +6,7 @@ import {
   canViewRequest,
   chargedCostCenterId,
   currentMissingReasonOf,
+  k1TransferReplacementPeriod,
   mayRequest,
   policyFor,
   proposalPolicy,
@@ -224,5 +225,40 @@ describe('QĐ-111an, R-4: RATE_MISSING is a reason an older release wrote and is
     for (const reason of ['PRICE_MISSING', 'PRICE_EXPIRED', 'NO_APPROVED_BUDGET', 'OVER_RESERVE'] as const) {
       expect(currentMissingReasonOf(reason)).toBe(reason);
     }
+  });
+});
+
+describe('W3-17 Case 6 (QĐ-117c): K1 annual transfer-grace replacement period', () => {
+  it('keeps the running month in the old department and starts the new department charge from the next billing cycle', () => {
+    expect(
+      k1TransferReplacementPeriod({
+        billingAnchorOn: '2026-11-05',
+        personalCommitmentMonths: 12,
+        today: '2027-03-20',
+      }),
+    ).toEqual({
+      keepSource: true,
+      paidThroughOn: '2027-11-04',
+      oldDepartmentCycleEndsOn: '2027-04-04',
+      chargeFrom: '2027-04-05',
+      chargeThrough: '2027-11-04',
+    });
+  });
+
+  it('returns null for K1 monthly or missing billing anchor', () => {
+    expect(
+      k1TransferReplacementPeriod({
+        billingAnchorOn: '2026-11-05',
+        personalCommitmentMonths: 1,
+        today: '2027-03-20',
+      }),
+    ).toBeNull();
+    expect(
+      k1TransferReplacementPeriod({
+        billingAnchorOn: null,
+        personalCommitmentMonths: 12,
+        today: '2027-03-20',
+      }),
+    ).toBeNull();
   });
 });

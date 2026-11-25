@@ -129,6 +129,8 @@ export class SubscriptionGrantingRepo {
       where: {
         planId: { in: [...planIds] },
         status: 'ACTIVE',
+        closedAt: null,
+        plan: { provisioningType: { not: 'K1' } },
         lines: { none: {} },
         AND: [notTakenOverOn(today), { OR: [{ endDate: null }, { endDate: { gte: toDateColumn(today) } }] }],
       },
@@ -174,6 +176,7 @@ export class SubscriptionGrantingRepo {
         OR: [{ closedOn: null }, { closedOn: { gte: day } }],
         subscription: {
           status: 'ACTIVE',
+          closedAt: null,
           kind: 'TERM',
           AND: [
             { OR: [{ startDate: null }, { startDate: { lte: day } }] },
@@ -241,6 +244,7 @@ export class SubscriptionGrantingRepo {
   async pageStockPlans(filter: StockPlanFilter): Promise<StockPlanPage> {
     const grantable: Prisma.SubscriptionWhereInput = {
       status: 'ACTIVE',
+      closedAt: null,
       ...(filter.responsibleItAdminEmployeeId
         ? { responsibleItAdminEmployeeId: filter.responsibleItAdminEmployeeId }
         : {}),

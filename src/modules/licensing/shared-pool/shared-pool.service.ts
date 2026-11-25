@@ -108,6 +108,9 @@ export class SharedPoolService {
     today: BusinessDate,
     provisioningType?: ProvisioningType,
   ): Promise<PoolStock> {
+    if (provisioningType === 'K1') {
+      return { free: 0, inRevocation: 0, freeSubscriptionIds: [], freeBySubscription: new Map() };
+    }
     const subscriptions = await this.grantableOf(tx, planId, today);
 
     return this.stockOfSubscriptions(tx, planId, subscriptions, today, provisioningType === 'K4');
@@ -205,6 +208,7 @@ export class SharedPoolService {
     tx: DbTx,
     input: { planId: string; provisioningType: ProvisioningType; today: BusinessDate },
   ): Promise<string | null> {
+    if (input.provisioningType === 'K1') return null;
     const subscriptions = await this.grantableOf(tx, input.planId, input.today);
     if (input.provisioningType !== 'K2' && input.provisioningType !== 'K4') {
       return subscriptions[0]?.subscriptionId ?? null;

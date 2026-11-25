@@ -94,4 +94,20 @@ describe('SharedPoolService (ledger seats & chooseLine)', () => {
 
     expect(chosen).toBe('sub-new');
   });
+
+  it('P13a W3-17: K1 skips closed/legacy K1 subscriptions in chooseLine and stockOf', async () => {
+    const getGrantableSubscriptions = jest.fn();
+    const service = new SharedPoolService(
+      { getGrantableSubscriptions } as unknown as CatalogApi,
+      {} as unknown as SharedPoolCapacityRepo,
+      {} as unknown as SharedPoolAvoidedCostRepo,
+      {} as unknown as SeatLedgerApi,
+    );
+
+    expect(await service.chooseLine(tx, { planId: 'plan-k1', provisioningType: 'K1', today: '2026-11-21' })).toBeNull();
+    const stock = await service.stockOf(tx, 'plan-k1', '2026-11-21', 'K1');
+    expect(stock.free).toBe(0);
+    expect(stock.freeSubscriptionIds).toEqual([]);
+    expect(getGrantableSubscriptions).not.toHaveBeenCalled();
+  });
 });

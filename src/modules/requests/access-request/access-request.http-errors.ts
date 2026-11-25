@@ -37,7 +37,9 @@ const refuse = (status: HttpStatus, code: string, message: string): ApiException
 
 /** What the client needs to act on a refused time of use: the contract end, or the most months the kind of plan takes. */
 function termDetailsOf(error: AccessRequestTermRefusedError): { details?: Record<string, unknown> } {
-  if (error.reason === 'TERM_CONTRACT_ENDED') return { details: { contractEndDate: error.contractEndDate } };
+  if (error.reason === 'TERM_CONTRACT_ENDED' || error.reason === 'K1_ANNUAL_CONTRACT_TOO_SHORT') {
+    return { details: { contractEndDate: error.contractEndDate } };
+  }
   if (error.reason !== 'TERM_MONTHS_OUT_OF_RANGE') return {};
   const { maxMonths } = termRuleOf(error.kind ?? 'K2');
 
@@ -196,6 +198,10 @@ export const ACCESS_REQUEST_ERROR_EXAMPLES = {
   TERM_NOT_ASKED: example(new AccessRequestTermRefusedError('TERM_NOT_ASKED')),
   TERM_LONG_TERM_NOT_ALLOWED: example(new AccessRequestTermRefusedError('TERM_LONG_TERM_NOT_ALLOWED')),
   TERM_CONTRACT_ENDED: example(new AccessRequestTermRefusedError('TERM_CONTRACT_ENDED', '2026-10-31')),
+  K1_ANNUAL_TERM_FIXED: example(new AccessRequestTermRefusedError('K1_ANNUAL_TERM_FIXED', null, 'K1')),
+  K1_ANNUAL_CONTRACT_TOO_SHORT: example(
+    new AccessRequestTermRefusedError('K1_ANNUAL_CONTRACT_TOO_SHORT', '2027-03-31', 'K1'),
+  ),
   NO_DEPARTMENT: example(new AccessRequestNoDepartmentError()),
   EMPLOYEE_NOT_STARTED: example(new EmployeeNotStartedError()),
   REQUEST_PARTY_INELIGIBLE: example(
@@ -249,11 +255,13 @@ export const ACCESS_REQUEST_ERROR_EXAMPLES = {
   EVIDENCE_REQUIRED: cancellation('EVIDENCE_REQUIRED'),
 } as const;
 
-/** The five answers of a time of use that is refused, for the routes that take one (`QĐ-111i`, `INV-07`). */
+/** The refused-term error examples for the routes that judge a request term (`QĐ-111i`, `INV-07`, `W3-17`). */
 export const TERM_ERROR_EXAMPLES = [
   ACCESS_REQUEST_ERROR_EXAMPLES.TERM_REQUIRED,
   ACCESS_REQUEST_ERROR_EXAMPLES.TERM_MONTHS_OUT_OF_RANGE,
   ACCESS_REQUEST_ERROR_EXAMPLES.TERM_NOT_ASKED,
   ACCESS_REQUEST_ERROR_EXAMPLES.TERM_LONG_TERM_NOT_ALLOWED,
   ACCESS_REQUEST_ERROR_EXAMPLES.TERM_CONTRACT_ENDED,
+  ACCESS_REQUEST_ERROR_EXAMPLES.K1_ANNUAL_TERM_FIXED,
+  ACCESS_REQUEST_ERROR_EXAMPLES.K1_ANNUAL_CONTRACT_TOO_SHORT,
 ] as const;

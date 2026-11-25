@@ -78,4 +78,24 @@ export class AssignmentChainRepo {
 
     return rows.map((row) => row.id);
   }
+
+  /** Reads K1 commitment terms stored on an assignment (`personalCommitmentMonths`, `billingAnchorOn`). */
+  async k1TermsOf(
+    db: Pick<DbTx, '$queryRaw'>,
+    assignmentId: string,
+  ): Promise<{ personalCommitmentMonths: 1 | 12 | null; billingAnchorOn: BusinessDate | null } | null> {
+    const rows = await db.$queryRaw<{ pcm: number | null; anchor: string | null }[]>`
+      SELECT "personal_commitment_months" AS pcm,
+             to_char("billing_anchor_on", 'YYYY-MM-DD') AS anchor
+        FROM "license_assignments"
+       WHERE "id" = ${assignmentId}::uuid
+       LIMIT 1`;
+    const row = rows[0];
+    if (!row) return null;
+
+    return {
+      personalCommitmentMonths: row.pcm === 1 || row.pcm === 12 ? row.pcm : null,
+      billingAnchorOn: row.anchor,
+    };
+  }
 }

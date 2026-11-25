@@ -368,9 +368,20 @@ export class UsageRulesSeatService {
     });
   }
 
-  private async subscriptionSavingFacts(
-    c: SeatCase,
-  ): Promise<{ commitmentTermMonths: 1 | 12 | null; realisableOn: BusinessDate | null }> {
+  private async subscriptionSavingFacts(c: SeatCase): Promise<{
+    commitmentTermMonths: 1 | 12 | null;
+    realisableOn: BusinessDate | null;
+    billingAnchorOn?: BusinessDate | null;
+    today?: BusinessDate;
+  }> {
+    if (c.seat.provisioningType === 'K1') {
+      return {
+        commitmentTermMonths: c.seat.personalCommitmentMonths ?? null,
+        realisableOn: null,
+        billingAnchorOn: c.seat.billingAnchorOn ?? null,
+        today: c.run.today,
+      };
+    }
     if (c.seat.provisioningType !== 'K2' || c.seat.subscriptionId === null) {
       return { commitmentTermMonths: null, realisableOn: null };
     }

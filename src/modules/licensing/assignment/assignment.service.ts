@@ -58,6 +58,10 @@ interface GrantedSeat {
   expectedEndDate: BusinessDate | null;
   /** The right of the person that this grant ended the same day (`endReplacedByGrant`, R-49); kept on the new right. */
   replacesAssignmentId?: string | null;
+  /** Personal commitment term in months for subscription-free K1 grants (`1 | 12`). */
+  personalCommitmentMonths?: 1 | 12 | null;
+  /** Rolling billing anchor date for subscription-free K1 grants (`YYYY-MM-DD`). */
+  billingAnchorOn?: BusinessDate | null;
 }
 
 /**
@@ -243,6 +247,8 @@ export class AssignmentService {
         predecessorId: null,
         baselineImportId: null,
         replacesAssignmentId: input.replacesAssignmentId ?? null,
+        personalCommitmentMonths: input.personalCommitmentMonths ?? null,
+        billingAnchorOn: input.billingAnchorOn ?? null,
         // A new grant is a plain seat: the flag is put on it afterwards, by the IT Admin (`QĐ-110m`).
         isMachineAccount: false,
         machineAccountNote: null,
@@ -321,6 +327,11 @@ export class AssignmentService {
     );
 
     return old.id;
+  }
+
+  /** Reads a single assignment record by ID within an optional transaction. */
+  findRecord(id: string, tx?: DbTx): Promise<AssignmentRecord | null> {
+    return this.repo.find(id, tx);
   }
 
   /** Whether the old right is one a grant on this target would end if no revocation task stood in the way. */

@@ -1,6 +1,11 @@
 import { addDays, type BusinessDate } from '../../../core/business-date';
 import { fiscalYearOf } from '../../../core/fiscal-year';
-import { lastMonthBeginsOn } from '../../../core/term-limit';
+import {
+  k1PaidThroughOn,
+  k1RemainingBillingStart,
+  lastMonthBeginsOn,
+  monthsBeginningIn,
+} from '../../../core/term-limit';
 import type { MonthReleaseInput, SeatCommitment } from '../../budgets/public/budgets.types';
 import type { ProvisioningKind, RevocationCompletedFacts } from '../../licensing/public/licensing.types';
 import { monthCostBefore, releaseOnLateGrant, releaseOnRevocation } from '../../../core/seat-month-cost';
@@ -96,16 +101,52 @@ export function firstMonthOf(commitment: Pick<SeatCommitment, 'year' | 'origin'>
 }
 
 /**
+ * `paidThroughOn` for a running K1 annual commitment (`billing_anchor_on + 12k months - 1 day`) (`QĐ-116ad`).
+ */
+export function paidThroughOnOfK1Annual(billingAnchorOn: BusinessDate, asOf: BusinessDate): BusinessDate {
+  return k1PaidThroughOn(billingAnchorOn, asOf, 12);
+}
+
+/** Formats `YYYY-MM-DD` as the Vietnamese lock label (`bị khóa tới DD/MM/YYYY`) for K1 annual revocations (`W3-17`). */
+export function k1PaidThroughLockLabel(paidThroughOn: BusinessDate): string {
+  return `bị khóa tới ${paidThroughOn.slice(8, 10)}/${paidThroughOn.slice(5, 7)}/${paidThroughOn.slice(0, 4)}`;
+}
+
+/** Resolves release cutoff date, effective paidThroughOn, and lock label for K1/K2/K4/K5 revocation (`QĐ-116ad`). */
+export function k1RevocationOutcome(
+  facts: Pick<RevocationCompletedFacts, 'provisioningType' | 'endedOn' | 'paidThroughOn'> & {
+    personalCommitmentMonths?: 1 | 12 | null;
+    billingAnchorOn?: BusinessDate | null;
+  },
+): { endsOn: BusinessDate | null; paidThroughOn: BusinessDate | null; lockLabel: string | null } {
+  const effectivePaidThrough =
+    facts.provisioningType !== 'K1'
+      ? null
+      : (facts.paidThroughOn ??
+        (facts.personalCommitmentMonths === 12 && facts.billingAnchorOn && facts.endedOn
+          ? paidThroughOnOfK1Annual(facts.billingAnchorOn, facts.endedOn)
+          : null));
+  const lockLabel = effectivePaidThrough !== null ? k1PaidThroughLockLabel(effectivePaidThrough) : null;
+  if (!BY_THE_MONTH.includes(facts.provisioningType)) {
+    return { endsOn: null, paidThroughOn: effectivePaidThrough, lockLabel };
+  }
+  const endsOn =
+    facts.provisioningType === 'K1' && effectivePaidThrough !== null ? addDays(effectivePaidThrough, 1) : facts.endedOn;
+
+  return { endsOn, paidThroughOn: effectivePaidThrough, lockLabel };
+}
+
+/**
  * The first day the right taken back no longer costs anything: for K2 the day it ends (it holds the seat on every day before it); for K1 the
  * day after the last day paid for, since what was paid is not given back. Null for any other kind, whose commitment does not go back by day.
  */
 export function revocationEndsOn(
-  facts: Pick<RevocationCompletedFacts, 'provisioningType' | 'endedOn' | 'paidThroughOn'>,
+  facts: Pick<RevocationCompletedFacts, 'provisioningType' | 'endedOn' | 'paidThroughOn'> & {
+    personalCommitmentMonths?: 1 | 12 | null;
+    billingAnchorOn?: BusinessDate | null;
+  },
 ): BusinessDate | null {
-  if (!BY_THE_MONTH.includes(facts.provisioningType)) return null;
-  if (facts.provisioningType === 'K1' && facts.paidThroughOn !== null) return addDays(facts.paidThroughOn, 1);
-
-  return facts.endedOn;
+  return k1RevocationOutcome(facts).endsOn;
 }
 
 /** Whether a commitment can go back by the day at all: a year still open, a price a month kept on it, something still held. */
@@ -267,6 +308,28 @@ export const releasesBeforeGrant = (kind: ProvisioningKind): boolean => kind ===
  */
 export function transferReleaseEndsOn(kind: ProvisioningKind, effectiveOn: BusinessDate): BusinessDate | null {
   return BY_THE_MONTH.includes(kind) ? effectiveOn : null;
+}
+
+/**
+ * Exact rolling-month commitment release for a K1 annual transfer replacement (`QĐ-117c`):
+ * keeps the running rolling cycle in the old department and releases `monthly × remaining rolling months` from the next billing cycle through `paidThroughOn`.
+ */
+export function k1TransferReleaseBreakdown(input: {
+  commitment: SeatCommitment;
+  billingAnchorOn: BusinessDate;
+  endedOn: BusinessDate;
+  currentYear: number;
+}): SeatReleaseBreakdown {
+  const { commitment, billingAnchorOn, endedOn, currentYear } = input;
+  if (!releasable(commitment, currentYear)) return ZERO_BREAKDOWN;
+  const paidThroughOn = paidThroughOnOfK1Annual(billingAnchorOn, endedOn);
+  const chargeFrom = k1RemainingBillingStart(billingAnchorOn, endedOn);
+  if (chargeFrom > paidThroughOn) return ZERO_BREAKDOWN;
+  const months = monthsBeginningIn({ start: chargeFrom, end: paidThroughOn, year: commitment.year });
+  if (months <= 0) return ZERO_BREAKDOWN;
+  const amount = commitment.seatMonthlyMinor * BigInt(months);
+
+  return amount > 0n ? { amountMinor: smaller(amount, commitment.heldMinor), months: [] } : ZERO_BREAKDOWN;
 }
 
 /** The reference of the release a commitment gives for a right the day the transfer takes effect: one for each transfer and right. */

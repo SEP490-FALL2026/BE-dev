@@ -272,4 +272,106 @@ describe('SeatReleaseService (W3-07 monthly breakdown)', () => {
       now: NOW,
     });
   });
+
+  it('P13a W3-17 Case 6 & 7: K1 annual releases 0 on transfer/normal revocation and releases exact 3.150.000 on replacement', async () => {
+    const queryRaw = jest.fn().mockResolvedValue([
+      {
+        id: 'req-k1-annual',
+        request_type: 'ACCESS_REQUEST',
+        budget_year: 2026,
+        amount_months: 2,
+        term_months: 12,
+        end_date: new Date('2027-11-04T00:00:00.000Z'),
+        previous_end: null,
+        by_hand: false,
+      },
+    ]);
+    const tx = { $queryRaw: queryRaw } as unknown as DbTx;
+    const realRepo = new SeatReleaseRepo();
+    const releaseForRequest = jest
+      .fn()
+      .mockResolvedValue([
+        { id: 'c-2027', year: 2027, releasedMinor: 3_150_000n, heldMinor: 1_350_000n, released: false },
+      ]);
+    const budgets = {
+      lockSeatCommitments: jest.fn().mockResolvedValue([
+        {
+          requestId: 'req-k1-annual',
+          year: 2027,
+          origin: 'APPROVAL',
+          seatMonthlyMinor: 450_000n,
+          heldMinor: 4_500_000n,
+          transferReleases: [],
+        },
+      ]),
+      releaseForRequest,
+      committedByRequests: jest.fn().mockResolvedValue([]),
+    };
+    const organizationReads = { businessToday: jest.fn().mockResolvedValue('2027-03-20') };
+    const licensing = {
+      listRightChainsOf: jest.fn().mockResolvedValue([
+        {
+          assignmentId: 'asg-k1',
+          grantRequestId: 'req-k1-annual',
+          chainAssignmentIds: ['asg-k1'],
+          grantedStartDate: '2026-11-05',
+          grantedEndDate: '2027-11-04',
+          personalCommitmentMonths: 12,
+          billingAnchorOn: '2026-11-05',
+        },
+      ]),
+    };
+    const service = new SeatReleaseService(budgets as never, organizationReads as never, realRepo, licensing as never);
+
+    // Normal/MF-5 revocation (Case 7): releases nothing from paid commitment
+    await service.afterRevocation(
+      tx,
+      {
+        id: 'rev-k1',
+        status: 'COMPLETED',
+        completed: {
+          grantRequestId: 'req-k1-annual',
+          chainAssignmentIds: ['asg-k1'],
+          grantedStartDate: '2026-11-05',
+          grantedEndDate: '2027-11-04',
+          provisioningType: 'K1',
+          endedOn: '2027-03-20',
+          paidThroughOn: null,
+          personalCommitmentMonths: 12,
+          billingAnchorOn: '2026-11-05',
+        },
+      } as never,
+      NOW,
+    );
+    expect(releaseForRequest).not.toHaveBeenCalled();
+
+    // Transfer effective alone: does not release paid K1 annual commitment before replacement
+    const transferResult = await service.afterTransferEffective(
+      tx,
+      {
+        transferId: 'tr-k1',
+        effectiveOn: '2027-03-20',
+        rights: [{ assignmentId: 'asg-k1', provisioningType: 'K1' }],
+      },
+      NOW,
+    );
+    expect(transferResult).toEqual({ released: [] });
+    expect(releaseForRequest).not.toHaveBeenCalled();
+
+    // Replacement in transfer grace (Case 6): releases exact 7 months (3.150.000) from 2027 commitment
+    await service.afterRightReplaced(tx, {
+      assignmentId: 'asg-k1',
+      provisioningType: 'K1',
+      endedOn: '2027-03-20',
+      now: NOW,
+    });
+    expect(releaseForRequest).toHaveBeenCalledTimes(1);
+    expect(releaseForRequest).toHaveBeenCalledWith(tx, {
+      requestId: 'req-k1-annual',
+      reason: 'TRANSFER_EFFECTIVE',
+      reference: 'transfer:regrant:assignment:asg-k1',
+      amounts: [{ year: 2027, amountMinor: 3_150_000n }],
+      now: NOW,
+    });
+  });
 });

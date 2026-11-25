@@ -460,6 +460,10 @@ export interface RevocationCompletedFacts {
   endedOn: BusinessDate | null;
   /** K1 only: the last day the provider was paid for; the access may run to it. */
   paidThroughOn: BusinessDate | null;
+  /** Personal commitment months (`1 | 12`) for subscription-free K1 rights; null/undefined otherwise. */
+  personalCommitmentMonths?: 1 | 12 | null;
+  /** Rolling billing anchor date for subscription-free K1 rights; null/undefined otherwise. */
+  billingAnchorOn?: BusinessDate | null;
   /** Every source that asked for the revocation. */
   sources: RevocationSource[];
   /** K1 only: the checklist the IT Admin ticked, so a listener can read `MAILBOX_LOCKED` (`QĐ-111az`); null for any other kind of provisioning. */
@@ -494,6 +498,8 @@ export interface RightChain {
   /** The start and the end of the seat the request's grant made, as in {@link RevocationCompletedFacts.grantedStartDate}. */
   grantedStartDate: BusinessDate | null;
   grantedEndDate: BusinessDate | null;
+  personalCommitmentMonths?: 1 | 12 | null;
+  billingAnchorOn?: BusinessDate | null;
 }
 
 /** The facts of a revocation task its listeners are told. */

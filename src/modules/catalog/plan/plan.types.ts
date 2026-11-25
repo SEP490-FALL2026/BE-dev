@@ -144,6 +144,7 @@ export interface PlanLookup {
   pricingModel: PricingModel | null;
   sharingPolicy: SharingPolicy | null;
   hasAdminConsole: boolean;
+  referencePriceMinor?: bigint | null;
   referenceCommitmentMonths: ReferenceCommitmentMonths | null;
   applicationId: string;
   applicationName: string;

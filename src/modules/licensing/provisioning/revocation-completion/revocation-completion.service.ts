@@ -78,6 +78,8 @@ export class RevocationCompletionService {
           provisioningType: plan.provisioningType,
           endedOn: done.endOn,
           paidThroughOn: done.paidThroughOn,
+          personalCommitmentMonths: assignment.personalCommitmentMonths ?? null,
+          billingAnchorOn: assignment.billingAnchorOn ?? null,
           k1Checklist: checklist?.facts ?? null,
         });
         await this.revocation.emit(tx, {

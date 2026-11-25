@@ -34,6 +34,8 @@ export interface SeatTarget {
   keyBinding: 'ACCOUNT' | 'DEVICE_KEY' | 'DEVICE_BUNDLED' | null;
   /** Reference commitment months on a K1/K2 plan (`1 | 12`), or null when unset or for other kinds. */
   referenceCommitmentMonths?: 1 | 12 | null;
+  /** Plan reference monthly unit price in minor units of dong (`W3-17` / `QĐ-113a`), or null when unset. */
+  monthlyUnitPriceMinor?: bigint | null;
   /** Whether the application of the plan is still in the catalog; a retired one takes no seat. */
   applicationStatus: 'APPROVED' | 'RETIRED';
   /** The state of the subscription; null for a plan that has none. A draft takes no seat (`US-04-03` AC-6). */
