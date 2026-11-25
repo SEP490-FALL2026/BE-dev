@@ -89,6 +89,13 @@ khai thuê bao; `budget-review-snapshot.service.ts:56-60` đọc `pool`/`company
   A 33 tr ⟹ `POOL_LOT_DIFFERENCE` −2 tr.
 - **P22b/P23:** gỡ trigger cầu nối test `legacy-perpetual-lot-bridge.ts` (ghi FIX-TEST), dọn mã `W3-xx` trong comment `src`, dọn
   `SUBSCRIPTION_SEATS_REDUCED` và code chết (`assertKeysWithinLicenses`, `costBorneOf`, `SeatMonthPoolService`, repo tháng cam kết).
+- **P22b — seed theo đối chiếu hãng** (Docs `Research-AI/vendors/doi-chieu-mo-hinh-kho-voi-hang-2026-11-25.md`, Owner 25/11 giao
+  điều phối chọn): (L-2) thuê bao **Figma trả tháng** và **Jira trả tháng** seed `seatCounting = MEMBERS` (_theo thành viên_) + _hãng
+  xuất hóa đơn sau_ — thực tế Figma tháng không gia hạn seat trống, Jira tháng tính theo số user tối đa trong kỳ; để _mua cố định_ sẽ
+  sinh `KPI-4` ảo và mở `SBF-11a` oan; (L-6) Claude Team `minimumSeats` = **2** (không 5); bỏ hạn chót báo hủy riêng của Claude
+  (Anthropic không có hạn báo trước — dùng mặc định hệ thống); đổi gói `office-ltsc-2024` (`catalog-extra.ts:90`, chỉ bán qua volume
+  licensing/KMS — trái luật mua trực tiếp từ hãng) thành **Office Home & Business 2024** (mua một lần, gắn 1 máy, `DEVICE_KEY`).
+  Không đổi code nghiệp vụ.
 
 ## Xong khi
 
