@@ -73,7 +73,10 @@ export const declareSubscriptionBodySchema = z.strictObject({
 });
 
 export const updateSubscriptionBodySchema = z.strictObject({
-  purchasedQuantity: quantity.optional(),
+  purchasedQuantity: quantity.optional().meta({
+    description:
+      'No longer used to write: sending a value is refused. The seats of a subscription are bought, corrected and reduced on its lines and counted from their ledger.',
+  }),
   unitPrice: unitPrice.optional(),
   monthlyUnitPrice: monthlyUnitPrice.optional(),
   originalPrice: originalPrice.nullable().optional().meta({
@@ -96,8 +99,10 @@ export const updateSubscriptionBodySchema = z.strictObject({
   seatCounting: seatCounting.optional(),
   minimumSeatsTotal: minimumSeatsTotal.nullable().optional(),
   invoicedLater: z.boolean().optional(),
-  // Makes this the subscription that prices its plan (Q-04); the flag of the other subscriptions of the plan is taken off.
-  isPrimaryForPlan: z.boolean().optional(),
+  isPrimaryForPlan: z.boolean().optional().meta({
+    description:
+      'No longer used to write: marking a subscription as the one that prices its plan is refused. The price of a plan is read from the lines of its workspace.',
+  }),
   quantityChangeReason: z.string().trim().min(1).max(500).optional().meta({
     description:
       'Reason for increasing purchasedQuantity on an active K2 subscription (1-500 characters after trimming; required when increasing, ignored when not increasing).',

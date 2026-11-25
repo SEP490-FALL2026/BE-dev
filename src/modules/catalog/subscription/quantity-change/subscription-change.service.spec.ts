@@ -2,13 +2,10 @@ import type { DbTx } from '../../../../infrastructure/database/transaction-runne
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { LockedPlan } from '../../plan/plan-facts.service';
 import { SubscriptionChangeService } from '../subscription-change.service';
-import {
-  SubscriptionMidTermReductionNotAllowedError,
-  SubscriptionQuantityReasonRequiredError,
-  SubscriptionUpdateEmptyError,
-  SubscriptionVersionRequiredError,
-} from '../subscription.errors';
+import { SubscriptionPrimaryRetiredError, SubscriptionUpdateEmptyError } from '../subscription.errors';
+import { SEAT_LEDGER_ROUTES } from '../subscription.policy';
 import type { SubscriptionRecord, SubscriptionView } from '../subscription.types';
+import type { UpdateSubscriptionInput } from '../subscription.service';
 
 const actor = {
   accountId: 'acc-1',
@@ -151,52 +148,40 @@ describe('SubscriptionChangeService', () => {
     expect(runner.run).not.toHaveBeenCalled();
   });
 
-  it('refuses changing purchasedQuantity without expectedUpdatedAt before entering a transaction', async () => {
+  it.each<[string, UpdateSubscriptionInput, Date | undefined]>([
+    ['without the version', { purchasedQuantity: 12 }, undefined],
+    [
+      'reducing a 12-month subscription whose flags the body tries to change',
+      { purchasedQuantity: 8, commitmentTermMonths: 1, allowsMidTermReduction: true },
+      baseDate,
+    ],
+    ['increasing, without a reason', { purchasedQuantity: 12 }, baseDate],
+    ['increasing, with a reason', { purchasedQuantity: 12, quantityChangeReason: 'New engineering hires' }, baseDate],
+    ['reducing by one', { purchasedQuantity: 11 }, baseDate],
+  ])(
+    'refuses an edit of the seats (%s) with the routes that change them, before a transaction opens and with nothing written (W3-27)',
+    async (_name, input, version) => {
+      const { service, runner, recordAudit, guard } = makeSut();
+
+      await expect(service.update(actor, 'sub-1', input, version)).rejects.toMatchObject({
+        name: 'SubscriptionSeatCountViaLedgerError',
+        routes: SEAT_LEDGER_ROUTES,
+      });
+      expect(runner.run).not.toHaveBeenCalled();
+      expect(recordAudit).not.toHaveBeenCalled();
+      expect(guard.tellSeatIncrease).not.toHaveBeenCalled();
+      expect(guard.tellSeatReduction).not.toHaveBeenCalled();
+    },
+  );
+
+  it('refuses to mark a subscription as the one that prices its plan, and lets the mark be taken off', async () => {
     const { service, runner } = makeSut();
 
-    await expect(service.update(actor, 'sub-1', { purchasedQuantity: 12 })).rejects.toThrow(
-      SubscriptionVersionRequiredError,
+    await expect(service.update(actor, 'sub-1', { isPrimaryForPlan: true }, baseDate)).rejects.toThrow(
+      SubscriptionPrimaryRetiredError,
     );
     expect(runner.run).not.toHaveBeenCalled();
-  });
-
-  it('blocks reducing a 12-month active K2 subscription using stored flags even when PATCH tries to change them', async () => {
-    const { service, guard } = makeSut();
-
-    await expect(
-      service.update(
-        actor,
-        'sub-1',
-        { purchasedQuantity: 8, commitmentTermMonths: 1, allowsMidTermReduction: true },
-        baseDate,
-      ),
-    ).rejects.toThrow(SubscriptionMidTermReductionNotAllowedError);
-    expect(guard.assertNotBelowOccupied).not.toHaveBeenCalled();
-  });
-
-  it('refuses increasing an active K2 subscription without quantityChangeReason', async () => {
-    const { service, recordAudit } = makeSut();
-
-    await expect(service.update(actor, 'sub-1', { purchasedQuantity: 12 }, baseDate)).rejects.toThrow(
-      SubscriptionQuantityReasonRequiredError,
-    );
-    expect(recordAudit).not.toHaveBeenCalled();
-  });
-
-  it('records quantityChangeReason in the audit after snapshot when increasing an active K2 subscription', async () => {
-    const { service, recordAudit } = makeSut();
-
-    await service.update(
-      actor,
-      'sub-1',
-      { purchasedQuantity: 12, quantityChangeReason: 'New engineering hires' },
-      baseDate,
-    );
-
-    expect(recordAudit).toHaveBeenCalledTimes(1);
-    const event = recordAudit.mock.calls[0][1];
-    expect(event.action).toBe('SUBSCRIPTION.UPDATED');
-    expect(event.after).toMatchObject({ quantity: 12, quantityChangeReason: 'New engineering hires' });
+    await expect(service.update(actor, 'sub-1', { isPrimaryForPlan: false }, baseDate)).resolves.toBeDefined();
   });
 
   it('ignores quantityChangeReason and omits it from audit when not increasing purchasedQuantity', async () => {
@@ -207,30 +192,5 @@ describe('SubscriptionChangeService', () => {
     expect(recordAudit).toHaveBeenCalledTimes(1);
     const event = recordAudit.mock.calls[0][1];
     expect(event.after).not.toHaveProperty('quantityChangeReason');
-  });
-
-  it('W3-03: reducing purchasedQuantity on active K2 calls tellSeatReduction and not tellSeatIncrease', async () => {
-    const { service, guard } = makeSut(makeRecord({ purchasedQuantity: 12, allowsMidTermReduction: true }));
-
-    await service.update(actor, 'sub-1', { purchasedQuantity: 11 }, baseDate);
-
-    expect(guard.tellSeatReduction).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        subscriptionId: 'sub-1',
-        from: 12,
-        to: 11,
-      }),
-    );
-    expect(guard.tellSeatIncrease).not.toHaveBeenCalled();
-  });
-
-  it('W3-03: increasing purchasedQuantity keeps tellSeatIncrease and does not call tellSeatReduction', async () => {
-    const { service, guard } = makeSut(makeRecord({ purchasedQuantity: 11 }));
-
-    await service.update(actor, 'sub-1', { purchasedQuantity: 12, quantityChangeReason: 'Growth' }, baseDate);
-
-    expect(guard.tellSeatIncrease).toHaveBeenCalledTimes(1);
-    expect(guard.tellSeatReduction).not.toHaveBeenCalled();
   });
 });

@@ -263,3 +263,35 @@ export class SubscriptionPriceMismatchError extends Error {
     this.name = 'SubscriptionPriceMismatchError';
   }
 }
+
+/** The seats of a subscription are not set by editing it: they are bought, corrected and reduced on the lines of the subscription, and counted from its ledger (W3-27). */
+export class SubscriptionSeatCountViaLedgerError extends Error {
+  constructor(readonly routes: readonly string[]) {
+    super('The seats of a subscription are not edited: buy, correct or reduce them on its lines.');
+    this.name = 'SubscriptionSeatCountViaLedgerError';
+  }
+}
+
+/** The subscription that prices its plan is no longer chosen by hand: the price of a plan is read from the line of the workspace (W3-27). */
+export class SubscriptionPrimaryRetiredError extends Error {
+  constructor() {
+    super('A subscription is no longer marked as the one that prices its plan.');
+    this.name = 'SubscriptionPrimaryRetiredError';
+  }
+}
+
+/** A plan of personal accounts (K1) is paid by the month for each account and has no subscription (W3-27). */
+export class SubscriptionK1HasNoSubscriptionError extends Error {
+  constructor() {
+    super('A plan of personal accounts has no subscription: its accounts are granted and paid one by one.');
+    this.name = 'SubscriptionK1HasNoSubscriptionError';
+  }
+}
+
+/** A purchase made once (K4) is a lot of licenses, not a subscription (W3-27). */
+export class SubscriptionPerpetualIsLicenseLotError extends Error {
+  constructor() {
+    super('A purchase made once is a lot of licenses: create it as a lot.');
+    this.name = 'SubscriptionPerpetualIsLicenseLotError';
+  }
+}

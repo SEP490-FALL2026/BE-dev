@@ -118640,7 +118640,12 @@
       "UpdateSubscriptionBodyDto": {
         "type": "object",
         "properties": {
-          "purchasedQuantity": { "type": "integer", "minimum": 0, "maximum": 1000000000 },
+          "purchasedQuantity": {
+            "description": "No longer used to write: sending a value is refused. The seats of a subscription are bought, corrected and reduced on its lines and counted from their ledger.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000000
+          },
           "unitPrice": {
             "type": "object",
             "properties": {
@@ -118724,7 +118729,10 @@
             "nullable": true
           },
           "invoicedLater": { "type": "boolean" },
-          "isPrimaryForPlan": { "type": "boolean" },
+          "isPrimaryForPlan": {
+            "description": "No longer used to write: marking a subscription as the one that prices its plan is refused. The price of a plan is read from the lines of its workspace.",
+            "type": "boolean"
+          },
           "quantityChangeReason": {
             "description": "Reason for increasing purchasedQuantity on an active K2 subscription (1-500 characters after trimming; required when increasing, ignored when not increasing).",
             "type": "string",

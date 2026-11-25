@@ -27,6 +27,7 @@ function assertSeatCountingOpen(
 import { sameState, snapshotOf, stateOf } from './subscription.mapper';
 import {
   assertSubscriptionShape,
+  assertUpdateWritesNoRetiredField,
   assertVersionForQuantityChange,
   deriveNotice,
   isStaleEdit,
@@ -83,6 +84,7 @@ export class SubscriptionChangeService {
     if (Object.entries(input).every(([key, value]) => key === 'quantityChangeReason' || value === undefined)) {
       throw new SubscriptionUpdateEmptyError();
     }
+    assertUpdateWritesNoRetiredField(input);
     assertVersionForQuantityChange(input.purchasedQuantity, expectedUpdatedAt);
     assertDeclarableCycle(input.billingCycle);
     const sentUnit = input.unitPrice ? await this.pricing.read(input.unitPrice, 'unitPrice') : undefined;

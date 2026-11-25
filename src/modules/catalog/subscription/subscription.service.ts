@@ -16,6 +16,7 @@ import {
   SubscriptionWorkspaceMovedError,
 } from './subscription.errors';
 import {
+  assertDeclarable,
   assertSubscriptionShape,
   declaredStateOf,
   missingData,
@@ -185,6 +186,7 @@ export class SubscriptionService {
    * finance facade for the unit price and the original price.
    */
   async declare(actor: AuthenticatedPrincipal, input: DeclareSubscriptionInput): Promise<SubscriptionView> {
+    assertDeclarable(input.kind);
     assertDeclarableCycle(input.billingCycle);
     const sentUnit = input.unitPrice ? await this.pricing.read(input.unitPrice, 'unitPrice') : undefined;
     const sentMonthly = input.monthlyUnitPrice
@@ -229,6 +231,7 @@ export class SubscriptionService {
     // without a lock, as it never changes.
     const [unlocked] = await this.plans.lookups([input.planId], tx);
     if (!unlocked) throw new SubscriptionPlanNotFoundError();
+    assertDeclarable(input.kind, unlocked.provisioningType);
     const workspaceId = await this.poolRules.workspaceFor(tx, actor, organizationId, unlocked, input.workspaceId);
     // The plan is locked `FOR UPDATE` before anything else: no row of this subscription exists yet to lock, so the plan is what two
     // declarations of the same K2 or K4 plan take turns on (R-E02); every other writer locks a subscription first, then its plan.

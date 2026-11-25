@@ -20,6 +20,7 @@ import {
 import { alertDates, deriveNotice, missingData, noticeInputOf, noticeWarnings } from './subscription.policy';
 import { isPricedInDong } from './price/subscription-price.policy';
 import { liveIdsByPlan, liveSiblingsOf, poolWarnings, vendorAdminFlags } from './pool/subscription-pool.policy';
+import { SubscriptionLineRepo } from '../subscription-line/subscription-line.repo';
 import { SubscriptionGrantingRepo } from './subscription-granting.repo';
 import { SubscriptionRepo } from './subscription.repo';
 import { SubscriptionWindowsService } from './subscription-windows.service';
@@ -107,6 +108,7 @@ export class SubscriptionViewService {
     private readonly occupancy: SeatOccupancyHook,
     private readonly periods: SubscriptionGrantingRepo,
     private readonly windows: SubscriptionWindowsService,
+    private readonly lines: SubscriptionLineRepo,
   ) {}
 
   /**
@@ -233,6 +235,8 @@ export class SubscriptionViewService {
     const { points, windows } = await this.pointsOf(records, today, await this.continuedAmong(records));
     const readings = this.readingsAt(records, points, today, seatCounts);
     const answerer = await this.answerersOf(records);
+    // A period that has lines is priced by its lines: the mark of the subscription that prices its plan is retired for it (W3-27).
+    const lined = new Set((await this.lines.ofSubscriptions(records.map((record) => record.id))).keys());
     const adjustment = (record: SubscriptionRecord) => ({
       logoUrl: record.applicationLogoUrl,
       responsibleItAdmin: answerer(record),
@@ -240,6 +244,7 @@ export class SubscriptionViewService {
       daysLeft: readings.get(record.id)?.daysLeft ?? null,
       deadlineKind: readings.get(record.id)?.deadlineKind ?? null,
       seats: seatsOfPool(record, seatCounts),
+      isPrimaryForPlan: record.isPrimaryForPlan && !lined.has(record.id),
     });
     const views: SubscriptionView[] = [];
     for (const record of records) {
@@ -310,7 +315,6 @@ export class SubscriptionViewService {
         seatCounting: record.seatCounting,
         minimumSeatsTotal: record.minimumSeatsTotal,
         invoicedLater: record.invoicedLater,
-        isPrimaryForPlan: record.isPrimaryForPlan,
         ...adjustment(record),
         noticeDeadline: { value: notice.deadline, source: notice.source },
         alerts: alertsOf(points.get(record.id) ?? null, record, windows.get(record.id)),

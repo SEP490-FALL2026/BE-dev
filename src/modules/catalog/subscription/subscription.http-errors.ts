@@ -23,13 +23,17 @@ import {
   SubscriptionBillingLongerThanCommitmentError,
   SubscriptionCommitmentTermNotAllowedError,
   SubscriptionCommitmentTermRequiredError,
+  SubscriptionK1HasNoSubscriptionError,
   SubscriptionK1MonthlyOnlyError,
   SubscriptionMembersMonthlyOnlyError,
   SubscriptionMembersPaymentDayRequiredError,
   SubscriptionSeatCountingFixedError,
   SubscriptionK4PerpetualOnlyError,
   SubscriptionMidTermReductionNotAllowedError,
+  SubscriptionPerpetualIsLicenseLotError,
   SubscriptionPrimaryConflictError,
+  SubscriptionPrimaryRetiredError,
+  SubscriptionSeatCountViaLedgerError,
   SubscriptionQuantityReasonRequiredError,
   SubscriptionStaleError,
   SubscriptionPrimaryNotEligibleError,
@@ -74,6 +78,18 @@ export function toSubscriptionApiException(error: unknown): unknown {
   }
   if (error instanceof SubscriptionSeatCountingFixedError) {
     return refuse(UNPROCESSABLE, 'SUBSCRIPTION.SEAT_COUNTING_FIXED', error.message);
+  }
+  if (error instanceof SubscriptionSeatCountViaLedgerError) {
+    return refuse(HttpStatus.CONFLICT, 'SUBSCRIPTION.SEAT_COUNT_VIA_LEDGER', error.message, { routes: error.routes });
+  }
+  if (error instanceof SubscriptionPrimaryRetiredError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.PRIMARY_RETIRED', error.message);
+  }
+  if (error instanceof SubscriptionK1HasNoSubscriptionError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.K1_HAS_NO_SUBSCRIPTION', error.message);
+  }
+  if (error instanceof SubscriptionPerpetualIsLicenseLotError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.PERPETUAL_IS_LICENSE_LOT', error.message);
   }
   if (error instanceof ApiException) return error;
 
@@ -229,6 +245,10 @@ export const SUBSCRIPTION_ERROR_EXAMPLES = {
   MEMBERS_MONTHLY_ONLY: example(new SubscriptionMembersMonthlyOnlyError()),
   MEMBERS_PAYMENT_DAY_REQUIRED: example(new SubscriptionMembersPaymentDayRequiredError()),
   SEAT_COUNTING_FIXED: example(new SubscriptionSeatCountingFixedError()),
+  SEAT_COUNT_VIA_LEDGER: example(new SubscriptionSeatCountViaLedgerError(['subscriptionLineSeatPurchase'])),
+  PRIMARY_RETIRED: example(new SubscriptionPrimaryRetiredError()),
+  K1_HAS_NO_SUBSCRIPTION: example(new SubscriptionK1HasNoSubscriptionError()),
+  PERPETUAL_IS_LICENSE_LOT: example(new SubscriptionPerpetualIsLicenseLotError()),
   MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(2, 'unitPrice')),
   MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError('unitPrice')),
   CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('XYZ', 'originalPrice')),

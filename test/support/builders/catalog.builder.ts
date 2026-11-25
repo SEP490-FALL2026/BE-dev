@@ -9,6 +9,7 @@ import { SubscriptionService } from '../../../src/modules/catalog/subscription/s
 import { pricingOfBody, writeLegacyPricing } from '../legacy-pricing';
 import type { HttpTestApp } from '../http-test-app';
 import { principalOf, sent } from './account.builder';
+import { insertLegacySubscription, isRetiredDeclaration } from './legacy-subscription.builder';
 
 /*
  * T2.2: the catalog a suite only needs as a precondition (an application, its plan, a subscription of it), declared by the
@@ -110,6 +111,9 @@ export async function declareSubscription(ctx: HttpTestApp, itAdminToken: string
   const actor = await principalOf(ctx, itAdminToken);
   const { planId } = body as { planId?: string };
   if (planId) await ensureVendorAdmins(ctx, planId, actor.employeeId);
+  // What the route refuses since W3-27 (a purchase made once, a plan of personal accounts) is written as a row: see legacy-subscription.builder.ts.
+  if (await isRetiredDeclaration(ctx, body))
+    return insertLegacySubscription(ctx, sent(body) as object, actor.employeeId);
   const { kind, billingCycle } = body as { kind?: string; billingCycle?: string };
   // A subscription that becomes active names the months it commits to and the IT Admin who answers for it (QĐ-103e, QĐ-103v(4)):
   // the commitment follows the cycle the body names, and the IT Admin who declares it answers unless the body says otherwise.
