@@ -43,7 +43,7 @@ const baseLineContext = {
     workspaceId: 'ws-1',
     planId: 'plan-k2',
     monthlyUnitPriceMinor: 500_000n,
-    minimumSeats: null,
+    minimumSeats: null as number | null,
     ledgerOpenedOn: '2026-07-01',
     renewedFromLineId: null,
     closedOn: null,
@@ -339,5 +339,52 @@ describe('SeatPurchaseRouteService (W3-18)', () => {
     }
     expect(caught).toBeInstanceOf(SeatPurchaseStockAvailableError);
     expect((caught as SeatPurchaseStockAvailableError).free).toBe(2);
+  });
+
+  it('Ca 1 tierStepSeats: records TIER_STEP purchase, updates minimumSeats, notifies Finance, returns 55,000,000', async () => {
+    const { service, seatLedger, tx } = build({
+      context: {
+        ...baseLineContext,
+        line: { ...baseLineContext.line, monthlyUnitPriceMinor: 150_000n, minimumSeats: 50 },
+      },
+      pendingCount: 1,
+      free: 0,
+    });
+    const recordTierStep = jest.fn().mockResolvedValue({
+      purchase: {
+        id: ID_2,
+        organizationId: 'org-1',
+        subscriptionLineId: ID_1,
+        code: 'MUA-000002',
+        kind: 'TIER_STEP',
+        purchasedOn: '2026-11-21',
+        quantity: 50,
+        invoiceObligation: 'WORKING_DAYS',
+        invoiceDueOn: '2026-11-27',
+        recordedByEmployeeId: 'emp-it',
+        recordedAt: new Date('2026-11-21T08:00:00.000Z'),
+      },
+      change: {
+        id: 'chg-ts',
+        effectiveOn: '2026-11-21',
+        delta: 50,
+        reason: 'TOP_UP',
+        source: 'VENDOR_RECORD',
+        basis: 'REQUEST_ITEM',
+        requestId: REQ_1,
+        beneficiaryEmployeeId: EMP_1,
+        seatPurchaseId: ID_2,
+      },
+    });
+    Object.assign(seatLedger, { recordTierStep, notifyVendorRecorded: jest.fn().mockResolvedValue(1) });
+
+    const res = await service.purchase(actor, ID_1, {
+      purchasedOn: '2026-11-21',
+      items: [{ requestId: REQ_1, beneficiaryEmployeeId: EMP_1 }],
+      tierStepSeats: 50,
+    });
+
+    expect(recordTierStep).toHaveBeenCalledWith(tx, expect.anything(), expect.objectContaining({ tierStepSeats: 50 }));
+    expect(res.expectedAmount).toEqual({ amount: '55000000', currency: 'VND' });
   });
 });

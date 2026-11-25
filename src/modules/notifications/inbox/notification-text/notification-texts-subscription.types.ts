@@ -221,6 +221,18 @@ export const SUBSCRIPTION_TEXTS = {
         'A seat purchase on subscription {subscriptionId:name} has passed its invoice due date ({dueOn:date}). Please submit the invoice.',
     },
   },
+  SEAT_LEDGER_VENDOR_RECORDED: {
+    vi: {
+      title: 'Đã ghi nhận điều chỉnh seat theo nhà cung cấp',
+      message:
+        '{recordedByEmployeeId:name} đã ghi nhận điều chỉnh {delta} seat theo nhà cung cấp cho thuê bao {subscriptionId:name} (hiệu lực {effectiveOn:date}).',
+    },
+    en: {
+      title: 'Vendor seat ledger adjustment recorded',
+      message:
+        '{recordedByEmployeeId:name} recorded a vendor seat adjustment of {delta} seat(s) on subscription {subscriptionId:name} (effective {effectiveOn:date}).',
+    },
+  },
   IDLE_SEAT_COST_RATIO_HIGH: {
     vi: {
       title: 'Chi phí seat trống vượt ngưỡng 10 %',

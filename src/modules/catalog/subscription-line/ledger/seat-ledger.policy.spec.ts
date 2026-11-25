@@ -1,6 +1,6 @@
 import type { BusinessDate } from '../../../../core/business-date';
-import { SeatLedgerBelowOccupancyError } from '../subscription-line.errors';
-import { SeatLedgerEffectiveInClosedMonthError, SeatLedgerInvalidEntryError } from './seat-ledger.errors';
+import { SeatLedgerBelowOccupancyError, SeatLedgerEffectiveInClosedMonthError } from '../subscription-line.errors';
+import { SeatLedgerInvalidEntryError } from './seat-ledger.errors';
 import { toSeatLedgerApiException } from './seat-ledger.http-errors';
 import {
   assertManualEffectiveOn,

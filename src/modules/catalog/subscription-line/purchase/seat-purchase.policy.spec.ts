@@ -1,16 +1,21 @@
-import { SeatLedgerEffectiveInClosedMonthError } from '../ledger/seat-ledger.errors';
+import { SeatLedgerEffectiveInClosedMonthError } from '../subscription-line.errors';
 import {
   SeatPurchaseBeforePeriodError,
+  SeatPurchaseConflictingModeError,
   SeatPurchaseInFutureError,
   SeatPurchaseLineNotPurchasableError,
+  SeatPurchaseReplacementOneItemError,
   SeatPurchaseStockAvailableError,
+  SeatPurchaseTierStepOneItemError,
 } from './seat-purchase.errors';
 import {
   assertLinePurchasableForPurchase,
   assertPurchaseDateWithinBounds,
+  assertPurchaseModeValid,
   assertStockAllowsSeatPurchase,
   isSeatPurchaseInvoiceOverdue,
   seatPurchaseExpectedAmount,
+  seatPurchaseNetExpectedAmount,
   seatPurchaseRecipients,
 } from './seat-purchase.policy';
 
@@ -281,6 +286,68 @@ describe('seat-purchase.policy (W3-18)', () => {
           actor: 'it-2',
         }),
       ).toEqual(['sa-1']);
+    });
+  });
+
+  describe('W3-19 tierStepSeats & replacesFromLineId', () => {
+    it('validates mode exclusivity and single-item constraint', () => {
+      expect(() =>
+        assertPurchaseModeValid({
+          itemCount: 1,
+          tierStepSeats: 50,
+          replacesFromLineId: 'line-old',
+          targetLineId: 'line-new',
+        }),
+      ).toThrow(SeatPurchaseConflictingModeError);
+
+      expect(() => assertPurchaseModeValid({ itemCount: 2, tierStepSeats: 50, targetLineId: 'line-new' })).toThrow(
+        SeatPurchaseTierStepOneItemError,
+      );
+
+      expect(() =>
+        assertPurchaseModeValid({ itemCount: 2, replacesFromLineId: 'line-old', targetLineId: 'line-new' }),
+      ).toThrow(SeatPurchaseReplacementOneItemError);
+    });
+
+    it.each([
+      {
+        name: 'Ca 1 Zoom tier 50 on 2026-11-21 (50 x 150,000 x 22/3 = 55,000,000)',
+        lines: [
+          {
+            seats: 50,
+            monthlyUnitPriceMinor: 150_000n,
+            billingCycle: 'ANNUAL' as const,
+            renewalDate: '2027-07-01',
+            endDate: '2027-06-30',
+            purchasedOn: '2026-11-21',
+          },
+        ],
+        expected: 55_000_000n,
+      },
+      {
+        name: 'Ca 5 switch Standard 500,000 -> Premium 2,500,000 on 2026-11-21 rounds ONCE -> 14,666,667 (kills 14,666,666)',
+        lines: [
+          {
+            seats: -1,
+            monthlyUnitPriceMinor: 500_000n,
+            billingCycle: 'ANNUAL' as const,
+            renewalDate: '2027-07-01',
+            endDate: '2027-06-30',
+            purchasedOn: '2026-11-21',
+          },
+          {
+            seats: 1,
+            monthlyUnitPriceMinor: 2_500_000n,
+            billingCycle: 'ANNUAL' as const,
+            renewalDate: '2027-07-01',
+            endDate: '2027-06-30',
+            purchasedOn: '2026-11-21',
+          },
+        ],
+        expected: 14_666_667n,
+      },
+    ])('$name', ({ lines, expected }) => {
+      expect(seatPurchaseNetExpectedAmount(lines)).toBe(expected);
     });
   });
 });

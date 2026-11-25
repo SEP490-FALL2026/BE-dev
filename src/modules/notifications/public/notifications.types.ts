@@ -211,6 +211,7 @@ export const IN_APP_NOTIFICATION_CODES = [
   'SUBSCRIPTION_SEATS_REDUCED',
   'SUBSCRIPTION_SEATS_BOUGHT',
   'SEAT_PURCHASE_INVOICE_OVERDUE',
+  'SEAT_LEDGER_VENDOR_RECORDED',
   'SUBSCRIPTION_PRICE_REVIEW',
   'IT_ADMIN_HANDOVER_PENDING',
   // The IT Admin who took everything a leaving IT Admin answered for is told how many subscriptions and applications are theirs now (`QĐ-110j`, SPEC P5).

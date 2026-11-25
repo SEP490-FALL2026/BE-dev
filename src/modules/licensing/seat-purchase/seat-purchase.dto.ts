@@ -21,18 +21,32 @@ const seatPurchaseItemSchema = z.strictObject({
 
 export const seatPurchaseLineParamSchema = z.strictObject({ id: z.uuid() });
 
-export const seatPurchaseBodySchema = z.strictObject({
-  items: z
-    .array(seatPurchaseItemSchema)
-    .min(1)
-    .max(SEAT_PURCHASE_ITEMS_MAX)
-    .refine(
-      (items) => new Set(items.map((item) => `${item.requestId}:${item.beneficiaryEmployeeId}`)).size === items.length,
-      { message: 'Each (requestId, beneficiaryEmployeeId) pair may appear only once.' },
-    )
-    .meta({ description: 'Unique pending request items receiving newly bought seats.' }),
-  purchasedOn: businessDate.meta({ description: 'Business date when the seats are purchased from the vendor.' }),
-});
+export const seatPurchaseBodySchema = z
+  .strictObject({
+    items: z
+      .array(seatPurchaseItemSchema)
+      .min(1)
+      .max(SEAT_PURCHASE_ITEMS_MAX)
+      .refine(
+        (items) =>
+          new Set(items.map((item) => `${item.requestId}:${item.beneficiaryEmployeeId}`)).size === items.length,
+        { message: 'Each (requestId, beneficiaryEmployeeId) pair may appear only once.' },
+      )
+      .meta({ description: 'Unique pending request items receiving newly bought seats.' }),
+    purchasedOn: businessDate.meta({ description: 'Business date when the seats are purchased from the vendor.' }),
+    tierStepSeats: z.number().int().positive().max(10_000).optional().meta({
+      description:
+        'Optional vendor tier-step seat count (requires items.length === 1; cannot combine with replacesFromLineId).',
+    }),
+    replacesFromLineId: z.uuid().optional().meta({
+      description:
+        'Optional source subscription line whose seat is replaced in the same transaction (requires items.length === 1).',
+    }),
+  })
+  .refine((body) => !(body.tierStepSeats !== undefined && body.replacesFromLineId !== undefined), {
+    message: 'tierStepSeats and replacesFromLineId cannot be provided together.',
+    path: ['tierStepSeats'],
+  });
 
 const seatChangeItemSchema = z.strictObject({
   id: z.uuid(),

@@ -48,20 +48,23 @@ export class SeatPurchasesController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'Line cannot take purchases, beneficiary has not started yet, or pool already has free capacity for the need.',
+        'Line cannot take purchases, beneficiary has not started yet, pool already has free capacity, or source line still has occupancy.',
       examples: [
         SEAT_PURCHASE_ERROR_EXAMPLES.EMPLOYEE_NOT_STARTED,
         SEAT_PURCHASE_ERROR_EXAMPLES.LINE_NOT_PURCHASABLE,
         SEAT_PURCHASE_ERROR_EXAMPLES.STOCK_AVAILABLE,
+        SEAT_PURCHASE_ERROR_EXAMPLES.BELOW_OCCUPANCY,
       ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: 'Validation failed, effective date falls in a closed month, or items are not pending.',
+      description:
+        'Validation failed, effective date falls in a closed month, items are not pending, or tier-step requires one item.',
       examples: [
         VALIDATION_EXAMPLE,
         SEAT_PURCHASE_ERROR_EXAMPLES.EFFECTIVE_IN_CLOSED_MONTH,
         SEAT_PURCHASE_ERROR_EXAMPLES.ITEM_NOT_PENDING,
+        SEAT_PURCHASE_ERROR_EXAMPLES.TIER_STEP_ONE_ITEM,
       ],
     },
   )

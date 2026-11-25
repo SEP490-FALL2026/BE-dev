@@ -3,8 +3,7 @@ import { isCheckViolation } from '../../../../infrastructure/database/unique-vio
 import { ApiException } from '../../../../infrastructure/http/errors/api.exception';
 import { toUnavailableApiException } from '../../../../infrastructure/http/errors/service-unavailable';
 import { errorExampleOf } from '../../../../infrastructure/http/openapi-error-examples';
-import { SeatLedgerBelowOccupancyError } from '../subscription-line.errors';
-import { SeatLedgerEffectiveInClosedMonthError } from './seat-ledger.errors';
+import { SeatLedgerBelowOccupancyError, SeatLedgerEffectiveInClosedMonthError } from '../subscription-line.errors';
 
 const refuse = (status: HttpStatus, code: string, message: string, details?: Record<string, unknown>): ApiException =>
   new ApiException(status, { code, message, ...(details ? { details } : {}) });

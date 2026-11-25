@@ -63,3 +63,35 @@ export class SeatPurchaseStockAvailableError extends Error {
     this.name = 'SeatPurchaseStockAvailableError';
   }
 }
+
+/** Tier-step purchase requires exactly one pending request item (`SEAT_PURCHASE.TIER_STEP_ONE_ITEM`). */
+export class SeatPurchaseTierStepOneItemError extends Error {
+  constructor() {
+    super('A tier-step purchase must reference exactly one pending request item.');
+    this.name = 'SeatPurchaseTierStepOneItemError';
+  }
+}
+
+/** Combining tierStepSeats and replacesFromLineId in one purchase is forbidden (`VALIDATION_ERROR`). */
+export class SeatPurchaseConflictingModeError extends Error {
+  constructor() {
+    super('Cannot combine tierStepSeats and replacesFromLineId in the same seat purchase.');
+    this.name = 'SeatPurchaseConflictingModeError';
+  }
+}
+
+/** Seat-type replacement purchase requires exactly one pending request item (`VALIDATION_ERROR`). */
+export class SeatPurchaseReplacementOneItemError extends Error {
+  constructor() {
+    super('Switching seat type (replacesFromLineId) requires exactly one pending request item.');
+    this.name = 'SeatPurchaseReplacementOneItemError';
+  }
+}
+
+/** Source line and target line for seat-type switch cannot be the same line (`VALIDATION_ERROR`). */
+export class SeatPurchaseReplacementSameLineError extends Error {
+  constructor() {
+    super('replacesFromLineId must differ from the target subscription line.');
+    this.name = 'SeatPurchaseReplacementSameLineError';
+  }
+}

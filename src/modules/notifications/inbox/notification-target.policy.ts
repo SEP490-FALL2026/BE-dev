@@ -94,6 +94,7 @@ export const TARGET_BY_CODE: Readonly<Partial<Record<InAppNotificationCode, Rout
   SUBSCRIPTION_RENEWAL_OUTCOME_RECORDED: route('subscriptionRenewalGet', { id: 'renewalId' }),
   SUBSCRIPTION_SEATS_BOUGHT: route('subscriptionGet', { id: 'subscriptionId' }),
   SEAT_PURCHASE_INVOICE_OVERDUE: route('subscriptionGet', { id: 'subscriptionId' }),
+  SEAT_LEDGER_VENDOR_RECORDED: route('subscriptionGet', { id: 'subscriptionId' }),
   SUBSCRIPTION_PRICE_REVIEW: route('subscriptionGet', { id: 'subscriptionId' }),
   // The incident is also told to the person who decides spending, who may not read a subscription: the list of deadline events is open to all three recipients.
   SUBSCRIPTION_AUTO_RENEWAL_INCIDENT: route('subscriptionDeadlineEventList'),

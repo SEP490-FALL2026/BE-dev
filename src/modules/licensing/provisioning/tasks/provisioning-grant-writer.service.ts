@@ -21,7 +21,7 @@ import { SharedPoolService } from '../../shared-pool/shared-pool.service';
 import type { ProvisioningTaskRecord } from '../provisioning-task.types';
 import type { GrantInput, ProvisioningGrantPlanner } from './provisioning-grant-planner.service';
 import { ProvisioningGrantTaskService } from './provisioning-grant-task.service';
-import { claimMatchesAnswer } from './provisioning-grant.policy';
+import { claimMatchesAnswer, memberGrantEffectiveOn } from './provisioning-grant.policy';
 import { ProvisioningHolderService } from './provisioning-holder.service';
 import { ProvisioningReplacementService } from './provisioning-replacement.service';
 
@@ -171,6 +171,18 @@ export class ProvisioningGrantWriter {
     },
   ) {
     const { plan, target, today, carriesOn } = facts;
+    if (plan.provisioningType === 'K2' && target.seatCounting === 'MEMBERS' && target.subscriptionLineId) {
+      if (!carriesOn) {
+        const future = await this.seatLedger.futureMemberChanges(target.subscriptionLineId, today, tx);
+        const effectiveOn = memberGrantEffectiveOn(today, future);
+        await this.seatLedger.recordMember(tx, target.subscriptionLineId, 1, effectiveOn, {
+          recordedByEmployeeId: actor.employeeId,
+          alreadyLocked: true,
+        });
+      }
+
+      return { purchased: false as const };
+    }
     const { decision, stock } = await this.sharedPool.judgePurchase(tx, {
       planId: plan.planId,
       provisioningType: plan.provisioningType,

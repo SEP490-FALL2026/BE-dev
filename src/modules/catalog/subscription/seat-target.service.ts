@@ -55,6 +55,7 @@ const ofSubscription = (
       hasPrice: isPricedInDong(subscription),
     }),
     purchasedQuantity,
+    seatCounting: subscription.seatCounting,
     allowsMidTermReduction: subscription.allowsMidTermReduction,
   };
 };

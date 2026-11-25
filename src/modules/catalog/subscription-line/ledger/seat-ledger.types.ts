@@ -99,6 +99,18 @@ export interface RecordVendorResult {
   change: SeatChangeRecord;
 }
 
+export interface RecordTierStepInput {
+  tierStepSeats: number;
+  effectiveOn: BusinessDate;
+  note: string;
+  requestId: string;
+  beneficiaryEmployeeId: string;
+  actor: AuthenticatedPrincipal;
+  alreadyLocked?: boolean;
+  checkClosedMonth?: boolean;
+  today?: BusinessDate;
+}
+
 export interface OpenNextPeriodLineInput {
   lineId: string;
   quantity: number;

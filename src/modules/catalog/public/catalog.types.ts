@@ -44,6 +44,8 @@ export interface SeatTarget {
   missing: string[];
   /** The seats bought; null while the subscription has no quantity, and always null for a plan with no subscription. */
   purchasedQuantity: number | null;
+  /** How seats are counted for K2 subscriptions (`FIXED` vs `MEMBERS`). */
+  seatCounting?: 'FIXED' | 'MEMBERS';
   /** Whether the subscription can be cut mid-term (a flexible plan); false for a plan that has none (`QĐ-98`, R-15). */
   allowsMidTermReduction: boolean;
 }

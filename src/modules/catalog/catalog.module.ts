@@ -119,6 +119,8 @@ import { SubscriptionLineRepo } from './subscription-line/subscription-line.repo
 import { SubscriptionLineSeatsService } from './subscription-line/subscription-line-seats.service';
 import { SeatChangeQueryService } from './subscription-line/seat-change-query.service';
 import { SubscriptionLineService } from './subscription-line/subscription-line.service';
+import { SubscriptionLineCorrectionService } from './subscription-line/correction/subscription-line-correction.service';
+import { SubscriptionLineSeatsController } from './subscription-line/correction/subscription-line-seats.controller';
 import { SubscriptionLinesController } from './subscription-line/subscription-lines.controller';
 import { SubscriptionPeriodLinesService } from './subscription-line/subscription-period-lines.service';
 import { SubscriptionMultiLineService } from './subscription/lines/subscription-lines.service';
@@ -155,6 +157,7 @@ import { WorkspacesController } from './workspace/workspaces.controller';
     VendorsController,
     SubscriptionsController,
     SubscriptionLinesController,
+    SubscriptionLineSeatsController,
     SubscriptionResponsibleController,
     WorkspacesController,
     ApplicationRetirementController,
@@ -201,6 +204,7 @@ import { WorkspacesController } from './workspace/workspaces.controller';
     SubscriptionLineRepo,
     SubscriptionLineSeatsService,
     SubscriptionLineService,
+    SubscriptionLineCorrectionService,
     SeatChangeQueryService,
     SubscriptionPeriodLinesService,
     SubscriptionMultiLineService,

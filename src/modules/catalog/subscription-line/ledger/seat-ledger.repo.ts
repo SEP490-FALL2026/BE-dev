@@ -274,4 +274,28 @@ export class SeatLedgerRepo {
 
     return rows.flatMap((row) => (row.seatPurchaseId ? [row.seatPurchaseId] : []));
   }
+
+  /** Total seats already reduced (`>= 0`) pointing at `refundedSeatChangeId`. */
+  async sumRefundedFor(refundedSeatChangeId: string, tx?: DbTx): Promise<number> {
+    const sum = await (tx ?? this.prisma).seatChange.aggregate({
+      where: { refundedSeatChangeId },
+      _sum: { delta: true },
+    });
+
+    return Math.abs(sum._sum.delta ?? 0);
+  }
+
+  /** Future `MEMBER` ledger entries (`effectiveOn > afterDay`) for `lineId`, ordered chronologically. */
+  async futureMemberChanges(lineId: string, afterDay: BusinessDate, tx?: DbTx): Promise<SeatChangeRecord[]> {
+    const rows = await (tx ?? this.prisma).seatChange.findMany({
+      where: {
+        subscriptionLineId: lineId,
+        source: 'MEMBER',
+        effectiveOn: { gt: toDateColumn(afterDay) },
+      },
+      orderBy: ORDER,
+    });
+
+    return rows.map(toRecord);
+  }
 }

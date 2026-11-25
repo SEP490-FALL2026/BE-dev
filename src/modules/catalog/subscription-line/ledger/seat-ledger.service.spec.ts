@@ -4,10 +4,13 @@ import type { AuditApi } from '../../../audit/public/audit.api';
 import type { OperatingParametersApi } from '../../../operating-parameters/public/operating-parameters.api';
 import type { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import type { SeatPurchaseService } from '../purchase/seat-purchase.service';
-import { SeatLedgerBelowOccupancyError, SubscriptionLineNotFoundError } from '../subscription-line.errors';
+import {
+  SeatLedgerBelowOccupancyError,
+  SeatLedgerEffectiveInClosedMonthError,
+  SubscriptionLineNotFoundError,
+} from '../subscription-line.errors';
 import type { SubscriptionLineRepo } from '../subscription-line.repo';
 import type { SubscriptionLineRecord } from '../subscription-line.types';
-import { SeatLedgerEffectiveInClosedMonthError } from './seat-ledger.errors';
 import type { SeatLedgerRepo } from './seat-ledger.repo';
 import { SeatLedgerService } from './seat-ledger.service';
 

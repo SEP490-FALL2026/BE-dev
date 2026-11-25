@@ -23,6 +23,9 @@ interface WriterOverrides {
   lockLiveRevocation?: jest.Mock;
   endReplacedRight?: jest.Mock;
   requireActingItAdmin?: jest.Mock;
+  recordMember?: jest.Mock;
+  futureMemberChanges?: jest.Mock;
+  createFromRequest?: jest.Mock;
 }
 
 function makeWriter(overrides: WriterOverrides = {}) {
@@ -56,7 +59,7 @@ function makeWriter(overrides: WriterOverrides = {}) {
     } as unknown as ProvisioningHolderService,
     {
       assertSeatTargetUsable: jest.fn(),
-      createFromRequest: jest.fn(() => Promise.resolve({ id: 'asg-1' })),
+      createFromRequest: overrides.createFromRequest ?? jest.fn(() => Promise.resolve({ id: 'asg-1' })),
     } as unknown as AssignmentService,
     {
       lockSeatTarget:
@@ -66,6 +69,7 @@ function makeWriter(overrides: WriterOverrides = {}) {
     { get: () => ({ claimForGrant }) } as unknown as GrantRequestGateHook,
     {
       chooseLine: jest.fn(() => Promise.resolve('sub-1')),
+      grantableOf: jest.fn(() => Promise.resolve([{ subscriptionId: 'sub-slack' }])),
       judgePurchase: jest.fn(() => Promise.resolve({ decision: { purchased: false }, stock: null })),
     } as unknown as SharedPoolService,
     {
@@ -74,19 +78,13 @@ function makeWriter(overrides: WriterOverrides = {}) {
     } as unknown as ProvisioningReplacementService,
     {
       buyForItems: jest.fn(),
+      recordMember: overrides.recordMember ?? jest.fn().mockResolvedValue({ id: 'chg-m1' }),
+      futureMemberChanges: overrides.futureMemberChanges ?? jest.fn().mockResolvedValue([]),
     } as unknown as SeatLedgerApi,
   );
 }
 
-const baseInput = {
-  requestId: 'req-1',
-  beneficiaryEmployeeId: 'emp-1',
-  subscriptionId: undefined,
-  accountIdentifier: undefined,
-  responsibleEmployeeId: undefined,
-  purchase: false,
-} as never;
-
+const baseInput = { requestId: 'req-1', beneficiaryEmployeeId: 'emp-1', purchase: false } as never;
 const plannedOf = (answer: Record<string, unknown>, serviceIdentifier: string | null = null) =>
   ({
     answer,

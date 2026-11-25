@@ -234,6 +234,15 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
     'recordedByEmployeeId',
   ],
   SEAT_PURCHASE_INVOICE_OVERDUE: ['seatPurchaseId', 'subscriptionId', 'dueOn'],
+  SEAT_LEDGER_VENDOR_RECORDED: [
+    'subscriptionId',
+    'subscriptionLineId',
+    'seatChangeId',
+    'delta',
+    'effectiveOn',
+    'recordedByEmployeeId',
+    'outOfProcess',
+  ],
   SUBSCRIPTION_PRICE_REVIEW: ['subscriptionId', 'purchaseInvoiceId'],
   // What an IT Admin who leaves still answers for, once the day has come and the handover is not done (`QĐ-110j`, `R-26`).
   IT_ADMIN_HANDOVER_PENDING: ['sourceKind', 'sourceId', 'employeeId', 'dueOn'],

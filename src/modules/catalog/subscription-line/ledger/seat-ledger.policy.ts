@@ -1,9 +1,10 @@
 import { addDays, monthBoundsOf, type BusinessDate } from '../../../../core/business-date';
 import { nthWorkingDayFrom, type NonWorkingDates } from '../../../../core/working-days';
 import type { SeatInvoiceObligation } from '../purchase/seat-purchase.types';
+import { SeatLedgerEffectiveInClosedMonthError } from '../subscription-line.errors';
 
 export type LedgerBillingCycle = 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER';
-import { SeatLedgerEffectiveInClosedMonthError, SeatLedgerInvalidEntryError } from './seat-ledger.errors';
+import { SeatLedgerInvalidEntryError } from './seat-ledger.errors';
 import type { NewSeatChange } from './seat-ledger.types';
 
 /** Default working days before a normal seat-purchase invoice is due. */

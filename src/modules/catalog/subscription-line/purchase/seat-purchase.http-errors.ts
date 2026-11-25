@@ -4,12 +4,16 @@ import { errorExampleOf } from '../../../../infrastructure/http/openapi-error-ex
 import { EmployeeNotStartedError } from '../../../organization/public/organization.errors';
 import {
   SeatPurchaseBeforePeriodError,
+  SeatPurchaseConflictingModeError,
   SeatPurchaseInFutureError,
   SeatPurchaseItemNotPendingError,
   SeatPurchaseLineNotFoundError,
   SeatPurchaseLineNotPurchasableError,
   SeatPurchaseNotInChargeError,
+  SeatPurchaseReplacementOneItemError,
+  SeatPurchaseReplacementSameLineError,
   SeatPurchaseStockAvailableError,
+  SeatPurchaseTierStepOneItemError,
 } from './seat-purchase.errors';
 
 const refuse = (status: HttpStatus, code: string, message: string, details?: Record<string, unknown>): ApiException =>
@@ -43,6 +47,24 @@ export function toSeatPurchaseApiException(error: unknown): unknown {
       items: error.items,
     });
   }
+  if (error instanceof SeatPurchaseTierStepOneItemError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'SEAT_PURCHASE.TIER_STEP_ONE_ITEM', error.message);
+  }
+  if (error instanceof SeatPurchaseConflictingModeError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'VALIDATION_ERROR', error.message, {
+      issues: [{ code: 'custom', path: 'tierStepSeats' }],
+    });
+  }
+  if (error instanceof SeatPurchaseReplacementOneItemError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'VALIDATION_ERROR', error.message, {
+      issues: [{ code: 'custom', path: 'items' }],
+    });
+  }
+  if (error instanceof SeatPurchaseReplacementSameLineError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'VALIDATION_ERROR', error.message, {
+      issues: [{ code: 'custom', path: 'replacesFromLineId' }],
+    });
+  }
 
   return error;
 }
@@ -58,5 +80,6 @@ export const SEAT_PURCHASE_ONLY_ERROR_EXAMPLES = {
   LINE_NOT_PURCHASABLE: example(new SeatPurchaseLineNotPurchasableError('PERIOD_NOT_ACTIVE')),
   STOCK_AVAILABLE: example(new SeatPurchaseStockAvailableError(1)),
   ITEM_NOT_PENDING: example(new SeatPurchaseItemNotPendingError([PLACEHOLDER_ITEM])),
+  TIER_STEP_ONE_ITEM: example(new SeatPurchaseTierStepOneItemError()),
   DATE_IN_FUTURE: example(new SeatPurchaseInFutureError('2026-01-01')),
 } as const;

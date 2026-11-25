@@ -1,5 +1,7 @@
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
+import type { SeatLedgerApi } from '../../../catalog/public/seat-ledger.api';
 import { ProvisioningNotInChargeError } from '../provisioning.errors';
+import { RevocationAftermath } from './revocation-aftermath.service';
 import { RevocationCompletionService } from './revocation-completion.service';
 
 const ACTOR: AuthenticatedPrincipal = {
@@ -34,5 +36,75 @@ describe('RevocationCompletionService (delegates acting IT Admin check via Provi
     ).rejects.toBeInstanceOf(ProvisioningNotInChargeError);
 
     expect(work).toHaveBeenCalledTimes(2);
+  });
+
+  it('Ca 6: records MEMBER REDUCE -1 effective on next payment date (2026-12-05) when completing K2 MEMBERS revocation on 2026-11-10', async () => {
+    const tx = {} as never;
+    const recordMember = jest.fn().mockResolvedValue({ id: 'chg-reduce' });
+    const seatLedger = {
+      findLineWithPeriodByPlan: jest.fn().mockResolvedValue({
+        line: { id: 'line-slack', ledgerOpenedOn: '2026-11-01', closedOn: null },
+        plan: { id: 'plan-slack', name: 'Slack', provisioningType: 'K2' },
+        period: {
+          id: 'sub-slack',
+          seatCounting: 'MEMBERS',
+          billingCycle: 'MONTHLY',
+          renewalDate: '2026-11-05',
+          endDate: null,
+        },
+      }),
+      recordMember,
+    } as unknown as SeatLedgerApi;
+    const aftermath = new RevocationAftermath(
+      { holdsKey: jest.fn(), takeBack: jest.fn() } as never,
+      { tell: jest.fn().mockResolvedValue(0) } as never,
+      { plan: jest.fn().mockResolvedValue(null), record: jest.fn() } as never,
+      seatLedger,
+    );
+    const service = new RevocationCompletionService(
+      { markRevocationCompleted: jest.fn() } as never,
+      {
+        work: jest.fn((_actor, _id, action: { write: (ctx: unknown) => Promise<unknown> }) =>
+          action
+            .write({
+              tx,
+              task: {
+                id: 'task-1',
+                assignmentId: 'asg-1',
+                assignment: { employeeId: 'emp-1', planId: 'plan-slack', subscriptionId: 'sub-slack' },
+              },
+              organizationId: 'org-1',
+              now: new Date('2026-11-10T08:00:00.000Z'),
+            })
+            .then(() => ({ id: 'task-1' })),
+        ),
+      } as never,
+      { views: jest.fn().mockResolvedValue([{ id: 'task-1' }]) } as never,
+      {
+        lock: jest.fn().mockResolvedValue({
+          id: 'asg-1',
+          subscriptionId: 'sub-slack',
+          effectiveFrom: '2026-11-01',
+        }),
+        end: jest.fn(),
+      } as never,
+      { businessToday: jest.fn().mockResolvedValue('2026-11-10') } as never,
+      { emit: jest.fn() } as never,
+      aftermath,
+      {
+        planOf: jest.fn().mockResolvedValue({ provisioningType: 'K2' }),
+        completedOf: jest.fn().mockResolvedValue({}),
+      } as never,
+    );
+
+    await service.complete(ACTOR, 'task-1', { completion: 'ACCOUNT_REMOVED', evidence: 'done' });
+
+    expect(recordMember).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({ id: 'line-slack' }),
+      -1,
+      '2026-12-05',
+      expect.objectContaining({ recordedByEmployeeId: ACTOR.employeeId, alreadyLocked: true }),
+    );
   });
 });

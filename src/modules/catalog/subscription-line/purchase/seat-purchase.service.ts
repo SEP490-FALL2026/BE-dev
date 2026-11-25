@@ -18,6 +18,20 @@ export interface NotifySeatsBoughtInput {
   actor: AuthenticatedPrincipal;
 }
 
+export interface NotifyVendorRecordedInput {
+  organizationId: string;
+  subscriptionId: string;
+  subscriptionLineId: string;
+  seatChangeId: string;
+  delta: number;
+  effectiveOn: BusinessDate;
+  outOfProcess: boolean;
+  responsibleItAdminEmployeeId: string | null;
+  notifyR1: boolean;
+  notifyFinance: boolean;
+  actor: AuthenticatedPrincipal;
+}
+
 /** Capability-internal entry for `subscription-line/purchase/` used by ledger writes, views, and purchase notifications. */
 @Injectable()
 export class SeatPurchaseService {
@@ -78,6 +92,52 @@ export class SeatPurchaseService {
           recordedByEmployeeId: input.actor.employeeId,
         },
         eventKey: `SUBSCRIPTION_SEATS_BOUGHT:${input.seatPurchaseId}`,
+      });
+      if (sent) told += 1;
+    }
+
+    return told;
+  }
+
+  /** Sends `SEAT_LEDGER_VENDOR_RECORDED` to Finance and/or R1 (`W3-19`), deduplicated and excluding `actor`. */
+  async notifyVendorRecorded(tx: DbTx, input: NotifyVendorRecordedInput): Promise<number> {
+    const recipients = new Set<string>();
+    if (input.notifyR1) {
+      const responsible = input.responsibleItAdminEmployeeId;
+      const responsibleUsable =
+        responsible !== null && (await this.identity.findUsableItAdminEmployeeIds([responsible], tx)).has(responsible);
+      const superAdmin = responsibleUsable ? null : await this.identity.findUsableSuperAdminEmployeeId(tx);
+      for (const id of seatPurchaseRecipients({
+        responsible,
+        responsibleUsable,
+        superAdmin,
+        actor: input.actor.employeeId,
+      })) {
+        recipients.add(id);
+      }
+    }
+    if (input.notifyFinance) {
+      const finance = await this.identity.findUsableFinanceEmployeeId(tx);
+      if (finance !== null && finance !== input.actor.employeeId) recipients.add(finance);
+    }
+
+    let told = 0;
+    for (const recipientEmployeeId of recipients) {
+      const sent = await this.notifications.notifyInApp(tx, {
+        organizationId: input.organizationId,
+        recipientEmployeeId,
+        code: 'SEAT_LEDGER_VENDOR_RECORDED',
+        subject: { type: 'SUBSCRIPTION', id: input.subscriptionId },
+        params: {
+          subscriptionId: input.subscriptionId,
+          subscriptionLineId: input.subscriptionLineId,
+          seatChangeId: input.seatChangeId,
+          delta: input.delta,
+          effectiveOn: input.effectiveOn,
+          recordedByEmployeeId: input.actor.employeeId,
+          outOfProcess: input.outOfProcess,
+        },
+        eventKey: `SEAT_LEDGER_VENDOR_RECORDED:${input.seatChangeId}`,
       });
       if (sent) told += 1;
     }

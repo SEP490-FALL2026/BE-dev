@@ -10,12 +10,17 @@ import type {
   OpenNextPeriodInput,
   OpenNextPeriodLineInput,
   RecordMemberOptions,
+  RecordTierStepInput,
   RecordVendorInput,
   RecordVendorResult,
   SeatChangeRecord,
   SeatPurchaseItemInput,
 } from '../subscription-line/ledger/seat-ledger.types';
-import { SeatLedgerEffectiveInClosedMonthError } from '../subscription-line/ledger/seat-ledger.errors';
+import {
+  SeatLedgerBelowOccupancyError,
+  SeatLedgerEffectiveInClosedMonthError,
+  SubscriptionLineClosedError,
+} from '../subscription-line/subscription-line.errors';
 import {
   SEAT_LEDGER_ERROR_EXAMPLES,
   toSeatLedgerApiException,
@@ -23,12 +28,16 @@ import {
 import { SeatLedgerService } from '../subscription-line/ledger/seat-ledger.service';
 import {
   SeatPurchaseBeforePeriodError,
+  SeatPurchaseConflictingModeError,
   SeatPurchaseInFutureError,
   SeatPurchaseItemNotPendingError,
   SeatPurchaseLineNotFoundError,
   SeatPurchaseLineNotPurchasableError,
   SeatPurchaseNotInChargeError,
+  SeatPurchaseReplacementOneItemError,
+  SeatPurchaseReplacementSameLineError,
   SeatPurchaseStockAvailableError,
+  SeatPurchaseTierStepOneItemError,
   type SeatPurchaseRefItem,
 } from '../subscription-line/purchase/seat-purchase.errors';
 import {
@@ -38,12 +47,19 @@ import {
 import {
   assertLinePurchasableForPurchase,
   assertPurchaseDateWithinBounds,
+  assertPurchaseModeValid,
   assertStockAllowsSeatPurchase,
   isSeatPurchaseInvoiceOverdue,
   overduePurchaseInvoiceRecipients,
   seatPurchaseExpectedAmount,
+  seatPurchaseNetExpectedAmount,
 } from '../subscription-line/purchase/seat-purchase.policy';
-import { SeatPurchaseService, type NotifySeatsBoughtInput } from '../subscription-line/purchase/seat-purchase.service';
+import type { SignedExpectedLine } from '../subscription-line/purchase/seat-purchase.policy';
+import {
+  SeatPurchaseService,
+  type NotifySeatsBoughtInput,
+  type NotifyVendorRecordedInput,
+} from '../subscription-line/purchase/seat-purchase.service';
 import type {
   SeatInvoiceObligation,
   SeatPurchaseKind,
@@ -60,7 +76,9 @@ export type {
   OpenNextPeriodInput,
   OpenNextPeriodLineInput,
   RecordMemberOptions,
+  RecordTierStepInput,
   RecordVendorInput,
+  SignedExpectedLine,
   RecordVendorResult,
   SeatChangeRecord,
   SeatInvoiceObligation,
@@ -72,6 +90,7 @@ export type {
 
 export const SEAT_PURCHASE_ERROR_EXAMPLES = {
   ...SEAT_PURCHASE_ONLY_ERROR_EXAMPLES,
+  BELOW_OCCUPANCY: SEAT_LEDGER_ERROR_EXAMPLES.BELOW_OCCUPANCY,
   EFFECTIVE_IN_CLOSED_MONTH: SEAT_LEDGER_ERROR_EXAMPLES.EFFECTIVE_IN_CLOSED_MONTH,
 } as const;
 
@@ -80,20 +99,28 @@ export function toSeatPurchaseApiException(error: unknown): unknown {
 }
 
 export {
+  SeatLedgerBelowOccupancyError,
   SeatLedgerEffectiveInClosedMonthError,
+  SubscriptionLineClosedError,
   SeatPurchaseBeforePeriodError,
+  SeatPurchaseConflictingModeError,
   SeatPurchaseInFutureError,
   SeatPurchaseItemNotPendingError,
   SeatPurchaseLineNotFoundError,
   SeatPurchaseLineNotPurchasableError,
   SeatPurchaseNotInChargeError,
+  SeatPurchaseReplacementOneItemError,
+  SeatPurchaseReplacementSameLineError,
   SeatPurchaseStockAvailableError,
+  SeatPurchaseTierStepOneItemError,
   assertLinePurchasableForPurchase,
   assertPurchaseDateWithinBounds,
+  assertPurchaseModeValid,
   assertStockAllowsSeatPurchase,
   isSeatPurchaseInvoiceOverdue,
   overduePurchaseInvoiceRecipients,
   seatPurchaseExpectedAmount,
+  seatPurchaseNetExpectedAmount,
 };
 
 /**
@@ -125,6 +152,10 @@ export class SeatLedgerApi {
     return this.ledger.recordVendor(tx, line, input);
   }
 
+  recordTierStep(tx: DbTx, line: LineTargetRef, input: RecordTierStepInput): Promise<RecordVendorResult> {
+    return this.ledger.recordTierStep(tx, line, input);
+  }
+
   openNextPeriod(tx: DbTx, input: OpenNextPeriodInput): Promise<SeatChangeRecord[]> {
     return this.ledger.openNextPeriod(tx, input);
   }
@@ -150,6 +181,18 @@ export class SeatLedgerApi {
 
   findWithPurchaseContext(lineId: string, tx?: DbTx) {
     return this.ledger.findWithPurchaseContext(lineId, tx);
+  }
+
+  findLineWithPeriodByPlan(subscriptionId: string, planId: string, tx?: DbTx) {
+    return this.ledger.findLineWithPeriodByPlan(subscriptionId, planId, tx);
+  }
+
+  futureMemberChanges(lineId: string, afterDay: BusinessDate, tx?: DbTx) {
+    return this.ledger.futureMemberChanges(lineId, afterDay, tx);
+  }
+
+  lockPeriodsAndLines(tx: DbTx, subscriptionIds: readonly string[], lineIds: readonly string[]) {
+    return this.ledger.lockPeriodsAndLines(tx, subscriptionIds, lineIds);
   }
 
   findLinePeriodIds(lineIds: readonly string[], tx?: DbTx): Promise<Map<string, string>> {
@@ -178,6 +221,10 @@ export class SeatLedgerApi {
 
   notifySeatsBought(tx: DbTx, input: NotifySeatsBoughtInput): Promise<number> {
     return this.purchases.notifySeatsBought(tx, input);
+  }
+
+  notifyVendorRecorded(tx: DbTx, input: NotifyVendorRecordedInput): Promise<number> {
+    return this.purchases.notifyVendorRecorded(tx, input);
   }
 
   findSeatPurchase(id: string, tx?: DbTx): Promise<SeatPurchaseRecord | null> {

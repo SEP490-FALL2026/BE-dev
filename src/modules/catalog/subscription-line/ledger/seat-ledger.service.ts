@@ -30,6 +30,7 @@ import type {
   OpenLinesInput,
   OpenNextPeriodInput,
   RecordMemberOptions,
+  RecordTierStepInput,
   RecordVendorInput,
   RecordVendorResult,
   SeatChangeRecord,
@@ -172,6 +173,33 @@ export class SeatLedgerService {
     return { purchase, change };
   }
 
+  /**
+   * Records a `TIER_STEP` purchase (`MUA-xxxxxx`), a single `VENDOR_RECORD` / `TOP_UP` ledger row (`+tierStepSeats`),
+   * increments `subscription_lines.minimum_seats`, and writes the `SEAT_PURCHASE.RECORDED` audit event.
+   */
+  async recordTierStep(tx: DbTx, lineRef: LineTargetRef, input: RecordTierStepInput): Promise<RecordVendorResult> {
+    const locked = await this.resolveLockedLine(tx, lineRef, input.alreadyLocked);
+    const result = await this.recordVendor(tx, locked, {
+      delta: input.tierStepSeats,
+      effectiveOn: input.effectiveOn,
+      note: input.note,
+      actor: input.actor,
+      requestId: input.requestId,
+      beneficiaryEmployeeId: input.beneficiaryEmployeeId,
+      tierStep: true,
+      alreadyLocked: true,
+      checkClosedMonth: input.checkClosedMonth,
+      today: input.today,
+    });
+    const nextMinimumSeats = (locked.minimumSeats ?? 0) + input.tierStepSeats;
+    await this.lines.update(tx, locked.id, { minimumSeats: nextMinimumSeats });
+    if (result.purchase) {
+      await this.auditPurchase(tx, input.actor, locked.organizationId, result.purchase);
+    }
+
+    return result;
+  }
+
   /** Opens the ledger of renewal lines for a next period (`ADJUSTMENT` / `RENEWAL`). */
   async openNextPeriod(tx: DbTx, input: OpenNextPeriodInput): Promise<SeatChangeRecord[]> {
     const ordered = [...input.lines].sort((a, b) => a.lineId.localeCompare(b.lineId));
@@ -264,6 +292,33 @@ export class SeatLedgerService {
   /** Context of a line and its parent subscription period for seat purchase route checks. */
   findWithPurchaseContext(lineId: string, tx?: DbTx) {
     return this.lines.findWithPurchaseContext(lineId, tx);
+  }
+
+  findLineWithPeriodByPlan(subscriptionId: string, planId: string, tx?: DbTx) {
+    return this.lines.findLineWithPeriodByPlan(subscriptionId, planId, tx);
+  }
+
+  futureMemberChanges(lineId: string, afterDay: BusinessDate, tx?: DbTx) {
+    return this.ledger.futureMemberChanges(lineId, afterDay, tx);
+  }
+
+  findChange(id: string, tx?: DbTx): Promise<SeatChangeRecord | null> {
+    return this.ledger.find(id, tx);
+  }
+
+  sumRefundedFor(refundedSeatChangeId: string, tx?: DbTx): Promise<number> {
+    return this.ledger.sumRefundedFor(refundedSeatChangeId, tx);
+  }
+
+  /** Locks multiple periods (`ORDER BY id`, tier 6) then multiple lines (`ORDER BY id`, tier 6c). */
+  async lockPeriodsAndLines(
+    tx: DbTx,
+    subscriptionIds: readonly string[],
+    lineIds: readonly string[],
+  ): Promise<SubscriptionLineRecord[]> {
+    await this.lines.lockPeriods(tx, subscriptionIds);
+
+    return this.lines.lockMany(tx, lineIds);
   }
 
   findLinePeriodIds(lineIds: readonly string[], tx?: DbTx): Promise<Map<string, string>> {

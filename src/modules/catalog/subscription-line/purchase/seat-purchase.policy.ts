@@ -1,12 +1,22 @@
 import { addDays, type BusinessDate } from '../../../../core/business-date';
-import { nextBillingBoundary, proratedSeatAmount, type BillingCycleKind } from '../../../../core/seat-month-cost';
+import {
+  coverFraction,
+  nextBillingBoundary,
+  proratedSeatAmount,
+  roundHalfAway,
+  type BillingCycleKind,
+} from '../../../../core/seat-month-cost';
 import { assertManualEffectiveOn } from '../ledger/seat-ledger.policy';
 import type { SubscriptionLineRecord } from '../subscription-line.types';
 import {
   SeatPurchaseBeforePeriodError,
+  SeatPurchaseConflictingModeError,
   SeatPurchaseInFutureError,
   SeatPurchaseLineNotPurchasableError,
+  SeatPurchaseReplacementOneItemError,
+  SeatPurchaseReplacementSameLineError,
   SeatPurchaseStockAvailableError,
+  SeatPurchaseTierStepOneItemError,
 } from './seat-purchase.errors';
 
 export interface LinePurchasabilityInput {
@@ -155,4 +165,73 @@ export function seatPurchasePeriodCutoff(
   const boundary = nextBillingBoundary({ billingCycle, renewalDate, endDate, fromDate: purchasedOn });
 
   return boundary === null ? null : addDays(boundary, -1);
+}
+
+/** Validates optional tier-step and seat-type-switch modes (`W3-19`): mutually exclusive, each requires 1 item. */
+export function assertPurchaseModeValid(input: {
+  itemCount: number;
+  tierStepSeats?: number;
+  replacesFromLineId?: string;
+  targetLineId: string;
+}): void {
+  if (input.tierStepSeats !== undefined && input.replacesFromLineId !== undefined) {
+    throw new SeatPurchaseConflictingModeError();
+  }
+  if (input.tierStepSeats !== undefined && input.itemCount !== 1) {
+    throw new SeatPurchaseTierStepOneItemError();
+  }
+  if (input.replacesFromLineId !== undefined) {
+    if (input.itemCount !== 1) throw new SeatPurchaseReplacementOneItemError();
+    if (input.replacesFromLineId === input.targetLineId) throw new SeatPurchaseReplacementSameLineError();
+  }
+}
+
+function gcdBig(a: bigint, b: bigint): bigint {
+  let x = a < 0n ? -a : a;
+  let y = b < 0n ? -b : b;
+  while (y !== 0n) {
+    const t = x % y;
+    x = y;
+    y = t;
+  }
+
+  return x === 0n ? 1n : x;
+}
+
+export interface SignedExpectedLine {
+  seats: number;
+  monthlyUnitPriceMinor: bigint;
+  billingCycle: BillingCycleKind | null;
+  renewalDate: BusinessDate | null;
+  endDate: BusinessDate | null;
+  purchasedOn: BusinessDate;
+}
+
+/**
+ * Expected invoice amount across signed lines (`W3-19` switch & tier step): sums exact rationals
+ * `seats * monthly * cover(purchasedOn, R - 1)` and performs ONE `roundHalfAway` on the net total.
+ */
+export function seatPurchaseNetExpectedAmount(lines: readonly SignedExpectedLine[]): bigint | null {
+  if (lines.length === 0) return 0n;
+  let totalNum = 0n;
+  let totalDen = 1n;
+  for (const line of lines) {
+    const boundary = nextBillingBoundary({
+      billingCycle: line.billingCycle,
+      renewalDate: line.renewalDate,
+      endDate: line.endDate,
+      fromDate: line.purchasedOn,
+    });
+    if (boundary === null) return null;
+    if (line.seats === 0 || line.purchasedOn >= boundary) continue;
+    const frac = coverFraction(line.purchasedOn, addDays(boundary, -1));
+    const termNum = BigInt(line.seats) * line.monthlyUnitPriceMinor * frac.num;
+    const num = totalNum * frac.den + termNum * totalDen;
+    const den = totalDen * frac.den;
+    const g = gcdBig(num, den);
+    totalNum = num / g;
+    totalDen = den / g;
+  }
+
+  return roundHalfAway(totalNum, totalDen);
 }

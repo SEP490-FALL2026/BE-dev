@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../../core/business-date';
+import { nextBillingBoundary } from '../../../../core/seat-month-cost';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
+import { SeatLedgerApi } from '../../../catalog/public/seat-ledger.api';
 import { LicenseKeyAssignmentService } from '../../license-key/license-key-assignment.service';
 import type { AccessState, ProvisioningKind } from '../../public/licensing.types';
 import type { K1ChecklistPlan } from '../k1-checklist/provisioning-k1-checklist.policy';
@@ -23,6 +25,7 @@ export class RevocationAftermath {
     private readonly keys: LicenseKeyAssignmentService,
     private readonly leaverAlert: RevocationLeaverAlert,
     private readonly checklists: ProvisioningK1Checklist,
+    private readonly seatLedger: SeatLedgerApi,
   ) {}
 
   /** Whether the seat holds a key (a K4 seat granted before the key pool holds none), its row locked until commit. */
@@ -79,7 +82,38 @@ export class RevocationAftermath {
       accessUntil: input.accessUntil,
       today: input.today,
     });
+    await this.recordMemberReduction(tx, actor, input.task, input.today);
 
     return { licenseKeyId: taken?.licenseKeyId ?? null };
+  }
+
+  /** For `K2` `MEMBERS` revocations, records `MEMBER` `REDUCE -1` effective on the next monthly payment date (`W3-19`). */
+  private async recordMemberReduction(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    task: ProvisioningTaskRecord,
+    today: BusinessDate,
+  ): Promise<void> {
+    if (!task.assignment.subscriptionId) return;
+    const context = await this.seatLedger.findLineWithPeriodByPlan(
+      task.assignment.subscriptionId,
+      task.assignment.planId,
+      tx,
+    );
+    if (!context || context.plan.provisioningType !== 'K2' || context.period.seatCounting !== 'MEMBERS') return;
+    if (context.line.ledgerOpenedOn === null) return;
+    const nextPaymentDate = nextBillingBoundary({
+      billingCycle: 'MONTHLY',
+      renewalDate: context.period.renewalDate,
+      endDate: context.period.endDate,
+      fromDate: today,
+    });
+    if (nextPaymentDate === null || nextPaymentDate < context.line.ledgerOpenedOn) return;
+    if (context.line.closedOn !== null && nextPaymentDate > context.line.closedOn) return;
+
+    await this.seatLedger.recordMember(tx, context.line, -1, nextPaymentDate, {
+      recordedByEmployeeId: actor.employeeId,
+      alreadyLocked: true,
+    });
   }
 }

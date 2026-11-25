@@ -23,4 +23,7 @@ export const API_COVERAGE_WAVE3_TECH: readonly string[] = [
   'GET /api/v1/subscription-lines/{id}/seat-changes',
   // W3-18: batch seat purchases on a subscription line.
   'POST /api/v1/subscription-lines/{id}/purchases',
+  // W3-19: vendor seat corrections and mid-term seat reductions on a subscription line.
+  'POST /api/v1/subscription-lines/{id}/seat-corrections',
+  'POST /api/v1/subscription-lines/{id}/seat-reductions',
 ];

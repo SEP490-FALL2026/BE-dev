@@ -1,3 +1,5 @@
+import type { BusinessDate } from '../../../core/business-date';
+
 /** The workspace already has a live line of this plan (C1, `QĐ-116ag`): the seats of one plan in one workspace are held in one subscription. */
 export class SubscriptionLineLiveTakenError extends Error {
   constructor() {
@@ -130,5 +132,13 @@ export class SubscriptionLineUpdateEmptyError extends Error {
   constructor() {
     super('Provide monthlyUnitPrice or minimumSeats when updating a subscription line.');
     this.name = 'SubscriptionLineUpdateEmptyError';
+  }
+}
+
+/** Manual ledger entry effective date falls in a month before the current business month (`SEAT_LEDGER.EFFECTIVE_IN_CLOSED_MONTH`). */
+export class SeatLedgerEffectiveInClosedMonthError extends Error {
+  constructor(readonly earliestOn: BusinessDate) {
+    super(`The effective date cannot be before the start of the current month (${earliestOn}).`);
+    this.name = 'SeatLedgerEffectiveInClosedMonthError';
   }
 }

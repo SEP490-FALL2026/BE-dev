@@ -120,12 +120,12 @@ export class SubscriptionLineRepo {
     return row ? { billingCycle: row.subscription.billingCycle, invoicedLater: row.subscription.invoicedLater } : null;
   }
 
-  /** Full context of a subscription line needed for seat purchase checks & calculations; null when line not found. */
+  /** Full context of a subscription line needed for seat purchase & correction checks; null when line not found. */
   async findWithPurchaseContext(lineId: string, tx?: DbTx) {
     const row = await (tx ?? this.prisma).subscriptionLine.findUnique({
       where: { id: lineId },
       include: {
-        plan: { select: { id: true, provisioningType: true } },
+        plan: { select: { id: true, name: true, provisioningType: true } },
         subscription: {
           select: {
             id: true,
@@ -134,6 +134,8 @@ export class SubscriptionLineRepo {
             kind: true,
             status: true,
             seatCounting: true,
+            allowsMidTermReduction: true,
+            commitmentTermMonths: true,
             billingCycle: true,
             invoicedLater: true,
             startDate: true,
@@ -148,7 +150,7 @@ export class SubscriptionLineRepo {
 
     return {
       line: toRecord(row),
-      plan: { id: row.plan.id, provisioningType: row.plan.provisioningType },
+      plan: { id: row.plan.id, name: row.plan.name, provisioningType: row.plan.provisioningType },
       period: {
         id: row.subscription.id,
         organizationId: row.subscription.organizationId,
@@ -156,6 +158,8 @@ export class SubscriptionLineRepo {
         kind: row.subscription.kind,
         status: row.subscription.status,
         seatCounting: row.subscription.seatCounting,
+        allowsMidTermReduction: row.subscription.allowsMidTermReduction,
+        commitmentTermMonths: row.subscription.commitmentTermMonths,
         billingCycle: row.subscription.billingCycle,
         invoicedLater: row.subscription.invoicedLater,
         startDate: row.subscription.startDate ? fromDateColumn(row.subscription.startDate) : null,
@@ -164,6 +168,31 @@ export class SubscriptionLineRepo {
         responsibleItAdminEmployeeId: row.subscription.responsibleItAdminEmployeeId,
       },
     };
+  }
+
+  /** Finds a line by `(subscriptionId, planId)` and loads its purchase/period context. */
+  async findLineWithPeriodByPlan(subscriptionId: string, planId: string, tx?: DbTx) {
+    const found = await this.findOfPlan(subscriptionId, planId, tx);
+
+    return found ? this.findWithPurchaseContext(found.id, tx) : null;
+  }
+
+  /** Locks multiple subscription periods (`ORDER BY id FOR UPDATE`, tier 6) in one statement. */
+  async lockPeriods(tx: DbTx, subscriptionIds: readonly string[]): Promise<void> {
+    const ids = [...new Set(subscriptionIds)].sort();
+    if (ids.length === 0) return;
+    await tx.$queryRaw<{ id: string }[]>`
+      SELECT id FROM subscriptions WHERE id = ANY(${ids}::uuid[]) ORDER BY id FOR UPDATE`;
+  }
+
+  /** Locks multiple subscription lines (`ORDER BY id FOR UPDATE`, tier 6c) in one statement. */
+  async lockMany(tx: DbTx, lineIds: readonly string[]): Promise<SubscriptionLineRecord[]> {
+    const ids = [...new Set(lineIds)].sort();
+    if (ids.length === 0) return [];
+    await tx.$queryRaw<{ id: string }[]>`
+      SELECT id FROM subscription_lines WHERE id = ANY(${ids}::uuid[]) ORDER BY id FOR UPDATE`;
+
+    return this.ofIds(ids, tx);
   }
 
   /** Batch read of line ledger opening dates and parent period fallback quantities for `seatsOnDays`. */
