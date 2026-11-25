@@ -153,6 +153,7 @@ export class BudgetReviewQueryService {
       reserve: money(row.reserveMinor),
       spent: money(row.spentMinor),
       spentAfterMonth: money(row.spentAfterMonthMinor),
+      priorYearReleased: money(row.priorYearReleasedMinor),
       changedAfterSnapshot: money((now.get(heldKey(row.costCenterId, period.year)) ?? 0n) - row.spentMinor),
       committed: money(row.committedMinor),
       pendingSpend: money(row.pendingSpendMinor),

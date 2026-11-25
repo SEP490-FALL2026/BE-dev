@@ -1,3 +1,5 @@
+import type { BusinessDate } from '../../../core/business-date';
+
 /** The current budget of a Cost Center and a year, as the check of a request reads it (`US-06-12`). */
 export interface YearBudgetFacts {
   versionId: string;
@@ -18,6 +20,16 @@ export interface YearBudgetFacts {
   spentMinor: bigint;
 }
 
+export interface MonthSliceInput {
+  month: BusinessDate;
+  seatCount: number;
+}
+
+export interface MonthReleaseInput {
+  month: BusinessDate;
+  amountMinor: bigint;
+}
+
 /** What a request holds against the budget of a Cost Center: one amount for each year its binding payments fall in. */
 export interface CommitmentHoldInput {
   organizationId: string;
@@ -34,6 +46,8 @@ export interface CommitmentHoldInput {
    * for a price that is not by the month (a one-time price), whose commitment is never released by day.
    */
   seatMonthlyMinor?: bigint | null;
+  /** Monthly seat counts for K2 commitments (`W3-07`); omitted or empty for K1/K4. */
+  months?: readonly MonthSliceInput[];
 }
 
 /**
@@ -54,6 +68,8 @@ export interface YearStartHoldInput {
     amountMinor: bigint;
     /** What one seat costs a month, kept for the release by day of a later slice. */
     seatMonthlyMinor: bigint;
+    /** Monthly seat counts for K2 commitments (`W3-07`); omitted or empty for K1/K4. */
+    months?: readonly MonthSliceInput[];
   }[];
 }
 
@@ -96,9 +112,10 @@ export interface CommitmentReleaseInput {
   reason: CommitmentReleaseReason;
   /**
    * Absent: everything still held goes back, and the part that already became an expense stays. Present: these amounts go
-   * back, one for each year named, which is how a share, or what is not yet spent, is released.
+   * back, one for each year named, which is how a share, or what is not yet spent, is released. When `months` is present on
+   * a K2 monthly-sliced commitment, the release spreads per month and caps each month at its remaining held amount.
    */
-  amounts?: readonly { year: number; amountMinor: bigint }[];
+  amounts?: readonly { year: number; amountMinor: bigint; months?: readonly MonthReleaseInput[] }[];
   /**
    * What caused it, kept on the release (`revocationTask:<id>`, `grantTask:<id>`): a commitment that already gave money back for the same
    * reason and reference gives nothing again, so the event is released once whatever repeats it.
@@ -118,6 +135,8 @@ export interface SeatCommitment {
   origin: 'APPROVAL' | 'YEAR_START';
   seatMonthlyMinor: bigint | null;
   heldMinor: bigint;
+  /** Monthly slice dates (`YYYY-MM-01`) when this commitment is monthly-sliced (K2); empty/absent otherwise. */
+  months?: readonly BusinessDate[];
   /**
    * The references of the releases this commitment already gave the day a transfer took effect (reason `TRANSFER_EFFECTIVE`,
    * `transfer:<transferId>:assignment:<assignmentId>`), read from its ledger under the same lock: what tells the release by day of a right

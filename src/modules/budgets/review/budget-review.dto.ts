@@ -107,6 +107,10 @@ const lineSchema = z.strictObject({
     description:
       'What was already recorded for the months after the one closed when it was closed: spent, and it took commitments down, so the forecast and what is left count it and the pace does not.',
   }),
+  priorYearReleased: moneyView.meta({
+    description:
+      'What was released from prior-year seat-month commitments at year end or December month end, shown on the January review.',
+  }),
   changedAfterSnapshot: moneyView.meta({
     description:
       'What the spent of the month closed is now over what the picture kept: an invoice that came late for a month already closed, or a seat-month charged again. The picture does not move; this is the change after it (negative when something was given back).',

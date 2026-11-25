@@ -280,4 +280,32 @@ export class CommitmentMonthRepo {
       unsettledMonths: Number(row?.unsettled_months ?? '0'),
     };
   }
+
+  /** Years strictly before `beforeYear` that still have unsettled monthly slices of HELD commitments. */
+  async listUnsettledYearsBefore(organizationId: string, beforeYear: number, tx?: DbTx): Promise<number[]> {
+    const rows = await (tx ?? this.prisma).$queryRaw<{ year: number }[]>`
+      SELECT DISTINCT c.year::int AS year
+        FROM budget_commitment_months m
+        JOIN budget_commitments c ON c.id = m.commitment_id
+       WHERE c.organization_id = ${organizationId}::uuid
+         AND c.state = 'HELD'
+         AND c.year < ${beforeYear}::int
+         AND m.settled_at IS NULL
+       ORDER BY year ASC`;
+    return rows.map((r) => Number(r.year));
+  }
+
+  /** Distinct unsettled slice months (`YYYY-MM-01`) of HELD commitments in `year`. */
+  async listUnsettledMonthsInYear(organizationId: string, year: number, tx?: DbTx): Promise<BusinessDate[]> {
+    const rows = await (tx ?? this.prisma).$queryRaw<{ month: string }[]>`
+      SELECT DISTINCT to_char(m.month, 'YYYY-MM-DD') AS month
+        FROM budget_commitment_months m
+        JOIN budget_commitments c ON c.id = m.commitment_id
+       WHERE c.organization_id = ${organizationId}::uuid
+         AND c.state = 'HELD'
+         AND c.year = ${year}::int
+         AND m.settled_at IS NULL
+       ORDER BY month ASC`;
+    return rows.map((r) => r.month);
+  }
 }

@@ -346,13 +346,13 @@ describe('YearStartCommitmentsBatchService (BR-MF1-09e, FR-5.8(6): one batch of 
       await service.commitBatch(tx as never, PASS, null);
 
       expect(held()).toEqual([
-        {
+        expect.objectContaining({
           requestId: 'r-1',
           costCenterId: 'cc-dep-request',
           currency: 'VND',
           amountMinor: 12_000_000n,
           seatMonthlyMinor: 1_000_000n,
-        },
+        }),
       ]);
     });
 

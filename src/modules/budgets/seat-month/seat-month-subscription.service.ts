@@ -5,8 +5,12 @@ import { AuditApi } from '../../audit/public/audit.api';
 import { SubscriptionPeriodApi } from '../../catalog/public/subscription-period.api';
 import type { SeatOfMonth } from '../../licensing/public/licensing-seat-month.types';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import { BudgetYearLockRepo } from '../budget/budget-year-lock.repo';
 import { CommitmentRepo, type LockedCommitmentOfRequest } from '../budget/commitment.repo';
+import {
+  CommitmentMonthFacadeService,
+  remainingOfSlice,
+  type CommitmentMonthRecord,
+} from '../commitment/commitment-month-facade.service';
 import { ThresholdAlertService } from '../threshold/threshold-alert.service';
 import { planSeatMonth, type ReturnedApplication, type SeatToCharge } from './seat-month-plan.policy';
 import { SeatMonthSeatFactsService } from './seat-month-seat-facts.service';
@@ -64,7 +68,7 @@ export class SeatMonthSubscriptionService {
     private readonly organizationReads: OrganizationReadApi,
     private readonly periods: SubscriptionPeriodApi,
     private readonly commitments: CommitmentRepo,
-    private readonly yearLock: BudgetYearLockRepo,
+    private readonly commitmentMonths: CommitmentMonthFacadeService,
     private readonly audit: AuditApi,
     private readonly thresholds: ThresholdAlertService,
   ) {}
@@ -89,43 +93,30 @@ export class SeatMonthSubscriptionService {
     const year = Number(month.slice(0, 4));
     const commitmentOf = await this.lockCommitments(tx, seats, year);
     const held = await this.lockPriorCommitments(tx, before, commitmentOf);
-    const waiting = waitingCostCenters(held);
-    const toCharge = await this.seats.toCharge(tx, month, seats, commitmentOf);
-    const departmentIds = [...new Set([...toCharge.flatMap((seat) => this.departmentsOf(seat))])];
-    const costCenterOfDepartment = await this.organizationReads.getUnitCostCenterIds(departmentIds, tx);
-    const [facts] = await this.periods.getPurchaseFacts([subscriptionId], tx);
-    const plan = planSeatMonth({
-      month,
-      subscriptionMonthlyPriceMinor: facts?.monthlyPriceMinor ?? null,
-      seats: toCharge,
-      costCenterOfDepartment,
-      heldByCommitment: new Map(
-        [...held.values()].map((row) => [
-          row.id,
-          row.state === 'HELD' ? row.amountMinor - row.releasedMinor - row.appliedMinor : 0n,
-        ]),
-      ),
-      prior: before,
-    });
-    const daysInMonth = daysBetween(monthBoundsOf(month).start, monthBoundsOf(month).nextStart);
-    const written: NewSeatMonthCharge[] = plan.rows.map((row) => ({
-      ...row,
-      organizationId: organization.id,
+    const slicesByCommitment = await this.lockSlices(tx, [...held.keys()]);
+    const plan = await this.computePlan(tx, {
       subscriptionId,
       month,
-      daysInMonth,
-      computedAt: now,
-    }));
-    // What each Cost Center uses is read before the rows are replaced and after the commitments took what they apply, to tell the threshold the month crosses (`RV-2`): the rows replace
-    // the ones of before, so the use goes by what changed and never by the whole month again.
+      seats,
+      before,
+      commitmentOf,
+      held,
+      slicesByCommitment,
+    });
+    const written = buildWrittenRows(organization.id, subscriptionId, month, plan.rows, now);
+    const waiting = waitingCostCenters(held);
     const watch = await this.thresholds.watch(tx, costCentersOf(year, before, written, waiting));
-    await this.replace(tx, year, before, written, waiting);
-    await this.giveBack(tx, { organizationId: organization.id, subscriptionId, month, now }, plan.returned);
-    await this.takeDown(tx, plan.takenByCommitment);
+    await this.replace(tx, before, written);
+    await this.giveBack(
+      tx,
+      { organizationId: organization.id, subscriptionId, month, now },
+      plan.returned,
+      slicesByCommitment,
+    );
+    await this.takeDown(tx, month, plan.takenByCommitment, slicesByCommitment);
     await this.thresholds.settle(tx, watch, now);
     if (before.length > 0 || written.length > 0)
       await this.record(tx, organization.id, subscriptionId, month, written, plan.returned);
-    // The mark is written in the transaction of the rows: it exists if and only if this subscription was charged for the month (`SM1-03`).
     await this.repo.markCharged(tx, {
       organizationId: organization.id,
       subscriptionId,
@@ -135,6 +126,38 @@ export class SeatMonthSubscriptionService {
     });
 
     return written.length;
+  }
+
+  private async computePlan(
+    tx: DbTx,
+    input: {
+      subscriptionId: string;
+      month: BusinessDate;
+      seats: readonly SeatOfMonth[];
+      before: readonly SeatMonthChargeRecord[];
+      commitmentOf: ReadonlyMap<string, LockedCommitmentOfRequest>;
+      held: ReadonlyMap<string, HeldCommitment>;
+      slicesByCommitment: ReadonlyMap<string, CommitmentMonthRecord[]>;
+    },
+  ) {
+    const toCharge = await this.seats.toCharge(tx, input.month, input.seats, input.commitmentOf);
+    const departmentIds = [...new Set([...toCharge.flatMap((seat) => this.departmentsOf(seat))])];
+    const costCenterOfDepartment = await this.organizationReads.getUnitCostCenterIds(departmentIds, tx);
+    const [facts] = await this.periods.getPurchaseFacts([input.subscriptionId], tx);
+    return planSeatMonth({
+      month: input.month,
+      subscriptionMonthlyPriceMinor: facts?.monthlyPriceMinor ?? null,
+      seats: toCharge,
+      costCenterOfDepartment,
+      heldByCommitment: new Map(
+        [...input.held.values()].map((row) => [
+          row.id,
+          row.state === 'HELD' ? row.amountMinor - row.releasedMinor - row.appliedMinor : 0n,
+        ]),
+      ),
+      monthlySliceByCommitment: sliceCapsForMonth(input.slicesByCommitment, input.month),
+      prior: input.before,
+    });
   }
 
   private departmentsOf(seat: SeatToCharge): string[] {
@@ -187,18 +210,19 @@ export class SeatMonthSubscriptionService {
     return held;
   }
 
+  private async lockSlices(tx: DbTx, commitmentIds: readonly string[]): Promise<Map<string, CommitmentMonthRecord[]>> {
+    const byIdMap = new Map<string, CommitmentMonthRecord[]>();
+    for (const id of [...commitmentIds].sort(byId)) {
+      byIdMap.set(id, await this.commitmentMonths.lockOfCommitment(tx, id));
+    }
+    return byIdMap;
+  }
+
   private async replace(
     tx: DbTx,
-    year: number,
     before: readonly SeatMonthChargeRecord[],
     written: readonly NewSeatMonthCharge[],
-    waiting: ReadonlySet<string>,
   ): Promise<void> {
-    const costCenterIds = [...before, ...written].flatMap((row) =>
-      row.costCenterId === null || waiting.has(row.costCenterId) ? [] : [row.costCenterId],
-    );
-    for (const costCenterId of [...new Set(costCenterIds)].sort(byId))
-      await this.yearLock.lock(tx, costCenterId, [year]);
     await this.repo.deleteRows(
       tx,
       before.map((row) => row.id),
@@ -211,6 +235,7 @@ export class SeatMonthSubscriptionService {
     tx: DbTx,
     month: { organizationId: string; subscriptionId: string; month: BusinessDate; now: Date },
     returned: readonly ReturnedApplication[],
+    slicesByCommitment: ReadonlyMap<string, CommitmentMonthRecord[]>,
   ): Promise<void> {
     if (returned.length === 0) return;
     await this.repo.insertReversals(
@@ -232,16 +257,27 @@ export class SeatMonthSubscriptionService {
     for (const [commitmentId, returnMinor] of [...total].sort(([a], [b]) => byId(a, b))) {
       const row = await this.commitments.lockById(tx, commitmentId);
       if (!row) throw new Error(`The commitment ${commitmentId} a seat-month gave back to is gone.`);
+      if ((slicesByCommitment.get(commitmentId)?.length ?? 0) > 0) {
+        await this.commitmentMonths.reverseApplied(tx, commitmentId, month.month, returnMinor);
+      }
       await this.commitments.giveBackApplied(tx, row, returnMinor);
     }
   }
 
   /** What the rows apply more than before takes each commitment down, read again after what went back to it. */
-  private async takeDown(tx: DbTx, taken: ReadonlyMap<string, bigint>): Promise<void> {
+  private async takeDown(
+    tx: DbTx,
+    month: BusinessDate,
+    taken: ReadonlyMap<string, bigint>,
+    slicesByCommitment: ReadonlyMap<string, CommitmentMonthRecord[]>,
+  ): Promise<void> {
     for (const [commitmentId, takeMinor] of [...taken].sort(([a], [b]) => byId(a, b))) {
       if (takeMinor === 0n) continue;
       const row = await this.commitments.lockById(tx, commitmentId);
       if (!row) throw new Error(`The commitment ${commitmentId} a seat-month applies to is gone.`);
+      if ((slicesByCommitment.get(commitmentId)?.length ?? 0) > 0) {
+        await this.commitmentMonths.addApplied(tx, commitmentId, month, takeMinor);
+      }
       const left = row.amountMinor - row.releasedMinor - row.appliedMinor - takeMinor;
       await this.commitments.applyInvoice(tx, row, { takeMinor, stateAfter: left === 0n ? 'EXPENSED' : 'HELD' });
     }
@@ -272,4 +308,35 @@ export class SeatMonthSubscriptionService {
       correlationId: `seat-month:${subscriptionId}:${month}`,
     });
   }
+}
+
+function buildWrittenRows(
+  organizationId: string,
+  subscriptionId: string,
+  month: BusinessDate,
+  rows: ReturnType<typeof planSeatMonth>['rows'],
+  now: Date,
+): NewSeatMonthCharge[] {
+  const daysInMonth = daysBetween(monthBoundsOf(month).start, monthBoundsOf(month).nextStart);
+  return rows.map((row) => ({
+    ...row,
+    organizationId,
+    subscriptionId,
+    month,
+    daysInMonth,
+    computedAt: now,
+  }));
+}
+
+function sliceCapsForMonth(
+  slicesByCommitment: ReadonlyMap<string, CommitmentMonthRecord[]>,
+  month: BusinessDate,
+): Map<string, bigint | null> {
+  const caps = new Map<string, bigint | null>();
+  for (const [commitmentId, slices] of slicesByCommitment) {
+    if (slices.length === 0) continue;
+    const match = slices.find((s) => s.month === month);
+    caps.set(commitmentId, match ? remainingOfSlice(match) : null);
+  }
+  return caps;
 }

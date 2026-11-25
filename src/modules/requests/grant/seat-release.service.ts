@@ -3,20 +3,25 @@ import type { BusinessDate } from '../../../core/business-date';
 import { fiscalYearOf } from '../../../core/fiscal-year';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { BudgetsApi } from '../../budgets/public/budgets.api';
-import type { CommitmentReleaseReason, SeatCommitment } from '../../budgets/public/budgets.types';
+import type {
+  CommitmentReleaseInput,
+  CommitmentReleaseReason,
+  SeatCommitment,
+} from '../../budgets/public/budgets.types';
 import { LicensingApi } from '../../licensing/public/licensing.api';
 import type { GrantOutcomeFacts, ProvisioningKind, RevocationTaskFacts } from '../../licensing/public/licensing.types';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { TransferReleaseInput, TransferReleaseResult } from '../public/requests.types';
 import {
   givenAtTransfer,
-  lateGrantShare,
+  lateGrantBreakdown,
   releasesBeforeGrant,
+  revocationBreakdown,
   revocationEndsOn,
-  revocationShare,
   transferReleaseEndsOn,
   transferReleaseReference,
   type SeatCoverage,
+  type SeatReleaseBreakdown,
 } from './seat-release.policy';
 import { SeatReleaseRepo } from './seat-release.repo';
 
@@ -64,10 +69,10 @@ export class SeatReleaseService {
     await this.give(tx, coverages, now, {
       reason: 'REVOKED',
       reference: `revocationTask:${task.id}`,
-      shareOf: (commitment, coverage, currentYear) =>
+      breakdownOf: (commitment, coverage, currentYear) =>
         givenAtTransfer(commitment, completed.chainAssignmentIds)
-          ? 0n
-          : revocationShare({ commitment, coverage, endsOn, currentYear }),
+          ? { amountMinor: 0n, months: [] }
+          : revocationBreakdown({ commitment, coverage, endsOn, currentYear }),
     });
   }
 
@@ -97,7 +102,8 @@ export class SeatReleaseService {
       const released = await this.give(tx, coverages, now, {
         reason: 'TRANSFER_EFFECTIVE',
         reference: transferReleaseReference(input.transferId, chain.assignmentId),
-        shareOf: (commitment, coverage, currentYear) => revocationShare({ commitment, coverage, endsOn, currentYear }),
+        breakdownOf: (commitment, coverage, currentYear) =>
+          revocationBreakdown({ commitment, coverage, endsOn, currentYear }),
       });
       for (const [requestId, amountMinor] of released)
         byRequest.set(requestId, (byRequest.get(requestId) ?? 0n) + amountMinor);
@@ -129,10 +135,10 @@ export class SeatReleaseService {
     await this.give(tx, coverages, input.now, {
       reason: 'TRANSFER_EFFECTIVE',
       reference: transferReleaseReference(REGRANT_REFERENCE, input.assignmentId),
-      shareOf: (commitment, coverage, currentYear) =>
+      breakdownOf: (commitment, coverage, currentYear) =>
         givenAtTransfer(commitment, chain.chainAssignmentIds)
-          ? 0n
-          : revocationShare({ commitment, coverage, endsOn, currentYear }),
+          ? { amountMinor: 0n, months: [] }
+          : revocationBreakdown({ commitment, coverage, endsOn, currentYear }),
     });
   }
 
@@ -148,7 +154,8 @@ export class SeatReleaseService {
     await this.give(tx, coverages, now, {
       reason: 'LATE_GRANT',
       reference: `grantAssignment:${facts.assignmentId}`,
-      shareOf: (commitment, coverage, currentYear) => lateGrantShare({ commitment, coverage, grantedOn, currentYear }),
+      breakdownOf: (commitment, coverage, currentYear) =>
+        lateGrantBreakdown({ commitment, coverage, grantedOn, currentYear }),
     });
   }
 
@@ -183,7 +190,7 @@ export class SeatReleaseService {
     by: {
       reason: Extract<CommitmentReleaseReason, 'REVOKED' | 'LATE_GRANT' | 'TRANSFER_EFFECTIVE'>;
       reference: string;
-      shareOf: (commitment: SeatCommitment, coverage: SeatCoverage, currentYear: number) => bigint;
+      breakdownOf: (commitment: SeatCommitment, coverage: SeatCoverage, currentYear: number) => SeatReleaseBreakdown;
     },
   ): Promise<Map<string, bigint>> {
     const given = new Map<string, bigint>();
@@ -191,16 +198,17 @@ export class SeatReleaseService {
     // The years before the year of today are closed: their commitments are left as they are.
     const currentYear = fiscalYearOf(await this.organizationReads.businessToday(now, tx));
     const commitments = await this.budgets.lockSeatCommitments(tx, [...coverages.keys()], currentYear);
-    const amounts = new Map<string, { year: number; amountMinor: bigint }[]>();
+    const amounts = new Map<string, NonNullable<CommitmentReleaseInput['amounts']>[number][]>();
     for (const commitment of commitments) {
       const coverage = coverages.get(commitment.requestId);
       if (coverage === undefined) continue;
-      const amountMinor = by.shareOf(commitment, coverage, currentYear);
-      if (amountMinor <= 0n) continue;
-      amounts.set(commitment.requestId, [
-        ...(amounts.get(commitment.requestId) ?? []),
-        { year: commitment.year, amountMinor },
-      ]);
+      const breakdown = by.breakdownOf(commitment, coverage, currentYear);
+      if (breakdown.amountMinor <= 0n) continue;
+      const entry =
+        breakdown.months.length > 0
+          ? { year: commitment.year, amountMinor: breakdown.amountMinor, months: breakdown.months }
+          : { year: commitment.year, amountMinor: breakdown.amountMinor };
+      amounts.set(commitment.requestId, [...(amounts.get(commitment.requestId) ?? []), entry]);
     }
     for (const [requestId, items] of amounts) {
       const released = await this.budgets.releaseForRequest(tx, {

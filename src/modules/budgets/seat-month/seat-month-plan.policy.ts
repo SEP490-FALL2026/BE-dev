@@ -71,8 +71,10 @@ export function planSeatMonth(input: {
   costCenterOfDepartment: ReadonlyMap<string, string>;
   heldByCommitment: ReadonlyMap<string, bigint>;
   prior: readonly PriorRow[];
+  /** When present for a commitment id: remaining held on `month` slice, or `null` if that commitment has slices for other months only. */
+  monthlySliceByCommitment?: ReadonlyMap<string, bigint | null>;
 }): SeatMonthPlan {
-  const held = new Map(input.heldByCommitment);
+  const held = initialHeldByCommitment(input.heldByCommitment, input.monthlySliceByCommitment);
   for (const row of input.prior) {
     if (row.commitmentId !== null && row.appliedMinor > 0n)
       held.set(row.commitmentId, (held.get(row.commitmentId) ?? 0n) + row.appliedMinor);
@@ -83,6 +85,23 @@ export function planSeatMonth(input: {
       : input.seats.flatMap((seat) => rowsOfSeat(seat, input.subscriptionMonthlyPriceMinor as bigint, input, held));
 
   return { rows, takenByCommitment: takenOf(input.prior, rows), returned: returnedOf(input.prior, rows) };
+}
+
+function initialHeldByCommitment(
+  heldByCommitment: ReadonlyMap<string, bigint>,
+  monthlySliceByCommitment?: ReadonlyMap<string, bigint | null>,
+): Map<string, bigint> {
+  const held = new Map(heldByCommitment);
+  if (!monthlySliceByCommitment) return held;
+  for (const [id, sliceRemaining] of monthlySliceByCommitment) {
+    if (sliceRemaining === null) {
+      held.set(id, 0n);
+      continue;
+    }
+    const current = held.get(id) ?? 0n;
+    held.set(id, sliceRemaining < current ? sliceRemaining : current);
+  }
+  return held;
 }
 
 /** The rows of one seat for the month, taking what each applies out of `held` so the rows after it see what is left. */

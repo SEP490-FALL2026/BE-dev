@@ -85,10 +85,20 @@ export function commitmentApplication(input: {
   amountMinor: bigint;
   heldMinor: bigint;
   sameCostCenter: boolean;
+  sliceRemainingMinor?: bigint | null;
 }): bigint {
   if (!input.sameCostCenter || input.heldMinor <= 0n) return 0n;
+  const available =
+    input.sliceRemainingMinor === undefined
+      ? input.heldMinor
+      : input.sliceRemainingMinor === null
+        ? 0n
+        : input.sliceRemainingMinor < input.heldMinor
+          ? input.sliceRemainingMinor
+          : input.heldMinor;
+  if (available <= 0n) return 0n;
 
-  return input.amountMinor < input.heldMinor ? input.amountMinor : input.heldMinor;
+  return input.amountMinor < available ? input.amountMinor : available;
 }
 
 /**

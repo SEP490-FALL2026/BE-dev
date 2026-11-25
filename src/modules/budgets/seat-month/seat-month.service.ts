@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { LicensingSeatMonthApi } from '../../licensing/public/licensing-seat-month.api';
+import { SharedPoolLineRepo } from '../shared-pool-line/shared-pool-line.repo';
 import { SeatMonthSubscriptionService } from './seat-month-subscription.service';
 import { SeatMonthChargeError } from './seat-month.errors';
 import { endedMonthsOf } from './seat-month.policy';
@@ -31,7 +32,24 @@ export class SeatMonthService {
     private readonly repo: SeatMonthRepo,
     private readonly licensing: LicensingSeatMonthApi,
     private readonly subscriptions: SeatMonthSubscriptionService,
+    private readonly sharedPoolLines: SharedPoolLineRepo,
   ) {}
+
+  /**
+   * True when every K2 subscription with seats or existing seat-month rows in `month` has a completed run in `seat_month_runs`
+   * (`W3-07` F6(a), Ca I).
+   */
+  async isMonthSettlingReady(organizationId: string, month: BusinessDate): Promise<boolean> {
+    const seatSubs = (await this.licensing.getSeatsOfMonth(month)).map((seat) => seat.subscriptionId);
+    const chargedSubs = await this.repo.subscriptionIdsOfMonth(month);
+    const needed = new Set([...seatSubs, ...chargedSubs]);
+    if (needed.size === 0) return true;
+    const completed = new Set(await this.sharedPoolLines.subscriptionIdsWithRunsForMonth(organizationId, month));
+    for (const id of needed) {
+      if (!completed.has(id)) return false;
+    }
+    return true;
+  }
 
   /** Charges the subscriptions of every month that has ended that have no mark for it, the earliest month first: what the sweeper does each hour. */
   async chargeEndedMonths(today: BusinessDate, now: Date = new Date()): Promise<SeatMonthResult> {

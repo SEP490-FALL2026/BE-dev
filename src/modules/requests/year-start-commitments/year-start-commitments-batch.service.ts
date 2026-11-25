@@ -15,6 +15,7 @@ import {
   approvalMonthlyFromSaved,
   bearingDepartmentOf,
   judgeYearStart,
+  yearStartMonthsOf,
   type YearStartPrice,
   type YearStartSeat,
   type YearStartSkipReason,
@@ -148,9 +149,10 @@ export class YearStartCommitmentsBatchService {
     pass: YearStartPassContext,
     rows: readonly YearStartCandidate[],
   ): Promise<YearStartJudgedBatch | null> {
-    const candidates = await this.withoutCommitment(tx, await this.ofPaidKinds(tx, rows), pass.year);
+    const { paidRows, kindsByPlan } = await this.ofPaidKinds(tx, rows);
+    const candidates = await this.withoutCommitment(tx, paidRows, pass.year);
 
-    return candidates.length === 0 ? null : this.judgeAll(tx, pass, candidates);
+    return candidates.length === 0 ? null : this.judgeAll(tx, pass, candidates, kindsByPlan);
   }
 
   /** What each candidate holds, in dong and the Cost Center of the department that bears it, or why it is left out. */
@@ -158,6 +160,7 @@ export class YearStartCommitmentsBatchService {
     tx: DbTx,
     pass: YearStartPassContext,
     candidates: readonly YearStartCandidate[],
+    kindsByPlan: ReadonlyMap<string, string>,
   ): Promise<YearStartJudgedBatch> {
     const yearStart: BusinessDate = `${pass.year}-01-01`;
     const { seats, ignored } = await this.seatsOf(tx, candidates, pass.year);
@@ -176,9 +179,10 @@ export class YearStartCommitmentsBatchService {
     const items: HoldItem[] = [];
     const leftOut: LeftOut[] = [];
     for (const candidate of candidates) {
+      const candidateSeats = seats.get(candidate.id) ?? [];
       const judgement = judgeYearStart({
         year: pass.year,
-        seats: seats.get(candidate.id) ?? [],
+        seats: candidateSeats,
         price: prices.get(candidate.planId) ?? null,
         costCenterId: costCenters.get(bearing.get(candidate.id) ?? candidate.departmentId) ?? null,
       });
@@ -187,12 +191,17 @@ export class YearStartCommitmentsBatchService {
         leftOut.push({ requestId: candidate.id, reason: judgement.reason });
         continue;
       }
+      const months =
+        kindsByPlan.get(candidate.planId) === 'K2'
+          ? yearStartMonthsOf({ year: pass.year, seats: candidateSeats })
+          : undefined;
       items.push({
         requestId: candidate.id,
         costCenterId: judgement.costCenterId,
         amountMinor: judgement.amountMinor,
         seatMonthlyMinor: judgement.seatMonthlyMinor,
         currency: judgement.currency,
+        ...(months && months.length > 0 ? { months } : {}),
       });
     }
 
@@ -200,14 +209,20 @@ export class YearStartCommitmentsBatchService {
   }
 
   /** Only the grants of a plan that costs money every month a seat is held: `K1` and `K2` (a key, or free software, holds nothing on 01/01). */
-  private async ofPaidKinds(tx: DbTx, rows: readonly YearStartCandidate[]): Promise<YearStartCandidate[]> {
-    if (rows.length === 0) return [];
+  private async ofPaidKinds(
+    tx: DbTx,
+    rows: readonly YearStartCandidate[],
+  ): Promise<{ paidRows: YearStartCandidate[]; kindsByPlan: Map<string, string> }> {
+    const kindsByPlan = new Map<string, string>();
+    if (rows.length === 0) return { paidRows: [], kindsByPlan };
     const plans = await this.catalog.getPlanRevocationInfo([...new Set(rows.map((row) => row.planId))], tx);
-    const paid = new Set(
-      plans.filter((plan) => YEAR_START_PLAN_KINDS.includes(plan.provisioningType)).map((plan) => plan.planId),
-    );
+    for (const plan of plans) {
+      if (YEAR_START_PLAN_KINDS.includes(plan.provisioningType)) {
+        kindsByPlan.set(plan.planId, plan.provisioningType);
+      }
+    }
 
-    return rows.filter((row) => paid.has(row.planId));
+    return { paidRows: rows.filter((row) => kindsByPlan.has(row.planId)), kindsByPlan };
   }
 
   /** What already holds a commitment for the year is left as it is, and is not read any further. */
@@ -403,7 +418,15 @@ export class YearStartCommitmentsBatchService {
     const prices = new Map<string, YearStartPrice | null>();
     for (const planId of new Set(candidates.map((candidate) => candidate.planId))) {
       const price = await this.catalog.getPlanPrice(planId, tx, yearStart);
-      prices.set(planId, price && { kind: price.kind, unitPrice: price.unitPrice, billingCycle: price.billingCycle });
+      prices.set(
+        planId,
+        price && {
+          kind: price.kind,
+          unitPrice: price.unitPrice,
+          monthlyPriceMinor: price.monthlyPriceMinor,
+          billingCycle: price.billingCycle,
+        },
+      );
     }
 
     return prices;

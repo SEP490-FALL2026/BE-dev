@@ -85,8 +85,10 @@ export class BudgetReviewFiguresService {
     const pending = await this.pending.totals(pairs, tx);
     const basis = await this.invoices.priceBasisOf(pairs, tx, from);
     const increases = await this.prices.itemsOf(tx, costCenterIds, year, month);
+    const priorYearReleased =
+      month === 1 ? await this.budgets.priorYearReleasedOf(costCenterIds, year - 1, tx) : new Map<string, bigint>();
 
-    const facts: YearFacts = { totals, spentThrough, pending, basis, increases };
+    const facts: YearFacts = { totals, spentThrough, pending, basis, increases, priorYearReleased };
 
     return approved.map(([costCenterId, budget]) => lineOf(month, year, costCenterId, budget, facts));
   }
@@ -99,6 +101,7 @@ interface YearFacts {
   pending: Map<string, bigint>;
   basis: Map<string, { basisMinor: bigint; actualMinor: bigint }>;
   increases: Map<string, PriceIncreaseItem[]>;
+  priorYearReleased: Map<string, bigint>;
 }
 
 /** The line of one Cost Center: its figures put in the policy and what the policy says kept with them. */
@@ -133,6 +136,7 @@ function lineOf(
     reserveMinor: input.reserveMinor,
     spentMinor: input.spentMinor,
     spentAfterMonthMinor: input.spentAfterMonthMinor,
+    priorYearReleasedMinor: facts.priorYearReleased.get(costCenterId) ?? 0n,
     committedMinor: input.committedMinor,
     pendingSpendMinor: input.pendingMinor,
     remainingMinor: figures.remainingMinor,

@@ -134664,7 +134664,9 @@
                         "REVOKED",
                         "LATE_GRANT",
                         "GRANTED_FROM_POOL",
-                        "TRANSFER_EFFECTIVE"
+                        "TRANSFER_EFFECTIVE",
+                        "MONTH_END",
+                        "YEAR_END_SEAT_MONTHS"
                       ]
                     },
                     "reasonText": { "type": "string", "nullable": true },
@@ -136667,6 +136669,13 @@
                       "additionalProperties": false,
                       "description": "What was already recorded for the months after the one closed when it was closed: spent, and it took commitments down, so the forecast and what is left count it and the pace does not."
                     },
+                    "priorYearReleased": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "What was released from prior-year seat-month commitments at year end or December month end, shown on the January review."
+                    },
                     "changedAfterSnapshot": {
                       "type": "object",
                       "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
@@ -136791,6 +136800,7 @@
                     "reserve",
                     "spent",
                     "spentAfterMonth",
+                    "priorYearReleased",
                     "changedAfterSnapshot",
                     "committed",
                     "pendingSpend",

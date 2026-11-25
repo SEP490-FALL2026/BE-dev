@@ -217,4 +217,62 @@ describe('the plan of a month of a subscription (SM-1.4; T-SM1)', () => {
 
     expect(rows).toMatchObject([{ departmentId: B, days: 31, amountMinor: 400_000n }]);
   });
+
+  describe('W3-07 monthly slice capping', () => {
+    it('Ca E: caps appliedMinor at remaining monthly slice (500k) even when commitment total holds 6.000.000', () => {
+      const commitment = { id: 'c-1', costCenterId: 'cc-a' };
+      const { rows, takenByCommitment } = plan({
+        month: '2027-07-01',
+        subscriptionMonthlyPriceMinor: 550_000n,
+        seats: [
+          seat({
+            commitment,
+            held: { from: '2027-01-01', until: null },
+            placements: [{ departmentId: A, from: '2027-01-01', to: null }],
+          }),
+        ],
+        heldByCommitment: new Map([['c-1', 6_000_000n]]),
+        monthlySliceByCommitment: new Map([['c-1', 500_000n]]),
+      });
+
+      expect(rows[0]).toMatchObject({ amountMinor: 550_000n, appliedMinor: 500_000n });
+      expect(takenByCommitment).toEqual(new Map([['c-1', 500_000n]]));
+    });
+
+    it('applies 0 when monthly-sliced commitment has no slice for the charged month (null)', () => {
+      const commitment = { id: 'c-1', costCenterId: 'cc-a' };
+      const { rows, takenByCommitment } = plan({
+        seats: [seat({ commitment })],
+        heldByCommitment: new Map([['c-1', 2_000_000n]]),
+        monthlySliceByCommitment: new Map([['c-1', null]]),
+      });
+
+      expect(rows.every((row) => row.appliedMinor === 0n)).toBe(true);
+      expect(takenByCommitment).toEqual(new Map());
+    });
+
+    it('Ca K / F3: allows prior applied amount to be reduced and returned even when slice remaining is 0 after MONTH_END', () => {
+      const commitment = { id: 'c-1', costCenterId: 'cc-a' };
+      const { rows, returned, takenByCommitment } = plan({
+        month: '2027-03-01',
+        subscriptionMonthlyPriceMinor: 350_000n,
+        seats: [
+          seat({
+            commitment,
+            held: { from: '2027-01-01', until: null },
+            placements: [{ departmentId: A, from: '2027-01-01', to: null }],
+          }),
+        ],
+        heldByCommitment: new Map([['c-1', 4_500_000n]]),
+        monthlySliceByCommitment: new Map([['c-1', 0n]]),
+        prior: [{ assignmentId: 'seat-1', departmentId: A, appliedMinor: 450_000n, commitmentId: 'c-1' }],
+      });
+
+      expect(rows[0]).toMatchObject({ amountMinor: 350_000n, appliedMinor: 350_000n });
+      expect(returned).toEqual([
+        { commitmentId: 'c-1', assignmentId: 'seat-1', departmentId: A, amountMinor: 100_000n, reason: 'RECALCULATED' },
+      ]);
+      expect(takenByCommitment).toEqual(new Map());
+    });
+  });
 });

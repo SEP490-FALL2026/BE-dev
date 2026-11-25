@@ -1,9 +1,14 @@
 import { Injectable } from '@nestjs/common';
+import type { BusinessDate } from '../../../core/business-date';
+import { fiscalYearOf } from '../../../core/fiscal-year';
+import { renewalStartOf, termEndOf, termRunOf } from '../../../core/term-limit';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { BudgetsApi } from '../../budgets/public/budgets.api';
+import type { MonthSliceInput } from '../../budgets/public/budgets.types';
 import { CatalogApi } from '../../catalog/public/catalog.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { chargedCostCenterId } from '../access-request/access-request.policy';
 import { seatMonthlyOf } from '../access-request/pricing.policy';
@@ -30,6 +35,7 @@ export class SpendEffectsService {
     private readonly catalog: CatalogApi,
     private readonly audit: AuditApi,
     private readonly decisions: SpendDecisionRepo,
+    private readonly organizationReads: OrganizationReadApi,
   ) {}
 
   /**
@@ -69,12 +75,7 @@ export class SpendEffectsService {
       return check;
     }
 
-    const monthlyPriceMinor =
-      request.pricing.monthlyPriceMinor !== undefined
-        ? request.pricing.monthlyPriceMinor
-        : request.planId !== null
-          ? (await this.catalog.getPlanPrice(request.planId, tx))?.monthlyPriceMinor
-          : undefined;
+    const { seatMonthlyMinor, months } = await this.seatMonthlyAndSlices(tx, request, year, seats, now);
 
     await this.budgets.holdForRequest(tx, actor, {
       organizationId: request.organizationId,
@@ -84,19 +85,118 @@ export class SpendEffectsService {
       currency: check.currency,
       now,
       items: [{ year: year.year, amountMinor: year.costMinor }],
-      seatMonthlyMinor: seatMonthlyOf({
-        monthlyPriceMinor,
-        unitPrice: request.pricing.unitPrice,
-        billingCycle: request.pricing.billingCycle,
-        costMinor: year.costMinor,
-        kind: request.pricing.kind,
-        // The months of the amount are those of the year it was worked out for, the year of the check.
-        months: request.pricing.budgetYear === year.year ? request.pricing.amountMonths : null,
-        seats,
-      }),
+      seatMonthlyMinor,
+      ...(months && months.length > 0 ? { months } : {}),
     });
 
     return check;
+  }
+
+  private async seatMonthlyAndSlices(
+    tx: DbTx,
+    request: AccessRequestRecord,
+    year: { year: number; costMinor: bigint },
+    seats: number,
+    now: Date,
+  ): Promise<{ seatMonthlyMinor: bigint | null; months: MonthSliceInput[] | undefined }> {
+    const planPrice = request.planId !== null ? await this.catalog.getPlanPrice(request.planId, tx) : undefined;
+    const monthlyPriceMinor =
+      request.pricing.monthlyPriceMinor !== undefined
+        ? request.pricing.monthlyPriceMinor
+        : planPrice?.monthlyPriceMinor;
+    const seatMonthlyMinor = seatMonthlyOf({
+      monthlyPriceMinor,
+      unitPrice: request.pricing.unitPrice,
+      billingCycle: request.pricing.billingCycle,
+      costMinor: year.costMinor,
+      kind: request.pricing.kind,
+      months: request.pricing.budgetYear === year.year ? request.pricing.amountMonths : null,
+      seats,
+    });
+    const months =
+      seatMonthlyMinor !== null
+        ? await this.monthlySlicesForHold(tx, request, year.year, seats, planPrice?.provisioningType, now)
+        : undefined;
+    return { seatMonthlyMinor, months };
+  }
+
+  private async monthlySlicesForHold(
+    tx: DbTx,
+    request: AccessRequestRecord,
+    year: number,
+    seats: number,
+    planKind: string | undefined,
+    now: Date,
+  ): Promise<MonthSliceInput[] | undefined> {
+    let kind = planKind;
+    if (kind === undefined && request.planId !== null) {
+      kind = (await this.catalog.getPlanRevocationInfo([request.planId], tx))[0]?.provisioningType;
+    }
+    if (kind !== 'K2') return undefined;
+    const today = await this.organizationReads.businessToday(now, tx);
+    const start = request.renewal
+      ? renewalStartOf({ previousEnd: request.renewal.previousExpectedEndDate, today })
+      : today;
+    const ends = await this.seatEndsForHold(tx, request, start, seats);
+    return countMonthlySeats(start, ends, year);
+  }
+
+  private async seatEndsForHold(
+    tx: DbTx,
+    request: AccessRequestRecord,
+    start: BusinessDate,
+    seats: number,
+  ): Promise<(BusinessDate | null)[]> {
+    if (request.type === 'GROUP_GRANT') {
+      const current = (await this.requests.findById(request.id, tx)) ?? request;
+      const lines = current.lines.filter((line) => line.state === 'APPROVED');
+      if (lines.length > 0) {
+        return this.resolveLineEnds(tx, request, lines, start);
+      }
+    }
+    if (request.expectedEndDate !== null) {
+      return Array.from({ length: seats }, () => request.expectedEndDate);
+    }
+    if (request.termMonths !== null && request.renewal === null) {
+      const ids = request.beneficiaryEmployeeIds;
+      if (ids.length === 0) return Array.from({ length: seats }, () => termEndOf(start, request.termMonths ?? 1));
+      const people = new Map(
+        (await this.organizationReads.getEmployees(ids, tx)).map((p) => [p.id, p.contractEndDate]),
+      );
+      return ids.map(
+        (id) => termRunOf({ start, months: request.termMonths, contractEndDate: people.get(id) ?? null }).end,
+      );
+    }
+    return Array.from({ length: seats }, () => null);
+  }
+
+  private async resolveLineEnds(
+    tx: DbTx,
+    request: AccessRequestRecord,
+    lines: AccessRequestRecord['lines'],
+    start: BusinessDate,
+  ): Promise<(BusinessDate | null)[]> {
+    const needLookup = lines.some(
+      (l) => l.expectedEndDate === null && request.termMonths !== null && request.renewal === null,
+    );
+    const people = needLookup
+      ? new Map(
+          (
+            await this.organizationReads.getEmployees(
+              lines.map((l) => l.employeeId),
+              tx,
+            )
+          ).map((p) => [p.id, p.contractEndDate]),
+        )
+      : new Map<string, BusinessDate | null>();
+    return lines.map((line) => {
+      if (line.expectedEndDate !== null) return line.expectedEndDate;
+      if (request.termMonths !== null && request.renewal === null) {
+        return termRunOf({ start, months: request.termMonths, contractEndDate: people.get(line.employeeId) ?? null })
+          .end;
+      }
+      return null;
+    });
   }
 
   /**
@@ -196,4 +296,28 @@ export class SpendEffectsService {
       ),
     );
   }
+}
+
+function countMonthlySeats(
+  start: BusinessDate,
+  ends: readonly (BusinessDate | null)[],
+  year: number,
+): MonthSliceInput[] {
+  const yearStart: BusinessDate = `${year}-01-01`;
+  const yearEnd: BusinessDate = `${year}-12-31`;
+  const counts = new Map<number, number>();
+  for (const lastHeldOn of ends) {
+    const first = start > yearStart ? start : yearStart;
+    const last = lastHeldOn !== null && lastHeldOn < yearEnd ? lastHeldOn : yearEnd;
+    if (first > last || fiscalYearOf(first) !== year || fiscalYearOf(last) !== year) continue;
+    const mFrom = Number(first.slice(5, 7));
+    const mTo = Number(last.slice(5, 7));
+    for (let m = mFrom; m <= mTo; m++) counts.set(m, (counts.get(m) ?? 0) + 1);
+  }
+  if (counts.size === 0 && fiscalYearOf(start) === year) {
+    counts.set(Number(start.slice(5, 7)), Math.max(1, ends.length));
+  }
+  return [...counts.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([m, seatCount]) => ({ month: `${year}-${String(m).padStart(2, '0')}-01`, seatCount }));
 }

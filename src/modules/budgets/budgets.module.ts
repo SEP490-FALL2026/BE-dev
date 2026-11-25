@@ -34,6 +34,9 @@ import {
 } from './public/budgets.extension-points';
 import { BudgetCommitmentsController } from './commitment/budget-commitments.controller';
 import { CommitmentMonthRepo } from './commitment/month/commitment-month.repo';
+import { CommitmentMonthService } from './commitment/month/commitment-month.service';
+import { CommitmentMonthSettlementService } from './commitment/month/commitment-month-settlement.service';
+import { CommitmentMonthFacadeService } from './commitment/commitment-month-facade.service';
 import { CommitmentService } from './commitment/commitment.service';
 import { SharedPoolLineRepo } from './shared-pool-line/shared-pool-line.repo';
 import { BudgetInvoicesController } from './invoice/budget-invoices.controller';
@@ -252,6 +255,9 @@ import { BudgetProposalTemplateListener } from './proposal/budget-proposal-templ
     SpendingApproverWaitListener,
     CommitmentService,
     CommitmentMonthRepo,
+    CommitmentMonthService,
+    CommitmentMonthFacadeService,
+    CommitmentMonthSettlementService,
     SharedPoolLineRepo,
     InvoiceService,
     PurchaseInvoiceRecorderService,

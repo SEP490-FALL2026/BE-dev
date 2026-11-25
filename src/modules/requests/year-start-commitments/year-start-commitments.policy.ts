@@ -41,6 +41,7 @@ export interface YearStartSeat {
 export interface YearStartPrice {
   kind: 'RECURRING' | 'ONE_TIME';
   unitPrice: Money;
+  monthlyPriceMinor?: bigint | null;
   billingCycle: BillingCycleCode | null;
 }
 
@@ -142,6 +143,7 @@ function priceSeatsByEnd(
     const priced = requestAmountOf({
       kind: 'RECURRING',
       unitPrice: price.unitPrice,
+      monthlyPriceMinor: price.monthlyPriceMinor,
       billingCycle: price.billingCycle,
       beneficiaries,
       checkDate: yearStart,
@@ -163,7 +165,11 @@ function priceAtToday(
   yearStart: BusinessDate,
 ): { ok: true; total: bigint; monthlyMinor: bigint } | { ok: false; reason: 'AMOUNT_TOO_LARGE' | 'NO_PRICE' } {
   if (!isRecurringPriceInDong(price)) return { ok: false, reason: 'NO_PRICE' };
-  const monthly = monthlyPriceOf({ unitPrice: price.unitPrice, billingCycle: price.billingCycle });
+  const monthly = monthlyPriceOf({
+    unitPrice: price.unitPrice,
+    monthlyPriceMinor: price.monthlyPriceMinor,
+    billingCycle: price.billingCycle,
+  });
   if (monthly === null || monthly.amountMinor <= 0n) return { ok: false, reason: 'NO_PRICE' };
   const remainder = priceSeatsByEnd(seatsByEnd, price, yearStart);
 
@@ -282,4 +288,29 @@ export function carriedOverByCostCenter(
   }
 
   return totals;
+}
+
+/** Monthly seat counts in `year` from 01/01 through each counted seat's end month (`W3-07` for K2). */
+export function yearStartMonthsOf(input: {
+  year: number;
+  seats: readonly YearStartSeat[];
+}): { month: BusinessDate; seatCount: number }[] {
+  const yearStart: BusinessDate = `${input.year}-01-01`;
+  const counts = new Map<number, number>();
+  for (const seat of input.seats) {
+    if (!seatCountsOn(seat, yearStart)) continue;
+    const last = lastDayOfSeat(seat);
+    const lastYear = last === null ? input.year + 1 : Number(last.slice(0, 4));
+    const lastMonth = last === null || lastYear > input.year ? 12 : Number(last.slice(5, 7));
+    for (let m = 1; m <= lastMonth; m++) {
+      counts.set(m, (counts.get(m) ?? 0) + 1);
+    }
+  }
+
+  return [...counts.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([m, seatCount]) => ({
+      month: `${input.year}-${String(m).padStart(2, '0')}-01`,
+      seatCount,
+    }));
 }

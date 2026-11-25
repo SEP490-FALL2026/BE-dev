@@ -14,14 +14,24 @@ import type {
 import { BudgetCommitmentNotHoldableError } from '../public/budgets.errors';
 import { BudgetYearLockRepo } from './budget-year-lock.repo';
 import { InvoiceRepo } from './invoice.repo';
-import type { CommitmentRow } from './commitment-release.policy';
+import {
+  heldKey,
+  type AttachedCommitment,
+  type CommitmentOfRequest,
+  type CommitmentRow,
+  type CommitmentTotals,
+  type HeldWithSeatPrice,
+  type LockedCommitmentOfRequest,
+} from './commitment-release.policy';
 
-export interface AttachedCommitment {
-  id: string;
-  requestId: string;
-  amountMinor: bigint;
-  currency: string;
-}
+export {
+  heldKey,
+  type AttachedCommitment,
+  type CommitmentOfRequest,
+  type CommitmentTotals,
+  type HeldWithSeatPrice,
+  type LockedCommitmentOfRequest,
+};
 
 /**
  * The commitments of the budget, as far as the decision of a version needs them: attaching the ones that wait for a budget
@@ -149,7 +159,12 @@ export class CommitmentRepo {
    * The commitments still held of these requests, for the years from `fromYear`, with their rows locked: the requests in order of id and the
    * years of each earliest first, as `lockOfRequest` takes them, so two releases queue and never wait for each other in a circle.
    */
-  async lockSeatCommitmentsOf(tx: DbTx, requestIds: readonly string[], fromYear: number): Promise<SeatCommitment[]> {
+  /** Locks held commitments from `fromYear` in deterministic request+year order, returning row IDs for Tier 9b slice locks. */
+  async lockSeatCommitmentsWithIds(
+    tx: DbTx,
+    requestIds: readonly string[],
+    fromYear: number,
+  ): Promise<Array<SeatCommitment & { id: string }>> {
     const found: (Omit<SeatCommitment, 'transferReleases'> & { id: string })[] = [];
     for (const requestId of [...new Set(requestIds)].sort()) {
       for (const row of await this.lockOfRequest(tx, requestId)) {
@@ -170,7 +185,10 @@ export class CommitmentRepo {
       found.map((item) => item.id),
     );
 
-    return found.map(({ id, ...commitment }) => ({ ...commitment, transferReleases: transferReleases.get(id) ?? [] }));
+    return found.map((commitment) => ({
+      ...commitment,
+      transferReleases: transferReleases.get(commitment.id) ?? [],
+    }));
   }
 
   /** For each of these commitments, the references of its releases for the day a transfer took effect; a commitment with none is absent. */
@@ -304,7 +322,7 @@ export class CommitmentRepo {
     row: CommitmentRow,
     input: {
       takeMinor: bigint;
-      reason: CommitmentReleaseReason | 'REMAINDER';
+      reason: CommitmentReleaseReason | 'REMAINDER' | 'MONTH_END' | 'YEAR_END_SEAT_MONTHS';
       reasonText: string | null;
       releasedByEmployeeId: string | null;
       now: Date;
@@ -604,34 +622,8 @@ export class CommitmentRepo {
 
     return { rows, total: await db.budgetCommitment.count({ where }) };
   }
-}
 
-export interface CommitmentOfRequest extends CommitmentRow {
-  organizationId: string;
-  costCenterId: string;
+  invoiceFiguresOf(commitmentIds: readonly string[]) {
+    return this.invoices.figuresOf(commitmentIds);
+  }
 }
-
-/** A commitment of a request as `lockOfRequest` reads it: with where it came from and what one seat costs a month in it. */
-export interface LockedCommitmentOfRequest extends CommitmentOfRequest {
-  origin: 'APPROVAL' | 'YEAR_START';
-  seatMonthlyMinor: bigint | null;
-  /** The version it is attached to; null while it waits for a budget (R-48). */
-  attachedVersionId: string | null;
-}
-
-/** A commitment still held that knows what one seat costs a month, with what it still holds. */
-export interface HeldWithSeatPrice {
-  costCenterId: string;
-  year: number;
-  requestId: string;
-  heldMinor: bigint;
-  seatMonthlyMinor: bigint;
-}
-
-/** What a commitment total says about the budget of a Cost Center and year. */
-export interface CommitmentTotals {
-  held: bigint;
-  spent: bigint;
-}
-
-export const heldKey = (costCenterId: string, year: number): string => `${costCenterId}:${year}`;
