@@ -1,7 +1,8 @@
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuditApi } from '../../audit/public/audit.api';
-import type { CatalogApi } from '../../catalog/public/catalog.api';
 import type { SeatTarget } from '../../catalog/public/catalog.types';
+import type { LicenseLotApi } from '../../catalog/public/license-lot.api';
+import type { LicenseLotView } from '../../catalog/public/license-lot.types';
 import {
   DeviceActivationAlreadyClosedError,
   DeviceActivationKeyWithdrawnError,
@@ -14,6 +15,17 @@ import {
 import { DeviceActivationCloseService } from './device-activation-close.service';
 import type { DeviceActivationRepo, KeyActivationMeta } from './device-activation.repo';
 import type { ActivationRecord } from './device-activation.types';
+
+/**
+ * The lot a purchase of wave 2 is since M6: a perpetual purchase of a K4 plan that is active is a lot of the same id and as many licenses as it bought;
+ * a draft (or anything else) is no lot.
+ */
+function lotOf(target: Partial<SeatTarget> | null): LicenseLotView | null {
+  if (!target || target.kind !== 'SUBSCRIPTION' || target.provisioningType !== 'K4' || target.status !== 'ACTIVE')
+    return null;
+
+  return { id: target.subscriptionId, licenseCount: target.purchasedQuantity ?? 0 } as unknown as LicenseLotView;
+}
 
 describe('DeviceActivationCloseService (W2-20, S-12)', () => {
   const tx = {} as DbTx;
@@ -122,18 +134,19 @@ describe('DeviceActivationCloseService (W2-20, S-12)', () => {
       }),
     } as unknown as DeviceActivationRepo;
 
-    const catalog = {
-      lockSeatTarget: jest.fn().mockImplementation(() => {
+    const lots = {
+      // The order label is the one of wave 2: the lock a purchase takes first is now the lot's.
+      lockLot: jest.fn().mockImplementation(() => {
         order.push('lockSeatTarget');
-        return Promise.resolve(purchase);
+        return Promise.resolve(lotOf(purchase));
       }),
-    } as unknown as CatalogApi;
+    } as unknown as LicenseLotApi;
 
     const auditRecord = jest.fn().mockResolvedValue(undefined);
     const audit = { record: auditRecord } as unknown as AuditApi;
-    const service = new DeviceActivationCloseService(repo, catalog, audit);
+    const service = new DeviceActivationCloseService(repo, lots, audit);
 
-    return { service, repo, catalog, auditRecord, order };
+    return { service, repo, lots, auditRecord, order };
   }
 
   it('closes DEVICE_KEY with default RETURN_TO_LOT and explicit LOST_WITH_DEVICE, and bundled with null release', async () => {

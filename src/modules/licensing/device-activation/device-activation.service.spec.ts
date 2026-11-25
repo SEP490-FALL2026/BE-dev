@@ -3,6 +3,8 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuditApi } from '../../audit/public/audit.api';
 import type { CatalogApi } from '../../catalog/public/catalog.api';
 import type { SeatTarget } from '../../catalog/public/catalog.types';
+import type { LicenseLotApi } from '../../catalog/public/license-lot.api';
+import type { LicenseLotView } from '../../catalog/public/license-lot.types';
 import {
   DeviceActivationAlreadyOnDeviceError,
   DeviceActivationKeyNotAllowedError,
@@ -18,6 +20,17 @@ import {
 import type { DeviceActivationRepo } from './device-activation.repo';
 import { DeviceActivationService } from './device-activation.service';
 import type { ActivationRecord, OpenActivationInput } from './device-activation.types';
+
+/**
+ * The lot a purchase of wave 2 is since M6: a perpetual purchase of a K4 plan that is active is a lot of the same id and as many licenses as it bought;
+ * a draft (or anything else) is no lot.
+ */
+function lotOf(target: Partial<SeatTarget> | null): LicenseLotView | null {
+  if (!target || target.kind !== 'SUBSCRIPTION' || target.provisioningType !== 'K4' || target.status !== 'ACTIVE')
+    return null;
+
+  return { id: target.subscriptionId, licenseCount: target.purchasedQuantity ?? 0 } as unknown as LicenseLotView;
+}
 
 interface SetupOptions {
   planTarget?: Partial<SeatTarget> | null;
@@ -150,17 +163,20 @@ describe('DeviceActivationService', () => {
 
     const catalog = {
       findPlanSeatTargets: jest.fn().mockResolvedValue(planTarget ? [planTarget] : []),
-      lockSeatTarget: jest.fn().mockImplementation(() => {
-        order.push('lockSeatTarget');
-        return Promise.resolve(lockedTarget);
-      }),
     } as unknown as CatalogApi;
+    const lots = {
+      // The order label is the one of wave 2: the lock a purchase takes first is now the lot's.
+      lockLot: jest.fn().mockImplementation(() => {
+        order.push('lockSeatTarget');
+        return Promise.resolve(lotOf(lockedTarget));
+      }),
+    } as unknown as LicenseLotApi;
 
     const auditRecord = jest.fn().mockResolvedValue(undefined);
     const audit = { record: auditRecord } as unknown as AuditApi;
-    const service = new DeviceActivationService(repo, catalog, audit);
+    const service = new DeviceActivationService(repo, catalog, lots, audit);
 
-    return { service, repo, catalog, auditRecord, order };
+    return { service, repo, catalog, lots, auditRecord, order };
   }
 
   const input = (over: Partial<OpenActivationInput> = {}): OpenActivationInput => ({
@@ -176,7 +192,7 @@ describe('DeviceActivationService', () => {
   });
 
   it('opens a DEVICE_BUNDLED activation without a key and records audit', async () => {
-    const { service, repo, catalog, auditRecord } = setup({
+    const { service, repo, lots, auditRecord } = setup({
       planTarget: { keyBinding: 'DEVICE_BUNDLED', subscriptionId: null },
     });
 
@@ -188,7 +204,7 @@ describe('DeviceActivationService', () => {
       overActivationCap: false,
       activation: { id: 'act-1', licenseKeyId: null },
     });
-    expect((catalog as unknown as { lockSeatTarget: jest.Mock }).lockSeatTarget).not.toHaveBeenCalled();
+    expect((lots as unknown as { lockLot: jest.Mock }).lockLot).not.toHaveBeenCalled();
     expect((repo as unknown as { insert: jest.Mock }).insert).toHaveBeenCalledTimes(1);
     expect(auditRecord).toHaveBeenCalledTimes(1);
   });

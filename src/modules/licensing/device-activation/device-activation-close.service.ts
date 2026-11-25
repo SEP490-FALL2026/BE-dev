@@ -3,7 +3,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { isCheckViolation, isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import { AuditApi } from '../../audit/public/audit.api';
 import type { AuditValue } from '../../audit/public/audit.types';
-import { CatalogApi } from '../../catalog/public/catalog.api';
+import { LicenseLotApi } from '../../catalog/public/license-lot.api';
 import {
   DeviceActivationAlreadyClosedError,
   DeviceActivationAlreadyOnDeviceError,
@@ -35,7 +35,7 @@ import type {
 export class DeviceActivationCloseService {
   constructor(
     private readonly repo: DeviceActivationRepo,
-    private readonly catalog: CatalogApi,
+    private readonly lots: LicenseLotApi,
     private readonly audit: AuditApi,
   ) {}
 
@@ -45,7 +45,7 @@ export class DeviceActivationCloseService {
     const probe = await this.repo.findById(input.activationId, tx);
     if (!probe) throw new DeviceActivationNotFoundError();
     if (probe.subscriptionId && probe.licenseKeyId) {
-      await this.catalog.lockSeatTarget(tx, { subscriptionId: probe.subscriptionId });
+      await this.lots.lockLot(tx, probe.subscriptionId);
       await this.repo.lockKeyForShare(tx, probe.licenseKeyId);
     }
 
@@ -85,20 +85,14 @@ export class DeviceActivationCloseService {
     if (!probe) throw new DeviceActivationNotFoundError();
     this.assertProbeMovable(probe, input.targetDeviceId);
 
-    const purchase = await this.catalog.lockSeatTarget(tx, { subscriptionId: probe.subscriptionId! });
+    const purchase = await this.lots.lockLot(tx, probe.subscriptionId!);
     await this.repo.lockKeyForShare(tx, probe.licenseKeyId!);
     const current = await this.repo.lockById(tx, input.activationId);
     if (!current) throw new DeviceActivationNotFoundError();
 
     const keyMeta = await this.repo.findKeyWithMeta(tx, current.licenseKeyId!);
-    if (
-      !purchase ||
-      purchase.kind !== 'SUBSCRIPTION' ||
-      purchase.provisioningType !== 'K4' ||
-      purchase.status !== 'ACTIVE'
-    ) {
-      throw new DeviceActivationPurchaseNotActiveError();
-    }
+    // A lot is a purchase of a K4 plan that can always give its licenses out: it has no draft state.
+    if (!purchase) throw new DeviceActivationPurchaseNotActiveError();
     const moveVerdict = judgeMove({
       isOpen: current.deactivatedAt === null,
       isDeviceKey: current.licenseKeyId !== null,
@@ -138,7 +132,7 @@ export class DeviceActivationCloseService {
     };
   }
 
-  /** Closes every open activation on `deviceId` (device retirement, loss, or voiding) in sorted subscription order. */
+  /** Closes every open activation on `deviceId` (device retirement, loss, or voiding) in sorted lot order (tier 6a). */
   async closeAllOfDevice(tx: DbTx, input: CloseAllDeviceActivationsInput): Promise<ActivationRecord[]> {
     const at = input.at ?? new Date();
     const openProbe = await this.repo.openOfDevice(input.deviceId, tx);
@@ -148,7 +142,7 @@ export class DeviceActivationCloseService {
       ...new Set(openProbe.map((row) => row.subscriptionId).filter((id): id is string => id !== null)),
     ].sort();
     for (const subscriptionId of subscriptionIds) {
-      await this.catalog.lockSeatTarget(tx, { subscriptionId });
+      await this.lots.lockLot(tx, subscriptionId);
     }
     const locked = await this.repo.lockOpenOfDevice(tx, input.deviceId);
     const decisionMap = this.validateDecisions(locked, input.decisions ?? []);

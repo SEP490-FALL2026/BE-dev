@@ -1,5 +1,6 @@
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import { SeatOccupancyHook } from '../../../catalog/public/catalog.extension-points';
+import type { LicenseLotApi } from '../../../catalog/public/license-lot.api';
 import type { DeviceActivationRepo } from '../../device-activation/device-activation.repo';
 import type { SharedPoolCapacityRepo } from '../../shared-pool/shared-pool-capacity.repo';
 import type { AssignmentRepo } from '../assignment.repo';
@@ -9,7 +10,7 @@ describe('AssignmentSeatOccupancy (S-6)', () => {
   const tx = {} as DbTx;
   const day = '2026-11-24';
 
-  function setup() {
+  function setup(lotIds: string[] = []) {
     const repo = {
       countHolding: jest.fn().mockResolvedValue(2),
       countHoldersOfPlans: jest.fn().mockResolvedValue(0),
@@ -32,8 +33,13 @@ describe('AssignmentSeatOccupancy (S-6)', () => {
       ),
     } as unknown as DeviceActivationRepo;
 
+    const lots = {
+      idsOfLots: jest
+        .fn()
+        .mockImplementation((ids: string[]) => Promise.resolve(new Set(ids.filter((id) => lotIds.includes(id))))),
+    } as unknown as LicenseLotApi;
     const hook = { bind: jest.fn() } as unknown as SeatOccupancyHook;
-    const listener = new AssignmentSeatOccupancy(repo, capacity, deviceActivations, hook);
+    const listener = new AssignmentSeatOccupancy(repo, capacity, deviceActivations, lots, hook);
 
     return { listener, repo, capacity, deviceActivations };
   }
@@ -58,5 +64,22 @@ describe('AssignmentSeatOccupancy (S-6)', () => {
     expect(map.get('sub-seat')).toEqual({ occupied: 3, inRevocation: 1 });
     expect(map.get('sub-key-only')).toEqual({ occupied: 4, inRevocation: 0 });
     expect(map.get('sub-empty')).toBeUndefined();
+  });
+
+  describe('a lot of a K4 plan is counted once, by the lot (DL-2)', () => {
+    it('takes the figure of the lot alone for occupiedBySubscription: the rights are already in it', async () => {
+      const { listener, repo } = setup(['lot-1']);
+
+      await expect(listener.occupiedBySubscription('lot-1', day, tx)).resolves.toBe(3);
+      expect((repo as unknown as { countHolding: jest.Mock }).countHolding).not.toHaveBeenCalled();
+    });
+
+    it('takes the figure of the lot alone in seatsOfSubscriptions, and keeps what is being taken back', async () => {
+      const { listener } = setup(['sub-seat']);
+
+      const map = await listener.seatsOfSubscriptions(['sub-seat', 'sub-key-only'], day, tx);
+      expect(map.get('sub-seat')).toEqual({ occupied: 1, inRevocation: 1 });
+      expect(map.get('sub-key-only')).toEqual({ occupied: 4, inRevocation: 0 });
+    });
   });
 });

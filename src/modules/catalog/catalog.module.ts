@@ -101,7 +101,9 @@ import { WorkspaceForSubscriptionService } from './workspace/workspace-for-subsc
 import { WorkspaceResponsibleService } from './workspace/workspace-responsible.service';
 import { WorkspaceService } from './workspace/workspace.service';
 import { WorkspaceRepo } from './workspace/workspace.repo';
+import { LicenseLotLockService } from './license-lot/license-lot-lock.service';
 import { LicenseLotRepo } from './license-lot/license-lot.repo';
+import { LicenseLotApi } from './public/license-lot.api';
 import { SeatLedgerRepo } from './subscription-line/ledger/seat-ledger.repo';
 import { SeatPurchaseRepo } from './subscription-line/purchase/seat-purchase.repo';
 import { SubscriptionLineRepo } from './subscription-line/subscription-line.repo';
@@ -180,6 +182,8 @@ import { WorkspacesController } from './workspace/workspaces.controller';
     WorkspaceRepo,
     SubscriptionLineRepo,
     LicenseLotRepo,
+    LicenseLotLockService,
+    LicenseLotApi,
     SeatLedgerRepo,
     SeatPurchaseRepo,
     WorkspaceApi,
@@ -234,12 +238,13 @@ import { WorkspacesController } from './workspace/workspaces.controller';
   ],
   // The facade licensing reads the seat targets through (ADR-0013), and the hook licensing binds its reader of occupied seats to
   // (`public/catalog.extension-points.ts`), and the facade the hand-over of an IT Admin who leaves moves their subscriptions and applications through
-  // (`public/catalog-responsibility.api.ts`), and the facade `usage` reads the applications of a contract through (`public/catalog-contract.api.ts`); the capability services and repos stay private.
+  // (`public/catalog-responsibility.api.ts`), and the facade `usage` reads the applications of a contract through (`public/catalog-contract.api.ts`), and the facade licensing reads and locks the lots of licenses through (`public/license-lot.api.ts`); the capability services and repos stay private.
   exports: [
     CatalogApi,
     CatalogPlanTermsApi,
     CatalogContractApi,
     CatalogResponsibilityApi,
+    LicenseLotApi,
     SubscriptionPeriodApi,
     SeatOccupancyHook,
     SeatBaselinePhaseHook,

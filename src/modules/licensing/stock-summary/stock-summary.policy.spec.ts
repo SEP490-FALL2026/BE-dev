@@ -3,7 +3,6 @@ import { stockOfPlan, type StockCounts } from './stock-summary.policy';
 const counts = (parts: Partial<StockCounts> = {}): StockCounts => ({
   seats: new Map(),
   keys: new Map(),
-  holders: new Map(),
   deviceOccupied: new Map(),
   ...parts,
 });
@@ -108,29 +107,6 @@ describe('stockOfPlan (QĐ-111n: the stock counted by what the plan gives out, n
       );
 
       expect(stock).toEqual({ kind: 'KEYS', inStore: 0, assigned: 0, withdrawn: 0 });
-    });
-  });
-
-  describe('a K1 plan counts rights', () => {
-    it('adds the people who hold the personal account over the subscriptions of the plan, with no figure of a free seat', () => {
-      const stock = stockOfPlan(
-        {
-          provisioningType: 'K1',
-          subscriptions: [
-            { subscriptionId: 'a', purchasedQuantity: 1 },
-            { subscriptionId: 'b', purchasedQuantity: 1 },
-            { subscriptionId: 'c', purchasedQuantity: 1 },
-          ],
-        },
-        counts({
-          holders: new Map([
-            ['a', 1],
-            ['c', 1],
-          ]),
-        }),
-      );
-
-      expect(stock).toEqual({ kind: 'HOLDERS', holders: 2 });
     });
   });
 });
