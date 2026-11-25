@@ -152,6 +152,22 @@ export class PlanWorkspaceLimitExceededError extends Error {
   }
 }
 
+/** The vendor of the plan holds several workspaces: the route of the old profile does not know which one to write (W3-13). */
+export class PlanWorkspaceAmbiguousError extends Error {
+  constructor(readonly workspaceIds: readonly string[]) {
+    super('The vendor of the plan holds several workspaces: record the administrators on the workspace itself.');
+    this.name = 'PlanWorkspaceAmbiguousError';
+  }
+}
+
+/** The application of the plan names no vendor, so there is no workspace to keep its administrators in (W3-13). */
+export class PlanWorkspaceVendorRequiredError extends Error {
+  constructor() {
+    super('The application of the plan has no vendor: name the vendor of the application first.');
+    this.name = 'PlanWorkspaceVendorRequiredError';
+  }
+}
+
 export class PlanWorkspaceTextInvalidError extends Error {
   constructor() {
     super('A workspace text field is too long.');

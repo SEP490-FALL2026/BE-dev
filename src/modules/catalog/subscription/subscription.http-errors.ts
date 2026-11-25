@@ -11,6 +11,11 @@ import {
 } from '../../../core/money/money.errors';
 import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import {
+  WorkspaceNotFoundError,
+  WorkspaceRequiredError,
+  WorkspaceVendorMismatchError,
+} from '../workspace/workspace.errors';
+import {
   SubscriptionApplicationRetiredError,
   SubscriptionPriceMismatchError,
   SubscriptionPriceNotVndError,
@@ -18,10 +23,17 @@ import {
   SubscriptionBillingLongerThanCommitmentError,
   SubscriptionCommitmentTermNotAllowedError,
   SubscriptionCommitmentTermRequiredError,
+  SubscriptionK1HasNoSubscriptionError,
   SubscriptionK1MonthlyOnlyError,
+  SubscriptionMembersMonthlyOnlyError,
+  SubscriptionMembersPaymentDayRequiredError,
+  SubscriptionSeatCountingFixedError,
   SubscriptionK4PerpetualOnlyError,
   SubscriptionMidTermReductionNotAllowedError,
+  SubscriptionPerpetualIsLicenseLotError,
   SubscriptionPrimaryConflictError,
+  SubscriptionPrimaryRetiredError,
+  SubscriptionSeatCountViaLedgerError,
   SubscriptionQuantityReasonRequiredError,
   SubscriptionStaleError,
   SubscriptionPrimaryNotEligibleError,
@@ -48,6 +60,37 @@ const UNPROCESSABLE = HttpStatus.UNPROCESSABLE_ENTITY;
 
 /** Maps the errors of the subscription routes to their HTTP answers; money errors come from the shared mapper. */
 export function toSubscriptionApiException(error: unknown): unknown {
+  if (error instanceof WorkspaceRequiredError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.WORKSPACE_REQUIRED', error.message, {
+      workspaceIds: error.workspaceIds,
+    });
+  }
+  if (error instanceof WorkspaceVendorMismatchError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.WORKSPACE_VENDOR_MISMATCH', error.message);
+  }
+  if (error instanceof WorkspaceNotFoundError)
+    return refuse(HttpStatus.NOT_FOUND, 'WORKSPACE.NOT_FOUND', error.message);
+  if (error instanceof SubscriptionMembersMonthlyOnlyError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.MEMBERS_MONTHLY_ONLY', error.message);
+  }
+  if (error instanceof SubscriptionMembersPaymentDayRequiredError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.MEMBERS_PAYMENT_DAY_REQUIRED', error.message);
+  }
+  if (error instanceof SubscriptionSeatCountingFixedError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.SEAT_COUNTING_FIXED', error.message);
+  }
+  if (error instanceof SubscriptionSeatCountViaLedgerError) {
+    return refuse(HttpStatus.CONFLICT, 'SUBSCRIPTION.SEAT_COUNT_VIA_LEDGER', error.message, { routes: error.routes });
+  }
+  if (error instanceof SubscriptionPrimaryRetiredError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.PRIMARY_RETIRED', error.message);
+  }
+  if (error instanceof SubscriptionK1HasNoSubscriptionError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.K1_HAS_NO_SUBSCRIPTION', error.message);
+  }
+  if (error instanceof SubscriptionPerpetualIsLicenseLotError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.PERPETUAL_IS_LICENSE_LOT', error.message);
+  }
   if (error instanceof ApiException) return error;
 
   if (error instanceof SubscriptionNotFoundError) {
@@ -196,6 +239,16 @@ export const SUBSCRIPTION_ERROR_EXAMPLES = {
   MID_TERM_REDUCTION_NOT_ALLOWED: example(new SubscriptionMidTermReductionNotAllowedError()),
   QUANTITY_REASON_REQUIRED: example(new SubscriptionQuantityReasonRequiredError()),
   DUPLICATE_PLAN: example(new SubscriptionDuplicatePlanError(['<subscription-id>'])),
+  WORKSPACE_REQUIRED: example(new WorkspaceRequiredError(['<workspace-id>', '<other-workspace-id>'])),
+  WORKSPACE_VENDOR_MISMATCH: example(new WorkspaceVendorMismatchError()),
+  WORKSPACE_NOT_FOUND: example(new WorkspaceNotFoundError()),
+  MEMBERS_MONTHLY_ONLY: example(new SubscriptionMembersMonthlyOnlyError()),
+  MEMBERS_PAYMENT_DAY_REQUIRED: example(new SubscriptionMembersPaymentDayRequiredError()),
+  SEAT_COUNTING_FIXED: example(new SubscriptionSeatCountingFixedError()),
+  SEAT_COUNT_VIA_LEDGER: example(new SubscriptionSeatCountViaLedgerError(['subscriptionLineSeatPurchase'])),
+  PRIMARY_RETIRED: example(new SubscriptionPrimaryRetiredError()),
+  K1_HAS_NO_SUBSCRIPTION: example(new SubscriptionK1HasNoSubscriptionError()),
+  PERPETUAL_IS_LICENSE_LOT: example(new SubscriptionPerpetualIsLicenseLotError()),
   MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(2, 'unitPrice')),
   MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError('unitPrice')),
   CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('XYZ', 'originalPrice')),

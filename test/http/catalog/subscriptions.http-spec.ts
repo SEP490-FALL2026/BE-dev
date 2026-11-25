@@ -5,7 +5,11 @@ import { PlanReferenceCommitmentNotApplicableError } from '../../../src/modules/
 import { PlanService } from '../../../src/modules/catalog/plan/plan.service';
 import { SubscriptionChangeService } from '../../../src/modules/catalog/subscription/subscription-change.service';
 import {
+  SubscriptionK1HasNoSubscriptionError,
+  SubscriptionPerpetualIsLicenseLotError,
   SubscriptionPriceMismatchError,
+  SubscriptionPrimaryRetiredError,
+  SubscriptionSeatCountViaLedgerError,
   SubscriptionStaleError,
 } from '../../../src/modules/catalog/subscription/subscription.errors';
 import { SubscriptionService } from '../../../src/modules/catalog/subscription/subscription.service';
@@ -122,6 +126,65 @@ describe('W3-02 & W3-03 catalog HTTP contract cases (e2e, no database)', () => {
       code: 'SUBSCRIPTION.STALE',
       details: { currentUpdatedAt: current.toISOString() },
     });
+  });
+
+  // W3-27: what a subscription no longer takes. The four refusals, with the code a client reads.
+  it('PATCH /subscriptions/:id with purchasedQuantity answers 409 SUBSCRIPTION.SEAT_COUNT_VIA_LEDGER with the routes that change the seats', async () => {
+    update.mockRejectedValueOnce(
+      new SubscriptionSeatCountViaLedgerError(['subscriptionLineSeatPurchase', 'subscriptionLineSeatCorrection']),
+    );
+
+    const response = await request(app.getHttpServer())
+      .patch(`/api/v1/subscriptions/${ID}`)
+      .set('Authorization', bearer(principal(['IT_ADMIN'])))
+      .send({ purchasedQuantity: 11, expectedUpdatedAt: '2026-11-25T09:00:00.000Z' })
+      .expect(409);
+
+    expect(bodyOf(response).error).toMatchObject({
+      code: 'SUBSCRIPTION.SEAT_COUNT_VIA_LEDGER',
+      details: { routes: ['subscriptionLineSeatPurchase', 'subscriptionLineSeatCorrection'] },
+    });
+  });
+
+  it('PATCH /subscriptions/:id with isPrimaryForPlan true answers 422 SUBSCRIPTION.PRIMARY_RETIRED', async () => {
+    update.mockRejectedValueOnce(new SubscriptionPrimaryRetiredError());
+
+    const response = await request(app.getHttpServer())
+      .patch(`/api/v1/subscriptions/${ID}`)
+      .set('Authorization', bearer(principal(['IT_ADMIN'])))
+      .send({ isPrimaryForPlan: true })
+      .expect(422);
+
+    expect(bodyOf(response).error.code).toBe('SUBSCRIPTION.PRIMARY_RETIRED');
+  });
+
+  it('POST /subscriptions for a plan of personal accounts answers 422 SUBSCRIPTION.K1_HAS_NO_SUBSCRIPTION', async () => {
+    declare.mockRejectedValueOnce(new SubscriptionK1HasNoSubscriptionError());
+
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/subscriptions')
+      .set('Authorization', bearer(principal(['IT_ADMIN'])))
+      .send(BASE_CREATE)
+      .expect(422);
+
+    expect(bodyOf(response).error.code).toBe('SUBSCRIPTION.K1_HAS_NO_SUBSCRIPTION');
+  });
+
+  it('POST /subscriptions with kind PERPETUAL answers 422 SUBSCRIPTION.PERPETUAL_IS_LICENSE_LOT', async () => {
+    declare.mockRejectedValueOnce(new SubscriptionPerpetualIsLicenseLotError());
+
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/subscriptions')
+      .set('Authorization', bearer(principal(['IT_ADMIN'])))
+      .send({
+        planId: ID,
+        kind: 'PERPETUAL',
+        unitPrice: { amount: '1000000', currency: 'VND' },
+        startDate: '2026-01-01',
+      })
+      .expect(422);
+
+    expect(bodyOf(response).error.code).toBe('SUBSCRIPTION.PERPETUAL_IS_LICENSE_LOT');
   });
 
   it('POST /plans maps PlanReferenceCommitmentNotApplicableError to 422 PLAN.REFERENCE_COMMITMENT_NOT_APPLICABLE', async () => {

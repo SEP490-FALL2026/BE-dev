@@ -220,8 +220,14 @@ describe('a change is made for a reason (US-04-13 AC-8)', () => {
 describe('which subscriptions a contract takes (US-04-13 AC-6, AC-7, AC-14; QĐ-111t)', () => {
   const k2 = { provisioningType: 'K2', subscriptionVendorId: VENDOR, contractVendorId: VENDOR };
 
-  it.each([['K2'], ['K4']])('takes a subscription of a %s plan of the same vendor', (provisioningType) => {
-    expect(() => assertSubscriptionLinkable({ ...k2, provisioningType })).not.toThrow();
+  it('takes a subscription of a K2 plan of the same vendor', () => {
+    expect(() => assertSubscriptionLinkable(k2)).not.toThrow();
+  });
+
+  it('refuses a subscription of a K4 plan: the contract of a lot of keys is set on the lot (W3-24)', () => {
+    expect(thrown(() => assertSubscriptionLinkable({ ...k2, provisioningType: 'K4' }))).toMatchObject({
+      name: 'ContractSubscriptionNotK2Error',
+    });
   });
 
   it.each([['K1'], ['K3'], ['K5']])(

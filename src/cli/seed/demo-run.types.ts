@@ -44,6 +44,8 @@ export interface DemoIds {
   vendors: Map<string, string>;
   plans: Map<string, string>;
   subscriptions: Map<string, string>;
+  /** The lots of licenses of the K4 plans, by the key of the lot. */
+  lots: Map<string, string>;
   costCenters: Map<string, string>;
   requests: Map<string, string>;
   usageSources: Map<string, string>;
@@ -79,6 +81,7 @@ export function emptyIds(): DemoIds {
     vendors: new Map(),
     plans: new Map(),
     subscriptions: new Map(),
+    lots: new Map(),
     costCenters: new Map(),
     requests: new Map(),
     usageSources: new Map(),

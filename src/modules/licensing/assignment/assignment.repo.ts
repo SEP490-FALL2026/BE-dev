@@ -11,60 +11,13 @@ import type {
   AssignmentSource,
   ExistingAssignment,
 } from '../public/licensing.types';
-
-/** The columns an assignment is answered with: a list reads these and nothing else. */
-const RECORD_SELECT = {
-  id: true,
-  source: true,
-  kind: true,
-  planId: true,
-  subscriptionId: true,
-  employeeId: true,
-  accountIdentifier: true,
-  reason: true,
-  costCenterId: true,
-  owningDepartmentId: true,
-  validFrom: true,
-  validFromBasis: true,
-  validUntil: true,
-  expectedEndDate: true,
-  predecessorId: true,
-  isMachineAccount: true,
-  machineAccountNote: true,
-  failedAt: true,
-  cancelledAt: true,
-  createdAt: true,
-} satisfies Prisma.LicenseAssignmentSelect;
-type Row = Prisma.LicenseAssignmentGetPayload<{ select: typeof RECORD_SELECT }>;
+import { RECORD_SELECT, toRecord } from './assignment-record.mapper';
 
 /** An assignment holds a seat from the day it is made until it ends or fails: not ended as of `day` and not failed. */
 const HOLDING = (day: BusinessDate): Prisma.LicenseAssignmentWhereInput => ({
   failedAt: null,
   cancelledAt: null,
   OR: [{ validUntil: null }, { validUntil: { gt: toDateColumn(day) } }],
-});
-
-export const toRecord = (row: Row): AssignmentRecord => ({
-  id: row.id,
-  source: row.source,
-  kind: row.kind,
-  planId: row.planId,
-  subscriptionId: row.subscriptionId,
-  employeeId: row.employeeId,
-  accountIdentifier: row.accountIdentifier,
-  reason: row.reason,
-  costCenterId: row.costCenterId,
-  owningDepartmentId: row.owningDepartmentId,
-  effectiveFrom: fromDateColumn(row.validFrom),
-  effectiveFromBasis: row.validFromBasis,
-  validUntil: row.validUntil ? fromDateColumn(row.validUntil) : null,
-  expectedEndDate: row.expectedEndDate ? fromDateColumn(row.expectedEndDate) : null,
-  predecessorId: row.predecessorId,
-  isMachineAccount: row.isMachineAccount,
-  machineAccountNote: row.machineAccountNote,
-  failedAt: row.failedAt,
-  cancelledAt: row.cancelledAt,
-  createdAt: row.createdAt,
 });
 
 export interface NewAssignment {
@@ -86,6 +39,9 @@ export interface NewAssignment {
   baselineImportId: string | null;
   /** The older right of the same person that the grant of this one ended the day it was given (R-49); absent for every other right. */
   replacesAssignmentId?: string | null;
+  /** A personal right of a K1 plan names the months it commits to and the day its billing counts from (W3-17); every other right leaves both out. */
+  personalCommitmentMonths?: 1 | 12 | null;
+  billingAnchorOn?: BusinessDate | null;
   /** A record that follows a flagged seat keeps its flag and its reason (`R-9`); every other record is written plain. */
   isMachineAccount: boolean;
   machineAccountNote: string | null;
@@ -120,6 +76,8 @@ export class AssignmentRepo {
         predecessorId: input.predecessorId,
         baselineImportId: input.baselineImportId,
         replacesAssignmentId: input.replacesAssignmentId ?? null,
+        personalCommitmentMonths: input.personalCommitmentMonths ?? null,
+        billingAnchorOn: input.billingAnchorOn ? toDateColumn(input.billingAnchorOn) : null,
         isMachineAccount: input.isMachineAccount,
         machineAccountNote: input.machineAccountNote,
         createdByAppUserId: input.createdByAppUserId,

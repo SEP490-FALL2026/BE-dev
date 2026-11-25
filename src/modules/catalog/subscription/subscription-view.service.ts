@@ -20,6 +20,7 @@ import {
 import { alertDates, deriveNotice, missingData, noticeInputOf, noticeWarnings } from './subscription.policy';
 import { isPricedInDong } from './price/subscription-price.policy';
 import { liveIdsByPlan, liveSiblingsOf, poolWarnings, vendorAdminFlags } from './pool/subscription-pool.policy';
+import { SubscriptionLotResponsibleService } from './responsible/subscription-lot-responsible.service';
 import { SubscriptionGrantingRepo } from './subscription-granting.repo';
 import { SubscriptionRepo } from './subscription.repo';
 import { SubscriptionWindowsService } from './subscription-windows.service';
@@ -107,6 +108,7 @@ export class SubscriptionViewService {
     private readonly occupancy: SeatOccupancyHook,
     private readonly periods: SubscriptionGrantingRepo,
     private readonly windows: SubscriptionWindowsService,
+    private readonly lotFacts: SubscriptionLotResponsibleService,
   ) {}
 
   /**
@@ -193,9 +195,28 @@ export class SubscriptionViewService {
     };
   }
 
-  /** The records as they are answered, with the derived notice, alerts, warnings, tax profile and estimate. */
+  /**
+   * The records as they are answered, with the derived notice, alerts, warnings, tax profile and estimate. A subscription that became a lot (a perpetual purchase)
+   * says who answers for the lot, which is where that is written (W3-24).
+   */
   async viewAll(records: SubscriptionRecord[]): Promise<SubscriptionView[]> {
     if (records.length === 0) return [];
+    const lotOwners = await this.lotFacts.lotResponsibles(
+      records.filter((record) => record.kind === 'PERPETUAL').map((record) => record.id),
+    );
+
+    return this.viewResolved(
+      lotOwners.size === 0
+        ? records
+        : records.map((record) =>
+            lotOwners.has(record.id)
+              ? { ...record, responsibleItAdminEmployeeId: lotOwners.get(record.id) ?? null }
+              : record,
+          ),
+    );
+  }
+
+  private async viewResolved(records: SubscriptionRecord[]): Promise<SubscriptionView[]> {
     // A priced subscription answers its tax profile from the read its estimate came from, so the two are one version
     //; only the vendors of the subscriptions without a price are read for their profile alone.
     const unpricedVendors = records.filter((record) => record.unitPrice === null).map((record) => record.vendor.id);
@@ -233,6 +254,8 @@ export class SubscriptionViewService {
     const { points, windows } = await this.pointsOf(records, today, await this.continuedAmong(records));
     const readings = this.readingsAt(records, points, today, seatCounts);
     const answerer = await this.answerersOf(records);
+    // A period that has lines is priced by its lines: the mark of the subscription that prices its plan is retired for it (W3-27).
+    const lined = await this.lotFacts.withLines(records.map((record) => record.id));
     const adjustment = (record: SubscriptionRecord) => ({
       logoUrl: record.applicationLogoUrl,
       responsibleItAdmin: answerer(record),
@@ -240,6 +263,7 @@ export class SubscriptionViewService {
       daysLeft: readings.get(record.id)?.daysLeft ?? null,
       deadlineKind: readings.get(record.id)?.deadlineKind ?? null,
       seats: seatsOfPool(record, seatCounts),
+      isPrimaryForPlan: record.isPrimaryForPlan && !lined.has(record.id),
     });
     const views: SubscriptionView[] = [];
     for (const record of records) {
@@ -306,7 +330,10 @@ export class SubscriptionViewService {
         allowsMidTermReduction: record.allowsMidTermReduction,
         responsibleItAdminEmployeeId: record.responsibleItAdminEmployeeId,
         vendorMinimumSeats: record.vendorMinimumSeats,
-        isPrimaryForPlan: record.isPrimaryForPlan,
+        workspace: record.workspace,
+        seatCounting: record.seatCounting,
+        minimumSeatsTotal: record.minimumSeatsTotal,
+        invoicedLater: record.invoicedLater,
         ...adjustment(record),
         noticeDeadline: { value: notice.deadline, source: notice.source },
         alerts: alertsOf(points.get(record.id) ?? null, record, windows.get(record.id)),

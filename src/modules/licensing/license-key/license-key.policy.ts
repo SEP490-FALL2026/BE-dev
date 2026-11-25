@@ -163,3 +163,40 @@ export function assertWithdrawable(key: KeyState): void {
   if (key.withdrawnAt !== null) throw new LicenseKeyStateError('ALREADY_WITHDRAWN');
   if (key.status === 'ASSIGNED') throw new LicenseKeyStateError('ASSIGNED');
 }
+
+/** What the keys of a purchase give: the capacity by how the plan is bound, what is taken of it and what is left. */
+export interface VaultSummary {
+  purchased: number | null;
+  usableKeys: number;
+  capacity: number;
+  warning: CapacityWarning | null;
+  /** How the plan of the purchase is bound; null for a plan that has no binding (read as bound to an account). */
+  keyBinding: KeyBinding;
+  /** What is taken of the capacity: the licenses held on machines for a key on a machine, the keys given to a seat otherwise. */
+  occupied: number;
+  /** What is left of the capacity. */
+  free: number;
+}
+
+/** The summary of a purchase from its figures: how many were bought, the keys usable and assigned, and the licenses held on machines. */
+export function vaultSummaryOf(input: {
+  purchased: number | null;
+  usableKeys: number;
+  keyBinding: KeyBinding;
+  assignedKeys: number;
+  deviceOccupied: number;
+}): VaultSummary {
+  const { purchased, usableKeys, keyBinding } = input;
+  const capacity = capacityOf({ purchased, usableKeys, keyBinding });
+  const occupied = occupiedOf(input);
+
+  return {
+    purchased,
+    usableKeys,
+    capacity,
+    warning: warningOf({ purchased, usableKeys, keyBinding }),
+    keyBinding,
+    occupied,
+    free: freeOf(capacity, occupied),
+  };
+}

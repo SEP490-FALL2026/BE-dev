@@ -39,6 +39,7 @@ const IT_ONLY = {
 const wireOf = (key: LicenseKeyView) => ({
   id: key.id,
   subscriptionId: key.subscriptionId,
+  licenseLot: key.licenseLotId === null ? null : { id: key.licenseLotId },
   masked: key.masked,
   status: key.status,
   importedAt: key.importedAt.toISOString(),
@@ -134,7 +135,11 @@ export class LicenseKeysController {
   )
   async list(@Query() query: ListKeysQueryDto) {
     try {
-      const page = await this.keys.list(query);
+      // A lot has the id of the subscription it was born from, so the purchase of the list is either id.
+      const page = await this.keys.list({
+        ...query,
+        subscriptionId: (query.licenseLotId ?? query.subscriptionId) as string,
+      });
 
       return {
         items: page.items.map(wireOf),

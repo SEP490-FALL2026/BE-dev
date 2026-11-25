@@ -1,7 +1,11 @@
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import type { LockedPlan } from '../../plan/plan-facts.service';
-import { SubscriptionVendorAdminsRequiredError } from '../subscription.errors';
-import { SubscriptionPoolService } from './subscription-pool.service';
+import {
+  SubscriptionStaleError,
+  SubscriptionVendorAdminsRequiredError,
+  SubscriptionWorkspaceMovedError,
+} from '../subscription.errors';
+import { SubscriptionPoolService, retryOnWorkspaceMove } from './subscription-pool.service';
 
 const tx = {} as unknown as DbTx;
 
@@ -16,6 +20,7 @@ function build(input: { applicationResponsible: string | null; usable: readonly 
     {} as never,
     {} as never,
     { responsibleItAdminIdOf } as never,
+    {} as never,
     {} as never,
   );
 
@@ -111,6 +116,7 @@ describe('SubscriptionPoolService.assertVendorAdmins and assertActivation', () =
       {} as never,
       baselinePhase as never,
       { vendorAdminsOf, workingAdminsAmong } as never,
+      {} as never,
       {} as never,
     );
 
@@ -227,5 +233,40 @@ describe('SubscriptionPoolService.assertVendorAdmins and assertActivation', () =
     await expect(
       closedShort.service.assertActivation(tx, k2Plan, 'TERM', state, true, 'org-1'),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe('retryOnWorkspaceMove (W3-14, N5)', () => {
+  const moved = () => new SubscriptionWorkspaceMovedError(new Date('2026-12-01T00:00:00.000Z'));
+
+  it('returns what the work returns when the workspace did not move', async () => {
+    const work = jest.fn().mockResolvedValue('written');
+
+    await expect(retryOnWorkspaceMove(work)).resolves.toBe('written');
+    expect(work).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts the write again when the workspace moved, and answers what the second try writes', async () => {
+    const work = jest.fn().mockRejectedValueOnce(moved()).mockResolvedValue('written');
+
+    await expect(retryOnWorkspaceMove(work)).resolves.toBe('written');
+    expect(work).toHaveBeenCalledTimes(2);
+  });
+
+  it('says the subscription is stale, with its version, after three tries, and no more', async () => {
+    const work = jest.fn().mockRejectedValue(moved());
+
+    await expect(retryOnWorkspaceMove(work)).rejects.toBeInstanceOf(SubscriptionStaleError);
+    await expect(retryOnWorkspaceMove(work)).rejects.toMatchObject({
+      currentUpdatedAt: new Date('2026-12-01T00:00:00.000Z'),
+    });
+    expect(work).toHaveBeenCalledTimes(6);
+  });
+
+  it('lets any other error through at once, with no new try', async () => {
+    const work = jest.fn().mockRejectedValue(new Error('db down'));
+
+    await expect(retryOnWorkspaceMove(work)).rejects.toThrow('db down');
+    expect(work).toHaveBeenCalledTimes(1);
   });
 });

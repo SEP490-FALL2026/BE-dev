@@ -13,8 +13,10 @@ import {
   SubscriptionNotFoundError,
   SubscriptionPlanNotFoundError,
   SubscriptionStillDraftError,
+  SubscriptionWorkspaceMovedError,
 } from './subscription.errors';
 import {
+  assertDeclarable,
   assertSubscriptionShape,
   declaredStateOf,
   missingData,
@@ -24,7 +26,7 @@ import {
 import { assertDeclarableCycle } from './pool/subscription-pool.policy';
 import { SubscriptionRepo } from './subscription.repo';
 import { snapshotOf, stateOf } from './subscription.mapper';
-import { SubscriptionPoolService } from './pool/subscription-pool.service';
+import { SubscriptionPoolService, retryOnWorkspaceMove } from './pool/subscription-pool.service';
 import { isPricedInDong } from './price/subscription-price.policy';
 import { SubscriptionPricingService } from './subscription-pricing.service';
 import { SubscriptionViewService } from './subscription-view.service';
@@ -32,6 +34,7 @@ import type {
   BillingCycle,
   CommitmentTermMonths,
   OriginalPriceRecord,
+  SeatCounting,
   SubscriptionRecord,
   SubscriptionKind,
   SubscriptionListFilter,
@@ -61,6 +64,11 @@ export interface DeclareSubscriptionInput {
   allowsMidTermReduction?: boolean;
   responsibleItAdminEmployeeId?: string;
   vendorMinimumSeats?: number;
+  /** The workspace the subscription is held in (W3-11); left out, the default of the vendor for a plan the company administers there. */
+  workspaceId?: string;
+  seatCounting?: SeatCounting;
+  minimumSeatsTotal?: number;
+  invoicedLater?: boolean;
 }
 
 /** The change of a subscription: the plan and the kind are not fields; only the four dates and the notice period clear. */
@@ -82,6 +90,11 @@ export interface UpdateSubscriptionInput {
   vendorMinimumSeats?: number | null;
   isPrimaryForPlan?: boolean;
   quantityChangeReason?: string;
+  /** Moves the subscription to another workspace of the same vendor (W3-11). */
+  workspaceId?: string;
+  seatCounting?: SeatCounting;
+  minimumSeatsTotal?: number | null;
+  invoicedLater?: boolean;
 }
 
 /**
@@ -113,6 +126,7 @@ export class SubscriptionService {
     query: {
       applicationId?: string;
       planId?: string;
+      workspaceId?: string;
       status?: SubscriptionStatus;
       kind?: SubscriptionKind;
       warning?: 'NO_ALERT_ANCHOR';
@@ -126,6 +140,7 @@ export class SubscriptionService {
     const scope: SubscriptionListScope = {
       ...(query.applicationId ? { applicationId: query.applicationId } : {}),
       ...(query.planId ? { planId: query.planId } : {}),
+      ...(query.workspaceId ? { workspaceId: query.workspaceId } : {}),
       ...(query.status ? { status: query.status } : {}),
       ...(query.kind ? { kind: query.kind } : {}),
       ...(query.warning ? { withoutAlertAnchor: true } : {}),
@@ -171,6 +186,7 @@ export class SubscriptionService {
    * finance facade for the unit price and the original price.
    */
   async declare(actor: AuthenticatedPrincipal, input: DeclareSubscriptionInput): Promise<SubscriptionView> {
+    assertDeclarable(input.kind);
     assertDeclarableCycle(input.billingCycle);
     const sentUnit = input.unitPrice ? await this.pricing.read(input.unitPrice, 'unitPrice') : undefined;
     const sentMonthly = input.monthlyUnitPrice
@@ -211,6 +227,12 @@ export class SubscriptionService {
     },
   ): Promise<SubscriptionRecord> {
     const { money, monthlyUnitPriceMinor, originalPrice, organizationId } = ctx;
+    // The workspace is locked `FOR UPDATE` first (tier 5b), so two declarations into one workspace take turns; its vendor is read from the plan
+    // without a lock, as it never changes.
+    const [unlocked] = await this.plans.lookups([input.planId], tx);
+    if (!unlocked) throw new SubscriptionPlanNotFoundError();
+    assertDeclarable(input.kind, unlocked.provisioningType);
+    const workspaceId = await this.poolRules.workspaceFor(tx, actor, organizationId, unlocked, input.workspaceId);
     // The plan is locked `FOR UPDATE` before anything else: no row of this subscription exists yet to lock, so the plan is what two
     // declarations of the same K2 or K4 plan take turns on (R-E02); every other writer locks a subscription first, then its plan.
     const plan = await this.plans.lockExclusive(tx, input.planId);
@@ -243,6 +265,7 @@ export class SubscriptionService {
       monthlyUnitPriceMinor,
       originalPrice,
       status: complete,
+      workspaceId,
     });
     await this.audit.record(
       tx,
@@ -268,14 +291,27 @@ export class SubscriptionService {
   async complete(actor: AuthenticatedPrincipal, id: string): Promise<SubscriptionView> {
     const organizationId = await this.requireOrganizationId();
 
-    const record = await this.runner.run(async (tx) => {
-      const current = await this.lockForComplete(tx, id);
+    const record = await retryOnWorkspaceMove(() =>
+      this.runner.run((tx) => this.completeIn(tx, actor, id, organizationId)),
+    );
+
+    return (await this.views.viewAll([record]))[0];
+  }
+
+  private async completeIn(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    id: string,
+    organizationId: string,
+  ): Promise<SubscriptionRecord> {
+    {
+      const { current, workspaceId } = await this.lockWorkspaceThenPeriod(tx, actor, id, organizationId);
       if (current.status === 'ACTIVE') return current;
       // The subscription candidates are locked first, then the plan `FOR UPDATE`: a draft that becomes live takes its turn against the other writes of the plan.
       const plan = await this.plans.lockExclusive(tx, current.planId);
       if (!plan) throw new SubscriptionPlanNotFoundError();
 
-      const state = stateOf(current);
+      const state = { ...stateOf(current), workspaceId: workspaceId ?? current.workspace?.id ?? null };
       const missing = this.missingOf(plan, current.kind, state);
       if (missing.length > 0) throw new SubscriptionStillDraftError(missing);
       await this.poolRules.assertActivation(
@@ -309,9 +345,29 @@ export class SubscriptionService {
       );
 
       return completed;
-    });
+    }
+  }
 
-    return (await this.views.viewAll([record]))[0];
+  /**
+   * The locks of a completion in the order of the lock table: the workspace first (tier 5b), read without a lock, locked, and read again once the
+   * period is locked (W3-14, N5); then the period. A draft of a plan that needs a workspace and has none takes the default of its vendor. Throws
+   * SubscriptionNotFoundError, SubscriptionPlanNotFoundError and SubscriptionWorkspaceMovedError.
+   */
+  private async lockWorkspaceThenPeriod(tx: DbTx, actor: AuthenticatedPrincipal, id: string, organizationId: string) {
+    const probe = await this.subscriptions.find(id, tx);
+    if (!probe) throw new SubscriptionNotFoundError();
+    const [unlocked] = await this.plans.lookups([probe.planId], tx);
+    if (!unlocked) throw new SubscriptionPlanNotFoundError();
+    const workspaceId =
+      probe.status === 'ACTIVE'
+        ? null
+        : await this.poolRules.workspaceFor(tx, actor, organizationId, unlocked, probe.workspace?.id);
+    const current = await this.lockForComplete(tx, id);
+    if ((current.workspace?.id ?? null) !== (probe.workspace?.id ?? null)) {
+      throw new SubscriptionWorkspaceMovedError(current.updatedAt);
+    }
+
+    return { current, workspaceId };
   }
 
   /**

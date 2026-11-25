@@ -31,6 +31,7 @@ import type {
 
 /** The plan, its application and the vendor of it, only as far as a subscription is answered with them. */
 const WITH_PLAN = {
+  workspace: { select: { id: true, name: true } },
   plan: {
     select: {
       name: true,
@@ -134,6 +135,10 @@ function toRecord(row: Row): SubscriptionRecord {
     vendorMinimumSeats: row.vendorMinimumSeats,
     isPrimaryForPlan: row.isPrimaryForPlan,
     renewedFromId: row.renewedFromId,
+    workspace: row.workspace ? { id: row.workspace.id, name: row.workspace.name } : null,
+    seatCounting: row.seatCounting === 'MEMBERS' ? 'MEMBERS' : 'FIXED',
+    minimumSeatsTotal: row.minimumSeatsTotal,
+    invoicedLater: row.invoicedLater,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -171,6 +176,10 @@ function columnsOf(state: SubscriptionState) {
     responsibleItAdminEmployeeId: state.responsibleItAdminEmployeeId,
     vendorMinimumSeats: state.vendorMinimumSeats,
     isPrimaryForPlan: state.isPrimaryForPlan,
+    ...(state.workspaceId === undefined ? {} : { workspaceId: state.workspaceId }),
+    ...(state.seatCounting === undefined ? {} : { seatCounting: state.seatCounting }),
+    ...(state.minimumSeatsTotal === undefined ? {} : { minimumSeatsTotal: state.minimumSeatsTotal }),
+    ...(state.invoicedLater === undefined ? {} : { invoicedLater: state.invoicedLater }),
   };
 }
 
@@ -557,6 +566,7 @@ export class SubscriptionRepo {
         : []),
       ...(filter.applicationId ? [{ plan: { applicationId: filter.applicationId } }] : []),
       ...(filter.planId ? [{ planId: filter.planId }] : []),
+      ...(filter.workspaceId ? [{ workspaceId: filter.workspaceId }] : []),
       ...(filter.status ? [{ status: filter.status }] : []),
       ...(filter.kind ? [{ kind: filter.kind }] : []),
       // The rule that derives the NO_ALERT_ANCHOR warning, as a filter: a term subscription with no declared deadline,

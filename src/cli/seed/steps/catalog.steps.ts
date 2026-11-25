@@ -182,7 +182,10 @@ export function workspaceProfileBody(
   ownerAccountEmail?: string;
 } | null {
   if (!needsVendorAdmins(plan)) return null;
-  const owner = ctx.fixture.subscriptions.find((subscription) => subscription.plan === plan.key)?.responsible;
+  // A K4 plan is held in lots, not in a subscription: the IT Admin who made its first lot answers for it.
+  const owner =
+    ctx.fixture.subscriptions.find((subscription) => subscription.plan === plan.key)?.responsible ??
+    ctx.fixture.lots.find((lot) => lot.plan === plan.key)?.responsible;
   const other =
     plan.vendorAdmin ??
     ctx.fixture.people.find((person) => person.account === 'IT_ADMIN' && person.code !== owner)?.code;
@@ -282,7 +285,7 @@ function annualDates(ctx: DatedContext, subscription: DemoSubscription): Dates {
 
 /** The day a subscription starts: the first day the seats of the pool exist, so no seat of it is granted before. */
 export function subscriptionStartDate(ctx: DatedContext, subscription: DemoSubscription): string {
-  if (subscription.kind === 'PERPETUAL' || subscription.withoutDates) return dayOffset(ctx.today, -200);
+  if (subscription.withoutDates) return dayOffset(ctx.today, -200);
 
   return (subscription.billingCycle === 'ANNUAL' ? annualDates(ctx, subscription) : monthlyDates(ctx, subscription))
     .startDate;
@@ -298,8 +301,6 @@ export function subscriptionTerms(ctx: DemoRunContext, subscription: DemoSubscri
     ...(subscription.originalPrice ? { originalPrice: subscription.originalPrice } : {}),
     responsibleItAdminEmployeeId: ctx.ids.employees.get(subscription.responsible),
   };
-  // A key is bought once, on a day in the past (the purchase date is the start date); it has no term and no end.
-  if (subscription.kind === 'PERPETUAL') return { ...base, startDate: dayOffset(ctx.today, -200) };
   const cycle = { billingCycle: subscription.billingCycle, commitmentTermMonths: subscription.termMonths };
   // A plan with no date to alert from: no end, no renewal, no notice (the warning `NO_ALERT_ANCHOR`, the refusal `CONTRACT_DATA_INCOMPLETE`).
   if (subscription.withoutDates) {
@@ -337,7 +338,6 @@ export function subscriptionBody(
 }
 
 function termOrPerpetualPriceFields(subscription: DemoSubscription): Record<string, unknown> {
-  if (subscription.kind === 'PERPETUAL') return { unitPrice: subscription.unitPrice };
   const cycleMonths = subscription.billingCycle === 'ANNUAL' ? 12n : 1n;
   const rawUnit = BigInt(subscription.unitPrice.amount);
   const monthlyMinor = (rawUnit * 2n + cycleMonths) / (2n * cycleMonths);

@@ -219,6 +219,41 @@ export class SubscriptionQuantityReasonRequiredError extends Error {
   }
 }
 
+/** A subscription counted by its members commits for one month only (QĐ-115g, C4). */
+export class SubscriptionMembersMonthlyOnlyError extends Error {
+  constructor() {
+    super('A subscription whose seats are the members the vendor counts commits for one month only.');
+    this.name = 'SubscriptionMembersMonthlyOnlyError';
+  }
+}
+
+/** An active subscription counted by its members names its payment day in renewalDate. */
+export class SubscriptionMembersPaymentDayRequiredError extends Error {
+  constructor() {
+    super('An active subscription counted by its members needs renewalDate, its payment day.');
+    this.name = 'SubscriptionMembersPaymentDayRequiredError';
+  }
+}
+
+/** How the seats are counted does not change once the subscription is active. */
+export class SubscriptionSeatCountingFixedError extends Error {
+  constructor() {
+    super('How the seats of an active subscription are counted cannot change.');
+    this.name = 'SubscriptionSeatCountingFixedError';
+  }
+}
+
+/**
+ * The workspace of the subscription changed between the read that told which workspace to lock and the lock of the period (W3-14, N5): the write
+ * starts again with the workspace it now holds. Never reaches a caller: after three tries it is a SubscriptionStaleError.
+ */
+export class SubscriptionWorkspaceMovedError extends Error {
+  constructor(readonly currentUpdatedAt: Date) {
+    super('The subscription moved to another workspace while it was being written.');
+    this.name = 'SubscriptionWorkspaceMovedError';
+  }
+}
+
 export class SubscriptionPriceMismatchError extends Error {
   constructor(
     readonly expectedUnitPriceMinor: bigint,
@@ -226,5 +261,37 @@ export class SubscriptionPriceMismatchError extends Error {
   ) {
     super('The provided unitPrice does not match monthlyUnitPrice multiplied by the billing cycle months.');
     this.name = 'SubscriptionPriceMismatchError';
+  }
+}
+
+/** The seats of a subscription are not set by editing it: they are bought, corrected and reduced on the lines of the subscription, and counted from its ledger (W3-27). */
+export class SubscriptionSeatCountViaLedgerError extends Error {
+  constructor(readonly routes: readonly string[]) {
+    super('The seats of a subscription are not edited: buy, correct or reduce them on its lines.');
+    this.name = 'SubscriptionSeatCountViaLedgerError';
+  }
+}
+
+/** The subscription that prices its plan is no longer chosen by hand: the price of a plan is read from the line of the workspace (W3-27). */
+export class SubscriptionPrimaryRetiredError extends Error {
+  constructor() {
+    super('A subscription is no longer marked as the one that prices its plan.');
+    this.name = 'SubscriptionPrimaryRetiredError';
+  }
+}
+
+/** A plan of personal accounts (K1) is paid by the month for each account and has no subscription (W3-27). */
+export class SubscriptionK1HasNoSubscriptionError extends Error {
+  constructor() {
+    super('A plan of personal accounts has no subscription: its accounts are granted and paid one by one.');
+    this.name = 'SubscriptionK1HasNoSubscriptionError';
+  }
+}
+
+/** A purchase made once (K4) is a lot of licenses, not a subscription (W3-27). */
+export class SubscriptionPerpetualIsLicenseLotError extends Error {
+  constructor() {
+    super('A purchase made once is a lot of licenses: create it as a lot.');
+    this.name = 'SubscriptionPerpetualIsLicenseLotError';
   }
 }

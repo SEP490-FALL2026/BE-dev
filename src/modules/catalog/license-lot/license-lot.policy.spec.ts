@@ -1,0 +1,106 @@
+import {
+  LicenseLotContractReasonRequiredError,
+  LicenseLotKeysExceedLicensesError,
+  LicenseLotPlanNotK4Error,
+  LicenseLotPriceLockedError,
+  LicenseLotPurposeNotAvailableError,
+  LicenseLotRequestRequiredError,
+} from './license-lot.errors';
+import {
+  assertCreatable,
+  assertKeysWithinLicenses,
+  assertPriceOpen,
+  costBorneOf,
+  freeOf,
+  grantableOf,
+  judgeContractChange,
+} from './license-lot.policy';
+
+describe('what a lot of licenses may be (W3-24)', () => {
+  const account = { planProvisioningType: 'K4', keyBinding: 'ACCOUNT' as const, requestId: undefined };
+  const machine = { planProvisioningType: 'K4', keyBinding: 'DEVICE_KEY' as const, requestId: undefined };
+
+  it('is made for a K4 plan whose key goes to an account (a request, a replacement) or on a machine (a stock)', () => {
+    expect(() => assertCreatable({ ...account, purpose: 'REQUEST', requestId: 'r-1' })).not.toThrow();
+    expect(() => assertCreatable({ ...account, purpose: 'REPLACEMENT' })).not.toThrow();
+    expect(() => assertCreatable({ ...machine, purpose: 'STOCK' })).not.toThrow();
+    expect(() => assertCreatable({ ...machine, purpose: 'REPLACEMENT' })).not.toThrow();
+  });
+
+  it('refuses a plan that is not K4, with the code of the rule', () => {
+    expect(() => assertCreatable({ ...account, planProvisioningType: 'K2', purpose: 'STOCK' })).toThrow(
+      LicenseLotPlanNotK4Error,
+    );
+    expect(() => assertCreatable({ ...account, planProvisioningType: 'NONE', purpose: 'REPLACEMENT' })).toThrow(
+      LicenseLotPlanNotK4Error,
+    );
+  });
+
+  it('refuses a purpose the plan cannot take: a request for a key on a machine, a stock for a key on an account, a plan bundled with the machine', () => {
+    expect(() => assertCreatable({ ...machine, purpose: 'REQUEST', requestId: 'r-1' })).toThrow(
+      LicenseLotPurposeNotAvailableError,
+    );
+    expect(() => assertCreatable({ ...account, purpose: 'STOCK' })).toThrow(LicenseLotPurposeNotAvailableError);
+    expect(() => assertCreatable({ ...account, keyBinding: 'DEVICE_BUNDLED', purpose: 'REPLACEMENT' })).toThrow(
+      LicenseLotPurposeNotAvailableError,
+    );
+  });
+
+  it('asks a lot for a request to name the request', () => {
+    expect(() => assertCreatable({ ...account, purpose: 'REQUEST' })).toThrow(LicenseLotRequestRequiredError);
+  });
+});
+
+describe('the contract of a lot (QĐ-115au)', () => {
+  it('asks the reason to leave a contract for another or for none, and not for the first one', () => {
+    expect(() => judgeContractChange({ current: 'c-1', next: 'c-2', reason: undefined })).toThrow(
+      LicenseLotContractReasonRequiredError,
+    );
+    expect(() => judgeContractChange({ current: 'c-1', next: null, reason: '   ' })).toThrow(
+      LicenseLotContractReasonRequiredError,
+    );
+    expect(judgeContractChange({ current: 'c-1', next: 'c-2', reason: 'The vendor signed again' })).toBe('CHANGED');
+    expect(judgeContractChange({ current: null, next: 'c-1', reason: undefined })).toBe('CHANGED');
+  });
+
+  it('is unchanged when the contract is not sent or is the one the lot has', () => {
+    expect(judgeContractChange({ current: 'c-1', next: undefined, reason: undefined })).toBe('UNCHANGED');
+    expect(judgeContractChange({ current: 'c-1', next: 'c-1', reason: undefined })).toBe('UNCHANGED');
+  });
+});
+
+describe('the price of a lot and its keys', () => {
+  it('is set until a key of the lot is given or an invoice of it is confirmed', () => {
+    expect(() => assertPriceOpen({ invoiceActualMinor: null, keysAssigned: 0 })).not.toThrow();
+    expect(() => assertPriceOpen({ invoiceActualMinor: 1n, keysAssigned: 0 })).toThrow(LicenseLotPriceLockedError);
+    expect(() => assertPriceOpen({ invoiceActualMinor: null, keysAssigned: 1 })).toThrow(LicenseLotPriceLockedError);
+  });
+
+  it('holds no more keys than licenses for a plan bound to an account, and no limit for a key on a machine (K-A6)', () => {
+    expect(() =>
+      assertKeysWithinLicenses({ keyBinding: 'ACCOUNT', licenseCount: 3, keysNotWithdrawn: 2, adding: 1 }),
+    ).not.toThrow();
+    expect(() =>
+      assertKeysWithinLicenses({ keyBinding: 'ACCOUNT', licenseCount: 3, keysNotWithdrawn: 3, adding: 1 }),
+    ).toThrow(LicenseLotKeysExceedLicensesError);
+    expect(() =>
+      assertKeysWithinLicenses({ keyBinding: 'DEVICE_KEY', licenseCount: 3, keysNotWithdrawn: 30, adding: 10 }),
+    ).not.toThrow();
+  });
+
+  it('bears the cost of every key but the ones bought for a request', () => {
+    expect([costBorneOf('REQUEST'), costBorneOf('OPENING'), costBorneOf('REPLACEMENT'), costBorneOf('STOCK')]).toEqual([
+      false,
+      true,
+      true,
+      true,
+    ]);
+  });
+
+  it('says what is free and worth: a lot of 3 with 1 taken and 1 key in the store has 2 free and 1 to grant', () => {
+    expect(freeOf(3, 1, 12_000_000n)).toEqual({ free: 2, freeValueMinor: 24_000_000n });
+    expect(freeOf(3, 5, 12_000_000n)).toEqual({ free: 0, freeValueMinor: 0n });
+    expect(grantableOf({ keyBinding: 'ACCOUNT', free: 2, keysInStore: 1 })).toBe(1);
+    expect(grantableOf({ keyBinding: 'DEVICE_KEY', free: 2, keysInStore: 1 })).toBeNull();
+  });
+});

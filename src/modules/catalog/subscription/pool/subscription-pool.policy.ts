@@ -6,6 +6,8 @@ import {
   SubscriptionCommitmentTermRequiredError,
   SubscriptionK1MonthlyOnlyError,
   SubscriptionK4PerpetualOnlyError,
+  SubscriptionMembersMonthlyOnlyError,
+  SubscriptionMembersPaymentDayRequiredError,
   SubscriptionResponsibleRequiredError,
   SubscriptionVendorAdminsRequiredError,
 } from '../subscription.errors';
@@ -13,6 +15,7 @@ import type {
   BillingCycle,
   DeclarableBillingCycle,
   ProvisioningType,
+  SeatCounting,
   SubscriptionKind,
   SubscriptionWarning,
 } from '../subscription.types';
@@ -24,6 +27,9 @@ export interface PoolTermsInput {
   commitmentTermMonths: number | null;
   /** The subscription is becoming active with this write: a new one that is complete, or a draft that was just completed. */
   activating: boolean;
+  /** How the seats are counted and the payment day of a subscription counted by its members (W3-11); left out, the rules of a fixed count apply. */
+  seatCounting?: SeatCounting | undefined;
+  renewalDate?: string | null | undefined;
 }
 
 const DECLARABLE_CYCLES: readonly string[] = ['MONTHLY', 'ANNUAL'] satisfies readonly DeclarableBillingCycle[];
@@ -74,11 +80,24 @@ export function assertPoolTerms(input: PoolTermsInput): void {
 
     return;
   }
+  assertMembersTerms(input);
   if (input.commitmentTermMonths === 1 && input.billingCycle === 'ANNUAL') {
     throw new SubscriptionBillingLongerThanCommitmentError();
   }
   assertTermOfKind(input);
   if (input.activating && input.commitmentTermMonths === null) throw new SubscriptionCommitmentTermRequiredError();
+}
+
+/**
+ * A subscription counted by the members the vendor counts (`MEMBERS`, `QĐ-115g`) commits for one month only, and once active names its payment day in
+ * `renewalDate`. A fixed count is judged by nothing here. Throws SubscriptionMembersMonthlyOnlyError, SubscriptionMembersPaymentDayRequiredError.
+ */
+function assertMembersTerms(input: PoolTermsInput): void {
+  if (input.seatCounting !== 'MEMBERS') return;
+  if (input.commitmentTermMonths !== null && input.commitmentTermMonths !== 1) {
+    throw new SubscriptionMembersMonthlyOnlyError();
+  }
+  if (input.activating && (input.renewalDate ?? null) === null) throw new SubscriptionMembersPaymentDayRequiredError();
 }
 
 /** An active subscription names the IT Admin who answers for it (`QĐ-103v`(4)). */

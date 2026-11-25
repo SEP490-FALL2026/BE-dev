@@ -65,6 +65,10 @@ import { LicenseKeyAssignmentService } from './license-key/license-key-assignmen
 import { LicenseKeyRevealQuotaRepo } from './license-key/license-key-reveal-quota.repo';
 import { LicenseKeyImportSettingsService } from './license-key/license-key-import-settings.service';
 import { LicenseKeyService } from './license-key/license-key.service';
+import { LicenseLotCreateController } from './license-lot/license-lot-create.controller';
+import { LicenseLotCreateService } from './license-lot/license-lot-create.service';
+import { LicenseLotKeyImportService } from './license-key/license-lot-key-import.service';
+import { LicenseLotKeysController } from './license-key/license-lot-keys.controller';
 import { LicenseKeysController } from './license-key/license-keys.controller';
 import { MySoftwareController } from './my-software/my-software.controller';
 import { MySoftwareRepo } from './my-software/my-software.repo';
@@ -162,6 +166,8 @@ import { SubscriptionRenewalSweepService } from './subscription-renewal/subscrip
 import { RenewalViewService } from './subscription-renewal/subscription-renewal-view.service';
 import { SubscriptionRenewalSweeper } from './subscription-renewal/subscription-renewal.job';
 import { SubscriptionRenewalRepo } from './subscription-renewal/subscription-renewal.repo';
+import { SubscriptionLineTargetRepo } from './subscription-renewal/lines/subscription-line-target.repo';
+import { SubscriptionRenewalAutoRepo } from './subscription-renewal/subscription-renewal-auto.repo';
 import { SubscriptionRenewalsController } from './subscription-renewal/subscription-renewals.controller';
 import { PoliciesTemplateFacadeModule } from '../policies/policies-template-facade.module';
 import { LicenseKeyTemplateListener } from './license-key/license-key-template.listener';
@@ -196,6 +202,8 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     ProvisioningTasksController,
     RevocationTasksController,
     LicenseKeysController,
+    LicenseLotCreateController,
+    LicenseLotKeysController,
     ExpiryController,
     SaasIssuesController,
     MySoftwareController,
@@ -295,6 +303,8 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     MySoftwareRepo,
     MySoftwareService,
     SubscriptionRenewalRepo,
+    SubscriptionLineTargetRepo,
+    SubscriptionRenewalAutoRepo,
     SubscriptionRenewalSeatRepo,
     RenewalSavingsRepo,
     RenewalSavingsService,
@@ -317,6 +327,8 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     LicenseKeyRepo,
     LicenseKeyRevealQuotaRepo,
     LicenseKeyService,
+    LicenseLotKeyImportService,
+    LicenseLotCreateService,
     LicenseKeyImportSettingsService,
     LicenseKeyAssignmentService,
     {

@@ -275,7 +275,11 @@ export class PurchaseInvoicePlanService {
 
   /** Reads K2 pool expectation inputs for a submitted invoice being confirmed. */
   async poolExpectationFactsOf(
-    link: { linkKind: 'REQUEST' | 'SUBSCRIPTION'; requestId: string | null; subscriptionId: string | null },
+    link: {
+      linkKind: 'REQUEST' | 'SUBSCRIPTION' | 'LICENSE_LOT';
+      requestId: string | null;
+      subscriptionId: string | null;
+    },
     tx?: DbTx,
   ): Promise<PoolExpectationFacts> {
     if (link.linkKind === 'SUBSCRIPTION') {

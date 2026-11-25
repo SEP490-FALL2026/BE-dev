@@ -10,7 +10,10 @@ interface ContractFixture {
   number: string;
   name: string;
   application: string;
+  /** The periods of the shared pool the contract rests on (K2). */
   subscriptions: string[];
+  /** The lots of licenses (K4) the contract rests on: a lot names its contract itself (W3-24), a K4 subscription is never linked. */
+  lots?: string[];
   openEnded?: boolean;
 }
 export interface InvoiceFixture {
@@ -44,13 +47,15 @@ export const CONTRACTS: ContractFixture[] = [
     number: 'SV-HD-JB-01',
     name: 'Hợp đồng JetBrains (All Products)',
     application: 'jetbrains',
-    subscriptions: ['jetbrains'],
+    subscriptions: [],
+    lots: ['jetbrains', 'jetbrains-second'],
   },
   {
     number: 'SV-HD-MS-01',
     name: 'Hợp đồng Microsoft (365 và Visio)',
     application: 'm365',
-    subscriptions: ['m365-basic', 'm365-standard', 'visio-pro'],
+    subscriptions: ['m365-basic', 'm365-standard'],
+    lots: ['visio-pro'],
   },
   {
     number: 'SV-HD-ADB-01',
@@ -78,8 +83,28 @@ export function contractBody(ctx: DemoRunContext, spec: ContractFixture) {
   };
 }
 
+/** The IT Admin who makes the contract: the one who answers for its first subscription, else for its first lot. */
+function contractAdminOf(ctx: DemoRunContext, spec: ContractFixture): string {
+  const [subscription] = spec.subscriptions;
+  if (subscription) return subscriptionOf(ctx, subscription).responsible;
+  const lot = ctx.fixture.lots.find((candidate) => candidate.key === spec.lots?.[0]);
+  if (!lot) throw new Error(`The contract ${spec.number} rests on nothing the fixture declares`);
+
+  return lot.responsible;
+}
+
+/** A lot rests on a contract by naming it, written by the IT Admin who answers for the lot on the version they read. */
+async function linkLot(ctx: DemoRunContext, key: string, contractId: string): Promise<void> {
+  const lot = ctx.fixture.lots.find((candidate) => candidate.key === key);
+  const lotId = ctx.ids.lots.get(key);
+  if (!lot || !lotId) throw new Error(`The fixture has no lot ${key}`);
+  const owner = await as(ctx, lot.responsible);
+  const current = await ctx.api.call<{ updatedAt: string }>(owner, 'GET', `/license-lots/${lotId}`);
+  await ctx.api.call(owner, 'PATCH', `/license-lots/${lotId}`, { contractId, expectedUpdatedAt: current.updatedAt });
+}
+
 async function oneContract(ctx: DemoRunContext, spec: ContractFixture): Promise<Result> {
-  const admin = await as(ctx, subscriptionOf(ctx, spec.subscriptions[0]).responsible);
+  const admin = await as(ctx, contractAdminOf(ctx, spec));
   const existing = await listAll<{ id: string; number: string | null }>(ctx, admin, '/contracts');
   if (existing.some((row) => row.number === spec.number)) return { status: 'present', label: spec.number };
   if (ctx.mode === 'plan') return { status: 'planned', label: spec.number };
@@ -89,6 +114,7 @@ async function oneContract(ctx: DemoRunContext, spec: ContractFixture): Promise<
     await ctx.api.call(admin, 'POST', `/contracts/${contract.id}/subscriptions`, {
       subscriptionId: ctx.ids.subscriptions.get(key),
     });
+  for (const key of spec.lots ?? []) await linkLot(ctx, key, contract.id);
   const pdf = await contractPdf({
     number: spec.number,
     name: spec.name,
@@ -260,7 +286,7 @@ export const DEMO_DOCUMENT_STEPS: readonly DemoStep[] = [
   {
     key: 'demo.contracts',
     title: 'Năm hợp đồng nhà cung cấp với tệp PDF (IT Admin)',
-    needs: ['catalog.subscriptions'],
+    needs: ['catalog.subscriptions', 'catalog.lots'],
     run: contracts,
   },
   {

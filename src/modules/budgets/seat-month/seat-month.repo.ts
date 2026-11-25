@@ -236,10 +236,12 @@ export class SeatMonthRepo {
   /**
    * What the year cost the company and what of it fell to no Cost Center (`MG-03`, `SM1-05`): every invoice of the year whatever it is booked to, and the
    * seat-months of the year of a department that has no Cost Center yet. The year of an invoice is the one of the month it pays for, else its commitment's.
+   * An invoice that has allocation lines (W3-26) counts by its lines, whatever their bucket and Cost Center, in the year of the month of each line.
    */
   async yearTotals(year: number): Promise<{ companyMinor: bigint; withoutCostCenterMinor: bigint }> {
     const rows = await this.prisma.$queryRaw<{ company: string; without_cost_center: string }[]>`
-      SELECT COALESCE(SUM(i.actual_cost_minor), 0)::text AS company,
+      SELECT (COALESCE(SUM(i.actual_cost_minor) FILTER (WHERE NOT EXISTS (SELECT 1 FROM invoice_allocations a WHERE a.invoice_id = i.id)), 0)
+              + (SELECT COALESCE(SUM(l.amount_minor), 0) FROM invoice_allocations l WHERE EXTRACT(YEAR FROM l.month)::int = ${year}::int))::text AS company,
              (SELECT COALESCE(SUM(s.amount_minor), 0)::text FROM seat_month_charges s
                WHERE EXTRACT(YEAR FROM s.month)::int = ${year}::int AND s.cost_center_id IS NULL) AS without_cost_center
         FROM invoices i LEFT JOIN budget_commitments c ON c.id = i.commitment_id

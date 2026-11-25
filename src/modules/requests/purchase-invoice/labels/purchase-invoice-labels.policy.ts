@@ -6,13 +6,13 @@ import type { BusinessDate } from '../../../../core/business-date';
  * month the right began. A month outside the term is a mark on the invoice, never a refusal (SPEC PI-1).
  */
 
-export type PurchaseInvoiceLabel = 'NEW_PURCHASE' | 'PERIOD' | 'RENEWAL';
+export type PurchaseInvoiceLabel = 'NEW_PURCHASE' | 'PERIOD' | 'RENEWAL' | 'SEAT_PURCHASE';
 
 /** Marks that are laid on an invoice and never refuse it. */
 export type PurchaseInvoiceFlag = 'OVER_APPROVED' | 'OUTSIDE_TERM' | 'NO_EXPECTED_AMOUNT';
 
 export interface PurchaseInvoiceLabelInput {
-  link: 'REQUEST' | 'SUBSCRIPTION';
+  link: 'REQUEST' | 'SUBSCRIPTION' | 'LICENSE_LOT';
   /** The request is one that goes on using a right that ended (`QĐ-111l`); its invoices are renewals. */
   continuation: boolean;
   /** An invoice of this request exists that was not returned. */

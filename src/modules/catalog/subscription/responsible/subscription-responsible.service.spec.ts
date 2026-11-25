@@ -6,6 +6,7 @@ import type { OrganizationReadApi } from '../../../organization/public/organizat
 import type { SubscriptionPoolService } from '../pool/subscription-pool.service';
 import { SubscriptionNotFoundError, SubscriptionResponsibleNotItAdminError } from '../subscription.errors';
 import { toSubscriptionApiException } from '../subscription.http-errors';
+import type { LicenseLotRepo } from '../../license-lot/license-lot.repo';
 import type { SubscriptionRepo } from '../subscription.repo';
 import type { SubscriptionRecord, SubscriptionView } from '../subscription.types';
 import type { SubscriptionViewService } from '../subscription-view.service';
@@ -35,6 +36,8 @@ describe('SubscriptionResponsibleService', () => {
     locked?: { id: string; responsibleItAdminEmployeeId: string | null } | null;
     foundAfter?: SubscriptionRecord | null;
     toIsUsableItAdmin?: boolean;
+    /** A lot of the same id (a perpetual purchase that became a lot): who answers for it, or absent for a subscription that is no lot. */
+    lot?: { responsibleItAdminEmployeeId: string | null };
   }) {
     const view = { id: 'sub-1', responsibleItAdminEmployeeId: 'emp-it2' } as unknown as SubscriptionView;
     const subscriptions = {
@@ -50,6 +53,10 @@ describe('SubscriptionResponsibleService', () => {
           options.foundAfter === undefined ? ({ id: 'sub-1' } as SubscriptionRecord) : options.foundAfter,
         ),
     } as unknown as SubscriptionRepo;
+    const lots = {
+      lock: jest.fn().mockResolvedValue(options.lot ? { id: 'sub-1', ...options.lot } : null),
+      setResponsible: jest.fn().mockResolvedValue(undefined),
+    } as unknown as LicenseLotRepo;
     const poolRules = {
       isUsableItAdmin: jest.fn().mockResolvedValue(options.toIsUsableItAdmin ?? true),
     } as unknown as SubscriptionPoolService;
@@ -61,6 +68,7 @@ describe('SubscriptionResponsibleService', () => {
 
     const service = new SubscriptionResponsibleService(
       subscriptions,
+      lots,
       poolRules,
       views,
       organizationReads,
@@ -68,8 +76,31 @@ describe('SubscriptionResponsibleService', () => {
       runner,
     );
 
-    return { service, subscriptions, poolRules, views, audit, view };
+    return { service, subscriptions, lots, poolRules, views, audit, view };
   }
+
+  it('writes the lot, and only the lot, for a perpetual purchase that became a lot, with the audit event of the lot (W3-24)', async () => {
+    const { service, subscriptions, lots, audit } = setup({ lot: { responsibleItAdminEmployeeId: 'emp-it1' } });
+
+    await expect(service.change(actor, 'sub-1', { employeeId: 'emp-it2', reason: 'Handover' })).resolves.toMatchObject({
+      changed: true,
+    });
+
+    expect((lots as unknown as { setResponsible: jest.Mock }).setResponsible).toHaveBeenCalledWith(
+      tx,
+      'sub-1',
+      'emp-it2',
+    );
+    expect((subscriptions as unknown as { setResponsible: jest.Mock }).setResponsible).not.toHaveBeenCalled();
+    expect((audit as unknown as { record: jest.Mock }).record).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        action: 'LICENSE_LOT.RESPONSIBLE_CHANGED',
+        resourceType: 'LicenseLot',
+        resourceId: 'sub-1',
+      }),
+    );
+  });
 
   it('changes the responsible IT Admin, records audit, and returns the updated view', async () => {
     const { service, subscriptions, audit, view } = setup({});

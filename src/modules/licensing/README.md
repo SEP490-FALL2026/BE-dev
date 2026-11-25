@@ -163,6 +163,7 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   Cửa sổ Request tiếp tục (BR-MF1-08a): `expiry-renewal-window.job.ts` mỗi giờ ghi `assignment_renewal_windows` (số ngày lúc mở, bất biến)
   và báo người giữ + trưởng phòng một lần (`RENEWAL_WINDOW_OPENED`). Tác vụ `EXTEND` (`provisioning/tasks/provisioning-extension.service.ts`,
   mở qua `LicensingRenewalApi.openExtension`) hoàn tất ⟹ `GrantRequestGate.reportExtended`.
+- `license-lot/` — tạo lô license của gói `K4` (`POST /license-lots`, IT Admin, W3-24): `license-lot-create.service.ts` gọi `LicenseLotApi.createLot` của catalog; lô cho Request (`purpose REQUEST`) đối chiếu task cấp phát còn mở của gói đó (`ProvisioningTaskRepo.findGrantOf`) và người gọi phải là IT Admin phụ trách phòng của người nhận (`ProvisioningTaskFrame.requireActingItAdmin`) — `LICENSE_LOT.NOT_IN_CHARGE`, `LICENSE_LOT.REQUEST_REQUIRED`. Nhập khóa vào lô nằm ở `license-key/` (`license-lot-keys.controller.ts`, `POST /license-lots/{id}/keys`, chỉ IT Admin phụ trách lô; K-A6: gói gắn tài khoản không quá số license, khóa gắn máy không giới hạn; `cost_borne` = đúng khi lô không mua cho Request). Route cũ `licenseKeyImport` vẫn nhận id lô (id lô = id thuê bao sinh ra nó).
 - `license-key/` — kho key của mua đứt K4 (US-04-12) và kho khóa dùng chung (`QĐ-103d`): `license-keys.controller.ts`; `LicenseKeyService`
   (nhập kèm `maxActivations`/`initialActivationsUsed` áp cho cả lần nhập, `license-key-import-settings.service.ts`; nâng trần
   `PATCH /license-keys/{id}` với `expectedUpdatedAt` (`licenseKeyUpdate`); liệt kê trả thêm `maxActivations`, `activationsUsed`,
@@ -186,7 +187,8 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   hạn phản hồi đầu tiên; `SAAS_ISSUE_STATE_CHANGED` cho bên còn lại — người báo khi IT Admin đổi trạng thái, IT Admin được giao khi
   người báo trả lời hoặc mở lại, người báo khi lượt quét tự đóng phiếu hết hạn mở lại (`REOPEN_WINDOW_LAPSED`) — không báo người tự
   làm. Tham số chỉ gồm id, mã phiếu và từ trạng thái; không có nội dung người báo hay IT Admin viết, trưởng phòng không được báo.
-- `subscription-renewal/` — điều chỉnh/gia hạn thuê bao kho `K2` theo kỳ (EP-11, `SBF-20`): `subscription-renewals.controller.ts`
+- Quyền cá nhân của gói `K1` (W3-17, M7): `license_assignments.personal_commitment_months` (1 hoặc 12) và `billing_anchor_on`, bắt buộc cho quyền `K1` mới không thuê bao (trigger `license_assignments_k1_terms`), bất biến; thuê bao `K1` cũ đóng (`subscriptions.closed_at`, `closed_reason = K1_WITHOUT_SUBSCRIPTION`), quyền cũ giữ `subscription_id`. `assignment-record.mapper.ts` giữ cột đọc và ánh xạ của `AssignmentRepo`.
+- `subscription-renewal/` — điều chỉnh/gia hạn thuê bao kho `K2` theo kỳ (EP-11, `SBF-20`); từ W3-16 có nhóm `lines/` (`subscription-line-target.repo.ts`: mục tiêu chốt của dòng theo ngày gia hạn, `subscription_line_targets`) và `subscription-renewal-auto.repo.ts` (cột `auto_recorded`, `minimum_total_*` của ca): `subscription-renewals.controller.ts`
   (`/subscription-renewals*`, `/subscription-deadline-events`); nhóm `record/` (chỉ IT Admin phụ trách thuê bao còn dùng được mới
   ghi kết quả — không có người làm thay tạm thời cho thuê bao, ngoài ⟹ 403 `SUBSCRIPTION_RENEWAL.NOT_RESPONSIBLE`; ghi ca, quyết định
   `IT_ADMIN_IN_CHARGE` và kết quả trong một transaction; báo Finance ở `renewal-record-trail.service.ts`),

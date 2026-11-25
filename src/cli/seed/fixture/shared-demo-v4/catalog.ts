@@ -1,11 +1,18 @@
-import type { DemoApplication, DemoFixture, DemoPlan, DemoSeat, DemoSubscription } from '../demo-fixture.types';
-import { EXTRA_APPLICATIONS, EXTRA_SEATS, EXTRA_SUBSCRIPTIONS, PLAN_TERMS } from './catalog-extra';
+import type {
+  DemoApplication,
+  DemoFixture,
+  DemoLot,
+  DemoPlan,
+  DemoSeat,
+  DemoSubscription,
+} from '../demo-fixture.types';
+import { EXTRA_APPLICATIONS, EXTRA_LOTS, EXTRA_SEATS, EXTRA_SUBSCRIPTIONS, PLAN_TERMS } from './catalog-extra';
 import { app, groupOf, k2, k4, monthly } from './catalog-kit';
 
 /*
  * The thirteen applications of the first dataset (twelve more are in `catalog-extra.ts`). Each (application, plan) has exactly one subscription, the stock of the shared pool (`QĐ-103d`): K2 plans have
  * seats Free to grant (Postman, Slack, GitHub, Mailchimp, Canva, Jira, Figma) and one plan is sold out (1Password); K1 plans are bought
- * on each grant; K4 plans draw from a key store (JetBrains has keys, DataGrip has none); K5 is internal software.
+ * on each grant; K4 plans are lots of licenses that draw from a key store (JetBrains has keys, DataGrip has none); K5 is internal software.
  *
  * A plan administered at the vendor (every K2, and JetBrains All Products, the K4 plan with an admin console) has a workspace profile of two
  * IT Admins (`QĐ-110k`, R-53): DataGrip, a K4 plan without one, is the control case that needs none. Mailchimp is owned by NV-ITA4, who
@@ -143,28 +150,39 @@ const SUBSCRIPTIONS: DemoSubscription[] = [
   },
   // The K1 plan of the person who leaves today: its one seat is his, so his revocation shows the K1 checklist (D-62).
   { ...monthly('grammarly', 'grammarly-pro', '300000', 'NV-ITA1', 0), quantity: 1 },
-  // K4: a key is bought once; the keys sit in the key store. JetBrains has three, DataGrip none.
+];
+
+/**
+ * K4: a key is bought once, as a lot of licenses; the keys sit in the key store. JetBrains All Products was bought twice at two prices (the first lot holds the
+ * three keys of the store, the second none yet); DataGrip has one license and no key.
+ */
+const LOTS: DemoLot[] = [
   {
     key: 'jetbrains',
     plan: 'jetbrains-all',
-    kind: 'PERPETUAL',
+    licenseCount: 3,
     unitPrice: { amount: '6000000', currency: 'VND' },
-    billingCycle: 'MONTHLY',
-    termMonths: 1,
+    purpose: 'REPLACEMENT',
+    purchasedDaysAgo: 200,
     responsible: 'NV-ITA1',
-    freeAfterBaseline: 0,
-    quantity: 3,
+  },
+  {
+    key: 'jetbrains-second',
+    plan: 'jetbrains-all',
+    licenseCount: 2,
+    unitPrice: { amount: '6500000', currency: 'VND' },
+    purpose: 'REPLACEMENT',
+    purchasedDaysAgo: 90,
+    responsible: 'NV-ITA1',
   },
   {
     key: 'datagrip',
     plan: 'jetbrains-datagrip',
-    kind: 'PERPETUAL',
+    licenseCount: 1,
     unitPrice: { amount: '3000000', currency: 'VND' },
-    billingCycle: 'MONTHLY',
-    termMonths: 1,
+    purpose: 'REPLACEMENT',
+    purchasedDaysAgo: 200,
     responsible: 'NV-ITA1',
-    freeAfterBaseline: 0,
-    quantity: 0,
   },
 ];
 
@@ -209,30 +227,38 @@ const SEATS: DemoSeat[] = [
 
 /**
  * The reference price of every paid plan (`QĐ-113a`): the price of one seat for a month of the subscription of the plan (a yearly price over 12, rounded
- * up to the dong), or the price of one key (K4). A plan the fixture gave a price by hand (a plan with no subscription) keeps it; K5 has none.
+ * up to the dong), or the price of one license of its first lot (K4). A plan the fixture gave a price by hand (a plan with no subscription) keeps it; K5 has none.
  */
 function withReferencePrices(
   applications: readonly DemoApplication[],
   subscriptions: readonly DemoSubscription[],
+  lots: readonly DemoLot[],
 ): DemoApplication[] {
   const priced = (plan: DemoPlan): DemoPlan => {
-    const subscription = subscriptions.find((candidate) => candidate.plan === plan.key);
-    if (plan.provisioningType === 'K5' || plan.referencePrice !== undefined || !subscription) return plan;
-    const amount = BigInt(subscription.unitPrice.amount);
-    const perMonth = subscription.billingCycle === 'ANNUAL' ? (amount + 11n) / 12n : amount;
+    if (plan.provisioningType === 'K5' || plan.referencePrice !== undefined) return plan;
+    if (plan.provisioningType === 'K4') {
+      const first = lots.find((candidate) => candidate.plan === plan.key);
 
-    return { ...plan, referencePrice: String(plan.provisioningType === 'K4' ? amount : perMonth) };
+      return first ? { ...plan, referencePrice: first.unitPrice.amount } : plan;
+    }
+    const subscription = subscriptions.find((candidate) => candidate.plan === plan.key);
+    if (!subscription) return plan;
+    const amount = BigInt(subscription.unitPrice.amount);
+
+    return { ...plan, referencePrice: String(subscription.billingCycle === 'ANNUAL' ? (amount + 11n) / 12n : amount) };
   };
 
   return applications.map((application) => ({ ...application, plans: application.plans.map(priced) }));
 }
 
-export const CATALOG: Pick<DemoFixture, 'applications' | 'subscriptions' | 'seats' | 'planTerms'> = {
+export const CATALOG: Pick<DemoFixture, 'applications' | 'subscriptions' | 'lots' | 'seats' | 'planTerms'> = {
   applications: withReferencePrices(
     [...APPLICATIONS, ...EXTRA_APPLICATIONS],
     [...SUBSCRIPTIONS, ...EXTRA_SUBSCRIPTIONS],
+    [...LOTS, ...EXTRA_LOTS],
   ),
   subscriptions: [...SUBSCRIPTIONS, ...EXTRA_SUBSCRIPTIONS],
+  lots: [...LOTS, ...EXTRA_LOTS],
   seats: [...SEATS, ...EXTRA_SEATS],
   planTerms: PLAN_TERMS,
 };

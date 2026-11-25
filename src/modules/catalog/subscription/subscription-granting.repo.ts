@@ -3,7 +3,13 @@ import { toDateColumn, type BusinessDate } from '../../../core/business-date';
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { PoolSubscription, RuleSubscription, StockPlanFilter, StockPlanPage } from '../public/catalog.types';
+import type {
+  PoolSubscription,
+  RuleSubscription,
+  StockPlan,
+  StockPlanFilter,
+  StockPlanPage,
+} from '../public/catalog.types';
 import { orderBySourcePreference, withoutPeriodsAhead } from './pool/subscription-pool.policy';
 import { withPriceSource } from './subscription-priced.repo';
 
@@ -19,6 +25,44 @@ export const notTakenOverOn = (today: BusinessDate): Prisma.SubscriptionWhereInp
 });
 
 /** Reads which subscriptions grant seats on a day, the way the shared pool reads it: what the rules of wasted seats judge. */
+
+/** The plan row of a stock page as the stock plan it is: a K2 plan over the subscriptions of its pool, a K4 plan over its lots (the id of the lot as the purchase). */
+function stockPlanOf(
+  row: {
+    id: string;
+    name: string;
+    provisioningType: string;
+    keyBinding: StockPlan['keyBinding'];
+    application: { id: string; name: string; logoUrl: string | null };
+    subscriptions: {
+      id: string;
+      purchasedQuantity: number | null;
+      renewedFromId: string | null;
+      startDate: Date | null;
+    }[];
+    licenseLots: { id: string; licenseCount: number }[];
+  },
+  today: BusinessDate,
+): StockPlan {
+  return {
+    planId: row.id,
+    planName: row.name,
+    // The filter keeps K2 and K4 plans only.
+    provisioningType: row.provisioningType as 'K2' | 'K4',
+    keyBinding: row.keyBinding,
+    applicationId: row.application.id,
+    applicationName: row.application.name,
+    applicationLogoUrl: row.application.logoUrl,
+    subscriptions:
+      row.provisioningType === 'K4'
+        ? row.licenseLots.map((lot) => ({ subscriptionId: lot.id, purchasedQuantity: lot.licenseCount }))
+        : withoutPeriodsAhead(row.subscriptions, today).map((subscription) => ({
+            subscriptionId: subscription.id,
+            purchasedQuantity: subscription.purchasedQuantity,
+          })),
+  };
+}
+
 @Injectable()
 export class SubscriptionGrantingRepo {
   constructor(private readonly prisma: PrismaService) {}
@@ -91,11 +135,11 @@ export class SubscriptionGrantingRepo {
   }
 
   /**
-   * One page of the plans that give out seats (K2), keys (K4) or personal accounts (K1), each with the subscriptions a seat can be taken
-   * from on `today`: the shared pool of the plan as a grant reads it (active, not taken over by a later period, not ended, a next period
-   * recorded ahead of its start counted with the one it continues, `withoutPeriodsAhead`). A plan with no
-   * such subscription is not listed, and with an IT Admin named only the subscriptions that person answers for count, so the plans of
-   * the others do not appear. By application, plan then id, and the total for the same filter, from one snapshot.
+   * One page of the plans that give out seats (K2) or keys (K4), each with what a grant can take from on `today`: for a K2 plan the shared pool
+   * of the plan as a grant reads it (active, not taken over by a later period, not ended, a next period recorded ahead of its start counted with
+   * the one it continues, `withoutPeriodsAhead`); for a K4 plan its lots, each as an entry of the id of the lot with the licenses it bought. A plan
+   * of personal accounts (K1) has no subscription and is not listed. A plan with nothing to take from is not listed, and with an IT Admin named
+   * only what that person answers for counts, so the plans of the others do not appear. By application, plan then id, and the total for the same filter, from one snapshot.
    */
   async pageStockPlans(filter: StockPlanFilter): Promise<StockPlanPage> {
     const grantable: Prisma.SubscriptionWhereInput = {
@@ -108,10 +152,15 @@ export class SubscriptionGrantingRepo {
         { OR: [{ endDate: null }, { endDate: { gte: toDateColumn(filter.today) } }] },
       ],
     };
+    const lots: Prisma.LicenseLotWhereInput = filter.responsibleItAdminEmployeeId
+      ? { responsibleItAdminEmployeeId: filter.responsibleItAdminEmployeeId }
+      : {};
     const where: Prisma.PlanWhereInput = {
-      provisioningType: { in: ['K1', 'K2', 'K4'] },
       ...(filter.planId ? { id: filter.planId } : {}),
-      subscriptions: { some: grantable },
+      OR: [
+        { provisioningType: 'K2', subscriptions: { some: grantable } },
+        { provisioningType: 'K4', licenseLots: { some: lots } },
+      ],
     };
 
     return this.prisma.$transaction(
@@ -129,6 +178,7 @@ export class SubscriptionGrantingRepo {
               select: { id: true, purchasedQuantity: true, renewedFromId: true, startDate: true },
               orderBy: { id: 'asc' },
             },
+            licenseLots: { where: lots, select: { id: true, licenseCount: true }, orderBy: { id: 'asc' } },
           },
           orderBy: [{ application: { normalizedName: 'asc' } }, { normalizedName: 'asc' }, { id: 'asc' }],
           skip: filter.skip,
@@ -136,20 +186,7 @@ export class SubscriptionGrantingRepo {
         });
 
         return {
-          items: rows.map((row) => ({
-            planId: row.id,
-            planName: row.name,
-            // The filter keeps K1, K2 and K4 plans only.
-            provisioningType: row.provisioningType as 'K1' | 'K2' | 'K4',
-            keyBinding: row.keyBinding,
-            applicationId: row.application.id,
-            applicationName: row.application.name,
-            applicationLogoUrl: row.application.logoUrl,
-            subscriptions: withoutPeriodsAhead(row.subscriptions, filter.today).map((subscription) => ({
-              subscriptionId: subscription.id,
-              purchasedQuantity: subscription.purchasedQuantity,
-            })),
-          })),
+          items: rows.map((row) => stockPlanOf(row, filter.today)),
           total: await tx.plan.count({ where }),
         };
       },

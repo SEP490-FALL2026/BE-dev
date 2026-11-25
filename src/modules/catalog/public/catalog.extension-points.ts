@@ -42,6 +42,14 @@ export interface SeatOccupancyReader {
     day: BusinessDate,
     tx?: DbTx,
   ): Promise<ReadonlyMap<string, { occupied: number; inRevocation: number }>>;
+  /**
+   * For each of these lots, the keys in the store and not withdrawn, those given to a person and those withdrawn, in one read. A lot with no key is
+   * absent. What the list of lots says of the keys of each (`keysInStore`, and what can be granted at once).
+   */
+  keyCountsOfLots(
+    lotIds: readonly string[],
+    tx?: DbTx,
+  ): Promise<ReadonlyMap<string, { inStore: number; assigned: number; withdrawn: number }>>;
 }
 
 /**

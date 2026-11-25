@@ -24,6 +24,10 @@ export const snapshotOf = (record: SubscriptionRecord) => ({
   responsibleItAdminEmployeeId: record.responsibleItAdminEmployeeId,
   vendorMinimumSeats: record.vendorMinimumSeats,
   isPrimaryForPlan: record.isPrimaryForPlan,
+  workspaceId: record.workspace?.id ?? null,
+  seatCounting: record.seatCounting,
+  minimumSeatsTotal: record.minimumSeatsTotal,
+  invoicedLater: record.invoicedLater,
   status: record.status,
 });
 
@@ -47,6 +51,10 @@ export const stateOf = (record: SubscriptionRecord): SubscriptionState => ({
   responsibleItAdminEmployeeId: record.responsibleItAdminEmployeeId,
   vendorMinimumSeats: record.vendorMinimumSeats,
   isPrimaryForPlan: record.isPrimaryForPlan,
+  workspaceId: record.workspace?.id ?? null,
+  seatCounting: record.seatCounting,
+  minimumSeatsTotal: record.minimumSeatsTotal,
+  invoicedLater: record.invoicedLater,
 });
 
 /** The state in one fixed order of keys, with money as text, so that two equal states serialize equally. */
@@ -77,6 +85,10 @@ const canonical = (state: SubscriptionState): string =>
     state.responsibleItAdminEmployeeId,
     state.vendorMinimumSeats,
     state.isPrimaryForPlan,
+    state.workspaceId ?? null,
+    state.seatCounting ?? 'FIXED',
+    state.minimumSeatsTotal ?? null,
+    state.invoicedLater ?? false,
   ]);
 
 /** True when two states hold the same data. */

@@ -1,5 +1,6 @@
 import type { RouteErrorStatus } from './openapi-example-manifest';
 import { ROUTE_ERROR_CODES_WAVE2 } from './openapi-example-route-codes-wave2';
+import { ROUTE_ERROR_CODES_WAVE3_TECH } from './openapi-example-route-codes-wave3-tech';
 
 /**
  * Part of ROUTE_ERROR_CODES (licensing and notifications added by G5/G6), traced on BE `0da8f56`
@@ -9,6 +10,7 @@ export const ROUTE_ERROR_CODES_LICENSING: Readonly<
   Record<string, Partial<Record<RouteErrorStatus, readonly string[]>>>
 > = {
   ...ROUTE_ERROR_CODES_WAVE2,
+  ...ROUTE_ERROR_CODES_WAVE3_TECH,
   assignmentExpiryReminderList: {
     '403': ['ASSIGNMENT_EXPIRY.SCOPE_FORBIDDEN'],
   },

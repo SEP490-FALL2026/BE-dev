@@ -60,6 +60,12 @@ model Organization {
   exchangeRates                      ExchangeRate[]
   vendorProposals                    VendorDictionaryProposal[]
   vendors                            Vendor[]
+  workspaces                         Workspace[]
+  subscriptionLines                  SubscriptionLine[]
+  licenseLots                        LicenseLot[]
+  licenseLotCharges                  LicenseLotCharge[]
+  seatPurchases                      SeatPurchase[]
+  seatChanges                        SeatChange[]
   functionalGroups                   FunctionalGroup[]
   applications                       Application[]
   plans                              Plan[]
@@ -136,6 +142,9 @@ model CostCenter {
   budgetProposals    BudgetProposal[]
   budgetVersions     BudgetVersion[]
   budgetCommitments  BudgetCommitment[]
+  licenseLotCharges  LicenseLotCharge[]
+  invoiceAllocations InvoiceAllocation[]
+  invoiceYearApplications InvoiceYearApplication[]
 
   @@unique([organizationId, code])
   @@map("cost_centers")
@@ -347,6 +356,14 @@ model Employee {
   workspacePrimaryOwnerOf         PlanWorkspaceProfile[]              @relation("WorkspacePrimaryOwner")
   workspaceEmergencyHolderOf      PlanWorkspaceProfile[]              @relation("WorkspaceEmergencyHolder")
   workspaceMemberships            PlanWorkspaceAdmin[]                @relation("WorkspaceMember")
+  workspacesOwned                 Workspace[]                         @relation("WorkspaceOwnerOfWorkspace")
+  workspacesInCharge              Workspace[]                         @relation("WorkspaceInCharge")
+  workspaceEmergencyHolderOfWorkspace Workspace[]                     @relation("WorkspaceEmergencyHolderOfWorkspace")
+  workspaceAdminships             WorkspaceAdmin[]                    @relation("WorkspaceAdminOfWorkspace")
+  seatPurchasesRecorded           SeatPurchase[]                      @relation("SeatPurchaseRecordedBy")
+  seatChangesRecorded             SeatChange[]                        @relation("SeatChangeRecordedBy")
+  seatChangesAsBeneficiary        SeatChange[]                        @relation("SeatChangeBeneficiary")
+  licenseLotsInCharge             LicenseLot[]                        @relation("LicenseLotInCharge")
   itAdminHandoversReceived        ItAdminHandover[]                   @relation("ItAdminHandoverReceiver")
   departmentSoftwareProposals     DepartmentSoftwareProposal[]        @relation("DepartmentSoftwareProposer")
   subscriptionsInCharge           Subscription[]                      @relation("SubscriptionResponsibleItAdmin")

@@ -12,14 +12,14 @@ import { SubscriptionService } from './subscription.service';
 import type { SubscriptionRepo } from './subscription.repo';
 import type { SubscriptionRecord } from './subscription.types';
 
-/** A subscription has no owning department (`QĐ-113g`): none is asked when a K1 one is declared, and no Cost Center when one is changed. */
+/** A subscription has no owning department (`QĐ-113g`): none is asked when one is declared, and no Cost Center when one is changed. A plan of personal accounts (K1) has no subscription since W3-27, so the plan here is one of seats. */
 describe('QĐ-113g: no owning department on a subscription', () => {
   const actor = { roles: ['IT_ADMIN'] } as unknown as AuthenticatedPrincipal;
   const tx = {};
   const runner = { run: (work: (t: unknown) => unknown) => Promise.resolve(work(tx)) } as unknown as TransactionRunner;
   const plan = {
     id: 'plan-1',
-    provisioningType: 'K1',
+    provisioningType: 'K2',
     applicationKind: 'SAAS',
     applicationStatus: 'ACTIVE',
     pricingModel: 'PER_SEAT',
@@ -28,7 +28,7 @@ describe('QĐ-113g: no owning department on a subscription', () => {
     ({
       id: 'sub-1',
       planId: 'plan-1',
-      planProvisioningType: 'K1',
+      planProvisioningType: 'K2',
       kind: 'TERM',
       status: 'DRAFT',
       purchasedQuantity: 5,
@@ -62,16 +62,20 @@ describe('QĐ-113g: no owning department on a subscription', () => {
 
   beforeEach(() => jest.clearAllMocks());
 
-  it('declares a K1 subscription: it has no department and none is looked at', async () => {
+  it('declares a subscription: it has no department and none is looked at', async () => {
     const insert = jest.fn(() => Promise.resolve(stored({})));
     const service = new SubscriptionService(
       { insert } as unknown as SubscriptionRepo,
-      { lockExclusive: jest.fn(() => Promise.resolve(plan)) } as unknown as PlanFactsService,
+      {
+        lockExclusive: jest.fn(() => Promise.resolve(plan)),
+        lookups: jest.fn(() => Promise.resolve([plan])),
+      } as unknown as PlanFactsService,
       pricing,
       view,
       { ...organization, lockDepartmentShared } as unknown as OrganizationReadApi,
       {
         assertNoLiveDuplicate: jest.fn(),
+        workspaceFor: jest.fn(() => Promise.resolve(null)),
         responsibleOfDeclaration: jest.fn(() => Promise.resolve(null)),
         assert: jest.fn(),
         assertVendorAdmins: jest.fn(),
@@ -87,7 +91,7 @@ describe('QĐ-113g: no owning department on a subscription', () => {
     expect(lockDepartmentShared).not.toHaveBeenCalled();
   });
 
-  it('changes a subscription so that it owes more without asking a Cost Center of any department', async () => {
+  it('changes the terms of a subscription without asking a Cost Center of any department', async () => {
     const update = jest.fn((_tx: unknown, _id: string, state: object) => Promise.resolve(stored({ ...state })));
     const guard = {
       requireOrganizationId: jest.fn(() => Promise.resolve('org-1')),
@@ -105,18 +109,9 @@ describe('QĐ-113g: no owning department on a subscription', () => {
       guard,
     );
 
-    await service.update(
-      actor,
-      'sub-1',
-      { purchasedQuantity: 50, autoRenew: true, quantityChangeReason: 'Growth' },
-      stored().updatedAt,
-    );
+    await service.update(actor, 'sub-1', { autoRenew: true }, stored().updatedAt);
 
-    expect(update).toHaveBeenCalledWith(
-      tx,
-      'sub-1',
-      expect.objectContaining({ purchasedQuantity: 50, autoRenew: true }),
-    );
+    expect(update).toHaveBeenCalledWith(tx, 'sub-1', expect.objectContaining({ autoRenew: true }));
   });
 
   it('declares TERM with monthlyUnitPrice 500.000 ANNUAL -> stores monthly 500.000 and unit 6.000.000, and defaults commitmentTermMonths from plan', async () => {
@@ -146,12 +141,16 @@ describe('QĐ-113g: no owning department on a subscription', () => {
     } as unknown as SubscriptionPricingService;
     const service = new SubscriptionService(
       { insert } as unknown as SubscriptionRepo,
-      { lockExclusive: jest.fn(() => Promise.resolve(planWithCommitment)) } as unknown as PlanFactsService,
+      {
+        lockExclusive: jest.fn(() => Promise.resolve(planWithCommitment)),
+        lookups: jest.fn(() => Promise.resolve([planWithCommitment])),
+      } as unknown as PlanFactsService,
       priceService,
       view,
       { ...organization, lockDepartmentShared } as unknown as OrganizationReadApi,
       {
         assertNoLiveDuplicate: jest.fn(),
+        workspaceFor: jest.fn(() => Promise.resolve(null)),
         responsibleOfDeclaration: jest.fn(() => Promise.resolve('it-1')),
         assert: jest.fn(),
         assertVendorAdmins: jest.fn(),
@@ -208,12 +207,14 @@ describe('QĐ-113g: no owning department on a subscription', () => {
       { insert } as unknown as SubscriptionRepo,
       {
         lockExclusive: jest.fn(() => Promise.resolve({ ...plan, referenceCommitmentMonths: 1 })),
+        lookups: jest.fn(() => Promise.resolve([{ ...plan, referenceCommitmentMonths: 1 }])),
       } as unknown as PlanFactsService,
       priceService,
       view,
       { ...organization, lockDepartmentShared } as unknown as OrganizationReadApi,
       {
         assertNoLiveDuplicate: jest.fn(),
+        workspaceFor: jest.fn(() => Promise.resolve(null)),
         responsibleOfDeclaration: jest.fn(() => Promise.resolve('it-1')),
         assert: jest.fn(),
         assertVendorAdmins: jest.fn(),

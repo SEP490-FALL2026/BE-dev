@@ -335,12 +335,12 @@ export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIs
     }),
   ],
   keys: [
-    { subscription: 'jetbrains', count: 3 },
-    { subscription: 'visio-pro', count: 3 },
-    { subscription: 'sublime-license', count: 2 },
+    { lot: 'jetbrains', count: 3 },
+    { lot: 'visio-pro', count: 3 },
+    { lot: 'sublime-license', count: 2 },
     // One key of 30 activations. It already ran on 8 machines before the installation phase closed: the six old machines below that carry
     // it (an `INITIAL` activation each) and two more the fixture does not enter. Four new machines run it since (4 `OPERATION` rows): 12 used, 10 open.
-    { subscription: 'office-ltsc-2024', count: 1, maxActivations: 30, initialActivationsUsed: 8 },
+    { lot: 'office-ltsc-2024', count: 1, maxActivations: 30, initialActivationsUsed: 8 },
   ],
   draft: { requester: 'NV-OPS1', plan: 'jira-standard', termMonths: null },
   saasIssues: [

@@ -131,7 +131,7 @@ export class CommitmentRequestFactsHook extends Hook<CommitmentRequestFacts> {
 
 /** What a purchase invoice Finance signed says that the invoice it wrote does not keep: the label it was given and how it was paid. */
 export interface PurchaseInvoiceFactsView {
-  label: 'NEW_PURCHASE' | 'PERIOD' | 'RENEWAL';
+  label: 'NEW_PURCHASE' | 'PERIOD' | 'RENEWAL' | 'SEAT_PURCHASE';
   paymentSource: 'COMPANY_CARD' | 'IT_ADVANCE';
 }
 

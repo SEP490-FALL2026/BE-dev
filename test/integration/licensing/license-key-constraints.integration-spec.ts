@@ -43,9 +43,9 @@ describe('license keys (integration, PostgreSQL constraints)', () => {
     const id = over.id ?? randomUUID();
     const code = await sqlState(
       sql,
-      `INSERT INTO license_keys (id, organization_id, subscription_id, fingerprint, masked, ciphertext, cipher_key_id,
+      `INSERT INTO license_keys (id, organization_id, subscription_id, cost_borne, fingerprint, masked, ciphertext, cipher_key_id,
          status, imported_by_app_user_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::"LicenseKeyStatus", $9)`,
+       VALUES ($1, $2, $3, true, $4, $5, $6, $7, $8::"LicenseKeyStatus", $9)`,
       [
         id,
         over.organizationId ?? organizationId,

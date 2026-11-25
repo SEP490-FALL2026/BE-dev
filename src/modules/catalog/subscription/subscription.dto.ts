@@ -16,6 +16,13 @@ const billingCycle = z.enum(['MONTHLY', 'QUARTERLY', 'ANNUAL', 'OTHER']);
 const declarableBillingCycle = z.enum(['MONTHLY', 'ANNUAL']);
 const commitmentTermMonths = z.union([z.literal(1), z.literal(12)]);
 const vendorMinimumSeats = z.number().int().min(1).max(1_000_000_000);
+const minimumSeatsTotal = z.number().int().min(1).max(1_000_000_000).meta({
+  description: 'The least number of seats the vendor sells across the workspace, when it says one.',
+});
+const seatCounting = z.enum(['FIXED', 'MEMBERS']).meta({
+  description:
+    'FIXED: a number of seats bought (the default). MEMBERS: the members the vendor counts; a one-month commitment only, with the payment day in renewalDate. It cannot change once the subscription is active.',
+});
 const quantity = z.number().int().min(0).max(1_000_000_000);
 /** The vendor admins a subscription lists: the members of the workspace profile of its plan, at most this many (X-IT.5, QĐ-110k). */
 export const VENDOR_ADMINS_MAX = 20;
@@ -56,10 +63,20 @@ export const declareSubscriptionBodySchema = z.strictObject({
       'The IT Admin who answers for the subscription. When it is not sent, the IT Admin responsible for the application of the plan is taken if they still work as an IT Admin; otherwise it stays empty and an active subscription refuses to be saved without one.',
   }),
   vendorMinimumSeats: vendorMinimumSeats.optional(),
+  workspaceId: z.uuid().optional().meta({
+    description:
+      'The workspace the subscription is held in; its vendor must be the vendor of the plan. Left out, a subscription of a plan the company administers at the vendor takes the only workspace of the vendor, or a workspace named after the vendor is made when it has none; with several the caller must say which.',
+  }),
+  seatCounting: seatCounting.optional(),
+  minimumSeatsTotal: minimumSeatsTotal.optional(),
+  invoicedLater: z.boolean().optional().meta({ description: 'The vendor invoices after the period.' }),
 });
 
 export const updateSubscriptionBodySchema = z.strictObject({
-  purchasedQuantity: quantity.optional(),
+  purchasedQuantity: quantity.optional().meta({
+    description:
+      'No longer used to write: sending a value is refused. The seats of a subscription are bought, corrected and reduced on its lines and counted from their ledger.',
+  }),
   unitPrice: unitPrice.optional(),
   monthlyUnitPrice: monthlyUnitPrice.optional(),
   originalPrice: originalPrice.nullable().optional().meta({
@@ -75,8 +92,17 @@ export const updateSubscriptionBodySchema = z.strictObject({
   autoRenew: z.boolean().optional(),
   allowsMidTermReduction: z.boolean().optional(),
   vendorMinimumSeats: vendorMinimumSeats.nullable().optional(),
-  // Makes this the subscription that prices its plan (Q-04); the flag of the other subscriptions of the plan is taken off.
-  isPrimaryForPlan: z.boolean().optional(),
+  workspaceId: z.uuid().optional().meta({
+    description:
+      'Moves the subscription to another workspace of the same vendor, unless it would duplicate a live plan there.',
+  }),
+  seatCounting: seatCounting.optional(),
+  minimumSeatsTotal: minimumSeatsTotal.nullable().optional(),
+  invoicedLater: z.boolean().optional(),
+  isPrimaryForPlan: z.boolean().optional().meta({
+    description:
+      'No longer used to write: marking a subscription as the one that prices its plan is refused. The price of a plan is read from the lines of its workspace.',
+  }),
   quantityChangeReason: z.string().trim().min(1).max(500).optional().meta({
     description:
       'Reason for increasing purchasedQuantity on an active K2 subscription (1-500 characters after trimming; required when increasing, ignored when not increasing).',
@@ -92,6 +118,7 @@ const queryFlag = z.enum(['true', 'false']).transform((value) => value === 'true
 export const listSubscriptionsQuerySchema = z.strictObject({
   applicationId: z.uuid().optional(),
   planId: z.uuid().optional(),
+  workspaceId: z.uuid().optional().meta({ description: 'Only the subscriptions held in this workspace.' }),
   status: status.optional(),
   kind: kind.optional(),
   warning: z.enum(['NO_ALERT_ANCHOR']).optional(),
@@ -150,6 +177,10 @@ const subscriptionSchema = z.strictObject({
     .nullable()
     .meta({ description: 'The IT Admin who answers for the subscription, by name; null when none is named.' }),
   vendorMinimumSeats: z.number().int().nullable(),
+  workspace: z.strictObject({ id: z.uuid(), name: z.string() }).nullable(),
+  seatCounting,
+  minimumSeatsTotal: z.number().int().nullable(),
+  invoicedLater: z.boolean(),
   isPrimaryForPlan: z.boolean(),
   expiry: z.enum(['SOON', 'EXPIRED']).nullable().meta({
     description:

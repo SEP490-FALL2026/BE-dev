@@ -108,23 +108,25 @@ describe('shared dataset v4: the organization', () => {
 });
 
 describe('shared dataset v4: the catalog and the shared pool', () => {
-  it('has one subscription per plan of the catalog except the internal one, Skype (retired), the K1 plan that has only a reference price (T6, QĐ-113a) and the plan bundled with the machine, which is never bought (W2-17)', () => {
+  it('has one subscription per plan of the catalog except the internal one, Skype (retired), the K1 plan that has only a reference price (T6, QĐ-113a), the K4 plans that are bought as lots (W3-24) and the plan bundled with the machine, which is never bought (W2-17)', () => {
     const plans = F.applications
       .flatMap((app) => app.plans)
       .filter(
         (p) =>
           p.provisioningType !== 'K5' &&
+          p.provisioningType !== 'K4' &&
           p.key !== 'skype-online' &&
           p.key !== 'grammarly-business' &&
           p.keyBinding !== 'DEVICE_BUNDLED',
       );
     expect(F.subscriptions.map((s) => s.plan).sort()).toEqual(plans.map((p) => p.key).sort());
-    expect(F.subscriptions).toHaveLength(31);
+    expect(F.subscriptions).toHaveLength(26);
   });
 
   it('gives every paid plan a reference price in dong: the monthly price of its subscription, the price of one key (K4), or a price of its own when it has no subscription (QĐ-113a)', () => {
     for (const declared of F.applications.flatMap((app) => app.plans)) {
       const subscription = F.subscriptions.find((s) => s.plan === declared.key);
+      const firstLot = F.lots.find((lot) => lot.plan === declared.key);
       if (declared.provisioningType === 'K5') {
         expect(declared.referencePrice).toBeUndefined();
         continue;
@@ -137,10 +139,11 @@ describe('shared dataset v4: the catalog and the shared pool', () => {
         continue;
       }
       expect(BigInt(declared.referencePrice!)).toBeGreaterThan(0n);
+      if (firstLot) expect(declared.referencePrice).toBe(firstLot.unitPrice.amount);
       if (!subscription) continue;
       const amount = BigInt(subscription.unitPrice.amount);
       const perMonth = subscription.billingCycle === 'ANNUAL' ? (amount + 11n) / 12n : amount;
-      expect(BigInt(declared.referencePrice!)).toBe(declared.provisioningType === 'K4' ? amount : perMonth);
+      expect(BigInt(declared.referencePrice!)).toBe(perMonth);
     }
     expect(plan('claude-team-standard').referencePrice).toBe('500000');
     expect(plan('claude-team-premium').referencePrice).toBe('2500000');
@@ -150,7 +153,13 @@ describe('shared dataset v4: the catalog and the shared pool', () => {
   it('has one K1 plan with no subscription but a reference price, and a request on it waiting for the spending approver (QĐ-113a, R59)', () => {
     const withoutSubscription = F.applications
       .flatMap((app) => app.plans)
-      .filter((p) => p.provisioningType !== 'K5' && p.key !== 'skype-online' && p.keyBinding !== 'DEVICE_BUNDLED')
+      .filter(
+        (p) =>
+          p.provisioningType !== 'K5' &&
+          p.provisioningType !== 'K4' &&
+          p.key !== 'skype-online' &&
+          p.keyBinding !== 'DEVICE_BUNDLED',
+      )
       .filter((p) => !F.subscriptions.some((s) => s.plan === p.key));
 
     expect(withoutSubscription.map((p) => p.key)).toEqual(['grammarly-business']);
@@ -228,8 +237,8 @@ describe('shared dataset v4: the catalog and the shared pool', () => {
     expect([...types].sort()).toEqual(['K1', 'K2', 'K4', 'K5']);
     expect(subscriptionOf('postman-professional').freeAfterBaseline).toBeGreaterThan(0);
     expect(subscriptionOf('onepassword-business').freeAfterBaseline).toBe(0);
-    expect(F.keys.find((k) => k.subscription === 'jetbrains')?.count).toBeGreaterThan(0);
-    expect(F.keys.some((k) => k.subscription === 'datagrip')).toBe(false);
+    expect(F.keys.find((k) => k.lot === 'jetbrains')?.count).toBeGreaterThan(0);
+    expect(F.keys.some((k) => k.lot === 'datagrip')).toBe(false);
   });
 
   it('commits for a year to eight annual subscriptions, and prices every subscription in dong (the dollar prices of Cursor, Claude Pro and Copilot Pro stay beside it as the original price)', () => {
@@ -303,12 +312,12 @@ describe('shared dataset v4: the catalog and the shared pool', () => {
       expect(subscriptionOf(key)).toMatchObject({ quantity: 0, responsible: 'NV-ITA1' });
       expect(subscriptionOf(key)).not.toHaveProperty('ownerDepartment');
     }
-    expect(subscriptionOf('visio-pro')).toMatchObject({ kind: 'PERPETUAL', quantity: 3 });
-    expect(subscriptionOf('sublime-license')).toMatchObject({ kind: 'PERPETUAL', quantity: 2 });
+    expect(F.lots.find((lot) => lot.key === 'visio-pro')).toMatchObject({ licenseCount: 3, purpose: 'REPLACEMENT' });
+    expect(F.lots.find((lot) => lot.key === 'sublime-license')).toMatchObject({ licenseCount: 2 });
     expect(subscriptionOf('adobe-cc-teams').responsible).toBe('NV-ITA2');
     expect(subscriptionOf('notion-business').responsible).toBe('NV-ITA2');
-    // Each subscription is named by the key of its plan (SPEC 4.4), the first thirteen by the key they have always had.
-    for (const declared of F.subscriptions.slice(13)) expect(declared.key).toBe(declared.plan);
+    // Each subscription is named by the key of its plan (SPEC 4.4), the first eleven by the key they have always had.
+    for (const declared of F.subscriptions.slice(11)) expect(declared.key).toBe(declared.plan);
   });
 
   it('declares no application of the old kind and no pricing model: the system works both out from the plan (CT-1, B-5)', () => {
@@ -317,10 +326,27 @@ describe('shared dataset v4: the catalog and the shared pool', () => {
       expect(declared).not.toHaveProperty('pricingModel');
   });
 
-  it('buys a plan of one purchase (K4) once and every other plan over a term: only a perpetual subscription is written for K4 (B-5)', () => {
-    for (const declared of F.subscriptions) {
-      expect(declared.kind === 'PERPETUAL').toBe(plan(declared.plan).provisioningType === 'K4');
+  it('buys a plan of one purchase (K4) as lots and every other plan over a term: no subscription is written for K4, no lot for another plan or for a key that comes with the machine (W3-24, W3-27)', () => {
+    for (const declared of F.subscriptions) expect(plan(declared.plan).provisioningType).not.toBe('K4');
+    for (const lot of F.lots) {
+      expect(plan(lot.plan)).toMatchObject({ provisioningType: 'K4' });
+      expect(plan(lot.plan).keyBinding).not.toBe('DEVICE_BUNDLED');
+      expect(lot.licenseCount).toBeGreaterThan(0);
+      expect(lot.purpose).toBe(plan(lot.plan).keyBinding === 'DEVICE_KEY' ? 'STOCK' : 'REPLACEMENT');
     }
+    const k4 = F.applications.flatMap((app) => app.plans).filter((p) => p.provisioningType === 'K4');
+    expect(k4.filter((p) => p.keyBinding !== 'DEVICE_BUNDLED' && !F.lots.some((lot) => lot.plan === p.key))).toEqual(
+      [],
+    );
+  });
+
+  it('buys JetBrains All Products twice at two prices, DataGrip once, and Windows 11 Pro OEM never (W3-28)', () => {
+    const jetbrains = F.lots.filter((lot) => lot.plan === 'jetbrains-all');
+    expect(jetbrains).toHaveLength(2);
+    expect(new Set(jetbrains.map((lot) => lot.unitPrice.amount)).size).toBe(2);
+    expect(F.lots.filter((lot) => lot.plan === 'jetbrains-datagrip')).toHaveLength(1);
+    expect(F.lots.some((lot) => lot.plan === 'windows-11-pro-oem')).toBe(false);
+    expect(new Set(F.lots.map((lot) => lot.key)).size).toBe(F.lots.length);
   });
 
   it('holds only seats of declared people and subscriptions, one seat of a person per subscription', () => {
@@ -414,9 +440,9 @@ describe('shared dataset v4: the catalog and the shared pool', () => {
   });
 
   it('puts the keys of the two new K4 plans in the store: three for Visio, two for Sublime (T8)', () => {
-    expect(F.keys).toContainEqual({ subscription: 'visio-pro', count: 3 });
-    expect(F.keys).toContainEqual({ subscription: 'sublime-license', count: 2 });
-    expect(F.keys.some((k) => k.subscription === 'datagrip')).toBe(false);
+    expect(F.keys).toContainEqual({ lot: 'visio-pro', count: 3 });
+    expect(F.keys).toContainEqual({ lot: 'sublime-license', count: 2 });
+    expect(F.keys.some((k) => k.lot === 'datagrip')).toBe(false);
   });
 
   it('never makes a person ask for a plan they already hold', () => {

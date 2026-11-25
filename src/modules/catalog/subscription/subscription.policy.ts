@@ -3,12 +3,16 @@ import { DONG, type Money } from '../../../core/money/money';
 import { isPricedInDong } from './price/subscription-price.policy';
 import {
   SubscriptionDatesInvalidError,
+  SubscriptionK1HasNoSubscriptionError,
   SubscriptionMidTermReductionNotAllowedError,
   SubscriptionPerpetualHasNoTermError,
+  SubscriptionPerpetualIsLicenseLotError,
   SubscriptionPerpetualNeedsLicensedApplicationError,
   SubscriptionPlanHasNoSubscriptionError,
   SubscriptionPriceMismatchError,
+  SubscriptionPrimaryRetiredError,
   SubscriptionQuantityReasonRequiredError,
+  SubscriptionSeatCountViaLedgerError,
   SubscriptionVersionRequiredError,
 } from './subscription.errors';
 import type {
@@ -19,6 +23,7 @@ import type {
   PlanKeyBinding,
   PlanPricingModel,
   ProvisioningType,
+  SeatCounting,
   SubscriptionKind,
   SubscriptionStatus,
   SubscriptionWarning,
@@ -190,6 +195,9 @@ export function nextStateOf<B extends string, C extends number>(
     responsibleItAdminEmployeeId: string | null;
     vendorMinimumSeats: number | null;
     isPrimaryForPlan: boolean;
+    seatCounting?: SeatCounting | undefined;
+    minimumSeatsTotal?: number | null | undefined;
+    invoicedLater?: boolean | undefined;
   },
   input: {
     purchasedQuantity?: number;
@@ -204,6 +212,9 @@ export function nextStateOf<B extends string, C extends number>(
     allowsMidTermReduction?: boolean;
     vendorMinimumSeats?: number | null;
     isPrimaryForPlan?: boolean;
+    seatCounting?: SeatCounting;
+    minimumSeatsTotal?: number | null;
+    invoicedLater?: boolean;
   },
 ) {
   return {
@@ -221,6 +232,10 @@ export function nextStateOf<B extends string, C extends number>(
     responsibleItAdminEmployeeId: current.responsibleItAdminEmployeeId,
     vendorMinimumSeats: given(input.vendorMinimumSeats, current.vendorMinimumSeats),
     isPrimaryForPlan: given(input.isPrimaryForPlan, current.isPrimaryForPlan),
+    // The way the seats are counted, the least seats across the workspace and the invoice after the period stay as stored when the update says nothing.
+    seatCounting: given(input.seatCounting, current.seatCounting),
+    minimumSeatsTotal: given(input.minimumSeatsTotal, current.minimumSeatsTotal),
+    invoicedLater: given(input.invoicedLater, current.invoicedLater),
   };
 }
 
@@ -283,6 +298,9 @@ export function declaredStateOf<B extends string, C extends number>(input: {
   noticePeriodDays?: number;
   autoRenew?: boolean;
   allowsMidTermReduction?: boolean;
+  seatCounting?: SeatCounting;
+  minimumSeatsTotal?: number;
+  invoicedLater?: boolean;
 }) {
   return {
     purchasedQuantity: orStart<number | null>(input.purchasedQuantity, null),
@@ -298,12 +316,44 @@ export function declaredStateOf<B extends string, C extends number>(input: {
     responsibleItAdminEmployeeId: orStart<string | null>(input.responsibleItAdminEmployeeId, null),
     vendorMinimumSeats: orStart<number | null>(input.vendorMinimumSeats, null),
     isPrimaryForPlan: false,
+    // Not given, these are not written and the column defaults stand (a fixed count, no minimum, no invoice after the period).
+    seatCounting: input.seatCounting,
+    minimumSeatsTotal: input.minimumSeatsTotal,
+    invoicedLater: input.invoicedLater,
   };
 }
 
 /** An edit made on a read of the row is stale when the row's `updated_at` (kept to the millisecond, `Timestamptz(3)`) is no longer that read; no read named means no check. */
 export function isStaleEdit(expectedUpdatedAt: Date | undefined, currentUpdatedAt: Date): boolean {
   return expectedUpdatedAt !== undefined && expectedUpdatedAt.getTime() !== currentUpdatedAt.getTime();
+}
+
+/** The routes that change the seats of a subscription: what an edit of the number answers with (W3-27). */
+export const SEAT_LEDGER_ROUTES = [
+  'subscriptionLineSeatPurchase',
+  'subscriptionLineSeatCorrection',
+  'subscriptionLineSeatReduction',
+] as const;
+
+/**
+ * What an update no longer writes (W3-27): the seats (they are bought and corrected on the lines of the subscription) and the mark of the subscription that
+ * prices its plan. Both fields stay in the body so a client that sends them is told so. Throws SubscriptionSeatCountViaLedgerError, SubscriptionPrimaryRetiredError.
+ */
+export function assertUpdateWritesNoRetiredField(input: {
+  purchasedQuantity?: number;
+  isPrimaryForPlan?: boolean;
+}): void {
+  if (input.purchasedQuantity !== undefined) throw new SubscriptionSeatCountViaLedgerError(SEAT_LEDGER_ROUTES);
+  if (input.isPrimaryForPlan === true) throw new SubscriptionPrimaryRetiredError();
+}
+
+/**
+ * What a declaration no longer takes (W3-27): a purchase made once is a lot, and a plan of personal accounts has no subscription. The kind is judged before
+ * the plan is read; the plan once it is. Throws SubscriptionPerpetualIsLicenseLotError, SubscriptionK1HasNoSubscriptionError.
+ */
+export function assertDeclarable(kind: SubscriptionKind, planProvisioningType?: ProvisioningType): void {
+  if (kind === 'PERPETUAL') throw new SubscriptionPerpetualIsLicenseLotError();
+  if (planProvisioningType === 'K1') throw new SubscriptionK1HasNoSubscriptionError();
 }
 
 /** Requires expectedUpdatedAt whenever purchasedQuantity is included in an update. */

@@ -1,15 +1,29 @@
 import type { CatalogApi } from '../../../catalog/public/catalog.api';
+import type { LicenseLotApi } from '../../../catalog/public/license-lot.api';
 import type { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import type { DeviceActivationRepo } from '../../device-activation/device-activation.repo';
 import { SubscriptionSeatUsageService } from './seat-usage-occupancy.service';
 import type { AssignmentRepo } from '../assignment.repo';
 
 describe('SubscriptionSeatUsageService.get (seats taken by assignments and by open machine activations)', () => {
-  const setup = (options: { purchased: number | null; assignments: number; activations: number }) => {
+  const setup = (options: {
+    purchased: number | null;
+    assignments: number;
+    activations: number;
+    provisioningType?: 'K4';
+    lotLicenses?: number;
+  }) => {
     const repo = { countOccupying: jest.fn().mockResolvedValue(options.assignments) };
     const deviceActivations = { occupiedBySubscription: jest.fn().mockResolvedValue(options.activations) };
     const catalog = {
-      findSeatTarget: jest.fn().mockResolvedValue({ purchasedQuantity: options.purchased }),
+      findSeatTarget: jest
+        .fn()
+        .mockResolvedValue({ purchasedQuantity: options.purchased, provisioningType: options.provisioningType }),
+    };
+    const lots = {
+      findLot: jest
+        .fn()
+        .mockResolvedValue(options.lotLicenses === undefined ? null : { licenseCount: options.lotLicenses }),
     };
     const organizationReads = { businessToday: jest.fn().mockResolvedValue('2026-11-24') };
     const service = new SubscriptionSeatUsageService(
@@ -17,6 +31,7 @@ describe('SubscriptionSeatUsageService.get (seats taken by assignments and by op
       deviceActivations as unknown as DeviceActivationRepo,
       organizationReads as unknown as OrganizationReadApi,
       catalog as unknown as CatalogApi,
+      lots as unknown as LicenseLotApi,
     );
 
     return { service, repo, deviceActivations };
@@ -55,5 +70,24 @@ describe('SubscriptionSeatUsageService.get (seats taken by assignments and by op
     await expect(
       setup({ purchased: null, assignments: 4, activations: 0 }).service.get('sub-1'),
     ).resolves.toMatchObject({ purchased: null, occupied: 4, free: null });
+  });
+
+  it('counts a lot of a K4 plan once: the licenses of the lot are bought, what the database counts of it is taken, the assignments are not added (DL-2)', async () => {
+    const { service, repo } = setup({
+      purchased: 1,
+      assignments: 3,
+      activations: 3,
+      provisioningType: 'K4',
+      lotLicenses: 5,
+    });
+
+    await expect(service.get('lot-1')).resolves.toEqual({
+      subscriptionId: 'lot-1',
+      purchased: 5,
+      occupied: 3,
+      free: 2,
+      asOf: '2026-11-24',
+    });
+    expect(repo.countOccupying).not.toHaveBeenCalled();
   });
 });

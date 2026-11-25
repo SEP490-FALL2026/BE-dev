@@ -53,13 +53,14 @@ export interface PoolSubscription {
 }
 
 /**
- * A plan that gives out seats (K2), keys (K4) or personal accounts (K1), with the subscriptions they sit on today: the shared pool of the plan,
- * as a grant reads it (`PoolSubscription`). What the stock summary of the IT Admin counts the plan over (`QĐ-111n`).
+ * A plan that gives out seats (K2) or keys (K4), with what they sit on today: for a K2 plan the subscriptions of the shared pool of the plan, as a grant
+ * reads it (`PoolSubscription`); for a K4 plan its lots, each as an entry whose `subscriptionId` is the id of the lot and whose `purchasedQuantity` is its
+ * licenses (a lot born from a perpetual purchase has the id of that subscription). What the stock summary of the IT Admin counts the plan over (`QĐ-111n`).
  */
 export interface StockPlan {
   planId: string;
   planName: string;
-  provisioningType: 'K1' | 'K2' | 'K4';
+  provisioningType: 'K2' | 'K4';
   /** How a K4 plan is bound once bought; null for a plan of another kind. A key that goes on a machine is counted by licenses, not by keys. */
   keyBinding: 'ACCOUNT' | 'DEVICE_KEY' | 'DEVICE_BUNDLED' | null;
   applicationId: string;
@@ -181,6 +182,14 @@ export interface WorkspaceDuty {
   role: 'PRIMARY_OWNER' | 'OWNER' | 'ADMIN';
   /** The plan declares an emergency account: only that it exists, never its name, its holder or any secret. */
   emergencyAccountDeclared: boolean;
+  /** The workspace the duty is held in (W3-10): the plan above is the one it is known by. */
+  workspace?: {
+    id: string;
+    name: string;
+    vendorId: string;
+    responsibleItAdminEmployeeId: string | null;
+    members: ReadonlyArray<{ employeeId: string; role: 'OWNER' | 'ADMIN' }>;
+  };
 }
 
 /**

@@ -70,9 +70,10 @@ export class ContractSubscriptionsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The request is invalid (VALIDATION_ERROR), the subscription is not of a shared stock, K2 or K4 (CONTRACT.SUBSCRIPTION_KIND_NOT_ALLOWED), the contract has no vendor yet (CONTRACT.INCOMPLETE) or the vendor of the subscription is not the vendor of the contract (CONTRACT.SUBSCRIPTION_VENDOR_MISMATCH).',
+        'The request is invalid (VALIDATION_ERROR), the subscription is of a plan of keys, K4, whose lot has its own contract (CONTRACT.SUBSCRIPTION_NOT_K2), the subscription is not of seats (CONTRACT.SUBSCRIPTION_KIND_NOT_ALLOWED), the contract has no vendor yet (CONTRACT.INCOMPLETE) or the vendor of the subscription is not the vendor of the contract (CONTRACT.SUBSCRIPTION_VENDOR_MISMATCH).',
       examples: [
         VALIDATION_EXAMPLE,
+        CONTRACT_ERROR_EXAMPLES.SUBSCRIPTION_NOT_K2,
         CONTRACT_ERROR_EXAMPLES.SUBSCRIPTION_KIND_NOT_ALLOWED,
         CONTRACT_ERROR_EXAMPLES.INCOMPLETE,
         CONTRACT_ERROR_EXAMPLES.SUBSCRIPTION_VENDOR_MISMATCH,

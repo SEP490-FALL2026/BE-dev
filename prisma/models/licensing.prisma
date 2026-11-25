@@ -45,6 +45,9 @@ model LicenseAssignment {
   expectedEndDate             DateTime?           @map("expected_end_date") @db.Date
   // The day the task of the grant was completed: the day the right really begins (`BR-MF1-06a`); null until then and for a seat that was not granted by a task.
   grantedOn                   DateTime?           @map("granted_on") @db.Date
+  // A personal right of a K1 plan (W3-17): the months it commits to (1 or 12) and the day its billing months count from; written with the right, never changed.
+  personalCommitmentMonths    Int?                @map("personal_commitment_months") @db.SmallInt
+  billingAnchorOn             DateTime?           @map("billing_anchor_on") @db.Date
   // Set once when the grant it was made for is closed as failed: the period is then empty, so no seat is taken.
   failedAt                    DateTime?           @map("failed_at") @db.Timestamptz(3)
   // Set once when the grant it was made for was cancelled because the request was withdrawn: the period is empty as well.
@@ -307,7 +310,11 @@ enum LicenseKeyStatus {
 model LicenseKey {
   id                  String           @id @default(uuid()) @db.Uuid
   organizationId      String           @map("organization_id") @db.Uuid
-  subscriptionId      String           @map("subscription_id") @db.Uuid
+  // Null for a key of a lot that came from no subscription (W3-24); at least one of the two is set (CHECK license_keys_lot_or_subscription).
+  subscriptionId      String?          @map("subscription_id") @db.Uuid
+  licenseLotId        String?          @map("license_lot_id") @db.Uuid
+  // Who bears the cost of the key: false for a key bought for a request (its cost was charged then), true for the others. Set by the application, never by default; it only goes from false to true.
+  costBorne           Boolean          @map("cost_borne")
   fingerprint         String
   masked              String
   ciphertext          Bytes
@@ -328,12 +335,15 @@ model LicenseKey {
   updatedAt              DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  subscription      Subscription       @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+  subscription      Subscription?      @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+  licenseLot        LicenseLot?        @relation(fields: [licenseLotId], references: [id], onDelete: Restrict)
   assignment        LicenseAssignment? @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
   deviceActivations DeviceActivation[]
+  charge            LicenseLotCharge?
 
   @@unique([organizationId, fingerprint])
   @@index([subscriptionId, status])
+  @@index([licenseLotId, status])
   @@map("license_keys")
 }
 
@@ -714,6 +724,11 @@ model SubscriptionRenewal {
   realisedSavingsCurrency     String?                @map("realised_savings_currency") @db.Char(3)
   realisedSavingsRecordedAt   DateTime?              @map("realised_savings_recorded_at") @db.Timestamptz(3)
   realisedSavingsInvoiceId    String?                @map("realised_savings_invoice_id") @db.Uuid
+  // A case recorded by the system at the milestone with nobody deciding (decider_role SYSTEM).
+  autoRecorded                Boolean                @default(false) @map("auto_recorded")
+  // The line that holds the least seats across the workspace, and the note of the one who recorded it (W3-16).
+  minimumTotalHolderLineId    String?                @map("minimum_total_holder_line_id") @db.Uuid
+  minimumTotalNote            String?                @map("minimum_total_note")
   createdAt                   DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt                   DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -721,6 +736,9 @@ model SubscriptionRenewal {
   subscription     Subscription                      @relation("RenewalOfPeriod", fields: [subscriptionId], references: [id], onDelete: Restrict)
   nextSubscription Subscription?                     @relation("RenewalNextPeriod", fields: [nextSubscriptionId], references: [id], onDelete: Restrict)
   releasedSeats    SubscriptionRenewalReleasedSeat[]
+  minimumTotalHolderLine SubscriptionLine?                @relation("RenewalMinimumTotalHolder", fields: [minimumTotalHolderLineId], references: [id], onDelete: Restrict)
+  seatChanges      SeatChange[]                      @relation("SeatChangeOfRenewal")
+  lineTargets      SubscriptionLineTarget[]
 
   @@index([state, noticeBaseDate])
   @@index([subscriptionId])
@@ -863,4 +881,23 @@ model DepartmentSoftwareProposal {
   @@index([planId])
   @@index([proposedByEmployeeId])
   @@map("department_software_proposals")
+}
+
+// What the system counted for a line at a renewal, locked at the milestone: the seats needed and the target, then the quantity the
+// decision recorded (set once, a trigger).
+model SubscriptionLineTarget {
+  subscriptionLineId String    @map("subscription_line_id") @db.Uuid
+  renewalOn          DateTime  @map("renewal_on") @db.Date
+  seatsNeeded        Int       @map("seats_needed")
+  target             Int
+  recordedQuantity   Int?      @map("recorded_quantity")
+  renewalId          String?   @map("renewal_id") @db.Uuid
+  lockedAt           DateTime  @map("locked_at") @db.Timestamptz(3)
+  lockedBy           String    @map("locked_by")
+
+  line    SubscriptionLine     @relation(fields: [subscriptionLineId], references: [id], onDelete: Restrict)
+  renewal SubscriptionRenewal? @relation(fields: [renewalId], references: [id], onDelete: Restrict)
+
+  @@id([subscriptionLineId, renewalOn])
+  @@map("subscription_line_targets")
 }

@@ -13,6 +13,9 @@ import {
   LicenseKeyInitialActivationsExceedMaxError,
   LicenseKeyInitialActivationsOnAccountPlanError,
   LicenseKeyInitializationClosedError,
+  LicenseKeyLotKeysExceedLicensesError,
+  LicenseKeyLotNotFoundError,
+  LicenseKeyLotNotResponsibleError,
   LicenseKeyMaxActivationsNotRaisedError,
   LicenseKeyPlanHasNoKeysError,
   LicenseKeyStaleError,
@@ -36,6 +39,18 @@ export function toLicenseKeyApiException(error: unknown): unknown {
   if (error instanceof LicenseKeyRevealLimitError) {
     // The same code the global rate limit answers with: to a client it is one kind of refusal.
     return refuse(HttpStatus.TOO_MANY_REQUESTS, 'HTTP_TOO_MANY_REQUESTS', error.message);
+  }
+  if (error instanceof LicenseKeyLotNotFoundError) {
+    return refuse(HttpStatus.NOT_FOUND, 'LICENSE_LOT.NOT_FOUND', error.message);
+  }
+  if (error instanceof LicenseKeyLotNotResponsibleError) {
+    return refuse(HttpStatus.FORBIDDEN, 'LICENSE_LOT.NOT_RESPONSIBLE', error.message);
+  }
+  if (error instanceof LicenseKeyLotKeysExceedLicensesError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'LICENSE_LOT.KEYS_EXCEED_LICENSES', error.message, {
+      licenseCount: error.licenseCount,
+      keysNotWithdrawn: error.keysNotWithdrawn,
+    });
   }
   if (error instanceof LicenseKeyApplicationRetiredError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'LICENSE_KEY.APPLICATION_RETIRED', error.message);
@@ -92,6 +107,9 @@ export const LICENSE_KEY_ERROR_EXAMPLES = {
   NOT_IN_STORE: example(new LicenseKeyStateError('NOT_IN_STORE')),
   SUBSCRIPTION_MISMATCH: example(new LicenseKeyStateError('SUBSCRIPTION_MISMATCH')),
   INITIALIZATION_CLOSED: example(new LicenseKeyInitializationClosedError()),
+  LOT_NOT_FOUND: example(new LicenseKeyLotNotFoundError()),
+  LOT_NOT_RESPONSIBLE: example(new LicenseKeyLotNotResponsibleError()),
+  LOT_KEYS_EXCEED_LICENSES: example(new LicenseKeyLotKeysExceedLicensesError(3, 3)),
   PLAN_HAS_NO_KEYS: example(new LicenseKeyPlanHasNoKeysError()),
   INITIAL_ACTIVATIONS_EXCEED_MAX: example(new LicenseKeyInitialActivationsExceedMaxError(6, 5)),
   INITIAL_ACTIVATIONS_ON_ACCOUNT_PLAN: example(new LicenseKeyInitialActivationsOnAccountPlanError()),
