@@ -27,10 +27,11 @@ export class RunningUncommittedFactsService {
     private readonly poolRepo: SharedPoolLineRepo,
   ) {}
 
-  /** Running uncommitted minor per Cost Center id for `year` on `today` (defaults to business today). */
+  /** Running uncommitted minor per Cost Center id for `year` (`Y` or `Y+1`) on `today` (defaults to business today). */
   async ofYear(year: number, today?: BusinessDate, tx?: DbTx): Promise<Map<string, bigint>> {
     const resolvedToday = today ?? (await this.organizationReads.businessToday(new Date(), tx));
-    if (year !== Number(resolvedToday.slice(0, 4))) return new Map();
+    const todayYear = Number(resolvedToday.slice(0, 4));
+    if (year !== todayYear && year !== todayYear + 1) return new Map();
 
     const seats = await this.licensing.getSeatsInForceOn(resolvedToday, tx);
     if (seats.length === 0) return new Map();

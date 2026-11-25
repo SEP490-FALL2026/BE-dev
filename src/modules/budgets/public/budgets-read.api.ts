@@ -37,4 +37,21 @@ export class BudgetsReadApi {
   approvedBudgetsOfYear(costCenterIds: readonly string[], year: number, tx?: DbTx) {
     return this.facts.approvedOfCostCenters(costCenterIds, year, tx);
   }
+
+  /** Running uncommitted minor of `year` per Cost Center id for `costCenterIds`. */
+  async runningUncommittedOfYear(
+    costCenterIds: readonly string[],
+    year: number,
+    tx?: DbTx,
+  ): Promise<Map<string, bigint>> {
+    const result = new Map<string, bigint>();
+    if (costCenterIds.length === 0 || this.runningUncommitted === null) return result;
+    for (const costCenterId of new Set(costCenterIds)) {
+      const byYear = await this.runningUncommitted.ofCostCenterYears(costCenterId, [year], tx);
+      const amount = byYear.get(year) ?? 0n;
+      if (amount > 0n) result.set(costCenterId, amount);
+    }
+
+    return result;
+  }
 }

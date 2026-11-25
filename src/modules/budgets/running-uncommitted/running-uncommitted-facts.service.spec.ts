@@ -100,17 +100,27 @@ describe('RunningUncommittedFactsService', () => {
       },
     ]);
 
-    commitments.commitmentsOfRequestsInYear.mockResolvedValue(
-      new Map([
-        ['req-grace', { state: 'HELD', costCenterId: CC_KT }],
-        ['req-held', { state: 'HELD', costCenterId: CC_TK }],
-      ]),
+    commitments.commitmentsOfRequestsInYear.mockImplementation((_ids: readonly string[], yr: number) =>
+      Promise.resolve(
+        yr === 2027
+          ? new Map([
+              ['req-grace', { state: 'HELD', costCenterId: CC_KT }],
+              ['req-held', { state: 'HELD', costCenterId: CC_TK }],
+            ])
+          : new Map(),
+      ),
     );
 
-    poolRepo.subscriptionIdsWithRunsByMonth.mockResolvedValue([
-      { subscriptionId: 'sub-1', month: '2027-01-01' },
-      { subscriptionId: 'sub-1', month: '2027-06-01' },
-    ]);
+    poolRepo.subscriptionIdsWithRunsByMonth.mockImplementation((input: { from: string }) =>
+      Promise.resolve(
+        input.from.startsWith('2027')
+          ? [
+              { subscriptionId: 'sub-1', month: '2027-01-01' },
+              { subscriptionId: 'sub-1', month: '2027-06-01' },
+            ]
+          : [],
+      ),
+    );
 
     const result = await service.ofCostCenterYears(CC_TK, [2027, 2028], tx);
 
@@ -125,7 +135,39 @@ describe('RunningUncommittedFactsService', () => {
     );
     // 2 counted seats (a1 baseline + a2 grace) x 375.000 x 10 un-run months (2,3,4,5,7,8,9,10,11,12) = 7.500.000
     expect(result.get(2027)).toBe(7_500_000n);
-    expect(result.get(2028)).toBe(0n);
+    // D-10 (Owner 25/11): next year (2028) counts all 3 active seats without 2028 commitment x 375.000 x 12 months = 13.500.000
+    expect(result.get(2028)).toBe(13_500_000n);
+  });
+
+  it('FIX-B1 F7 (D-10): computes Y+1 (open 500k -> 6M, ending 31/03 Y+1 -> 1.5M) and returns 0 for past years', async () => {
+    const { service, licensing, periods, organizationReads } = buildService();
+    licensing.getSeatsInForceOn.mockResolvedValue([
+      inForceSeat({ assignmentId: 'a-open', employeeId: 'emp-open', heldUntil: null }),
+      inForceSeat({ assignmentId: 'a-mar', employeeId: 'emp-mar', heldUntil: '2028-04-01' }),
+    ]);
+    organizationReads.getOwningUnits.mockResolvedValue(
+      new Map([
+        ['emp-open', { departmentId: 'd-tk', costCenter: { id: CC_TK, code: 'TK', name: 'TK', status: 'ACTIVE' } }],
+        ['emp-mar', { departmentId: 'd-kt', costCenter: { id: CC_KT, code: 'KT', name: 'KT', status: 'ACTIVE' } }],
+      ]),
+    );
+    periods.getPurchaseFacts.mockResolvedValue([
+      {
+        subscriptionId: 'sub-1',
+        status: 'ACTIVE',
+        kind: 'TERM',
+        provisioningType: 'K2',
+        monthlyPriceMinor: 500_000n,
+        startDate: '2027-01-01',
+      },
+    ]);
+
+    const res = await service.ofCostCenterYears(CC_TK, [2026, 2028]);
+    const ktNext = await service.ofYear(2028);
+
+    expect(res.get(2026)).toBe(0n);
+    expect(res.get(2028)).toBe(6_000_000n);
+    expect(ktNext.get(CC_KT)).toBe(1_500_000n);
   });
 
   it('short-circuits without querying licensing or catalog when requested year is not current year', async () => {

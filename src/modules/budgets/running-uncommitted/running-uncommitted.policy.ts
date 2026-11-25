@@ -94,11 +94,12 @@ function seatUncommittedCost(seat: RunningUncommittedSeat, input: RunningUncommi
 
 /**
  * Computes running uncommitted K2 pool cost per Cost Center for `year` on `today`.
- * Only applies to the fiscal year containing `today`; past/future years return empty totals.
+ * Applies to the current fiscal year and next year (`Y+1`); past years and further future years return empty totals.
  */
 export function runningUncommittedByCostCenter(input: RunningUncommittedInput): Map<string, bigint> {
   const totals = new Map<string, bigint>();
-  if (input.year !== Number(input.today.slice(0, 4))) return totals;
+  const todayYear = Number(input.today.slice(0, 4));
+  if (input.year !== todayYear && input.year !== todayYear + 1) return totals;
 
   for (const seat of input.seats) {
     if (seat.costCenterId === null) continue;

@@ -247,17 +247,42 @@ describe('runningUncommittedByCostCenter (SPEC-B1 W3-08)', () => {
       expect(result.size).toBe(0);
     });
 
-    it('returns empty map when requested year differs from today year', () => {
+    it('returns empty map when requested year is in the past or more than one year ahead', () => {
+      for (const year of [2026, 2029]) {
+        const result = runningUncommittedByCostCenter({
+          year,
+          today: '2027-07-08',
+          seats: [seat()],
+          periodBySubscription: new Map([['sub-1', period()]]),
+          commitmentByRequest: new Map(),
+          runMonthsBySubscription: new Map(),
+        });
+
+        expect(result.size).toBe(0);
+      }
+    });
+
+    it('FIX-B1 F7 (D-10): computes next-year (Y+1) runningUncommitted for active seats (open=12m, end 31/03 next year=3m)', () => {
       const result = runningUncommittedByCostCenter({
-        year: 2026,
+        year: 2028,
         today: '2027-07-08',
-        seats: [seat()],
-        periodBySubscription: new Map([['sub-1', period()]]),
+        seats: [
+          seat({ assignmentId: 'open', costCenterId: CC_TK, heldFrom: '2027-01-01', heldUntil: null }),
+          seat({ assignmentId: 'ends-mar', costCenterId: CC_KT, heldFrom: '2027-01-01', heldUntil: '2028-04-01' }),
+          seat({
+            assignmentId: 'ends-this-year',
+            costCenterId: CC_KT,
+            heldFrom: '2027-01-01',
+            heldUntil: '2027-12-31',
+          }),
+        ],
+        periodBySubscription: new Map([['sub-1', period({ monthlyPriceMinor: 500_000n, startDate: '2027-01-01' })]]),
         commitmentByRequest: new Map(),
         runMonthsBySubscription: new Map(),
       });
 
-      expect(result.size).toBe(0);
+      expect(result.get(CC_TK)).toBe(6_000_000n);
+      expect(result.get(CC_KT)).toBe(1_500_000n);
     });
 
     it('clamps heldUntil past year-end (e.g. 2028-03-01) to month 12 of the requested year', () => {
