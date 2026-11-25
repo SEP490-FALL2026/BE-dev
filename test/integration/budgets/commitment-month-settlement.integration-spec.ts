@@ -463,6 +463,7 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
       employeeId: personId,
       requestId: cD.requestId,
       validFrom: `${h.year}-02-01`,
+      validUntil: `${h.year}-04-30`,
     });
     await seatMonths().chargeMonth(`${h.year}-02-01`, NOW);
     await setPoolPrice(subscriptionId, 450_000n);
