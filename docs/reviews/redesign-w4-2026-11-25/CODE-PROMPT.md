@@ -1,11 +1,14 @@
-# Prompt dán sẵn cho chat code — Đợt 4 thiết kế lại (phiếu nhiều mục, chế độ tự quyết, bản 2.1)
+# Prompt dán sẵn cho chat code — Đợt 4 thiết kế lại (phiếu nhiều mục, chế độ tự quyết, bản 2.2)
 
+> **Bản 2.2 (25/11):** Skill Preflight theo bước của `docs/guides/quy-trinh-code-ai.md` (Implement / Verify + repo skill `be-quick-check`, `create-migration`);
+> PLAN bản 2.2 có _Khuôn bước_, **Interfaces**, **Test trước**, **Commit** từng gói — làm đúng theo đó. Không đổi luật.
+>
 > **Bản 2.1 (25/11):** Owner đã chốt OQ-W4-1 → OQ-W4-4 và `NESTED_ARRAYS` (dòng `Owner đã chốt:` đã điền, [OWNER-ANSWERS.md](OWNER-ANSWERS.md)).
 >
 > **Bản 2 (25/11):** theo SPEC/PLAN bản 2 (hai review đã áp — SPEC §15): cổng C0 (T1 ở `int`) trước refactor; gói tách a/b; ghi chú trả lời chỉ sau _Trả về
 > của người_ chưa trả lời; gửi phiếu hai pha; bộ kiểm nhanh thêm prettier, `arch:routes`/`arch:docs:check`, tự kiểm drift.
 >
-> Dán nguyên khối dưới vạch vào một chat Sonnet (model **sonnet**) hoặc Gemini mới **sau khi** Owner đã duyệt SPEC/PLAN bản 2.1 **và** đợt 3 đã ở `dev`
+> Dán nguyên khối dưới vạch vào một chat Sonnet (model **sonnet**) hoặc Gemini mới **sau khi** Owner đã duyệt SPEC bản 2.1 / PLAN bản 2.2 **và** đợt 3 đã ở `dev`
 > **và** đã có `DELTA-W3-FINAL.md`. Sửa dòng `LÀN:` trước khi dán (dòng `Owner đã chốt:` đã điền). Quy trình
 > chung: `docs/guides/quy-trinh-code-ai.md`.
 
@@ -75,9 +78,18 @@ các gói của làn không chờ duyệt giữa gói; câu hỏi nhỏ tự ch�
 
 ## 0. Skill Preflight (bắt buộc, trước mọi việc, và lại sau mỗi lần compact context)
 
-1. Liệt kê skill có sẵn. Đọc đầy đủ `SKILL.md` của: một process skill (`superpowers:executing-plans` hoặc `agent-skills:incremental-implementation`);
-   `superpowers:test-driven-development` (hoặc `agent-skills:test-driven-development`); `superpowers:verification-before-completion`. Gói có route mới thêm
-   `agent-skills:api-and-interface-design`. Không có đúng tên ⟹ skill gần nhất, ghi mapping.
+1. Liệt kê skill có sẵn. Đọc đầy đủ `SKILL.md` của đúng bộ theo bước (`docs/guides/quy-trinh-code-ai.md`):
+
+   | Bước | Skill | Dùng khi |
+   | ---- | ----- | -------- |
+   | Implement | `superpowers:executing-plans` (process) + `superpowers:test-driven-development` | mọi gói: chạy PLAN tuần tự từng gói theo _Khuôn bước_, test đỏ trước |
+   | Verify | `superpowers:verification-before-completion` | trước mọi `xong-unit`/`xong`, commit, báo cáo — có lệnh + output mới chạy mới được tuyên bố |
+   | Kiểm nhanh | repo skill `.claude/skills/be-quick-check/SKILL.md` | bước 8 mục 3 mỗi gói, mỗi commit (cộng phần đợt 4 thêm ở PLAN _Bộ kiểm nhanh_) |
+   | Migration | repo skill `.claude/skills/create-migration/SKILL.md` (chỉ gọi tay ⟹ **đọc file**) | B1, B5a (làn `biz`): quy ước tên/thứ tự/không GRANT/roll-forward; **thay** `pnpm db:migrate:dev` bằng `prisma migrate diff` (PLAN bước **M**) |
+
+   Gói có route mới đọc thêm `agent-skills:api-and-interface-design`. Không có đúng tên ⟹ skill gần nhất (`agent-skills:incremental-implementation`,
+   `agent-skills:test-driven-development`), ghi mapping. **Không** dùng `superpowers:subagent-driven-development` song song, `using-git-worktrees`,
+   `finishing-a-development-branch` (quy trình BE: tuần tự, không worktree, agent không merge/PR). Skill chỉ chuẩn hóa cách làm; LUẬT CỨNG, PLAN, SPEC thắng skill.
 2. Đọc trong repo: `AGENTS.md`, `ARCHITECTURE.md`, `docs/rules/README.md`, `docs/guides/quy-trinh-code-ai.md`, `docs/rules/database-business.md` (mục
    _Thứ tự khóa chuẩn_), `docs/rules/module-structure.md`, `docs/rules/api-contract.md`, `docs/rules/work-item-sizing.md`, `test/README.md`,
    `src/modules/requests/README.md`.

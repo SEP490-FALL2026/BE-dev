@@ -687,3 +687,7 @@ chỉ sau _Trả về_ của Người duyệt chi (`QĐ-116f`).
 | RB-10, RT-18 (một phần) | dùng một ngưỡng                                                          | Giữ biên Zod 20 + `TOO_MANY_ITEMS` (cần biên kỹ thuật cho mảng thân; lỗi riêng nêu "tối đa 6" đúng AC-5); ghi rõ mô tả      |
 | RB-11 (một phần) | tính `status`/`itemCount` trên mục xem được                                     | Giữ trên mọi mục (trạng thái phiếu một nghĩa cho mọi người xem), ghi dòng chấp nhận                                       |
 | RT-6 (một phần) | `results` có thể cần mục registry                                                | Không khẳng định — chưa thấy `spendBatchDecide#results` trong registry nested; người code theo tiền lệ, gate đòi thì thêm cùng file w4 |
+
+### 15.3. Rà theo `superpowers:brainstorming` (25/11, cùng PLAN bản 2.2)
+
+Đã rà theo `superpowers:brainstorming` — không thấy lựa chọn nghiệp vụ bị bỏ sót (chỗ còn mở chỉ là kỹ thuật, người code tự chốt `D-n` theo CODE-PROMPT §4).
