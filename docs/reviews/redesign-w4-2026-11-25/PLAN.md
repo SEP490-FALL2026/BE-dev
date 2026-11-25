@@ -1,11 +1,14 @@
-# PLAN — Đợt 4 thiết kế lại: phiếu nhiều mục (25/11/2026, bản 2)
+# PLAN — Đợt 4 thiết kế lại: phiếu nhiều mục (25/11/2026, bản 2.1)
+
+> **Bản 2.1 (25/11):** **Owner đã chốt:** OQ-W4-1 = A (1–6 mục) · OQ-W4-2 = A (`QĐ-116b` ở đợt 4, gói B6) · OQ-W4-3 = A (không mã) ·
+> OQ-W4-4 = A (thông báo từng mục) · `NESTED_ARRAYS` `requestTicketSubmit#ticket.items`, `requestTicketGet#ticket.items` = duyệt
+> ([OWNER-ANSWERS.md](OWNER-ANSWERS.md)).
 
 > **Bản 2 (25/11):** áp REVIEW-SPEC-BIZ / REVIEW-SPEC-TECH (SPEC §15). Đổi: T1 viết spec đặc tả hành vi hiện có (unit + integration) cho ba service bị
 > refactor, **B2a/B3/B4a chỉ bắt đầu khi T1 ở `int`**; tách B2 → B2a/B2b, B4 → B4a/B4b, B5 → B5a/B5b; `biz` làm B1 → B5a → B6 trước để không chờ T1;
 > `step-routing/` và hàng đợi trình thuộc `biz`; registry collection đúng file w4; bộ kiểm nhanh thêm prettier, `arch:routes`/`arch:docs:check`, tự kiểm drift.
 
-Spec: [SPEC.md](SPEC.md). Trạng thái: Proposed bản 2 — chờ Owner trả lời OQ-W4-1 → OQ-W4-4 + duyệt `NESTED_ARRAYS` ([SPEC §12](SPEC.md#12-câu-hỏi-owner-oq-w4-n))
-và duyệt. Quy trình: [`docs/guides/quy-trinh-code-ai.md`](../../guides/quy-trinh-code-ai.md). Đường dẫn tính từ gốc repo; `src/modules/` viết tắt `m/`. Mỗi file
+Spec: [SPEC.md](SPEC.md). Trạng thái: **Owner đã duyệt — bản 2.1**; chỉ code sau khi đợt 3 vào `dev` + có `DELTA-W3-FINAL.md`. Quy trình: [`docs/guides/quy-trinh-code-ai.md`](../../guides/quy-trinh-code-ai.md). Đường dẫn tính từ gốc repo; `src/modules/` viết tắt `m/`. Mỗi file
 `*.ts` có logic mới kèm spec **cùng thư mục, cùng tên** — ghi `(+spec)`. `*` = file chung, chỉ thêm dòng.
 
 ## Nền và nhánh
@@ -45,7 +48,7 @@ và duyệt. Quy trình: [`docs/guides/quy-trinh-code-ai.md`](../../guides/quy-t
 - **File chung, chỉ thêm dòng, gộp tay khi merge:** `openapi.json`, `docs/generated/*` (sinh lại sau merge, không sửa tay), `test/support/openapi-example-manifest.ts`,
   `openapi-example-route-codes-requests.ts`, `…-requests-spend.ts`, `api-coverage-manifest.ts`, `m/requests/requests.module.ts`,
   `test/support/api-collection-registry-nested-w4.ts`, `api-collection-registry-events-w4.ts` (B2b tạo, nối vào `api-collection-registry-nested.ts`/`-events.ts`;
-  T2 thêm key — **Owner duyệt**; gate từ chối ⟹ dừng hỏi), `prisma/models/organization.prisma` (chỉ quan hệ ngược, chỉ `biz`).
+  T2 thêm key — Owner **đã duyệt**; gate vẫn từ chối ⟹ dừng hỏi), `prisma/models/organization.prisma` (chỉ quan hệ ngược, chỉ `biz`).
 - Mọi file khác: **một làn tại một thời điểm**; đổi làn chỉ theo bảng _Tự kiểm chéo_. Gói cần file của làn kia ngoài bảng ⟹ dừng, ghi _Bàn giao_ ở PROGRESS.
 
 ### Tự kiểm chéo (file xuất hiện ở nhiều gói)
@@ -121,7 +124,7 @@ pnpm prisma:validate && pnpm prisma:generate   # gói có prisma/
 | --- | ----------------------------------------------------------------------------------------------------- | ---------------------------- | -- | ---- | ------------------------------------------ |
 | B1  | M1, model, lõi `request-ticket/` (repo + `view`, policy, lỗi, dto, mapper), `ticket` trên `AccessRequestRecord` | W4-01, phần luật W4-02/W4-04 | M  | biz  | điều kiện                         |
 | B5a | M2, `request-reply/`, gửi lại: ghi chú bắt buộc sau _Trả về của người_; `latestReply` trong `view`    | W4-09, W4-11 (phần repo)     | M  | biz  | B1                                         |
-| B6  | Rút cả phiếu; _(OQ-W4-2 = A)_ trưởng phòng rút ở hàng đợi trình                                       | W4-08, W4-12                 | S  | biz  | B5a                                        |
+| B6  | Rút cả phiếu; trưởng phòng rút ở hàng đợi trình                                       | W4-08, W4-12                 | S  | biz  | B5a                                        |
 | B2a | Refactor gửi Request đơn: kiểm cấp người/phòng / kiểm mục / ghi / định tuyến (enabler, giữ hành vi)   | W4-02 (enabler)              | S  | biz  | B6 + **T1 ở int (C0)**                     |
 | B2b | Route gửi phiếu, kiểm trước từng mục, hai pha, phiếu trưởng phòng theo thứ tự, registry w4            | W4-02, W4-03                 | M  | biz  | B2a                                        |
 | B3  | Quyết nhu cầu nhiều mục (`decide(…, judged?)`, route, kết quả từng mục)                               | W4-05                        | M  | biz  | B2b + **T1 ở int**                         |
@@ -175,10 +178,9 @@ OpenAPI không mã nội bộ.
 
 ### B6 — biz · S
 
-- **File:** **mới** `m/requests/withdraw/ticket-withdrawals.controller.ts`, `ticket-withdrawal.service.ts` (+spec); _(OQ-W4-2 = A)_
-  `m/requests/access-request/withdrawal.policy.ts` (+spec); `m/requests/requests.module.ts`\*; manifest\*;
+- **File:** **mới** `m/requests/withdraw/ticket-withdrawals.controller.ts`, `ticket-withdrawal.service.ts` (+spec); `m/requests/access-request/withdrawal.policy.ts` (+spec); `m/requests/requests.module.ts`\*; manifest\*;
   `test/integration/requests/request-ticket-withdrawal.integration-spec.ts`, `head-withdraw-submission-queue.integration-spec.ts`.
-- **Làm:** SPEC §7.8 (A–G), §7.12 (đúng `NOT_SUBMITTED`, ca âm). OQ-W4-2 chưa trả lời ⟹ làm theo khuyến nghị A, ghi D-n _cần Owner_.
+- **Làm:** SPEC §7.8 (A–G), §7.12 (đúng `NOT_SUBMITTED`, ca âm). OQ-W4-2 = A (Owner chốt).
 - **Xong khi:** ca §7.8 và §7.12 có test.
 
 ### B2a — biz · S (sau C0)
@@ -196,7 +198,7 @@ OpenAPI không mã nội bộ.
   `api-collection-registry-events-w4.ts` (+ nối `api-collection-registry-nested.ts`, `-events.ts`); `test/integration/requests/request-ticket-submit.integration-spec.ts`,
   `request-ticket-head.integration-spec.ts`; `test/http/requests/request-tickets.http-spec.ts`.
 - **Làm:** SPEC §7.2, §7.3. Lỗi cấp phiếu một lần trước vòng mục; vòng mục chỉ bắt danh sách lớp lỗi của gói; hai pha ghi; comment đầu service ghi thứ tự khóa (§6.2,
-  E5). Key registry `requestTicketSubmit#ticket.items`. OQ-W4-1 chưa trả lời ⟹ A (1–6), ghi D-n.
+  E5). Key registry `requestTicketSubmit#ticket.items`. OQ-W4-1 = A (1–6 mục, không lỗi tối thiểu).
 - **Kiểm:** `it.each` precheck ca A–M, K2 (phần không cần DB).
 - **Xong khi:** 14 ca §7.2 + 7 ca §7.3 + ca đồng thời §11.3 #1, #4 có test (viết).
 

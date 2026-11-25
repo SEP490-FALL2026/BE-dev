@@ -1,13 +1,15 @@
-# SPEC — Đợt 4 thiết kế lại: phiếu nhiều mục (25/11/2026, bản 2)
+# SPEC — Đợt 4 thiết kế lại: phiếu nhiều mục (25/11/2026, bản 2.1)
+
+> **Bản 2.1 (25/11):** Owner chốt OQ-W4-1 → OQ-W4-4 = A và duyệt `NESTED_ARRAYS` w4 ([OWNER-ANSWERS.md](OWNER-ANSWERS.md),
+> [§12](#12-câu-hỏi-owner-oq-w4-n)). Không đổi luật khác.
 
 > **Bản 2 (25/11):** áp hai review độc lập [REVIEW-SPEC-BIZ.md](REVIEW-SPEC-BIZ.md) (RB-1…RB-11) và [REVIEW-SPEC-TECH.md](REVIEW-SPEC-TECH.md)
 > (RT-1…RT-18) — bảng [§15](#15-đã-áp-review-bản-2). Đổi chính: ghi chú trả lời chỉ bắt buộc sau _Trả về_ **của người** chưa được trả lời (đúng chữ
 > `QĐ-114q`); `returned_step_id` nullable, bỏ unique; lô giữ thứ tự `results`; lỗi cấp phiếu luôn thắng lỗi mục; gửi phiếu hai pha (chèn rồi định tuyến);
 > enum `reason` đóng; registry `NESTED_ARRAYS` đúng file/key; T1 viết spec đặc tả hành vi hiện có trước mọi refactor.
 
-- **Trạng thái:** Proposed **bản 2** — chờ Owner trả lời [§12](#12-câu-hỏi-owner-oq-w4-n) (OQ-W4-1 → OQ-W4-4 + duyệt `NESTED_ARRAYS`; cả hai reviewer
-  đồng ý khuyến nghị A) và duyệt SPEC/PLAN. Sonnet/Gemini chỉ code khi Owner đã duyệt **và** đợt 3 đã vào `dev` **và** đã có `DELTA-W3-FINAL.md` (PLAN —
-  _Nền và nhánh_).
+- **Trạng thái:** **Owner đã duyệt — bản 2.1** (25/11/2026): mọi câu Owner đã trả lời ([§12](#12-câu-hỏi-owner-oq-w4-n),
+  [OWNER-ANSWERS.md](OWNER-ANSWERS.md)). **Chỉ code sau khi đợt 3 đã vào `dev` và đã có `DELTA-W3-FINAL.md`** (PLAN — _Nền và nhánh_).
 - **Nền đọc code:** `origin/int/redesign-w3` `444e6fc3` (= `dev` có đợt 1 + đợt 2 + **B1 của đợt 3**, P1–P8 xong). Đợt 3 còn P10 → P23 (B2, B3) đang
   làm và **cũng sửa module `requests`** (giá Request, cấp, giải phóng seat, `K1`, `K4`). Đợt 4 **dựa trên đợt 3 hoàn tất**; mọi `file:line` dưới đây
   đọc trên `444e6fc3`, người code xác nhận lại sau delta check ([§10](#10-phụ-thuộc-đợt-3-và-delta-check)).
@@ -88,7 +90,7 @@ Bảng [§3](#3-bảng-mục-w4-xx).
 | W4-09 | Ghi chú trả lời khi người xin gửi lại sau _Trả về_ của người (mỗi mục một ghi chú)                         | `QĐ-114q`, `QĐ-116az`(3), `US-05-02` AC-24, `US-05-25` AC-10         | M  | biz  | B5a          |
 | W4-10 | Ghi chú trả lời khi trưởng phòng trình lại Request bị Người duyệt chi _Trả về_ ở 1.7                        | `QĐ-116f`, `QĐ-114q`, `US-06-14` AC-24                               | S  | biz  | B5b          |
 | W4-11 | Người quyết thấy ghi chú trả lời mới nhất (chi tiết Request, mục phiếu)                                    | `QĐ-114q`, `US-06-01` AC-35, `US-05-25` AC-10                        | S  | tech | T3           |
-| W4-12 | _(chờ OQ-W4-2)_ Trưởng phòng rút mọi Request ở hàng đợi trình, lý do bắt buộc                               | `QĐ-116b`, `US-05-08` AC-15, `US-06-14` AC-23                        | S  | biz  | B6           |
+| W4-12 | Trưởng phòng rút mọi Request ở hàng đợi trình, lý do bắt buộc                               | `QĐ-116b`, `US-05-08` AC-15, `US-06-14` AC-23                        | S  | biz  | B6           |
 | W4-13 | Mobile: 4 tác vụ với mục của phiếu (test, không route mới)                                                 | `QĐ-61b`, `QĐ-82l`(16), `QĐ-116ab`                                   | S  | tech | T4           |
 | W4-14 | Ca biên tổ chức: người xin vừa thành trưởng phòng, phòng không có trưởng phòng, IT phụ trách (QĐ-118)       | `QĐ-116c`, `QĐ-110i`, `QĐ-118d`                                      | S  | biz+tech | B4b, T4  |
 | W4-15 | Seed phiếu demo                                                                                            | `US-05-25` TS-1, TS-6                                                | S  | tech | T5           |
@@ -140,8 +142,7 @@ trigger BEFORE UPDATE OF ticket_id, ticket_position ON access_requests: đổi g
 trigger BEFORE UPDATE OR DELETE ON request_tickets ⟹ RAISE (phiếu chỉ ghi thêm)
 ```
 
-- Không lưu trạng thái, số mục, số tiền trên phiếu (`QĐ-115aa`; `US-05-25` AC-4). Không mã hiển thị — chờ **OQ-W4-3** (có ⟹ thêm cột + sequence ở M1 trước
-  khi đẩy).
+- Không lưu trạng thái, số mục, số tiền trên phiếu (`QĐ-115aa`; `US-05-25` AC-4). Không mã hiển thị (OQ-W4-3 = A).
 - `src/infrastructure/database/database-role-judgement.ts` `RUNTIME_TABLE_EXCEPTIONS`: thêm `request_tickets: ['INSERT', 'SELECT']` (tiền lệ bảng chỉ ghi
   thêm, dòng 14-40).
 
@@ -232,8 +233,7 @@ Nhân vật (theo `US-05-25`): `E1` nhân viên phòng `P-DES` (Cost Center `CC-
   2. **Lỗi cấp phiếu — kiểm một lần, trước vòng mục, luôn thắng (RT-5):** Super Admin (`ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST` 403), bên bị loại
      (`REQUEST_PARTY.INELIGIBLE` 422), chưa xếp phòng / chưa tới ngày bắt đầu (`ACCESS_REQUEST.NO_DEPARTMENT`, `EMPLOYEE.NOT_STARTED` 409), phòng không có Cost
      Center hiện hành (`FINANCE.SETUP_INCOMPLETE`, cùng status như Request đơn), thân sai (422 `VALIDATION_ERROR` — gồm mục thiếu `businessReason`, path
-     `items.<i>.businessReason`), **quá 6 mục** (422 `REQUEST_TICKET.TOO_MANY_ITEMS`, `details: { max: 6, count }`), dưới số mục tối thiểu (chờ **OQ-W4-1**;
-     nếu B: 422 `REQUEST_TICKET.TOO_FEW_ITEMS`). Refactor: phần kiểm người/phòng của `assess` chạy một lần (B2a).
+     `items.<i>.businessReason`), **quá 6 mục** (422 `REQUEST_TICKET.TOO_MANY_ITEMS`, `details: { max: 6, count }`), không có lỗi số mục tối thiểu (phiếu 1 mục hợp lệ — OQ-W4-1 = A). Refactor: phần kiểm người/phòng của `assess` chạy một lần (B2a).
   3. **Kiểm từng mục** theo `position` (= chỉ số + 1). Vòng mục chỉ bắt **đúng** các lớp lỗi của gói/mục: `AccessRequestPlanNotFoundError`,
      `AccessRequestApplicationRetiredError`, `AccessRequestPlanBoundToDeviceError`, `AccessRequestNotPriceableError` (nếu `assess` ném),
      `AccessRequestAlreadyHoldsAccessError`, `AccessRequestTermRefusedError`; lớp khác ⟹ ném lên (lỗi cấp phiếu/lập trình). Mỗi mục nhận **lý do đầu tiên** theo
@@ -247,7 +247,7 @@ Nhân vật (theo `US-05-25`): `E1` nhân viên phòng `P-DES` (Cost Center `CC-
      `NEED_STEP_ROUTED`); **pha 2** `SpendRoutingService.start` từng mục theo `position` — mọi kết cục của Request đơn giữ nguyên. Thêm một audit
      `REQUEST_TICKET.SUBMITTED` (resource `REQUEST_TICKET`, `after: { requestIds, planIds }`) — T-W4-2.
   6. Trả 201 `{ ticket }` (dạng `ticketSchema` của `request-ticket/`, cùng dạng `requestTicketGet`), message `REQUEST_TICKET.SUBMITTED`.
-  7. Thông báo: giữ thông báo hiện có **của từng Request** (chờ **OQ-W4-4**).
+  7. Thông báo: giữ thông báo hiện có **của từng Request** (OQ-W4-4 = A).
 - **Refactor (LUẬT CỨNG 2):** `AccessRequestService.submitWithin` tách _kiểm cấp người/phòng_, _kiểm mục_ (trả kết quả, không ném lỗi của mục), _ghi_, _định
   tuyến_; `submitWithin` = các phần theo thứ tự cũ, ném lỗi đầu tiên như cũ. Spec đặc tả của T1 xanh không đổi kỳ vọng.
 - **Tiêu chí** (`it.each` ở `request-ticket.policy.spec.ts`, `request-ticket-precheck.service.spec.ts` + integration `request-ticket-submit.integration-spec.ts`):
@@ -303,7 +303,7 @@ Nhân vật (theo `US-05-25`): `E1` nhân viên phòng `P-DES` (Cost Center `CC-
     `test/support/api-collection-registry-events-w4.ts` (`registry: 'nested', change: 'added', to: 'bounded'`), nối vào `api-collection-registry-nested.ts` /
     `-events.ts`; key **`requestTicketSubmit#ticket.items`** (B2b) và **`requestTicketGet#ticket.items`** (T2); `businessMaximum.source` = CHECK
     `access_requests_ticket_position_range` + `MAX_TICKET_ITEMS` (RT-6). `results` của #3/#4/#5 (≤ 6) đăng ký theo tiền lệ `spendBatchDecide` (người code tra
-    registry; gate đòi ⟹ thêm cùng file w4). **Owner duyệt** mục `NESTED_ARRAYS` mới; gate từ chối ⟹ dừng hỏi (phương án subresource phân trang).
+    registry; gate đòi ⟹ thêm cùng file w4). Owner **đã duyệt** hai mục `NESTED_ARRAYS` này (OWNER-ANSWERS); gate vẫn từ chối ⟹ dừng hỏi (phương án subresource phân trang).
 - **Tiêu chí:** (1) `R1` cấp xong, `R2` bị từ chối, `R3` chờ duyệt chi ⟹ `IN_PROGRESS`, 3 mục kèm `state`; `R3` từ chối ⟹ `DONE` (AC-4); (2) `IT2` (không xem
   được mục nào) ⟹ 404; (3) `H1` thấy đủ 3 mục; (4) Request đơn ⟹ `ticketRef: null` ở mọi operation trên.
 
@@ -445,14 +445,14 @@ Nhân vật (theo `US-05-25`): `E1` nhân viên phòng `P-DES` (Cost Center `CC-
   (`RequestTicketRepo.view`, B1/B5a — một câu, không N+1; RB-6). Lý do trả về đã có trong lịch sử bước.
 - **Tiêu chí:** sau 7.9 (B) `H1` mở `R3` ⟹ `latestReply.note` đúng; mở `PH-1` ⟹ mục `R3` có `latestReply`; Request chưa từng gửi lại ⟹ `null`.
 
-### 7.12. W4-12 Trưởng phòng rút Request ở hàng đợi trình _(chờ OQ-W4-2)_
+### 7.12. W4-12 Trưởng phòng rút Request ở hàng đợi trình (OQ-W4-2 = A)
 
 - **Nguồn:** `QĐ-116b` "rút được **mọi Request trong hàng đợi trình của mình** (đã duyệt nhu cầu chờ trình lô, hoặc bị Người duyệt chi trả về ở bước 1.7), lý do
   bắt buộc"; `US-05-08` AC-15; `US-06-14` AC-23.
 - **Hiện trạng:** `access-request/withdrawal.policy.ts:23` `HEAD_MAY_WITHDRAW_AT: SpendStage[] = ['BLOCKED', 'RESERVE_CONFIRMATION']`; `SpendStage`
   (`access-request/access-request.types.ts:293-301`): `NOT_SUBMITTED`, `RETURNED_TO_REQUESTER`, `RESERVE_CONFIRMATION`, `BLOCKED`, `WAITING_SPEND_DECISION`,
   `REFUSED`; Request ở hàng đợi trình (kể cả bị `C1` trả về) ra `NOT_SUBMITTED` (`spend/spend-status.service.ts:57`).
-- **Hành vi đúng (nếu OQ-W4-2 = A; RB-8, RT-15):** thêm **đúng** `NOT_SUBMITTED` vào `HEAD_MAY_WITHDRAW_AT`; **không** thêm `RETURNED_TO_REQUESTER` (Request
+- **Hành vi đúng (OQ-W4-2 = A; RB-8, RT-15):** thêm **đúng** `NOT_SUBMITTED` vào `HEAD_MAY_WITHDRAW_AT`; **không** thêm `RETURNED_TO_REQUESTER` (Request
   chờ người xin sửa không thuộc hàng đợi trình). Lý do bắt buộc (`REASON_REQUIRED` như hiện có); người xin được báo (thông báo rút hiện có). Không route mới.
 - **Tiêu chí:** `R4` (đã duyệt nhu cầu, chưa trình), `R5` (bị `C1` trả về); `H1` rút không lý do ⟹ 409/422 `REASON_REQUIRED` (mã hiện có); có lý do ⟹ cả hai
   `WITHDRAWN`, không khoản cam kết, người xin được báo; **ca âm:** Request `RETURNED_TO_REQUESTER` ⟹ `H1` rút bị từ chối như hiện có.
@@ -486,7 +486,7 @@ Theo `docs/rules/api-contract.md`: Zod strict, mỗi mã lỗi một status, `ex
 
 | # | Method · path                                  | `operationId`              | Vai · phạm vi                                                     | Thành công        | Lỗi riêng (status)                                                                                                    |
 | - | ---------------------------------------------- | -------------------------- | ----------------------------------------------------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------- |
-| 1 | POST `/request-tickets`                        | `requestTicketSubmit`      | `@AuthenticatedOnly` · người xin cho chính mình (không Super Admin) | 201 `{ ticket }`  | `REQUEST_TICKET.TOO_MANY_ITEMS` (422), `REQUEST_TICKET.ITEMS_REFUSED` (422), [`TOO_FEW_ITEMS` (422) nếu OQ-W4-1 = B]; lỗi cấp phiếu (§7.2 bước 2) |
+| 1 | POST `/request-tickets`                        | `requestTicketSubmit`      | `@AuthenticatedOnly` · người xin cho chính mình (không Super Admin) | 201 `{ ticket }`  | `REQUEST_TICKET.TOO_MANY_ITEMS` (422), `REQUEST_TICKET.ITEMS_REFUSED` (422), lỗi cấp phiếu (§7.2 bước 2) |
 | 2 | GET `/request-tickets/{id}`                    | `requestTicketGet`         | `@AuthenticatedOnly` · xem được ≥ 1 mục                            | 200 `{ ticket }`  | `REQUEST_TICKET.NOT_FOUND` (404)                                                                                      |
 | 3 | POST `/request-tickets/{id}/need-decisions`    | `requestTicketNeedDecide`  | `@AuthenticatedOnly` · người giữ bước nhu cầu của từng mục         | 200 `{ results }` | `REQUEST_TICKET.NOT_FOUND` (404); `POLICY.VERSION_CHANGED` (409), `POLICY.CHECKLIST_INCOMPLETE`/`CHECKLIST_HAS_NO` (422) |
 | 4 | POST `/request-tickets/{id}/spend-decisions`   | `requestTicketSpendDecide` | `@AuthenticatedOnly` · Người duyệt chi giữ bước chi của từng mục   | 200 `{ results }` | như #3                                                                                                                |
@@ -507,7 +507,7 @@ Theo `docs/rules/api-contract.md`: Zod strict, mỗi mã lỗi một status, `ex
 | `spendBatchItemList`                                                | mỗi mục thêm `ticketRef`                                                                                                             | Nhóm theo phiếu                                |
 | `accessRequestGet`                                                  | thêm `ticketRef`, `latestReply`                                                                                                      | Liên kết phiếu, hiện ghi chú                   |
 | `meAccessRequestList` (GET `/me/access-requests`), `needDecisionList`, `spendApprovalList` | mỗi mục thêm `ticketRef`                                                                                      | Nhóm theo phiếu                                |
-| `accessRequestWithdraw`                                             | _(nếu OQ-W4-2 = A)_ trưởng phòng rút được Request ở hàng đợi trình; mã lỗi không đổi                                                 | Nút rút ở hàng đợi trình                       |
+| `accessRequestWithdraw`                                             | trưởng phòng rút được Request ở hàng đợi trình; mã lỗi không đổi                                                 | Nút rút ở hàng đợi trình                       |
 
 Không đổi: route Request đơn, Request nhóm, lô chi (ngoài dòng trên), cấp phát.
 
@@ -515,8 +515,7 @@ Không đổi: route Request đơn, Request nhóm, lô chi (ngoài dòng trên),
 
 - **Message thành công:** `REQUEST_TICKET.SUBMITTED`, `REQUEST_TICKET.FOUND`, `REQUEST_TICKET.NEED_DECIDED`, `REQUEST_TICKET.SPEND_DECIDED`,
   `REQUEST_TICKET.WITHDRAWN`.
-- **Lỗi mới:** `REQUEST_TICKET.NOT_FOUND` 404, `REQUEST_TICKET.NOT_REQUESTER` 403, `REQUEST_TICKET.TOO_MANY_ITEMS` 422, `REQUEST_TICKET.ITEMS_REFUSED` 422,
-  (`REQUEST_TICKET.TOO_FEW_ITEMS` 422), `ACCESS_REQUEST.REPLY_NOTE_REQUIRED` 422, `SPEND.REPLY_NOTE_NOT_IN_BATCH` 422.
+- **Lỗi mới:** `REQUEST_TICKET.NOT_FOUND` 404, `REQUEST_TICKET.NOT_REQUESTER` 403, `REQUEST_TICKET.TOO_MANY_ITEMS` 422, `REQUEST_TICKET.ITEMS_REFUSED` 422, `ACCESS_REQUEST.REPLY_NOTE_REQUIRED` 422, `SPEND.REPLY_NOTE_NOT_IN_BATCH` 422.
 - **Enum đóng (Zod, RT-10):**
 
 | Nơi                                       | Giá trị                                                                                                                                         |
@@ -610,7 +609,9 @@ dùng chung: `test/support/request-ticket-harness.ts` (T1).
 
 ## 12. Câu hỏi Owner (OQ-W4-n)
 
-Chờ Owner. Cả hai reviewer đồng ý khuyến nghị A ở cả bốn câu và nên duyệt `NESTED_ARRAYS`.
+**Owner đã chốt (25/11/2026, [OWNER-ANSWERS.md](OWNER-ANSWERS.md)):** OQ-W4-1 = **A** (1–6 mục) · OQ-W4-2 = **A** (làm `QĐ-116b` ở đợt 4) ·
+OQ-W4-3 = **A** (không mã hiển thị) · OQ-W4-4 = **A** (mỗi mục một thông báo) · `NESTED_ARRAYS` `requestTicketSubmit#ticket.items`,
+`requestTicketGet#ticket.items` = **duyệt**. Bảng dưới giữ để tra lý do; không còn câu chờ.
 
 | Mã      | Câu hỏi                                                                                                | Phương án                                                                      | Khuyến nghị + lý do                                                                                                     |
 | ------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |

@@ -1,10 +1,12 @@
-# Prompt dán sẵn cho chat code — Đợt 4 thiết kế lại (phiếu nhiều mục, chế độ tự quyết, bản 2)
+# Prompt dán sẵn cho chat code — Đợt 4 thiết kế lại (phiếu nhiều mục, chế độ tự quyết, bản 2.1)
 
+> **Bản 2.1 (25/11):** Owner đã chốt OQ-W4-1 → OQ-W4-4 và `NESTED_ARRAYS` (dòng `Owner đã chốt:` đã điền, [OWNER-ANSWERS.md](OWNER-ANSWERS.md)).
+>
 > **Bản 2 (25/11):** theo SPEC/PLAN bản 2 (hai review đã áp — SPEC §15): cổng C0 (T1 ở `int`) trước refactor; gói tách a/b; ghi chú trả lời chỉ sau _Trả về
 > của người_ chưa trả lời; gửi phiếu hai pha; bộ kiểm nhanh thêm prettier, `arch:routes`/`arch:docs:check`, tự kiểm drift.
 >
-> Dán nguyên khối dưới vạch vào một chat Sonnet (model **sonnet**) hoặc Gemini mới **sau khi** Owner đã duyệt SPEC/PLAN bản 2 **và** đợt 3 đã ở `dev`
-> **và** đã có `DELTA-W3-FINAL.md`. Sửa dòng `LÀN:` và dòng `Owner đã chốt:` (điền OQ-W4-1 → OQ-W4-4 từ `OWNER-ANSWERS.md`) trước khi dán. Quy trình
+> Dán nguyên khối dưới vạch vào một chat Sonnet (model **sonnet**) hoặc Gemini mới **sau khi** Owner đã duyệt SPEC/PLAN bản 2.1 **và** đợt 3 đã ở `dev`
+> **và** đã có `DELTA-W3-FINAL.md`. Sửa dòng `LÀN:` trước khi dán (dòng `Owner đã chốt:` đã điền). Quy trình
 > chung: `docs/guides/quy-trinh-code-ai.md`.
 
 ---
@@ -13,8 +15,9 @@
 **Nhánh:** làn `tech` = nhánh của Bảo `feat/redesign-w4-tech` (có Docker); làn `biz` = làm **thẳng trên** `int/redesign-w4` · **Nhánh gộp:** `int/redesign-w4` ·
 **Hai làn chạy song song** (PLAN bản 2): `biz` B1 → B5a → B6 → (C0: T1 ở int) B2a → B2b → B3 → B4a → B4b → B5b → B7 (mọi luật, mọi ghi, mọi migration);
 `tech` T1 → T2 → T3 → T4 → T5 → T6 (spec đặc tả, đọc/hiện, chạy Docker, seed)
-**Owner đã chốt:** OQ-W4-1 = _(điền)_ · OQ-W4-2 = _(điền)_ · OQ-W4-3 = _(điền)_ · OQ-W4-4 = _(điền)_ · `NESTED_ARRAYS` `requestTicketSubmit#ticket.items`,
-`requestTicketGet#ticket.items` = _(điền)_ · Ghi chú trả lời chỉ bắt buộc sau _Trả về của người_ chưa trả lời (`QĐ-114q`, SPEC §7.9) ·
+**Owner đã chốt:** OQ-W4-1 = A (phiếu 1–6 mục) · OQ-W4-2 = A (`QĐ-116b` ở đợt 4 — B6, đúng `NOT_SUBMITTED`) · OQ-W4-3 = A (không mã
+hiển thị) · OQ-W4-4 = A (mỗi mục một thông báo) · `NESTED_ARRAYS` `requestTicketSubmit#ticket.items`,
+`requestTicketGet#ticket.items` = **duyệt** · Ghi chú trả lời chỉ bắt buộc sau _Trả về của người_ chưa trả lời (`QĐ-114q`, SPEC §7.9) ·
 Xác nhận lần hai, AI, tách dòng Request nhóm: **không** thuộc đợt 4 (`QĐ-118a`, `QĐ-118c`)
 
 Trả lời bằng **tiếng Việt**. Giữ nguyên tiếng Anh cho tên file, hàm, lệnh, mã lỗi và code.
