@@ -8,7 +8,7 @@ export const PURCHASE_INVOICE_DOCUMENTS_MAX = 20;
 /** The most marks laid on one invoice: over what was approved, outside the term, or missing expected pool amount. */
 export const PURCHASE_INVOICE_FLAGS_MAX = 3;
 
-const label = z.enum(['NEW_PURCHASE', 'PERIOD', 'RENEWAL']);
+const label = z.enum(['NEW_PURCHASE', 'PERIOD', 'RENEWAL', 'SEAT_PURCHASE']);
 const state = z.enum(['SUBMITTED', 'CONFIRMED', 'RETURNED']);
 const matchResult = z.enum(['MATCHED', 'PRICE_QUANTITY_EXCEPTION']);
 const flag = z.enum(['OVER_APPROVED', 'OUTSIDE_TERM', 'NO_EXPECTED_AMOUNT']);
@@ -117,7 +117,7 @@ const personRef = z.strictObject({ employeeId: z.uuid() });
 const summarySchema = planView.extend({
   id: z.uuid(),
   state,
-  linkKind: z.enum(['REQUEST', 'SUBSCRIPTION']),
+  linkKind: z.enum(['REQUEST', 'SUBSCRIPTION', 'LICENSE_LOT']),
   requestId: z.uuid().nullable(),
   subscriptionId: z.uuid().nullable(),
   vendorId: z.uuid(),

@@ -58683,7 +58683,7 @@
             "name": "label",
             "required": false,
             "in": "query",
-            "schema": { "type": "string", "enum": ["NEW_PURCHASE", "PERIOD", "RENEWAL"] }
+            "schema": { "type": "string", "enum": ["NEW_PURCHASE", "PERIOD", "RENEWAL", "SEAT_PURCHASE"] }
           },
           { "name": "vendorId", "required": false, "in": "query", "schema": { "format": "uuid", "type": "string" } },
           {
@@ -131949,7 +131949,7 @@
           "data": {
             "type": "object",
             "properties": {
-              "label": { "type": "string", "enum": ["NEW_PURCHASE", "PERIOD", "RENEWAL"] },
+              "label": { "type": "string", "enum": ["NEW_PURCHASE", "PERIOD", "RENEWAL", "SEAT_PURCHASE"] },
               "servicePeriodMonth": { "type": "string", "description": "A calendar month as YYYY-MM." },
               "periodIndex": {
                 "type": "integer",
@@ -132116,7 +132116,7 @@
           "data": {
             "type": "object",
             "properties": {
-              "label": { "type": "string", "enum": ["NEW_PURCHASE", "PERIOD", "RENEWAL"] },
+              "label": { "type": "string", "enum": ["NEW_PURCHASE", "PERIOD", "RENEWAL", "SEAT_PURCHASE"] },
               "servicePeriodMonth": { "type": "string", "description": "A calendar month as YYYY-MM." },
               "periodIndex": {
                 "type": "integer",
@@ -132140,7 +132140,7 @@
               },
               "id": { "type": "string", "format": "uuid" },
               "state": { "type": "string", "enum": ["SUBMITTED", "CONFIRMED", "RETURNED"] },
-              "linkKind": { "type": "string", "enum": ["REQUEST", "SUBSCRIPTION"] },
+              "linkKind": { "type": "string", "enum": ["REQUEST", "SUBSCRIPTION", "LICENSE_LOT"] },
               "requestId": { "type": "string", "format": "uuid", "nullable": true },
               "subscriptionId": { "type": "string", "format": "uuid", "nullable": true },
               "vendorId": { "type": "string", "format": "uuid" },
@@ -132363,7 +132363,7 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "label": { "type": "string", "enum": ["NEW_PURCHASE", "PERIOD", "RENEWAL"] },
+                    "label": { "type": "string", "enum": ["NEW_PURCHASE", "PERIOD", "RENEWAL", "SEAT_PURCHASE"] },
                     "servicePeriodMonth": { "type": "string", "description": "A calendar month as YYYY-MM." },
                     "periodIndex": {
                       "type": "integer",
@@ -132387,7 +132387,7 @@
                     },
                     "id": { "type": "string", "format": "uuid" },
                     "state": { "type": "string", "enum": ["SUBMITTED", "CONFIRMED", "RETURNED"] },
-                    "linkKind": { "type": "string", "enum": ["REQUEST", "SUBSCRIPTION"] },
+                    "linkKind": { "type": "string", "enum": ["REQUEST", "SUBSCRIPTION", "LICENSE_LOT"] },
                     "requestId": { "type": "string", "format": "uuid", "nullable": true },
                     "subscriptionId": { "type": "string", "format": "uuid", "nullable": true },
                     "vendorId": { "type": "string", "format": "uuid" },
@@ -132481,7 +132481,7 @@
                     "linkKind": { "type": "string", "enum": ["REQUEST", "SUBSCRIPTION"] },
                     "requestId": { "type": "string", "format": "uuid", "nullable": true },
                     "subscriptionId": { "type": "string", "format": "uuid", "nullable": true },
-                    "label": { "type": "string", "enum": ["NEW_PURCHASE", "PERIOD", "RENEWAL"] },
+                    "label": { "type": "string", "enum": ["NEW_PURCHASE", "PERIOD", "RENEWAL", "SEAT_PURCHASE"] },
                     "servicePeriodMonth": { "type": "string", "description": "A calendar month as YYYY-MM." },
                     "periodIndex": {
                       "type": "integer",
@@ -132617,7 +132617,7 @@
                           "type": "string",
                           "description": "The month the invoice pays for, as YYYY-MM."
                         },
-                        "linkKind": { "type": "string", "enum": ["REQUEST", "SUBSCRIPTION"] },
+                        "linkKind": { "type": "string", "enum": ["REQUEST", "SUBSCRIPTION", "LICENSE_LOT"] },
                         "requestId": { "type": "string", "format": "uuid", "nullable": true },
                         "subscriptionId": { "type": "string", "format": "uuid", "nullable": true },
                         "netAmount": {
@@ -132747,7 +132747,7 @@
                     "type": "string",
                     "description": "The month the invoice pays for, as YYYY-MM."
                   },
-                  "linkKind": { "type": "string", "enum": ["REQUEST", "SUBSCRIPTION"] },
+                  "linkKind": { "type": "string", "enum": ["REQUEST", "SUBSCRIPTION", "LICENSE_LOT"] },
                   "requestId": { "type": "string", "format": "uuid", "nullable": true },
                   "subscriptionId": { "type": "string", "format": "uuid", "nullable": true },
                   "netAmount": {
@@ -137210,8 +137210,8 @@
                     },
                     "label": {
                       "type": "string",
-                      "enum": ["NEW_PURCHASE", "PERIOD", "RENEWAL", null],
-                      "description": "What the purchase was: a new purchase, a later period of one, or a renewal; empty for an invoice that is not of a purchase invoice.",
+                      "enum": ["NEW_PURCHASE", "PERIOD", "RENEWAL", "SEAT_PURCHASE", null],
+                      "description": "What the purchase was: a new purchase, a later period of one, a renewal, or seats added to a subscription; empty for an invoice that is not of a purchase invoice.",
                       "nullable": true
                     },
                     "paymentSource": {

@@ -28,7 +28,7 @@ export class PurchaseInvoiceQueryService {
     actor: AuthenticatedPrincipal,
     query: {
       state?: 'SUBMITTED' | 'CONFIRMED' | 'RETURNED';
-      label?: 'NEW_PURCHASE' | 'PERIOD' | 'RENEWAL';
+      label?: 'NEW_PURCHASE' | 'PERIOD' | 'RENEWAL' | 'SEAT_PURCHASE';
       vendorId?: string;
       subscriptionId?: string;
       requestId?: string;

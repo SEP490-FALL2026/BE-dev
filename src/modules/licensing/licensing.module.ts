@@ -162,6 +162,8 @@ import { SubscriptionRenewalSweepService } from './subscription-renewal/subscrip
 import { RenewalViewService } from './subscription-renewal/subscription-renewal-view.service';
 import { SubscriptionRenewalSweeper } from './subscription-renewal/subscription-renewal.job';
 import { SubscriptionRenewalRepo } from './subscription-renewal/subscription-renewal.repo';
+import { SubscriptionLineTargetRepo } from './subscription-renewal/lines/subscription-line-target.repo';
+import { SubscriptionRenewalAutoRepo } from './subscription-renewal/subscription-renewal-auto.repo';
 import { SubscriptionRenewalsController } from './subscription-renewal/subscription-renewals.controller';
 import { PoliciesTemplateFacadeModule } from '../policies/policies-template-facade.module';
 import { LicenseKeyTemplateListener } from './license-key/license-key-template.listener';
@@ -295,6 +297,8 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     MySoftwareRepo,
     MySoftwareService,
     SubscriptionRenewalRepo,
+    SubscriptionLineTargetRepo,
+    SubscriptionRenewalAutoRepo,
     SubscriptionRenewalSeatRepo,
     RenewalSavingsRepo,
     RenewalSavingsService,

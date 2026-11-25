@@ -40,7 +40,7 @@ export interface OpenServiceMonths {
 
 export interface NewPurchaseInvoice {
   organizationId: string;
-  linkKind: 'REQUEST' | 'SUBSCRIPTION';
+  linkKind: 'REQUEST' | 'SUBSCRIPTION' | 'LICENSE_LOT';
   requestId: string | null;
   provisioningTaskId: string | null;
   subscriptionId: string | null;
@@ -48,7 +48,7 @@ export interface NewPurchaseInvoice {
   number: string;
   issuedOn: BusinessDate;
   serviceMonth: BusinessDate;
-  label: 'NEW_PURCHASE' | 'PERIOD' | 'RENEWAL';
+  label: 'NEW_PURCHASE' | 'PERIOD' | 'RENEWAL' | 'SEAT_PURCHASE';
   periodIndex: number | null;
   periodCount: number | null;
   quantity: number;
@@ -73,7 +73,7 @@ export interface NewPurchaseInvoice {
 
 export interface PurchaseInvoiceFilter {
   state?: 'SUBMITTED' | 'CONFIRMED' | 'RETURNED';
-  label?: 'NEW_PURCHASE' | 'PERIOD' | 'RENEWAL';
+  label?: 'NEW_PURCHASE' | 'PERIOD' | 'RENEWAL' | 'SEAT_PURCHASE';
   vendorId?: string;
   subscriptionId?: string;
   requestId?: string;

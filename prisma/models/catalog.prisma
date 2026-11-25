@@ -255,6 +255,7 @@ model Plan {
   workspaceProfile       PlanWorkspaceProfile?
   deviceActivations      DeviceActivation[]
   subscriptions          Subscription[]
+  subscriptionLines      SubscriptionLine[]
   usageRate              PlanUsageRate?
   terms                  PlanTerms?
   termOpinions           PlanTermOpinion[]
@@ -421,6 +422,7 @@ model Subscription {
   licenseAssignments  LicenseAssignment[]
   licenseKeys         LicenseKey[]
   contractLink        ContractSubscription?
+  lines               SubscriptionLine[]
 
   @@index([planId])
   @@index([responsibleItAdminEmployeeId])
@@ -635,6 +637,7 @@ model Workspace {
   emergencyHolder    Employee?        @relation("WorkspaceEmergencyHolderOfWorkspace", fields: [emergencyHolderEmployeeId], references: [id], onDelete: Restrict)
   admins             WorkspaceAdmin[]
   subscriptions      Subscription[]
+  subscriptionLines  SubscriptionLine[]
 
   @@unique([organizationId, vendorId, normalizedName])
   @@index([vendorId])
@@ -653,4 +656,104 @@ model WorkspaceAdmin {
   @@id([workspaceId, employeeId])
   @@index([employeeId])
   @@map("workspace_admins")
+}
+
+// One line of a subscription period: a plan of seats of the workspace, its price per seat-month and the least seats of its tier (W3-15).
+// The seats it serves on a day are its ledger up to that day (when the ledger has opened) or the quantity of the period. At most one line
+// per (workspace, plan) is live: a partial unique index in the migration (ADR-0005), as are the checks and triggers.
+model SubscriptionLine {
+  id                    String    @id @default(uuid(7)) @db.Uuid
+  organizationId        String    @map("organization_id") @db.Uuid
+  subscriptionId        String    @map("subscription_id") @db.Uuid
+  workspaceId           String    @map("workspace_id") @db.Uuid
+  planId                String    @map("plan_id") @db.Uuid
+  monthlyUnitPriceMinor BigInt    @map("monthly_unit_price_minor")
+  minimumSeats          Int?      @map("minimum_seats")
+  // The day the ledger of the line opens; null = no ledger (a draft, a past period), the seats are the quantity of the period.
+  ledgerOpenedOn        DateTime? @map("ledger_opened_on") @db.Date
+  renewedFromLineId     String?   @unique @map("renewed_from_line_id") @db.Uuid
+  // The last day the line still serves, with why it stopped: RENEWED, ENDED or REMOVED (both null while it is live).
+  closedOn              DateTime? @map("closed_on") @db.Date
+  closedReason          String?   @map("closed_reason")
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization         Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  subscription         Subscription             @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+  workspace            Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  plan                 Plan                     @relation(fields: [planId], references: [id], onDelete: Restrict)
+  renewedFromLine      SubscriptionLine?        @relation("SubscriptionLineRenewal", fields: [renewedFromLineId], references: [id], onDelete: Restrict)
+  renewedByLine        SubscriptionLine?        @relation("SubscriptionLineRenewal")
+  seatPurchases        SeatPurchase[]
+  seatChanges          SeatChange[]
+  targets              SubscriptionLineTarget[]
+  minimumTotalHolderOf SubscriptionRenewal[]    @relation("RenewalMinimumTotalHolder")
+
+  @@unique([subscriptionId, planId])
+  @@index([workspaceId])
+  @@index([planId])
+  @@map("subscription_lines")
+}
+
+// One purchase of seats on a line (a top-up or a step of the vendor's tier): written once, never changed (a trigger).
+model SeatPurchase {
+  id                   String    @id @default(uuid(7)) @db.Uuid
+  organizationId       String    @map("organization_id") @db.Uuid
+  subscriptionLineId   String    @map("subscription_line_id") @db.Uuid
+  // MUA- and six digits, drawn from the sequence seat_purchase_code_seq.
+  code                 String
+  kind                 String
+  purchasedOn          DateTime  @map("purchased_on") @db.Date
+  quantity             Int
+  invoiceObligation    String    @map("invoice_obligation")
+  invoiceDueOn         DateTime? @map("invoice_due_on") @db.Date
+  recordedByEmployeeId String    @map("recorded_by_employee_id") @db.Uuid
+  recordedAt           DateTime  @default(now()) @map("recorded_at") @db.Timestamptz(3)
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  line         SubscriptionLine  @relation(fields: [subscriptionLineId], references: [id], onDelete: Restrict)
+  recordedBy   Employee          @relation("SeatPurchaseRecordedBy", fields: [recordedByEmployeeId], references: [id], onDelete: Restrict)
+  changes      SeatChange[]
+  purchaseInvoices PurchaseInvoice[]
+
+  @@unique([organizationId, code])
+  @@index([subscriptionLineId])
+  @@map("seat_purchases")
+}
+
+// The ledger of the seats of a line: added to and never changed (a trigger); the seats on a day are the sum of the deltas up to it.
+model SeatChange {
+  id                    String   @id @default(uuid(7)) @db.Uuid
+  organizationId        String   @map("organization_id") @db.Uuid
+  subscriptionLineId    String   @map("subscription_line_id") @db.Uuid
+  effectiveOn           DateTime @map("effective_on") @db.Date
+  delta                 Int
+  reason                String
+  source                String
+  basis                 String
+  requestId             String?  @map("request_id") @db.Uuid
+  beneficiaryEmployeeId String?  @map("beneficiary_employee_id") @db.Uuid
+  seatPurchaseId        String?  @map("seat_purchase_id") @db.Uuid
+  renewalId             String?  @map("renewal_id") @db.Uuid
+  refundedSeatChangeId  String?  @map("refunded_seat_change_id") @db.Uuid
+  note                  String?
+  outOfProcess          Boolean  @default(false) @map("out_of_process")
+  autoRecorded          Boolean  @default(false) @map("auto_recorded")
+  recordedByEmployeeId  String?  @map("recorded_by_employee_id") @db.Uuid
+  recordedAt            DateTime @default(now()) @map("recorded_at") @db.Timestamptz(3)
+
+  organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  line           SubscriptionLine     @relation(fields: [subscriptionLineId], references: [id], onDelete: Restrict)
+  request        AccessRequest?       @relation("SeatChangeOfRequest", fields: [requestId], references: [id], onDelete: Restrict)
+  beneficiary    Employee?            @relation("SeatChangeBeneficiary", fields: [beneficiaryEmployeeId], references: [id], onDelete: Restrict)
+  seatPurchase   SeatPurchase?        @relation(fields: [seatPurchaseId], references: [id], onDelete: Restrict)
+  renewal        SubscriptionRenewal? @relation("SeatChangeOfRenewal", fields: [renewalId], references: [id], onDelete: Restrict)
+  refundedChange SeatChange?          @relation("SeatChangeRefund", fields: [refundedSeatChangeId], references: [id], onDelete: Restrict)
+  refundedBy     SeatChange[]         @relation("SeatChangeRefund")
+  recordedBy     Employee?            @relation("SeatChangeRecordedBy", fields: [recordedByEmployeeId], references: [id], onDelete: Restrict)
+
+  // The partial unique index of the grant of an item and the triggers are SQL in the migration (ADR-0005).
+  @@index([subscriptionLineId, effectiveOn])
+  @@index([requestId])
+  @@map("seat_changes")
 }

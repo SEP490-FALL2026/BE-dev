@@ -60,6 +60,7 @@ subscription → plan`; `licensing/license-key` và `licensing/device-activation
 - Vendor: `vendors`, `vendor_groups`, `vendor_service_lines`, `vendor_dictionary_proposals`.
 - Ứng dụng: `applications`, `application_business_owners`, `application_retirement_confirmations`, `functional_groups`.
 - Plan: `plans`, `plan_workspace_profiles`, `plan_workspace_admins` (dữ liệu cũ, thôi là nguồn từ M4), `plan_terms`, `plan_term_opinions`.
+- Dòng thuê bao và sổ seat (W3-15, M5): `subscription_lines` (một dòng mỗi kỳ và gói `K2`; unique một phần (workspace, gói) khi chưa đóng; `ledger_opened_on` NULL = không có sổ), `seat_purchases` (mã `MUA-` + 6 số từ `seat_purchase_code_seq`, bất biến), `seat_changes` (sổ chỉ ghi thêm; trigger `seat_changes_check_row`, `seat_changes_check_capacity`, `seat_changes_append_only`). `license_assignment_check_capacity` khóa dòng và đọc sổ khi sổ đã mở, kỳ không có dòng giữ luật cũ.
 - Workspace của nhà cung cấp: `workspaces`, `workspace_admins` (W3-10). `subscriptions.workspace_id` (trigger `subscriptions_workspace_vendor`: hãng của workspace = hãng của gói), `seat_counting` (`FIXED`/`MEMBERS`), `minimum_seats_total`, `invoiced_later` (W3-11).
 - Subscription: `subscriptions`. Hợp đồng: `contracts`, `contract_subscriptions`, `document_attachments`.
 - Nguồn: `prisma/models/catalog.prisma`; hồ sơ thuế vendor (`VendorTaxProfile*`) thuộc `finance`.
@@ -120,6 +121,7 @@ file thuần xuống tầng thấp, hoặc đưa dịch vụ điều phối lên
   Giá tham chiếu (`QĐ-113a`): `referencePrice { amount, currency }` không bắt buộc ở `POST/PATCH /plans` và gói đầu của `POST /applications` (`null` xóa khi sửa); chỉ `K1`/`K2`/`K4`,
   chỉ VND (`PLAN.REFERENCE_PRICE_NOT_VND`, `PLAN.REFERENCE_PRICE_NOT_APPLICABLE`); CHECK ở bảng (`plans_reference_price_whole/_valid`). Đổi kiểu sang `K5` hoặc giữa
   `K1`/`K2` và `K4` ⟹ xóa giá (nhập lại; audit `PLAN.UPDATED` giữ giá cũ); `K1`↔`K2` giữ. Requestable-software không lộ số (chỉ trạng thái giá).
+- `subscription-line/` — dòng của kỳ thuê bao và sổ seat (W3-15): `subscription-line.repo.ts` (một người ghi `subscription_lines`, khóa dòng tầng 6a), nhóm `ledger/` (`seat-ledger.repo.ts`, một người ghi `seat_changes`; lỗi `SeatLedgerBelowOccupancyError`, `SeatLedgerItemGrantedError`, `SeatLedgerClosedError`) và `purchase/` (`seat-purchase.repo.ts`, một người ghi `seat_purchases`, rút mã từ sequence). Chưa có route: dịch vụ ghi đến ở P15/P16.
 - `workspace/` — workspace công ty giữ ở một nhà cung cấp (W3-10, `QĐ-115c`): `workspaces.controller.ts` (sáu route: `workspaceList`, `workspaceGet`
   đọc cho `IT_ADMIN`/`FINANCE`/`SUPER_ADMIN`; `workspaceCreate` mọi IT Admin, người tạo là người phụ trách; `workspaceUpdate`, `workspaceAdminsSet` chỉ IT phụ trách,
   `expectedUpdatedAt` bắt buộc; `workspaceResponsibleItAdminChange` chỉ `SUPER_ADMIN`); `WorkspaceService`, `WorkspaceAdminsService` (≥ 2 IT Admin khác nhau, chủ chính

@@ -61,6 +61,9 @@ model Organization {
   vendorProposals                    VendorDictionaryProposal[]
   vendors                            Vendor[]
   workspaces                         Workspace[]
+  subscriptionLines                  SubscriptionLine[]
+  seatPurchases                      SeatPurchase[]
+  seatChanges                        SeatChange[]
   functionalGroups                   FunctionalGroup[]
   applications                       Application[]
   plans                              Plan[]
@@ -352,6 +355,9 @@ model Employee {
   workspacesInCharge              Workspace[]                         @relation("WorkspaceInCharge")
   workspaceEmergencyHolderOfWorkspace Workspace[]                     @relation("WorkspaceEmergencyHolderOfWorkspace")
   workspaceAdminships             WorkspaceAdmin[]                    @relation("WorkspaceAdminOfWorkspace")
+  seatPurchasesRecorded           SeatPurchase[]                      @relation("SeatPurchaseRecordedBy")
+  seatChangesRecorded             SeatChange[]                        @relation("SeatChangeRecordedBy")
+  seatChangesAsBeneficiary        SeatChange[]                        @relation("SeatChangeBeneficiary")
   itAdminHandoversReceived        ItAdminHandover[]                   @relation("ItAdminHandoverReceiver")
   departmentSoftwareProposals     DepartmentSoftwareProposal[]        @relation("DepartmentSoftwareProposer")
   subscriptionsInCharge           Subscription[]                      @relation("SubscriptionResponsibleItAdmin")

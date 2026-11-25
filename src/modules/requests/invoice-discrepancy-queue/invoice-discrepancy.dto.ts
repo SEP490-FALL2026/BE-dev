@@ -49,7 +49,7 @@ const summarySchema = z.strictObject({
     vendorId: z.uuid(),
     vendorInvoiceNumber: z.string(),
     servicePeriodMonth: z.string().meta({ description: 'The month the invoice pays for, as YYYY-MM.' }),
-    linkKind: z.enum(['REQUEST', 'SUBSCRIPTION']),
+    linkKind: z.enum(['REQUEST', 'SUBSCRIPTION', 'LICENSE_LOT']),
     requestId: z.uuid().nullable(),
     subscriptionId: z.uuid().nullable(),
     netAmount: moneyView.meta({ description: 'What was taken out of the company in dong, before tax.' }),

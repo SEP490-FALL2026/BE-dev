@@ -186,7 +186,7 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   hạn phản hồi đầu tiên; `SAAS_ISSUE_STATE_CHANGED` cho bên còn lại — người báo khi IT Admin đổi trạng thái, IT Admin được giao khi
   người báo trả lời hoặc mở lại, người báo khi lượt quét tự đóng phiếu hết hạn mở lại (`REOPEN_WINDOW_LAPSED`) — không báo người tự
   làm. Tham số chỉ gồm id, mã phiếu và từ trạng thái; không có nội dung người báo hay IT Admin viết, trưởng phòng không được báo.
-- `subscription-renewal/` — điều chỉnh/gia hạn thuê bao kho `K2` theo kỳ (EP-11, `SBF-20`): `subscription-renewals.controller.ts`
+- `subscription-renewal/` — điều chỉnh/gia hạn thuê bao kho `K2` theo kỳ (EP-11, `SBF-20`); từ W3-16 có nhóm `lines/` (`subscription-line-target.repo.ts`: mục tiêu chốt của dòng theo ngày gia hạn, `subscription_line_targets`) và `subscription-renewal-auto.repo.ts` (cột `auto_recorded`, `minimum_total_*` của ca): `subscription-renewals.controller.ts`
   (`/subscription-renewals*`, `/subscription-deadline-events`); nhóm `record/` (chỉ IT Admin phụ trách thuê bao còn dùng được mới
   ghi kết quả — không có người làm thay tạm thời cho thuê bao, ngoài ⟹ 403 `SUBSCRIPTION_RENEWAL.NOT_RESPONSIBLE`; ghi ca, quyết định
   `IT_ADMIN_IN_CHARGE` và kết quả trong một transaction; báo Finance ở `renewal-record-trail.service.ts`),

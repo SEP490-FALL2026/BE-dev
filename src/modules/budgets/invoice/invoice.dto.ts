@@ -23,9 +23,9 @@ const invoiceSchema = z.strictObject({
   servicePeriodMonth: z.string().nullable().meta({
     description: 'The month the invoice pays for, as YYYY-MM; empty for an invoice booked before the month was kept.',
   }),
-  label: z.enum(['NEW_PURCHASE', 'PERIOD', 'RENEWAL']).nullable().meta({
+  label: z.enum(['NEW_PURCHASE', 'PERIOD', 'RENEWAL', 'SEAT_PURCHASE']).nullable().meta({
     description:
-      'What the purchase was: a new purchase, a later period of one, or a renewal; empty for an invoice that is not of a purchase invoice.',
+      'What the purchase was: a new purchase, a later period of one, a renewal, or seats added to a subscription; empty for an invoice that is not of a purchase invoice.',
   }),
   paymentSource: z
     .enum(['COMPANY_CARD', 'IT_ADVANCE'])
