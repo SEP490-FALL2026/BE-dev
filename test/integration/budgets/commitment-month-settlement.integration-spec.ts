@@ -63,11 +63,28 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
     const planId = await h.planOf(subscriptionId);
     await h.ctx.sql.query(
       `UPDATE subscriptions
-          SET unit_price_minor = $2, monthly_unit_price_minor = $2, price_reporting_minor = $2
+          SET unit_price_minor = $2,
+              monthly_unit_price_minor = $2,
+              price_reporting_minor = $2,
+              start_date = $3::date,
+              end_date = $4::date
         WHERE id = $1`,
-      [subscriptionId, priceMinor.toString()],
+      [subscriptionId, priceMinor.toString(), `${h.year}-01-01`, `${h.year}-12-31`],
     );
     return { subscriptionId, planId };
+  }
+
+  async function staffSinceYearStart(unit: Unit, code: string): Promise<string> {
+    const employeeId = await h.person(code);
+    const open = `${h.year}-01-01`;
+    await h.ctx.sql.query(
+      `BEGIN;
+       UPDATE employee_placements SET valid_from = '2020-01-01', valid_to = '${open}' WHERE employee_id = '${employeeId}';
+       INSERT INTO employee_placements (id, organization_id, employee_id, department_id, valid_from, valid_to)
+       VALUES (gen_random_uuid(), '${h.seed.organizationId}', '${employeeId}', '${unit.department.id}', '${open}', NULL);
+       COMMIT;`,
+    );
+    return employeeId;
   }
 
   async function setPoolPrice(subscriptionId: string, priceMinor: bigint): Promise<void> {
@@ -109,14 +126,16 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
     amountMinor: bigint;
     months: readonly MonthSliceInput[];
     origin?: 'APPROVAL' | 'YEAR_START';
+    now?: Date;
   }): Promise<{ requestId: string; commitmentId: string }> {
+    const at = input.now ?? NOW;
     const requestId = await h.paidRequest(input.unit, input.planId);
     if (input.origin === 'YEAR_START') {
       const res = await runner().run((tx) =>
         budgets().holdYearStart(tx, {
           organizationId: h.seed.organizationId,
           year: input.year,
-          now: NOW,
+          now: at,
           items: [
             {
               requestId,
@@ -139,7 +158,7 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
         costCenterId: input.unit.department.unitId,
         snapshotCheckId,
         currency: 'VND',
-        now: NOW,
+        now: at,
         items: [{ year: input.year, amountMinor: input.amountMinor }],
         seatMonthlyMinor: STD,
         months: input.months,
@@ -218,7 +237,7 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
   it('Ca A & Ca J: LATE_GRANT + seat-month application + MONTH_END settlement keep Σ(applied+released) = amount', async () => {
     const unit = await newUnitWithBudget(h.year);
     const { subscriptionId, planId } = await newK2Pool(STD);
-    const person = await h.staff(unit.department, 'STAFF-A');
+    const personId = await staffSinceYearStart(unit, 'STAFF-A');
     const nov = `${h.year}-11-01`;
     const dec = `${h.year}-12-01`;
     const { requestId, commitmentId } = await createHeldK2({
@@ -242,7 +261,7 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
     await addPoolSeat({
       subscriptionId,
       planId,
-      employeeId: person.employeeId,
+      employeeId: personId,
       requestId,
       validFrom: `${h.year}-11-21`,
     });
@@ -263,7 +282,7 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
   it('Ca B & Ca G: YEAR_START revocation (15/01) and mid-month transfer (26/03) leave exact applied and settle 0đ', async () => {
     const unit = await newUnitWithBudget(h.year);
     const { subscriptionId, planId } = await newK2Pool(STD);
-    const pB = await h.staff(unit.department, 'STAFF-B');
+    const pBId = await staffSinceYearStart(unit, 'STAFF-B');
     const cB = await createHeldK2({
       unit,
       planId,
@@ -296,7 +315,7 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
     await addPoolSeat({
       subscriptionId,
       planId,
-      employeeId: pB.employeeId,
+      employeeId: pBId,
       requestId: cB.requestId,
       validFrom: `${h.year}-01-01`,
       validUntil: `${h.year}-01-15`,
@@ -337,10 +356,12 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
     );
     const snapG = await commitmentSnapshot(cG.commitmentId);
     expect(snapG.monthRows[2].releasedMinor).toBe(96_774n);
+    await settlements().settleMonth(h.seed.organizationId, mar, NOW);
   });
 
   it("Ca C, C', F, F6 & Q-G: December MONTH_END + legacy K2 YEAR_END_SEAT_MONTHS feed January priorYearReleasedMinor", async () => {
     const priorYear = h.year - 1;
+    const priorNow = new Date(`${priorYear}-12-01T01:00:00.000Z`);
     const unit = await newUnitWithBudget(h.year);
     await h.ctx.sql.query(
       `INSERT INTO budget_versions (id, organization_id, cost_center_id, year, number, kind, state, origin, base_minor, reserve_minor, total_minor,
@@ -358,6 +379,7 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
       year: priorYear,
       amountMinor: 500_000n,
       months: [{ month: `${priorYear}-12-01`, seatCount: 1 }],
+      now: priorNow,
     });
     const reqLegacyK2 = await h.paidRequest(unit, k2.planId);
     const legacyCheckId = await createSnapshotCheck(reqLegacyK2, unit.department.unitId, 1_000_000n);
@@ -368,7 +390,7 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
         costCenterId: unit.department.unitId,
         snapshotCheckId: legacyCheckId,
         currency: 'VND',
-        now: NOW,
+        now: priorNow,
         items: [{ year: priorYear, amountMinor: 1_000_000n }],
         seatMonthlyMinor: STD,
       }),
@@ -386,7 +408,7 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
         costCenterId: unit.department.unitId,
         snapshotCheckId: k1CheckId,
         currency: 'VND',
-        now: NOW,
+        now: priorNow,
         items: [{ year: priorYear, amountMinor: 500_000n }],
       }),
     );
@@ -399,7 +421,7 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
         costCenterId: unit.department.unitId,
         snapshotCheckId: k4CheckId,
         currency: 'VND',
-        now: NOW,
+        now: priorNow,
         items: [{ year: priorYear, amountMinor: 500_000n }],
       }),
     );
@@ -427,7 +449,7 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
   it('Ca D, D2, E, K, F3, L & I: price drop/rise, reversal re-settle, remainder reverse spread, and draft gate', async () => {
     const unit = await newUnitWithBudget(h.year);
     const { subscriptionId, planId } = await newK2Pool(STD);
-    const person = await h.staff(unit.department, 'STAFF-D');
+    const personId = await staffSinceYearStart(unit, 'STAFF-D');
     const cD = await createHeldK2({
       unit,
       planId,
@@ -438,7 +460,7 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
     await addPoolSeat({
       subscriptionId,
       planId,
-      employeeId: person.employeeId,
+      employeeId: personId,
       requestId: cD.requestId,
       validFrom: `${h.year}-02-01`,
     });
@@ -488,7 +510,7 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
     await addPoolSeat({
       subscriptionId: activeNoRun.subscriptionId,
       planId: activeNoRun.planId,
-      employeeId: (await h.staff(unit.department, 'STAFF-I')).employeeId,
+      employeeId: await staffSinceYearStart(unit, 'STAFF-I'),
       requestId: reqI,
       validFrom: `${h.year}-05-01`,
     });
@@ -501,7 +523,7 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
   it('Ca H: concurrent settleMonth vs chargeMonth with 2 connections + Barrier x20 completes with 0 40P01 deadlocks', async () => {
     const unit = await newUnitWithBudget(h.year);
     const { subscriptionId, planId } = await newK2Pool(STD);
-    const person = await h.staff(unit.department, 'STAFF-H');
+    const personId = await staffSinceYearStart(unit, 'STAFF-H');
     const month: BusinessDate = `${h.year}-06-01`;
     const { requestId, commitmentId } = await createHeldK2({
       unit,
@@ -513,7 +535,7 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
     await addPoolSeat({
       subscriptionId,
       planId,
-      employeeId: person.employeeId,
+      employeeId: personId,
       requestId,
       validFrom: month,
     });
@@ -537,7 +559,7 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
       });
       const s2 = jest.spyOn(seatMonthRepo(), 'lockMonthOf').mockImplementation(async (tx, sub, m) => {
         await lockSubMonth(tx, sub, m);
-        await barrier.wait();
+        if (sub === subscriptionId) await barrier.wait();
       });
       try {
         await Promise.all([
