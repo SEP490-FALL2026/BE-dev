@@ -159,6 +159,7 @@ export interface ReleasedCommitment {
 /** What one commitment was made for, as another context counts it. */
 export interface CommittedAmount {
   requestId: string;
+  year: number;
   amountMinor: bigint;
   currency: string;
 }

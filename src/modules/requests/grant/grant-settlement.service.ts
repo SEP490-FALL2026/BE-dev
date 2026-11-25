@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { fiscalYearOf } from '../../../core/fiscal-year';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { BudgetsApi } from '../../budgets/public/budgets.api';
 import type { CommitmentReleaseInput, ReleasedCommitment } from '../../budgets/public/budgets.types';
@@ -25,8 +26,11 @@ export class GrantSettlementService {
 
   async recordPoolGrantAvoidedCost(tx: DbTx, request: AccessRequestRecord, facts: GrantOutcomeFacts): Promise<void> {
     if (!facts.fromPool || facts.taskId === undefined) return;
+    const grantYear = fiscalYearOf(facts.grantedOn);
     const yearCommitment =
-      facts.provisioningType === 'K2' ? ((await this.budgets.committedByRequests([request.id], tx))[0] ?? null) : null;
+      facts.provisioningType === 'K2'
+        ? ((await this.budgets.committedByRequests([request.id], tx)).find((item) => item.year === grantYear) ?? null)
+        : null;
     const commitmentSeatCount = await this.commitmentSeatCountOf(tx, request, facts.provisioningType);
     const amount = avoidedCostForPoolGrant({
       provisioningType: facts.provisioningType,

@@ -451,7 +451,7 @@ export class CommitmentRepo {
 
     return (tx ?? this.prisma).budgetCommitment.findMany({
       where: { requestId: { in: [...requestIds] } },
-      select: { requestId: true, amountMinor: true, currency: true },
+      select: { requestId: true, year: true, amountMinor: true, currency: true },
       orderBy: [{ requestId: 'asc' }, { year: 'asc' }],
     });
   }

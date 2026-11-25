@@ -75,7 +75,7 @@ function factsOf(over: Partial<GrantOutcomeFacts> = {}): GrantOutcomeFacts {
 function build(
   opts: {
     request?: AccessRequestRecord | null;
-    commitments?: { requestId: string; amountMinor: bigint; currency: string }[];
+    commitments?: { requestId: string; year?: number; amountMinor: bigint; currency: string }[];
     lineAmounts?: { employeeId: string; held: boolean }[];
   } = {},
 ) {
@@ -108,7 +108,7 @@ describe('AccessRequestGrantGate avoided cost on pool grant (W3-09, B1-R8)', () 
   it('records 100% of year commitment for single K2 pool grant regardless of elapsed days', async () => {
     const { gate, recordAvoidedCost } = build({
       request: requestOf(),
-      commitments: [{ requestId: 'req-1', amountMinor: 5_000_000n, currency: 'VND' }],
+      commitments: [{ requestId: 'req-1', year: 2026, amountMinor: 5_000_000n, currency: 'VND' }],
     });
 
     await gate.reportOutcome(
@@ -123,10 +123,31 @@ describe('AccessRequestGrantGate avoided cost on pool grant (W3-09, B1-R8)', () 
     expect(recordAvoidedCost).toHaveBeenCalledWith(TX, 'task-1', { amountMinor: 5_000_000n, currency: 'VND' });
   });
 
+  it('FIX-B1 F6 (B-I4): picks commitment whose year matches grant date (approved 12/2026, granted 01/2027 -> picks 2027)', async () => {
+    const { gate, recordAvoidedCost } = build({
+      request: requestOf(),
+      commitments: [
+        { requestId: 'req-1', year: 2026, amountMinor: 500_000n, currency: 'VND' },
+        { requestId: 'req-1', year: 2027, amountMinor: 6_000_000n, currency: 'VND' },
+      ],
+    });
+
+    await gate.reportOutcome(
+      TX,
+      'req-1',
+      'COMPLETED',
+      'emp-1',
+      factsOf({ grantedOn: '2027-01-10', effectiveFrom: '2027-01-10' }),
+    );
+
+    expect(recordAvoidedCost).toHaveBeenCalledTimes(1);
+    expect(recordAvoidedCost).toHaveBeenCalledWith(TX, 'task-1', { amountMinor: 6_000_000n, currency: 'VND' });
+  });
+
   it('divides group K2 year commitment across committed seats via lineAmounts', async () => {
     const { gate, recordAvoidedCost } = build({
       request: requestOf({ type: 'GROUP_GRANT', beneficiaryEmployeeIds: ['e1', 'e2', 'e3'] }),
-      commitments: [{ requestId: 'req-1', amountMinor: 15_000_000n, currency: 'VND' }],
+      commitments: [{ requestId: 'req-1', year: 2026, amountMinor: 15_000_000n, currency: 'VND' }],
       lineAmounts: [
         { employeeId: 'e1', held: true },
         { employeeId: 'e2', held: true },
@@ -163,7 +184,7 @@ describe('AccessRequestGrantGate avoided cost on pool grant (W3-09, B1-R8)', () 
 
   it('does not record avoided cost when fromPool is false or grant failed', async () => {
     const { gate, recordAvoidedCost } = build({
-      commitments: [{ requestId: 'req-1', amountMinor: 5_000_000n, currency: 'VND' }],
+      commitments: [{ requestId: 'req-1', year: 2026, amountMinor: 5_000_000n, currency: 'VND' }],
     });
 
     await gate.reportOutcome(TX, 'req-1', 'COMPLETED', 'emp-1', factsOf({ fromPool: false }));
