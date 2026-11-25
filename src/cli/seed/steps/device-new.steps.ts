@@ -50,22 +50,22 @@ function newDeviceBody(ctx: DemoRunContext, spec: DemoNewDevice): Record<string,
   };
 }
 
-/** The plan bought per machine that the subscription is of, and whether the machine already runs it. */
+/** Whether the machine already runs the plan bought per machine. */
 async function runsKey(ctx: DemoRunContext, email: string, device: NewDeviceWire, planId: string): Promise<boolean> {
   const rows = await listAll<ActivationWire>(ctx, email, `/device-activations?deviceId=${device.id}&state=ALL`);
 
   return rows.some((row) => row.plan.id === planId);
 }
 
-/** Runs the key of the purchase on the machine: nothing to run it with, already running, or written now. */
+/** Runs the key of the lot on the machine: nothing to run it with, already running, or written now. */
 async function activateKey(
   ctx: DemoRunContext,
   email: string,
   device: NewDeviceWire,
   spec: DemoNewDevice,
 ): Promise<'missing' | 'present' | 'done'> {
-  const subscription = ctx.fixture.subscriptions.find(({ key }) => key === spec.keyOf);
-  const planId = subscription ? ctx.ids.plans.get(subscription.plan) : undefined;
+  const lot = ctx.fixture.lots.find(({ key }) => key === spec.keyOf);
+  const planId = lot ? ctx.ids.plans.get(lot.plan) : undefined;
   const keyId = spec.keyOf ? await storeKeyId(ctx, spec.keyOf) : null;
   if (!planId || !keyId) return 'missing';
   if (await runsKey(ctx, email, device, planId)) return 'present';

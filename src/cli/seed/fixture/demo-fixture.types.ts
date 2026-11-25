@@ -109,7 +109,8 @@ export interface DemoApplication {
 export interface DemoSubscription {
   key: string;
   plan: string;
-  kind: 'TERM' | 'PERPETUAL';
+  /** A period of the shared pool. A purchase made once (K4) is a lot (`DemoLot`), never a subscription (W3-24, W3-27). */
+  kind: 'TERM';
   /** The price of one seat for one billing period, in dong (`QĐ-111an`: a price is written in the currency of the company only). */
   unitPrice: { amount: string; currency: 'VND' };
   /** The price the vendor quotes, when it is not in dong: kept beside `unitPrice` (FX-1), never used to work anything out. */
@@ -135,6 +136,20 @@ export interface DemoSubscription {
   freeAfterBaseline: number;
   /** Seats bought when no baseline file gives the number (K1, K4, K5). */
   quantity?: number;
+}
+
+/** A lot of licenses of a K4 plan: a purchase made once, on a day in the past, with the price of one license. A plan has one lot or more (a second purchase at another price). */
+export interface DemoLot {
+  key: string;
+  plan: string;
+  licenseCount: number;
+  unitPrice: { amount: string; currency: 'VND' };
+  /** Why it was bought: a key given to an account is replaced (`REPLACEMENT`), a key that goes on a machine is kept in stock (`STOCK`). */
+  purpose: 'REPLACEMENT' | 'STOCK';
+  /** Days before today the licenses were bought. */
+  purchasedDaysAgo: number;
+  /** The IT Admin who makes the lot and answers for it (a person code). */
+  responsible: string;
 }
 
 /**
@@ -330,8 +345,8 @@ export interface DemoReturn {
 }
 
 export interface DemoKeys {
-  /** The K4 subscription the keys are imported into. */
-  subscription: string;
+  /** The lot of licenses the keys are imported into (by the key of the lot). */
+  lot: string;
   /** How many keys the store holds; their values are written by the seed, never shared. */
   count: number;
   /** The cap of activations of each key (default: the install limit in the terms of the plan, else one). */
@@ -432,6 +447,8 @@ export interface DemoFixture {
   approvalRoles: { SPENDING_APPROVER: string };
   applications: DemoApplication[];
   subscriptions: DemoSubscription[];
+  /** The lots of licenses of the K4 plans, bought through `POST /license-lots` (W3-24). */
+  lots: DemoLot[];
   seats: DemoSeat[];
   /** The terms IT recorded for some plans; the others have none yet (the warning of a review due). */
   planTerms: DemoPlanTerms[];

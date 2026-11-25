@@ -65,13 +65,6 @@ describe('the body of a subscription the dataset declares', () => {
     expect(m365Annual).not.toHaveProperty('unitPrice');
   });
 
-  it('declares a perpetual subscription with the day it was bought and no end', () => {
-    const body = subscriptionBody(ctx, subscription('jetbrains'), 'plan-1');
-
-    expect(body).toMatchObject({ kind: 'PERPETUAL', purchasedQuantity: 3, startDate: '2026-04-24' });
-    expect(body).not.toHaveProperty('endDate');
-  });
-
   it('buys the seats of the baseline file and the free ones, or the number the fixture names for a plan with no file', () => {
     for (const declared of SHARED_DEMO_V4.subscriptions) {
       expect(purchasedQuantityOf(ctx, declared)).toBe(
@@ -93,7 +86,12 @@ describe('the workspace profile the dataset records for the plans that need admi
       .flatMap((app) => app.plans)
       .filter((p) => p.provisioningType === 'K2' || p.hasAdminConsole === true)
       // A plan with no subscription (Skype, retired in S21) has no IT Admin who answers for it and so no profile.
-      .filter((p) => SHARED_DEMO_V4.subscriptions.some((s) => s.plan === p.key) || p.key === 'skype-online');
+      .filter(
+        (p) =>
+          SHARED_DEMO_V4.subscriptions.some((s) => s.plan === p.key) ||
+          SHARED_DEMO_V4.lots.some((lot) => lot.plan === p.key) ||
+          p.key === 'skype-online',
+      );
     expect(needing.map((p) => p.key)).toContain('jetbrains-all');
     for (const needed of needing) {
       if (needed.key === 'skype-online') {
@@ -101,7 +99,8 @@ describe('the workspace profile the dataset records for the plans that need admi
         continue;
       }
       const body = workspaceProfileBody(ctx, needed)!;
-      const responsible = SHARED_DEMO_V4.subscriptions.find((s) => s.plan === needed.key)!.responsible;
+      const responsible = (SHARED_DEMO_V4.subscriptions.find((s) => s.plan === needed.key) ??
+        SHARED_DEMO_V4.lots.find((lot) => lot.plan === needed.key))!.responsible;
 
       expect(body.primaryOwnerEmployeeId).toBe(`id-${responsible}`);
       expect(body.members).toHaveLength(2);

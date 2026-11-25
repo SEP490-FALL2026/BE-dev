@@ -18,6 +18,21 @@ describe('contracts and invoices of the expanded fixture', () => {
     expect(contractBody(context(), zoom).effectiveFrom).toMatch(/^2026-/);
     expect(zoom.subscriptions).toEqual(['zoom-pro', 'zoom-business']);
   });
+  it('rests a contract of K4 licenses on the lots that name it, never on a subscription (W3-24)', () => {
+    const lotKeys = new Set(fixture.lots.map((lot) => lot.key));
+    const subscriptionKeys = new Set(fixture.subscriptions.map((subscription) => subscription.key));
+
+    for (const contract of CONTRACTS) {
+      for (const key of contract.subscriptions) expect(subscriptionKeys.has(key)).toBe(true);
+      for (const key of contract.lots ?? []) expect(lotKeys.has(key)).toBe(true);
+      expect(contract.subscriptions.length + (contract.lots ?? []).length).toBeGreaterThan(0);
+    }
+    expect(CONTRACTS.find(({ number }) => number === 'SV-HD-JB-01')).toMatchObject({
+      subscriptions: [],
+      lots: ['jetbrains', 'jetbrains-second'],
+    });
+    expect(CONTRACTS.find(({ number }) => number === 'SV-HD-MS-01')).toMatchObject({ lots: ['visio-pro'] });
+  });
   it('has unique invoice numbers and preserves the intentional Postman discrepancy', () => {
     expect(INVOICES).toHaveLength(12);
     expect(new Set(INVOICES.map(({ number }) => number)).size).toBe(12);

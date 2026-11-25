@@ -16,24 +16,25 @@ describe('shared dataset v4: the company machines and their software (W2-25)', (
 
   it('buys 25 licenses of Office LTSC 2024 once, on one key of 30 activations that already ran 8 times, plans bound to an account staying as they are', () => {
     expect(plan('office-ltsc-2024')).toMatchObject({ provisioningType: 'K4', keyBinding: 'DEVICE_KEY' });
-    expect(F.subscriptions.find((subscription) => subscription.plan === 'office-ltsc-2024')).toMatchObject({
-      kind: 'PERPETUAL',
-      quantity: 25,
+    expect(F.lots.find((lot) => lot.plan === 'office-ltsc-2024')).toMatchObject({
+      purpose: 'STOCK',
+      licenseCount: 25,
     });
-    expect(F.keys.find((keys) => keys.subscription === 'office-ltsc-2024')).toEqual({
-      subscription: 'office-ltsc-2024',
+    expect(F.subscriptions.some((subscription) => subscription.plan === 'office-ltsc-2024')).toBe(false);
+    expect(F.keys.find((keys) => keys.lot === 'office-ltsc-2024')).toEqual({
+      lot: 'office-ltsc-2024',
       count: 1,
       maxActivations: 30,
       initialActivationsUsed: 8,
     });
-    for (const keys of F.keys.filter((candidate) => candidate.subscription !== 'office-ltsc-2024')) {
-      expect(plan(F.subscriptions.find((s) => s.key === keys.subscription)!.plan).keyBinding).toBeUndefined();
+    for (const keys of F.keys.filter((candidate) => candidate.lot !== 'office-ltsc-2024')) {
+      expect(plan(F.lots.find((lot) => lot.key === keys.lot)!.plan).keyBinding).toBeUndefined();
       expect(keys.initialActivationsUsed).toBeUndefined();
     }
   });
 
   it('ends with 12 activations used and 10 open on the Office key: 8 told at import plus 4 on new machines, 6 old machines and 4 new ones running it', () => {
-    const key = F.keys.find((keys) => keys.subscription === 'office-ltsc-2024')!;
+    const key = F.keys.find((keys) => keys.lot === 'office-ltsc-2024')!;
     const initialRows = F.devices.filter((machine) => machine.initialKeyOf === 'office-ltsc-2024');
     const operationRows = F.newDevices.filter((machine) => machine.keyOf === 'office-ltsc-2024');
 

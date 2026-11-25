@@ -288,22 +288,25 @@ export async function grantTaskStatus(
   return latest?.status ?? null;
 }
 
-/** The free key of the K4 subscription the scenario's plan has, for the IT Admin to hand over. */
+/** The free key of the first lot that has one in the store of the scenario's K4 plan, for the IT Admin to hand over. */
 async function freeKeyId(
   ctx: DemoRunContext,
   email: string,
   scenario: DemoRequestScenario,
 ): Promise<string | undefined> {
   if (scenario.grant !== 'KEY') return undefined;
-  const subscription = ctx.fixture.subscriptions.find((candidate) => candidate.plan === scenario.plan);
-  const subscriptionId = ctx.ids.subscriptions.get(subscription?.key ?? '');
-  const keys = await listAll<{ id: string; status: string }>(
-    ctx,
-    email,
-    `/license-keys?subscriptionId=${subscriptionId}&status=IN_STORE`,
-  );
+  for (const lot of ctx.fixture.lots.filter((candidate) => candidate.plan === scenario.plan)) {
+    const lotId = ctx.ids.lots.get(lot.key);
+    if (!lotId) continue;
+    const keys = await listAll<{ id: string; status: string }>(
+      ctx,
+      email,
+      `/license-keys?licenseLotId=${lotId}&status=IN_STORE`,
+    );
+    if (keys[0]) return keys[0].id;
+  }
 
-  return keys[0]?.id;
+  return undefined;
 }
 
 /**

@@ -1,4 +1,11 @@
-import type { DemoApplication, DemoPlan, DemoPlanTerms, DemoSeat, DemoSubscription } from '../demo-fixture.types';
+import type {
+  DemoApplication,
+  DemoLot,
+  DemoPlan,
+  DemoPlanTerms,
+  DemoSeat,
+  DemoSubscription,
+} from '../demo-fixture.types';
 import { app, groupOf, k2, k4, monthly } from './catalog-kit';
 
 export const RETIRED_APPLICATIONS = ['skype'];
@@ -133,21 +140,24 @@ const k1Subscription = (key: string, amount: string, dollars: string): DemoSubsc
   originalPrice: { amount: dollars, currency: 'USD' },
 });
 
-/** A key bought once, on a day in the past: its keys come from the key store. */
-const perpetual = (key: string, amount: string, quantity: number): DemoSubscription => ({
+/** Licenses bought once, on a day in the past, by the IT Admin who answers for them: a lot named by the key of its plan; its keys come from the key store. */
+const lot = (
+  key: string,
+  amount: string,
+  licenseCount: number,
+  purpose: DemoLot['purpose'] = 'REPLACEMENT',
+): DemoLot => ({
   key,
   plan: key,
-  kind: 'PERPETUAL',
+  licenseCount,
   unitPrice: { amount, currency: 'VND' },
-  billingCycle: 'MONTHLY',
-  termMonths: 1,
+  purpose,
+  purchasedDaysAgo: 200,
   responsible: 'NV-ITA1',
-  freeAfterBaseline: 0,
-  quantity,
 });
 
 /*
- * Seventeen subscriptions, one per plan but Skype (retired in S21) and the internal attendance plan. Their payment and renewal days are counted
+ * Fifteen subscriptions (and the three lots below), one per plan but Skype (retired in S21) and the internal attendance plan. Their payment and renewal days are counted
  * from the day of the seed (SPEC 4.5) so that on that day and the next, some stand inside the window of SBF-20 and some outside it:
  * Zoom Pro, Confluence Standard and HubSpot are inside (monthly); Notion Plus, Confluence Premium (a declared deadline) and Adobe (red: its
  * deadline is in 5 days) are inside (annual); Microsoft 365, Notion Business and Photoshop are outside. Zoom Business's renewal day has passed
@@ -169,11 +179,18 @@ export const EXTRA_SUBSCRIPTIONS: DemoSubscription[] = [
   annual('claude-team-standard', '6000000', 'NV-ITA1', 2, { withoutDates: true }),
   annual('claude-team-premium', '30000000', 'NV-ITA1', 1, { withoutDates: true }),
   k1Subscription('copilot-pro', '254000', '10'),
-  perpetual('visio-pro', '13000000', 3),
-  perpetual('sublime-license', '2500000', 2),
-  // 25 licenses bought once, run on machines through one key of 30 activations (W2-25).
-  perpetual('office-ltsc-2024', '3500000', 25),
   byMonth('hubspot-starter', '450000', 'NV-ITA1', 2, 1),
+];
+
+/**
+ * The lots of licenses of the K4 plans of this file, made through `POST /license-lots` (W3-24, W3-28). Windows 11 Pro OEM has none: its key comes with the
+ * machine (`DEVICE_BUNDLED`).
+ */
+export const EXTRA_LOTS: DemoLot[] = [
+  lot('visio-pro', '13000000', 3),
+  lot('sublime-license', '2500000', 2),
+  // 25 licenses bought once and kept in stock, run on machines through one key of 30 activations (W2-25).
+  lot('office-ltsc-2024', '3500000', 25, 'STOCK'),
 ];
 
 /*
