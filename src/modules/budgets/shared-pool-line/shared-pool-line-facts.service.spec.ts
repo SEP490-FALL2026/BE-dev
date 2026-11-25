@@ -173,6 +173,45 @@ describe('SharedPoolLineFactsService', () => {
     expect(onlyTotals.unallocatedMinor).toBe(novLine.unallocatedMinor);
   });
 
+  it('FIX-B1 F5 (B-I3): includes variance-only subscription in June poolLines when renewal starts 01/07 and matches year total (and only branch)', async () => {
+    const { service, periods, licensing, poolRepo, organizationReads } = build();
+    organizationReads.businessToday.mockResolvedValue('2027-07-05');
+    licensing.getSeatsOfMonth.mockResolvedValue([]);
+    poolRepo.seatMonthTotalsBySubscriptionMonth.mockResolvedValue([]);
+    poolRepo.invoiceVariancesBySubscriptionMonth.mockImplementation((_orgId: string, month: string) =>
+      Promise.resolve(
+        month === '2027-06-01'
+          ? [{ subscriptionId: 'sub-renewal-july', varianceMinor: 2_000_000n, varianceInReviewMinor: 0n }]
+          : [],
+      ),
+    );
+    poolRepo.invoiceVariancesTotals.mockResolvedValue({ varianceMinor: 2_000_000n, varianceInReviewMinor: 0n });
+    periods.getPurchaseFacts.mockResolvedValue([
+      fact({
+        subscriptionId: 'sub-renewal-july',
+        startDate: '2027-07-01',
+        endDate: '2028-06-30',
+        endExclusive: '2028-07-01',
+      }),
+    ]);
+
+    const juneLines = await service.linesOfMonth('2027-06-01', undefined, 100);
+    const yearTotals = await service.yearFigures(2027, 6);
+    const onlyTotals = await service.yearFigures(2027, 6, 'sub-renewal-july');
+
+    expect(juneLines).toHaveLength(1);
+    expect(juneLines[0]).toMatchObject({
+      subscriptionId: 'sub-renewal-july',
+      paidMinor: 0n,
+      idleCostMinor: 0n,
+      invoiceVarianceMinor: 2_000_000n,
+      unallocatedMinor: 2_000_000n,
+    });
+    const sumOfLines = juneLines.reduce((acc, item) => acc + item.unallocatedMinor, 0n);
+    expect(sumOfLines).toBe(yearTotals.unallocatedMinor);
+    expect(onlyTotals).toEqual(yearTotals);
+  });
+
   it('aggregates year sub-lines through ended months including org-wide invoice variances', async () => {
     const { service, periods, licensing, poolRepo, organizationReads } = build();
     organizationReads.businessToday.mockResolvedValue('2026-12-05');

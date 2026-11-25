@@ -57,6 +57,23 @@ function groupSeatsBySubscription(seats: readonly SeatOfMonth[]): Map<string, Se
   return grouped;
 }
 
+function collectCandidateIds(
+  seatsOfMonth: readonly SeatOfMonth[],
+  chargeTotals: ReadonlyArray<{ subscriptionId: string }>,
+  variances: readonly SubscriptionInvoiceVariance[],
+  only?: string,
+): string[] {
+  const matchesOnly = (subscriptionId: string) => only === undefined || subscriptionId === only;
+
+  return [
+    ...new Set([
+      ...seatsOfMonth.map((seat) => seat.subscriptionId),
+      ...chargeTotals.filter((row) => matchesOnly(row.subscriptionId)).map((row) => row.subscriptionId),
+      ...variances.filter((row) => matchesOnly(row.subscriptionId)).map((row) => row.subscriptionId),
+    ]),
+  ].sort();
+}
+
 function buildLineDetail(input: {
   fact: SubscriptionPurchaseFacts;
   month: BusinessDate;
@@ -128,14 +145,8 @@ export class SharedPoolLineFactsService {
           tx,
         )
       : [];
-    const candidateIds = [
-      ...new Set([
-        ...seatsOfMonth.map((seat) => seat.subscriptionId),
-        ...chargeTotals
-          .filter((row) => only === undefined || row.subscriptionId === only)
-          .map((row) => row.subscriptionId),
-      ]),
-    ].sort();
+    const variances = org ? await this.poolRepo.invoiceVariancesBySubscriptionMonth(org.id, month, tx) : [];
+    const candidateIds = collectCandidateIds(seatsOfMonth, chargeTotals, variances, only);
     if (candidateIds.length === 0) return [];
     const candidateSet = new Set(candidateIds);
 
@@ -156,7 +167,6 @@ export class SharedPoolLineFactsService {
       { from: start, until: nextStart, invoicedIds: eligibleIds, only },
       tx,
     );
-    const variances = org ? await this.poolRepo.invoiceVariancesBySubscriptionMonth(org.id, month, tx) : [];
     const windowsMap = await this.periods.adjustmentWindowsOf(eligibleIds, monthEnd, tx);
     const qNextMap = await this.licensing.getNextPeriodQuantities(eligibleIds, tx);
 
