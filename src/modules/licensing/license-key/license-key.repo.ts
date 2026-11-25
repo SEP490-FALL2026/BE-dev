@@ -22,7 +22,10 @@ const ofPurchase = (purchaseId: string): Prisma.LicenseKeyWhereInput => ({
 /** A key of the vault as a list shows it: never the key itself, its fingerprint or its ciphertext. */
 export interface LicenseKeyListed {
   id: string;
+  /** The purchase of the key: its lot, or the subscription of wave 2 for a key with no lot. */
   subscriptionId: string;
+  /** The lot the key belongs to (W3-24). */
+  licenseLotId: string | null;
   masked: string;
   status: LicenseKeyStatus;
   importedAt: Date;
@@ -362,6 +365,7 @@ interface LicenseKeyHeldRow {
 const listed = (row: Prisma.LicenseKeyGetPayload<{ select: typeof LISTED }>): LicenseKeyListed => ({
   id: row.id,
   subscriptionId: purchaseIdOf(row),
+  licenseLotId: row.licenseLotId,
   masked: row.masked,
   status: row.status,
   importedAt: row.importedAt,

@@ -24,6 +24,7 @@ describe('AssignmentSeatOccupancy (S-6)', () => {
     } as unknown as SharedPoolCapacityRepo;
 
     const deviceActivations = {
+      keyCountsOfLots: jest.fn().mockResolvedValue(new Map([['lot-1', { inStore: 2, assigned: 1, withdrawn: 0 }]])),
       occupiedBySubscription: jest.fn().mockResolvedValue(3),
       occupiedBySubscriptions: jest.fn().mockResolvedValue(
         new Map([
@@ -64,6 +65,14 @@ describe('AssignmentSeatOccupancy (S-6)', () => {
     expect(map.get('sub-seat')).toEqual({ occupied: 3, inRevocation: 1 });
     expect(map.get('sub-key-only')).toEqual({ occupied: 4, inRevocation: 0 });
     expect(map.get('sub-empty')).toBeUndefined();
+  });
+
+  it('reads the keys of lots through the repo of the vault, by the purchase of each key', async () => {
+    const { listener } = setup();
+
+    await expect(listener.keyCountsOfLots(['lot-1'])).resolves.toEqual(
+      new Map([['lot-1', { inStore: 2, assigned: 1, withdrawn: 0 }]]),
+    );
   });
 
   describe('a lot of a K4 plan is counted once, by the lot (DL-2)', () => {

@@ -54,12 +54,12 @@ flowchart BT
   budgets -->|4| operating_parameters
   budgets -->|25| organization
   budgets -->|8| policies
-  catalog -->|23| audit
-  catalog -->|11| finance
+  catalog -->|31| audit
+  catalog -->|12| finance
   catalog -->|8| identity_access
   catalog -->|3| notifications
   catalog -->|3| operating_parameters
-  catalog -->|28| organization
+  catalog -->|36| organization
   dashboards -->|2| catalog
   dashboards -->|2| devices
   dashboards -->|4| identity_access
@@ -95,13 +95,13 @@ flowchart BT
   installation -->|11| identity_access
   installation -->|8| organization
   installation -->|2| policies
-  licensing -->|34| audit
-  licensing -->|66| catalog
+  licensing -->|35| audit
+  licensing -->|75| catalog
   licensing -->|2| finance
   licensing -->|19| identity_access
   licensing -->|12| notifications
   licensing -->|6| operating_parameters
-  licensing -->|69| organization
+  licensing -->|70| organization
   licensing -->|4| policies
   onboarding -->|2| catalog
   onboarding -->|2| data_import

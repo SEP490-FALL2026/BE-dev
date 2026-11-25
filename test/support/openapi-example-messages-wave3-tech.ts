@@ -10,4 +10,11 @@ export const SUCCESS_MESSAGES_WAVE3_TECH: Readonly<Record<string, string>> = {
   workspaceUpdate: 'WORKSPACE.UPDATED',
   workspaceAdminsSet: 'WORKSPACE.ADMINS_SET',
   workspaceResponsibleItAdminChange: 'WORKSPACE.RESPONSIBLE_CHANGED',
+  // W3-24: lots of licenses.
+  licenseLotList: 'LICENSE_LOT.LISTED',
+  licenseLotCreate: 'LICENSE_LOT.CREATED',
+  licenseLotGet: 'LICENSE_LOT.FETCHED',
+  licenseLotUpdate: 'LICENSE_LOT.UPDATED',
+  licenseLotKeyImport: 'LICENSE_KEY.IMPORTED',
+  licenseLotResponsibleItAdminChange: 'LICENSE_LOT.RESPONSIBLE_CHANGED',
 };

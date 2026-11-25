@@ -53,12 +53,20 @@ const NOT_FOUND_OR_WORKSPACE = {
     'The subscription does not exist (SUBSCRIPTION.NOT_FOUND) or the workspace named does not exist (WORKSPACE.NOT_FOUND).',
   examples: [SUBSCRIPTION_ERROR_EXAMPLES.NOT_FOUND, SUBSCRIPTION_ERROR_EXAMPLES.WORKSPACE_NOT_FOUND],
 } as const;
+const LOT_RULES_NOTE =
+  ' A plan of personal accounts (K1) has no subscription: its rights are held per person (SUBSCRIPTION.K1_HAS_NO_SUBSCRIPTION); a perpetual purchase is a lot of licenses, made by the lot route (SUBSCRIPTION.PERPETUAL_IS_LICENSE_LOT).';
+const RETIRED_PRIMARY_NOTE =
+  ' A subscription of a retired plan cannot be made the primary one (SUBSCRIPTION.PRIMARY_RETIRED).';
+const SEAT_LEDGER_NOTE =
+  ' The number of seats is no longer written here: a seat is bought or reduced on the lines of the period (SUBSCRIPTION.SEAT_COUNT_VIA_LEDGER, details.routes).';
 const INVALID_UPDATE_NOTE =
-  ' Changing purchasedQuantity requires expectedUpdatedAt (SUBSCRIPTION.VERSION_REQUIRED) and increasing it on an active K2 subscription requires quantityChangeReason (SUBSCRIPTION.QUANTITY_REASON_REQUIRED). An update that would put the seats bought under the seats taken is refused with SUBSCRIPTION.QUANTITY_BELOW_OCCUPIED (details.occupied, details.requested). An active subscription is never lowered to a draft by an update: one still priced in another currency (an earlier release could not convert it) is refused with SUBSCRIPTION.STILL_DRAFT (details.missing is UNIT_PRICE) until the update enters the price in dong, and it stays active.';
+  ' Changing purchasedQuantity requires expectedUpdatedAt (SUBSCRIPTION.VERSION_REQUIRED) and increasing it on an active K2 subscription requires quantityChangeReason (SUBSCRIPTION.QUANTITY_REASON_REQUIRED). An update that would put the seats bought under the seats taken is refused with SUBSCRIPTION.QUANTITY_BELOW_OCCUPIED (details.occupied, details.requested). An active subscription is never lowered to a draft by an update: one still priced in another currency (an earlier release could not convert it) is refused with SUBSCRIPTION.STILL_DRAFT (details.missing is UNIT_PRICE) until the update enters the price in dong, and it stays active.' +
+  RETIRED_PRIMARY_NOTE;
 const INVALID = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
   description:
-    'The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION.PLAN_NOT_FOUND and APPLICATION_RETIRED (declaring only), PLAN_HAS_NO_SUBSCRIPTION, PERPETUAL_NEEDS_LICENSED_APPLICATION, PERPETUAL_HAS_NO_TERM, DATES_INVALID or UPDATE_EMPTY; the shared-pool rules refuse COMMITMENT_TERM_REQUIRED (a term that becomes active names 1 or 12 months), COMMITMENT_TERM_NOT_ALLOWED (a perpetual purchase), K1_MONTHLY_ONLY (R-E01), K4_PERPETUAL_ONLY (a K4 plan is bought once: only a perpetual purchase is written for it), BILLING_LONGER_THAN_COMMITMENT (R-G01), BILLING_CYCLE_UNSUPPORTED (only MONTHLY and ANNUAL are written; QUARTERLY and OTHER stay readable on older data), RESPONSIBLE_REQUIRED (an active subscription names the IT Admin who answers for it), RESPONSIBLE_NOT_IT_ADMIN and VENDOR_ADMINS_REQUIRED (a plan that needs admins at the vendor, a K2 plan or a K4 plan with an admin console, is not activated as a new subscription, nor its pool made, once the seat baseline is closed while fewer than two different working IT Admins are recorded in its workspace profile; while the seat baseline is open it is let through and carries vendorAdminsBelowMinimum when read; the period a renewal continues is never asked, it only carries the flag vendorAdminsBelowMinimum), and an update may also be refused with PRIMARY_NOT_ELIGIBLE (details.reason); the unit price is refused with PRICE_NOT_VND (it is entered in dong only, details.currency) or PRICE_MISMATCH (when monthlyUnitPrice and unitPrice disagree, details.expectedUnitPrice), and the unit price and the original price with MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE or CURRENCY_NOT_SUPPORTED (the currency of the original price). The workspace the subscription is held in is judged too: WORKSPACE_VENDOR_MISMATCH (it is held at another vendor than the plan), WORKSPACE_REQUIRED (the vendor has several workspaces and none is named, details.workspaceIds), MEMBERS_MONTHLY_ONLY (seats counted by the members commit for one month) and MEMBERS_PAYMENT_DAY_REQUIRED (an active one names its payment day in renewalDate); an update may also be refused with SEAT_COUNTING_FIXED (how the seats are counted does not change once active).',
+    'The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION.PLAN_NOT_FOUND and APPLICATION_RETIRED (declaring only), PLAN_HAS_NO_SUBSCRIPTION, PERPETUAL_NEEDS_LICENSED_APPLICATION, PERPETUAL_HAS_NO_TERM, DATES_INVALID or UPDATE_EMPTY; the shared-pool rules refuse COMMITMENT_TERM_REQUIRED (a term that becomes active names 1 or 12 months), COMMITMENT_TERM_NOT_ALLOWED (a perpetual purchase), K1_MONTHLY_ONLY (R-E01), K4_PERPETUAL_ONLY (a K4 plan is bought once: only a perpetual purchase is written for it), BILLING_LONGER_THAN_COMMITMENT (R-G01), BILLING_CYCLE_UNSUPPORTED (only MONTHLY and ANNUAL are written; QUARTERLY and OTHER stay readable on older data), RESPONSIBLE_REQUIRED (an active subscription names the IT Admin who answers for it), RESPONSIBLE_NOT_IT_ADMIN and VENDOR_ADMINS_REQUIRED (a plan that needs admins at the vendor, a K2 plan or a K4 plan with an admin console, is not activated as a new subscription, nor its pool made, once the seat baseline is closed while fewer than two different working IT Admins are recorded in its workspace profile; while the seat baseline is open it is let through and carries vendorAdminsBelowMinimum when read; the period a renewal continues is never asked, it only carries the flag vendorAdminsBelowMinimum), and an update may also be refused with PRIMARY_NOT_ELIGIBLE (details.reason); the unit price is refused with PRICE_NOT_VND (it is entered in dong only, details.currency) or PRICE_MISMATCH (when monthlyUnitPrice and unitPrice disagree, details.expectedUnitPrice), and the unit price and the original price with MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE or CURRENCY_NOT_SUPPORTED (the currency of the original price). The workspace the subscription is held in is judged too: WORKSPACE_VENDOR_MISMATCH (it is held at another vendor than the plan), WORKSPACE_REQUIRED (the vendor has several workspaces and none is named, details.workspaceIds), MEMBERS_MONTHLY_ONLY (seats counted by the members commit for one month) and MEMBERS_PAYMENT_DAY_REQUIRED (an active one names its payment day in renewalDate); an update may also be refused with SEAT_COUNTING_FIXED (how the seats are counted does not change once active).' +
+    LOT_RULES_NOTE,
   examples: [
     VALIDATION_EXAMPLE,
     SUBSCRIPTION_ERROR_EXAMPLES.WORKSPACE_VENDOR_MISMATCH,
@@ -75,6 +83,8 @@ const INVALID = {
     SUBSCRIPTION_ERROR_EXAMPLES.COMMITMENT_TERM_NOT_ALLOWED,
     SUBSCRIPTION_ERROR_EXAMPLES.K1_MONTHLY_ONLY,
     SUBSCRIPTION_ERROR_EXAMPLES.K4_PERPETUAL_ONLY,
+    SUBSCRIPTION_ERROR_EXAMPLES.K1_HAS_NO_SUBSCRIPTION,
+    SUBSCRIPTION_ERROR_EXAMPLES.PERPETUAL_IS_LICENSE_LOT,
     SUBSCRIPTION_ERROR_EXAMPLES.BILLING_LONGER_THAN_COMMITMENT,
     SUBSCRIPTION_ERROR_EXAMPLES.BILLING_CYCLE_UNSUPPORTED,
     SUBSCRIPTION_ERROR_EXAMPLES.RESPONSIBLE_REQUIRED,
@@ -114,6 +124,7 @@ const INVALID_UPDATE = {
     SUBSCRIPTION_ERROR_EXAMPLES.VENDOR_ADMINS_REQUIRED,
     SUBSCRIPTION_ERROR_EXAMPLES.RESPONSIBLE_NOT_IT_ADMIN,
     SUBSCRIPTION_ERROR_EXAMPLES.PRIMARY_NOT_ELIGIBLE,
+    SUBSCRIPTION_ERROR_EXAMPLES.PRIMARY_RETIRED,
     SUBSCRIPTION_ERROR_EXAMPLES.PRICE_NOT_VND,
     SUBSCRIPTION_ERROR_EXAMPLES.PRICE_MISMATCH,
     SUBSCRIPTION_ERROR_EXAMPLES.MONEY_SCALE_EXCEEDED,
@@ -133,11 +144,13 @@ const DUPLICATE_PLAN_CONFLICT = {
 const UPDATE_CONFLICT = {
   status: HttpStatus.CONFLICT,
   description:
-    'The unique index of the flag that makes a subscription the primary one of its plan refuses the loser of a race (SUBSCRIPTION.PRIMARY_CONFLICT); the plan is locked for the write, so it normally does not fire. When expectedUpdatedAt is sent and the subscription was changed since (by another edit, or by a seat bought for a grant), nothing is written (SUBSCRIPTION.STALE, details.currentUpdatedAt): read it again and redo the edit. Reducing purchasedQuantity on a 12-month active K2 subscription without mid-term reduction enabled is refused (SUBSCRIPTION.MID_TERM_REDUCTION_NOT_ALLOWED).',
+    'The unique index of the flag that makes a subscription the primary one of its plan refuses the loser of a race (SUBSCRIPTION.PRIMARY_CONFLICT); the plan is locked for the write, so it normally does not fire. When expectedUpdatedAt is sent and the subscription was changed since (by another edit, or by a seat bought for a grant), nothing is written (SUBSCRIPTION.STALE, details.currentUpdatedAt): read it again and redo the edit. Reducing purchasedQuantity on a 12-month active K2 subscription without mid-term reduction enabled is refused (SUBSCRIPTION.MID_TERM_REDUCTION_NOT_ALLOWED).' +
+    SEAT_LEDGER_NOTE,
   examples: [
     SUBSCRIPTION_ERROR_EXAMPLES.PRIMARY_CONFLICT,
     SUBSCRIPTION_ERROR_EXAMPLES.STALE,
     SUBSCRIPTION_ERROR_EXAMPLES.MID_TERM_REDUCTION_NOT_ALLOWED,
+    SUBSCRIPTION_ERROR_EXAMPLES.SEAT_COUNT_VIA_LEDGER,
   ],
 } as const;
 

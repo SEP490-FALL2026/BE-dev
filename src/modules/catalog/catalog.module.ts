@@ -102,6 +102,13 @@ import { WorkspaceResponsibleService } from './workspace/workspace-responsible.s
 import { WorkspaceService } from './workspace/workspace.service';
 import { WorkspaceRepo } from './workspace/workspace.repo';
 import { LicenseLotLockService } from './license-lot/license-lot-lock.service';
+import { LicenseLotCreateService } from './license-lot/license-lot-create.service';
+import { LicenseLotPriceService } from './license-lot/license-lot-price.service';
+import { LicenseLotResponsibleService } from './license-lot/license-lot-responsible.service';
+import { LicenseLotViewService } from './license-lot/license-lot-view.service';
+import { SubscriptionLotResponsibleService } from './subscription/responsible/subscription-lot-responsible.service';
+import { LicenseLotService } from './license-lot/license-lot.service';
+import { LicenseLotsController } from './license-lot/license-lots.controller';
 import { LicenseLotRepo } from './license-lot/license-lot.repo';
 import { LicenseLotApi } from './public/license-lot.api';
 import { SeatLedgerRepo } from './subscription-line/ledger/seat-ledger.repo';
@@ -129,6 +136,7 @@ import { WorkspacesController } from './workspace/workspaces.controller';
     ObjectStorageModule,
   ],
   controllers: [
+    LicenseLotsController,
     VendorDictionaryController,
     ApplicationsController,
     ApplicationIntakeController,
@@ -181,8 +189,14 @@ import { WorkspacesController } from './workspace/workspaces.controller';
     WorkspaceForSubscriptionService,
     WorkspaceRepo,
     SubscriptionLineRepo,
+    SubscriptionLotResponsibleService,
     LicenseLotRepo,
     LicenseLotLockService,
+    LicenseLotService,
+    LicenseLotCreateService,
+    LicenseLotPriceService,
+    LicenseLotViewService,
+    LicenseLotResponsibleService,
     LicenseLotApi,
     SeatLedgerRepo,
     SeatPurchaseRepo,

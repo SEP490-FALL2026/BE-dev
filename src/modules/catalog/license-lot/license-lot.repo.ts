@@ -89,6 +89,29 @@ export class LicenseLotRepo {
     return rows.map(toRecord);
   }
 
+  /** One page of the lots, the newest purchase first, optionally of one plan; the total is counted in the same snapshot. */
+  async page(filter: {
+    planId?: string;
+    skip: number;
+    take: number;
+  }): Promise<{ rows: LicenseLotRecord[]; total: number }> {
+    const where: Prisma.LicenseLotWhereInput = filter.planId ? { planId: filter.planId } : {};
+
+    return this.prisma.$transaction(
+      async (tx) => {
+        const rows = await tx.licenseLot.findMany({
+          where,
+          orderBy: [{ purchasedOn: 'desc' }, { id: 'desc' }],
+          skip: filter.skip,
+          take: filter.take,
+        });
+
+        return { rows: rows.map(toRecord), total: await tx.licenseLot.count({ where }) };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
+  }
+
   /** Writes a lot. Throws LicenseLotMismatchError or LicenseLotRequestTakenError. */
   async insert(tx: DbTx, input: NewLicenseLot): Promise<LicenseLotRecord> {
     try {
@@ -150,6 +173,23 @@ export class LicenseLotRepo {
     });
 
     return toRecord(row);
+  }
+
+  /**
+   * Hands every lot the IT Admin answers for to another (SBF-16): the lots are locked in id order (tier 6a) and written; answers their ids. A lot born from a
+   * perpetual purchase has the id of a subscription the handover has just written (tier 6), so the order is: workspaces, subscriptions, lots.
+   */
+  async reassignResponsible(tx: DbTx, fromEmployeeId: string, toEmployeeId: string): Promise<string[]> {
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT id FROM license_lots WHERE responsible_it_admin_employee_id = ${fromEmployeeId}::uuid ORDER BY id FOR UPDATE`;
+    const ids = locked.map((row) => row.id);
+    if (ids.length === 0) return [];
+    await tx.licenseLot.updateMany({
+      where: { id: { in: ids } },
+      data: { responsibleItAdminEmployeeId: toEmployeeId, updatedAt: new Date() },
+    });
+
+    return ids;
   }
 
   /** Records what Finance confirmed the invoice of the lot at. */

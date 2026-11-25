@@ -284,7 +284,8 @@ describe('API inventory (e2e): openapi presentation and wire messages', () => {
       // 432 with the IT Admin route that raises the cap of activations of a license key (redesign wave 2).
       // 453 with redesign wave 2 routes (department IT substitutes, unplaced-work designations, device lifecycle, return tasks, activations, initial records, device software reads).
       // 459 with the six workspace routes of redesign wave 3.
-      expect(operations).toHaveLength(459);
+      // 465 with the six routes of the lots of licenses.
+      expect(operations).toHaveLength(465);
       expect(missing).toEqual([]);
     });
 

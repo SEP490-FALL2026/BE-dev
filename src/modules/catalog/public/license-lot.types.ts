@@ -33,3 +33,17 @@ export interface LicenseLotView {
   applicationStatus: 'APPROVED' | 'RETIRED';
   updatedAt: Date;
 }
+
+/** What a lot is made from (W3-24): the plan, the purchase, the purpose, and what the purpose and the plan need. The IT Admin who makes it answers for it. */
+export interface CreateLicenseLotInput {
+  planId: string;
+  purchasedOn: BusinessDate;
+  licenseCount: number;
+  unitPrice: { amount: string; currency: string };
+  originalUnitPrice?: { amount: string; currency: string };
+  purpose: Exclude<LicenseLotPurpose, 'OPENING'>;
+  requestId?: string;
+  workspaceId?: string;
+  contractId?: string;
+  note?: string;
+}

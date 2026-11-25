@@ -4,6 +4,7 @@ import type { AuthenticatedPrincipal } from '../../../../infrastructure/security
 import { AuditApi } from '../../../audit/public/audit.api';
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { catalogAuditEvent } from '../../catalog-audit-event.mapper';
+import { LicenseLotRepo } from '../../license-lot/license-lot.repo';
 import { SubscriptionPoolService } from '../pool/subscription-pool.service';
 import { SubscriptionNotFoundError } from '../subscription.errors';
 import { SubscriptionRepo } from '../subscription.repo';
@@ -22,6 +23,7 @@ import { judgeResponsibleChange } from './subscription-responsible.policy';
 export class SubscriptionResponsibleService {
   constructor(
     private readonly subscriptions: SubscriptionRepo,
+    private readonly lots: LicenseLotRepo,
     private readonly poolRules: SubscriptionPoolService,
     private readonly views: SubscriptionViewService,
     private readonly organizationReads: OrganizationReadApi,
@@ -41,23 +43,27 @@ export class SubscriptionResponsibleService {
     const changed = await this.runner.run(async (tx) => {
       const current = await this.subscriptions.lock(tx, subscriptionId);
       if (!current) throw new SubscriptionNotFoundError();
+      // A perpetual purchase that became a lot has the id of the lot (6a, after the period, 6): who answers for it is written in the lot and only there (W3-24).
+      const lot = await this.lots.lock(tx, subscriptionId);
+      const currentEmployeeId = lot ? lot.responsibleItAdminEmployeeId : current.responsibleItAdminEmployeeId;
       const decision = judgeResponsibleChange({
-        currentEmployeeId: current.responsibleItAdminEmployeeId,
+        currentEmployeeId,
         toEmployeeId: input.employeeId,
         toIsUsableItAdmin: await this.poolRules.isUsableItAdmin(input.employeeId, tx),
       });
       if (decision === 'UNCHANGED') return false;
 
-      await this.subscriptions.setResponsible(tx, subscriptionId, input.employeeId);
+      if (lot) await this.lots.setResponsible(tx, subscriptionId, input.employeeId);
+      else await this.subscriptions.setResponsible(tx, subscriptionId, input.employeeId);
       await this.audit.record(
         tx,
         catalogAuditEvent(
           actor,
           organization.id,
-          'SUBSCRIPTION.RESPONSIBLE_CHANGED',
-          'Subscription',
+          lot ? 'LICENSE_LOT.RESPONSIBLE_CHANGED' : 'SUBSCRIPTION.RESPONSIBLE_CHANGED',
+          lot ? 'LicenseLot' : 'Subscription',
           subscriptionId,
-          { responsibleItAdminEmployeeId: current.responsibleItAdminEmployeeId },
+          { responsibleItAdminEmployeeId: currentEmployeeId },
           { responsibleItAdminEmployeeId: input.employeeId, reason: input.reason },
         ),
       );

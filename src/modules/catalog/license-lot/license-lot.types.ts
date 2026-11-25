@@ -55,3 +55,35 @@ export interface LicenseLotChanges {
   contractId?: string | null;
   note?: string | null;
 }
+
+/** A lot as the routes read it (W3-24): what it is, how many licenses it gave out and has left, and who answers for it. */
+export interface LicenseLotDetail {
+  id: string;
+  plan: { id: string; name: string; keyBinding: 'ACCOUNT' | 'DEVICE_KEY' | 'DEVICE_BUNDLED' | null };
+  purchasedOn: BusinessDate;
+  licenseCount: number;
+  /** The licenses taken: the keys given to people, the activations on machines and the old rights with no key. */
+  assigned: number;
+  free: number;
+  keysInStore: number;
+  /** The keys that can be given at once; null for a plan whose key goes on a machine. */
+  grantable: number | null;
+  unitPriceMinor: bigint;
+  freeValueMinor: bigint;
+  purpose: LicenseLotPurpose;
+  contract: { id: string; name: string } | null;
+  workspace: { id: string; name: string } | null;
+  responsibleItAdminEmployeeId: string | null;
+  note: string | null;
+  requestId: string | null;
+  invoiceActualMinor: bigint | null;
+  originalUnitPrice: { amountMinor: bigint; currency: string } | null;
+  updatedAt: Date;
+}
+
+export interface UpdateLicenseLotInput {
+  contractId?: string | null;
+  contractChangeReason?: string;
+  note?: string | null;
+  unitPrice?: { amount: string; currency: string };
+}

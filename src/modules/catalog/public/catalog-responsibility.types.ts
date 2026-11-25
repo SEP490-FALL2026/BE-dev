@@ -28,4 +28,6 @@ export interface ResponsibilitiesTransferred {
   applicationIds: string[];
   /** The workspaces the IT Admin answered for (W3-10, `QĐ-116o`); they change hands in the same transaction. */
   workspaceIds: string[];
+  /** The lots of licenses the IT Admin answered for (W3-24); they change hands in the same transaction, after the subscriptions. */
+  licenseLotIds: string[];
 }

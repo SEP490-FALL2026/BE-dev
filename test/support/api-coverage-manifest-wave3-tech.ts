@@ -10,4 +10,11 @@ export const API_COVERAGE_WAVE3_TECH: readonly string[] = [
   'PATCH /api/v1/workspaces/{id}',
   'PUT /api/v1/workspaces/{id}/admins',
   'POST /api/v1/workspaces/{id}/responsible-it-admin',
+  // W3-24: the lots of licenses of a K4 plan.
+  'GET /api/v1/license-lots',
+  'POST /api/v1/license-lots',
+  'GET /api/v1/license-lots/{id}',
+  'PATCH /api/v1/license-lots/{id}',
+  'POST /api/v1/license-lots/{id}/keys',
+  'POST /api/v1/license-lots/{id}/responsible-it-admin',
 ];

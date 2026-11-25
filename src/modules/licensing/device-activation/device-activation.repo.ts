@@ -150,6 +150,37 @@ export class DeviceActivationRepo {
     return Number(rows[0]?.occupied ?? 0n);
   }
 
+  /**
+   * For each of these lots, the keys in the store and not withdrawn, those given to a person and those withdrawn, in one statement. A lot with no key is absent.
+   * Read here, next to the licenses the lot gives out, so the seat reader that binds to the catalog does not depend on the vault of keys.
+   */
+  async keyCountsOfLots(
+    lotIds: readonly string[],
+    client?: DbTx,
+  ): Promise<Map<string, { inStore: number; assigned: number; withdrawn: number }>> {
+    const result = new Map<string, { inStore: number; assigned: number; withdrawn: number }>();
+    if (lotIds.length === 0) return result;
+    const rows = await (client ?? this.prisma).$queryRaw<
+      { lot_id: string; in_store: bigint; assigned: bigint; withdrawn: bigint }[]
+    >`
+      SELECT COALESCE(license_lot_id, subscription_id) AS lot_id,
+             count(*) FILTER (WHERE status = 'IN_STORE' AND withdrawn_at IS NULL) AS in_store,
+             count(*) FILTER (WHERE status = 'ASSIGNED') AS assigned,
+             count(*) FILTER (WHERE withdrawn_at IS NOT NULL) AS withdrawn
+        FROM license_keys
+       WHERE COALESCE(license_lot_id, subscription_id) = ANY(${[...lotIds]}::uuid[])
+       GROUP BY COALESCE(license_lot_id, subscription_id)`;
+    for (const row of rows) {
+      result.set(row.lot_id, {
+        inStore: Number(row.in_store),
+        assigned: Number(row.assigned),
+        withdrawn: Number(row.withdrawn),
+      });
+    }
+
+    return result;
+  }
+
   async occupiedBySubscriptions(subscriptionIds: readonly string[], client?: DbTx): Promise<Map<string, number>> {
     const result = new Map<string, number>();
     if (subscriptionIds.length === 0) return result;

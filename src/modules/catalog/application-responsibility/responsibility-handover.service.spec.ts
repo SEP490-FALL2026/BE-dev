@@ -4,6 +4,7 @@ import type { OrganizationReadApi } from '../../organization/public/organization
 import type { ApplicationRepo } from '../catalog-entry/application.repo';
 import type { PlanFactsService } from '../plan/plan-facts.service';
 import type { SubscriptionRepo } from '../subscription/subscription.repo';
+import type { LicenseLotRepo } from '../license-lot/license-lot.repo';
 import type { WorkspaceRepo } from '../workspace/workspace.repo';
 import { ResponsibilityHandoverService } from './responsibility-handover.service';
 
@@ -19,6 +20,7 @@ function setup(subscriptionIds: string[], workingIds: string[]) {
     {} as OrganizationReadApi,
     {} as AuditApi,
     {} as WorkspaceRepo,
+    {} as LicenseLotRepo,
   );
 
   return { service, findActiveResponsibleItAdminIdsOfPlan, workingAdminsAmong };
@@ -70,6 +72,13 @@ describe('ResponsibilityHandoverService.transfer: the workspaces of the IT Admin
         return Promise.resolve(['sub-1']);
       }),
     };
+    const lots = {
+      reassignResponsible: jest.fn(() => {
+        order.push('lots');
+
+        return Promise.resolve(['lot-1']);
+      }),
+    };
     const audit = { record: jest.fn().mockResolvedValue(undefined) };
     const service = new ResponsibilityHandoverService(
       applications as unknown as ApplicationRepo,
@@ -78,9 +87,10 @@ describe('ResponsibilityHandoverService.transfer: the workspaces of the IT Admin
       { getOrganization: jest.fn().mockResolvedValue({ id: 'org-1' }) } as unknown as OrganizationReadApi,
       audit as unknown as AuditApi,
       workspaces as unknown as WorkspaceRepo,
+      lots as unknown as LicenseLotRepo,
     );
 
-    return { service, order, audit, workspaces };
+    return { service, order, audit, workspaces, lots };
   }
 
   it('hands the workspaces over in the same transaction, between the applications and the subscriptions, and audits each one', async () => {
@@ -88,8 +98,14 @@ describe('ResponsibilityHandoverService.transfer: the workspaces of the IT Admin
 
     const moved = await service.transfer(TX, actor, 'it-khoa', 'it-nam', { kind: 'OffboardingCase', id: 'case-1' });
 
-    expect(moved).toEqual({ applicationIds: ['app-1'], subscriptionIds: ['sub-1'], workspaceIds: ['ws-1', 'ws-2'] });
-    expect(order).toEqual(['applications', 'workspaces', 'subscriptions']);
+    expect(moved).toEqual({
+      applicationIds: ['app-1'],
+      subscriptionIds: ['sub-1'],
+      workspaceIds: ['ws-1', 'ws-2'],
+      licenseLotIds: ['lot-1'],
+    });
+    // The lots come last: after the subscriptions they were born from (tier 6a after tier 6).
+    expect(order).toEqual(['applications', 'workspaces', 'subscriptions', 'lots']);
     expect(workspaces.reassignResponsible).toHaveBeenCalledWith(TX, 'it-khoa', 'it-nam');
     const actions = audit.record.mock.calls.map((call: unknown[]) => (call[1] as { action: string }).action);
     expect(actions.filter((action: string) => action === 'WORKSPACE.RESPONSIBLE_TRANSFERRED')).toHaveLength(2);
@@ -100,6 +116,22 @@ describe('ResponsibilityHandoverService.transfer: the workspaces of the IT Admin
         resourceId: 'ws-1',
         before: { responsibleItAdminEmployeeId: 'it-khoa' },
         after: { responsibleItAdminEmployeeId: 'it-nam', sourceKind: 'OffboardingCase', sourceId: 'case-1' },
+      }),
+    );
+  });
+
+  it('audits each lot it hands over with the event of the lot', async () => {
+    const { service, audit, lots } = build();
+
+    await service.transfer(TX, actor, 'it-khoa', 'it-nam');
+
+    expect(lots.reassignResponsible).toHaveBeenCalledWith(TX, 'it-khoa', 'it-nam');
+    expect(audit.record).toHaveBeenCalledWith(
+      TX,
+      expect.objectContaining({
+        action: 'LICENSE_LOT.RESPONSIBLE_TRANSFERRED',
+        resourceType: 'LicenseLot',
+        resourceId: 'lot-1',
       }),
     );
   });
