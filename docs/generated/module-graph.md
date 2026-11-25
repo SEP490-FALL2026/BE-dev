@@ -45,14 +45,14 @@ flowchart BT
   ai_assist -->|2| operating_parameters
   ai_assist -->|4| organization
   ai_assist -->|4| requests
-  budgets -->|26| audit
-  budgets -->|8| catalog
+  budgets -->|27| audit
+  budgets -->|11| catalog
   budgets -->|2| finance
-  budgets -->|5| identity_access
-  budgets -->|6| licensing
-  budgets -->|12| notifications
+  budgets -->|6| identity_access
+  budgets -->|10| licensing
+  budgets -->|13| notifications
   budgets -->|4| operating_parameters
-  budgets -->|23| organization
+  budgets -->|25| organization
   budgets -->|8| policies
   catalog -->|23| audit
   catalog -->|11| finance
@@ -96,7 +96,7 @@ flowchart BT
   installation -->|8| organization
   installation -->|2| policies
   licensing -->|34| audit
-  licensing -->|62| catalog
+  licensing -->|66| catalog
   licensing -->|2| finance
   licensing -->|19| identity_access
   licensing -->|12| notifications
@@ -112,7 +112,7 @@ flowchart BT
   operating_parameters -->|4| audit
   operating_parameters -->|6| organization
   optimization -->|7| audit
-  optimization -->|7| catalog
+  optimization -->|8| catalog
   optimization -->|9| identity_access
   optimization -->|25| licensing
   optimization -->|7| notifications
@@ -137,14 +137,14 @@ flowchart BT
   policies -->|2| notifications
   policies -->|7| organization
   requests -->|67| audit
-  requests -->|32| budgets
-  requests -->|43| catalog
+  requests -->|36| budgets
+  requests -->|45| catalog
   requests -->|11| finance
-  requests -->|41| identity_access
-  requests -->|61| licensing
-  requests -->|14| notifications
-  requests -->|12| operating_parameters
-  requests -->|105| organization
+  requests -->|42| identity_access
+  requests -->|65| licensing
+  requests -->|15| notifications
+  requests -->|13| operating_parameters
+  requests -->|106| organization
   requests -->|34| policies
   usage -->|10| audit
   usage -->|3| budgets

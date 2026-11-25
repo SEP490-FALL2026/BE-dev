@@ -177,6 +177,7 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
         channel: 'MANUAL',
         status: 'COMPLETED',
         requestId: input.requestId,
+        createdByAppUserId: h.it1.appUserId,
         completedByAppUserId: h.it1.appUserId,
         completedAt: NOW,
         evidence: 'done',

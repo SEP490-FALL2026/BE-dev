@@ -264,10 +264,12 @@ describe('purchase invoice confirmation & pool variance (http contract, no datab
     const body = response.body as DiscrepancyDetailBody;
     expect(body.data.mismatches).toEqual(['QUANTITY', 'UNIT_PRICE', 'EXPECTED_AMOUNT']);
     expect(body.data.outcome).toBe('EXCHANGE_RATE_LINE_PRICE_UPDATED');
-    expect(body.data.closure).toEqual({
+    expect(body.data.closure).toMatchObject({
       outcome: 'EXCHANGE_RATE_LINE_PRICE_UPDATED',
-      reason: 'Vendor adjusted list price and exchange rate',
+      reason: 'Vendor updated FX and per-seat price',
       differenceAmount: { amount: '0', currency: 'VND' },
+      closedBy: { employeeId: FINANCE_ID },
+      closedAt: NOW.toISOString(),
     });
   });
 

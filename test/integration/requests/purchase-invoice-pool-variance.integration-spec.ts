@@ -187,7 +187,7 @@ describe('K2 pool expected figures & SBF-11a variance over PostgreSQL (integrati
     const periodPurchase = h.dataOf<PurchaseWire>(
       await api('post', '', h.it1)
         .send({
-          link: { subscriptionId: subId, label: 'PERIOD' },
+          link: { subscriptionId: subId },
           vendorInvoiceNumber: `W305-MERGED-${++numbers}`,
           issuedOn: `${h.year}-11-05`,
           servicePeriodMonth: `${h.year}-11`,
