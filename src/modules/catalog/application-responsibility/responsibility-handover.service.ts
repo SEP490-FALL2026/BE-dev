@@ -9,6 +9,7 @@ import { PlanFactsService } from '../plan/plan-facts.service';
 import { ResponsibilityHandoverRefusedError } from '../public/catalog-responsibility.errors';
 import type { ResponsibilitiesTransferred, ResponsibilityCounts } from '../public/catalog-responsibility.types';
 import { SubscriptionRepo } from '../subscription/subscription.repo';
+import { WorkspaceRepo } from '../workspace/workspace.repo';
 import { handoverRefusal } from './responsibility-handover.policy';
 
 /**
@@ -26,6 +27,7 @@ export class ResponsibilityHandoverService {
     private readonly planFacts: PlanFactsService,
     private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
+    private readonly workspaces: WorkspaceRepo,
   ) {}
 
   /** How many subscriptions and applications each of these employees answers for, in two statements; an employee with none is counted zero. */
@@ -64,6 +66,8 @@ export class ResponsibilityHandoverService {
     if (!organization) throw new Error('The catalog was used before installation');
 
     const applicationIds = await this.applications.reassignResponsible(tx, fromEmployeeId, toEmployeeId);
+    // The workspaces come before the subscriptions (tier 5b before tier 6 of the lock order).
+    const workspaceIds = await this.workspaces.reassignResponsible(tx, fromEmployeeId, toEmployeeId);
     const subscriptionIds = await this.subscriptions.reassignResponsible(tx, fromEmployeeId, toEmployeeId);
     const before = { responsibleItAdminEmployeeId: fromEmployeeId };
     // The event that asked for it (a departure or a transfer) is part of what the Audit Trail says (`US-04-06` AC-3): who from, who to, why.
@@ -85,6 +89,12 @@ export class ResponsibilityHandoverService {
         ),
       );
     }
+    for (const id of workspaceIds) {
+      await this.audit.record(
+        tx,
+        catalogAuditEvent(actor, organization.id, 'WORKSPACE.RESPONSIBLE_TRANSFERRED', 'Workspace', id, before, after),
+      );
+    }
     for (const id of subscriptionIds) {
       await this.audit.record(
         tx,
@@ -100,6 +110,6 @@ export class ResponsibilityHandoverService {
       );
     }
 
-    return { applicationIds, subscriptionIds };
+    return { applicationIds, subscriptionIds, workspaceIds };
   }
 }

@@ -181,6 +181,14 @@ export interface WorkspaceDuty {
   role: 'PRIMARY_OWNER' | 'OWNER' | 'ADMIN';
   /** The plan declares an emergency account: only that it exists, never its name, its holder or any secret. */
   emergencyAccountDeclared: boolean;
+  /** The workspace the duty is held in (W3-10): the plan above is the one it is known by. */
+  workspace?: {
+    id: string;
+    name: string;
+    vendorId: string;
+    responsibleItAdminEmployeeId: string | null;
+    members: ReadonlyArray<{ employeeId: string; role: 'OWNER' | 'ADMIN' }>;
+  };
 }
 
 /**

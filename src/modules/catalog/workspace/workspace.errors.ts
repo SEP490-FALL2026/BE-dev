@@ -73,6 +73,22 @@ export class WorkspaceResponsibleNotItAdminError extends Error {
   }
 }
 
+/** The workspace named for a subscription is held at another vendor than the plan of the subscription. */
+export class WorkspaceVendorMismatchError extends Error {
+  constructor() {
+    super('The workspace is held at another vendor than the plan.');
+    this.name = 'WorkspaceVendorMismatchError';
+  }
+}
+
+/** The vendor has several workspaces and the subscription names none: the caller must say which. */
+export class WorkspaceRequiredError extends Error {
+  constructor(readonly workspaceIds: readonly string[]) {
+    super('The vendor has several workspaces: name the one the subscription is held in.');
+    this.name = 'WorkspaceRequiredError';
+  }
+}
+
 /** A free-text field of the workspace is longer than allowed, or the emergency account names no identity. */
 export class WorkspaceTextInvalidError extends Error {
   constructor() {

@@ -1,28 +1,34 @@
 import { Injectable } from '@nestjs/common';
-import { TransactionRunner, DbTx } from '../../../infrastructure/database/transaction-runner';
+import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditApi } from '../../audit/public/audit.api';
-import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
-import { EmployeeNotFoundError } from '../../organization/public/organization.errors';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import { catalogAuditEvent } from '../catalog-audit-event.mapper';
+import {
+  WorkspaceAdminNotItAdminError,
+  WorkspaceAdminsTooFewError,
+  WorkspaceLimitExceededError,
+  WorkspacePrimaryOwnerNotAdminError,
+  WorkspaceRequiredError,
+  WorkspaceTextInvalidError,
+} from '../workspace/workspace.errors';
+import { WorkspaceRepo } from '../workspace/workspace.repo';
+import { WorkspaceService } from '../workspace/workspace.service';
+import { WorkspaceAdminsService } from '../workspace/workspace-admins.service';
+import { WorkspaceForSubscriptionService } from '../workspace/workspace-for-subscription.service';
 import {
   PlanNotFoundError,
+  PlanPrimaryOwnerNotListedError,
+  PlanVendorAdminsInvalidError,
+  PlanWorkspaceAmbiguousError,
+  PlanWorkspaceLimitExceededError,
   PlanWorkspacePersonInvalidError,
   PlanWorkspaceProfileNotApplicableError,
   PlanWorkspaceTextInvalidError,
+  PlanWorkspaceVendorRequiredError,
 } from './plan.errors';
 import { assertWorkspaceShape, cleanWorkspaceText } from './plan.policy';
-import { PlanFactsService } from './plan-facts.service';
 import { PlanRepo } from './plan.repo';
 import { assertVendorAdminsEnough, needsVendorAdmins } from './plan-vendor-admins.policy';
-import type {
-  PersonView,
-  WorkspaceMemberRecord,
-  WorkspaceProfileRecord,
-  WorkspaceProfileView,
-  WorkspaceRole,
-} from './plan.types';
+import type { PersonView, WorkspaceProfileRecord, WorkspaceProfileView, WorkspaceRole } from './plan.types';
 
 export interface WorkspaceProfileInput {
   primaryOwnerEmployeeId: string;
@@ -61,25 +67,28 @@ const sameSnapshot = (a: ReturnType<typeof snapshot>, b: ReturnType<typeof snaps
   JSON.stringify(a) === JSON.stringify(b);
 
 /**
- * The workspace profile of a plan the company administers at the vendor (`QĐ-77d`, `QĐ-110k`, `QĐ-110u`): a K2 plan, or a K4 plan the IT Admin
- * said has an admin console. Who owns and administers it, the emergency account, the email of the company account that owns it there and a note,
- * recorded as a whole and replaced as a whole. Every person named must be an employee still working with a usable IT Admin account, and at least
- * two different ones administer the plan; no password or secret is stored or accepted.
+ * The workspace profile of a plan the company administers at the vendor (`QĐ-77d`, `QĐ-110k`, `QĐ-110u`), as the old route records it (W3-13): a K2
+ * plan, or a K4 plan the IT Admin said has an admin console. The profile is the workspace of the vendor of the plan (`QĐ-115c`): the route finds it (the
+ * only one of the vendor, or makes one named after the vendor when it has none) and writes through the services of the workspace, the same rules as
+ * the routes of the workspace itself. The route, its body and its answer stay as they were; the old table is no longer written.
  */
 @Injectable()
 export class PlanWorkspaceService {
   constructor(
     private readonly plans: PlanRepo,
+    private readonly workspaces: WorkspaceService,
+    private readonly workspaceAdmins: WorkspaceAdminsService,
+    private readonly forSubscription: WorkspaceForSubscriptionService,
+    private readonly workspaceRepo: WorkspaceRepo,
     private readonly organizationReads: OrganizationReadApi,
-    private readonly identity: IdentityAccessApi,
-    private readonly facts: PlanFactsService,
-    private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
 
   /**
-   * Replaces the profile. Throws PlanNotFoundError, PlanWorkspaceProfileNotApplicableError (a plan that needs no admins at the vendor), the shape
-   * errors of `assertWorkspaceShape`, PlanVendorAdminsInvalidError, PlanWorkspaceTextInvalidError and PlanWorkspacePersonInvalidError.
+   * Replaces the profile. Throws PlanNotFoundError, PlanWorkspaceProfileNotApplicableError (a plan that needs no admins at the vendor),
+   * PlanWorkspaceVendorRequiredError (its application has no vendor), the shape errors of `assertWorkspaceShape`, PlanVendorAdminsInvalidError,
+   * PlanWorkspaceTextInvalidError, PlanWorkspacePersonInvalidError, PlanWorkspaceAmbiguousError (the vendor holds several workspaces) and the refusal
+   * of the workspace to anyone who does not answer for it (WorkspaceNotResponsibleError).
    */
   async set(
     actor: AuthenticatedPrincipal,
@@ -92,81 +101,92 @@ export class PlanWorkspaceService {
     const emergency = input.emergencyAccount ? this.cleanEmergency(input.emergencyAccount) : null;
     const adminNote = cleanWorkspaceText(input.adminNote);
     const ownerAccountEmail = cleanWorkspaceText(input.ownerAccountEmail);
-    const organization = await this.organizationReads.getOrganization();
-    if (!organization) throw new Error('The workspace profile was used before installation');
-
-    const stored = await this.runner.run(async (tx) => {
-      const plan = await this.plans.lock(tx, planId);
-      if (!plan) throw new PlanNotFoundError();
-      if (!needsVendorAdmins(plan.provisioningType, plan.hasAdminConsole))
-        throw new PlanWorkspaceProfileNotApplicableError();
-      assertWorkspaceShape({
-        primaryOwnerEmployeeId: input.primaryOwnerEmployeeId,
-        members: input.members,
-        ownerLimit,
-        adminLimit,
-      });
-      assertVendorAdminsEnough(input.members.map((member) => member.employeeId));
-
-      await this.requirePeople(tx, input, emergency);
-
-      const before = await this.plans.findProfile(planId, tx);
-      const members: WorkspaceMemberRecord[] = input.members.map((member) => ({
-        employeeId: member.employeeId,
-        role: member.role,
-      }));
-      const next = {
-        planId,
-        primaryOwnerEmployeeId: input.primaryOwnerEmployeeId,
-        members,
-        ownerLimit,
-        adminLimit,
-        ownerTransferProcedure: procedure,
-        emergencyAccount: emergency,
-        ownerAccountEmail,
-        adminNote,
-      };
-      if (before && sameSnapshot(snapshot(before), snapshot({ ...next, updatedAt: before.updatedAt }))) return before;
-
-      const after = await this.plans.replaceProfile(tx, next);
-      await this.audit.record(
-        tx,
-        catalogAuditEvent(
-          actor,
-          organization.id,
-          'PLAN.WORKSPACE_PROFILE_SET',
-          'Plan',
-          planId,
-          snapshot(before),
-          snapshot(after),
-        ),
-      );
-
-      return after;
+    const [plan] = await this.plans.findLookups([planId]);
+    if (!plan) throw new PlanNotFoundError();
+    if (!needsVendorAdmins(plan.provisioningType, plan.hasAdminConsole))
+      throw new PlanWorkspaceProfileNotApplicableError();
+    const vendorId = plan.applicationVendorId ?? null;
+    if (vendorId === null) throw new PlanWorkspaceVendorRequiredError();
+    assertWorkspaceShape({
+      primaryOwnerEmployeeId: input.primaryOwnerEmployeeId,
+      members: input.members,
+      ownerLimit,
+      adminLimit,
     });
+    assertVendorAdminsEnough(input.members.map((member) => member.employeeId));
 
-    return this.view(stored);
+    const before = await this.plans.findProfile(planId);
+    const next = {
+      planId,
+      primaryOwnerEmployeeId: input.primaryOwnerEmployeeId,
+      members: input.members.map((member) => ({ employeeId: member.employeeId, role: member.role })),
+      ownerLimit,
+      adminLimit,
+      ownerTransferProcedure: procedure,
+      emergencyAccount: emergency,
+      ownerAccountEmail,
+      adminNote,
+    };
+    if (before && sameSnapshot(snapshot(before), snapshot({ ...next, updatedAt: before.updatedAt }))) {
+      return this.view(before);
+    }
+
+    try {
+      await this.writeToWorkspace(actor, vendorId, next);
+    } catch (error) {
+      throw this.asPlanError(error);
+    }
+
+    return this.view((await this.plans.findProfile(planId)) as WorkspaceProfileRecord);
   }
 
-  /**
-   * Every person the profile names (owner, admins, the holder of the emergency account) is an IT Admin who works now, in id order: an account that can
-   * act, whose departure has not blocked yet (`workingAdminsAmong`, the judgment of the flags and of the hand-over).
-   */
-  private async requirePeople(
-    tx: DbTx,
-    input: WorkspaceProfileInput,
-    emergency: { holderEmployeeId: string } | null,
+  /** The administrators first, then the rest of the profile on the version they leave: the limits of the profile are judged against the new people. */
+  private async writeToWorkspace(
+    actor: AuthenticatedPrincipal,
+    vendorId: string,
+    profile: Omit<WorkspaceProfileRecord, 'updatedAt'>,
   ): Promise<void> {
-    const people = new Set<string>([
-      input.primaryOwnerEmployeeId,
-      ...input.members.map((member) => member.employeeId),
-      ...(emergency ? [emergency.holderEmployeeId] : []),
-    ]);
-    const ordered = [...people].sort();
-    for (const employeeId of ordered) await this.requireItAdmin(tx, employeeId);
-    const working = await this.facts.workingAdminsAmong(ordered, tx);
-    const gone = ordered.find((employeeId) => !working.has(employeeId));
-    if (gone !== undefined) throw new PlanWorkspacePersonInvalidError(gone);
+    const workspaceId = await this.workspaceOf(actor, vendorId);
+    const current = await this.workspaceRepo.find(workspaceId);
+    if (!current) throw new PlanNotFoundError();
+    const withAdmins = await this.workspaceAdmins.set(actor, workspaceId, {
+      admins: profile.members,
+      primaryOwnerEmployeeId: profile.primaryOwnerEmployeeId,
+      expectedUpdatedAt: current.updatedAt,
+    });
+    await this.workspaces.update(actor, workspaceId, {
+      expectedUpdatedAt: new Date(withAdmins.updatedAt),
+      ownerLimit: profile.ownerLimit,
+      adminLimit: profile.adminLimit,
+      ownerTransferProcedure: profile.ownerTransferProcedure,
+      emergencyAccount: profile.emergencyAccount,
+      ownerAccountEmail: profile.ownerAccountEmail,
+      adminNote: profile.adminNote,
+    });
+  }
+
+  /** The workspace of the vendor the profile is written to: the only one, or one made named after the vendor; several is the caller's to choose. */
+  private async workspaceOf(actor: AuthenticatedPrincipal, vendorId: string): Promise<string> {
+    const organization = await this.organizationReads.getOrganization();
+    if (!organization) throw new Error('The workspace profile was used before installation');
+    const id = await this.runner.run((tx) =>
+      this.forSubscription.resolveAndLock(tx, actor, organization.id, { vendorId, needsWorkspace: true }, undefined),
+    );
+
+    return id as string;
+  }
+
+  /** The error of the workspace as the plan route has always said it. */
+  private asPlanError(error: unknown): unknown {
+    if (error instanceof WorkspaceAdminNotItAdminError) return new PlanWorkspacePersonInvalidError(error.employeeId);
+    if (error instanceof WorkspaceTextInvalidError) return new PlanWorkspaceTextInvalidError();
+    if (error instanceof WorkspaceLimitExceededError) return new PlanWorkspaceLimitExceededError(error.role);
+    if (error instanceof WorkspaceAdminsTooFewError)
+      return new PlanVendorAdminsInvalidError(error.given, error.minimum);
+    if (error instanceof WorkspacePrimaryOwnerNotAdminError) return new PlanPrimaryOwnerNotListedError();
+    if (error instanceof WorkspaceRequiredError) return new PlanWorkspaceAmbiguousError(error.workspaceIds);
+
+    return error;
   }
 
   /** The profile with its people named from the organization. */
@@ -215,22 +235,5 @@ export class PlanWorkspaceService {
     if (identity === null) throw new PlanWorkspaceTextInvalidError();
 
     return { ...account, identity };
-  }
-
-  /**
-   * The person must be an employee still working with a usable IT Admin account. The employee is locked first and
-   * the account second (the lock order of the identity facade), so a departure or a lock cannot slip in.
-   */
-  private async requireItAdmin(tx: DbTx, employeeId: string): Promise<void> {
-    try {
-      await this.organizationReads.lockEmployeeForShare(tx, employeeId);
-    } catch (error) {
-      if (error instanceof EmployeeNotFoundError) throw new PlanWorkspacePersonInvalidError(employeeId);
-      throw error;
-    }
-    const employee = await this.organizationReads.getEmployee(employeeId, tx);
-    if (!employee || employee.status !== 'ACTIVE') throw new PlanWorkspacePersonInvalidError(employeeId);
-    const account = await this.identity.inspectEmployeeAccount(tx, employeeId);
-    if (!account.usable || !account.roles.includes('IT_ADMIN')) throw new PlanWorkspacePersonInvalidError(employeeId);
   }
 }

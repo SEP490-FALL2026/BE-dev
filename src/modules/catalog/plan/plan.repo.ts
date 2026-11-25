@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../../generated/prisma/client';
-import { fromDateColumn, toDateColumn } from '../../../core/business-date';
+import { fromDateColumn } from '../../../core/business-date';
 import type { PlanRevocationInfo, PlanSummary, PlanSummaryWithLogo, WorkspaceDuty } from '../public/catalog.types';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
@@ -22,7 +22,7 @@ import { applicationPlanName } from './plan.policy';
 
 const WITH_APPLICATION = { application: { select: { name: true, kind: true, logoUrl: true } } } as const;
 type PlanRow = Prisma.PlanGetPayload<{ include: typeof WITH_APPLICATION }>;
-type ProfileRow = Prisma.PlanWorkspaceProfileGetPayload<{ include: { members: true } }>;
+type WorkspaceRow = Prisma.WorkspaceGetPayload<{ include: { admins: true } }>;
 
 /** The reference price of a plan row (`QĐ-113a`): both columns or none (a CHECK of the table). */
 const referencePriceOf = (row: {
@@ -60,28 +60,38 @@ const toPlan = (row: PlanRow): PlanRecord => ({
   updatedAt: row.updatedAt,
 });
 
-const toProfile = (row: ProfileRow): WorkspaceProfileRecord => ({
-  planId: row.planId,
-  primaryOwnerEmployeeId: row.primaryOwnerEmployeeId,
-  members: row.members.map((member) => ({ employeeId: member.employeeId, role: member.role })),
-  ownerLimit: row.ownerLimit,
-  adminLimit: row.adminLimit,
-  ownerTransferProcedure: row.ownerTransferProcedure,
-  emergencyAccount:
-    row.emergencyIdentity === null
-      ? null
-      : {
-          identity: row.emergencyIdentity,
-          occupiesSeat: row.emergencyOccupiesSeat as boolean,
-          holderEmployeeId: row.emergencyHolderEmployeeId as string,
-          lastReviewedOn: fromDateColumn(row.emergencyLastReviewedOn as Date),
-        },
-  ownerAccountEmail: row.ownerAccountEmail,
-  adminNote: row.adminNote,
-  updatedAt: row.updatedAt,
-});
+/**
+ * The profile of a plan as the workspace of its vendor says it (W3-10): the workspace is the source, the old profile of the plan is old data. A workspace
+ * nobody is named in (no primary owner and no owner among the administrators) is no profile yet.
+ */
+const toProfile = (planId: string, row: WorkspaceRow): WorkspaceProfileRecord | null => {
+  const members = row.admins.map((member) => ({ employeeId: member.employeeId, role: member.role }));
+  const owner = row.primaryOwnerEmployeeId ?? members.find((member) => member.role === 'OWNER')?.employeeId ?? null;
+  if (owner === null) return null;
 
-/** The one writer of `plans`, `plan_workspace_profiles` and `plan_workspace_admins`: the plan aggregate (US-04-02). */
+  return {
+    planId,
+    primaryOwnerEmployeeId: owner,
+    members,
+    ownerLimit: row.ownerLimit,
+    adminLimit: row.adminLimit,
+    ownerTransferProcedure: row.ownerTransferProcedure,
+    emergencyAccount:
+      row.emergencyIdentity === null
+        ? null
+        : {
+            identity: row.emergencyIdentity,
+            occupiesSeat: row.emergencyOccupiesSeat as boolean,
+            holderEmployeeId: row.emergencyHolderEmployeeId as string,
+            lastReviewedOn: fromDateColumn(row.emergencyLastReviewedOn as Date),
+          },
+    ownerAccountEmail: row.ownerAccountEmail,
+    adminNote: row.adminNote,
+    updatedAt: row.updatedAt,
+  };
+};
+
+/** The one writer of `plans`: the plan aggregate (US-04-02). It reads the profile of a plan from the workspace of its vendor (W3-10). */
 @Injectable()
 export class PlanRepo {
   constructor(private readonly prisma: PrismaService) {}
@@ -216,7 +226,7 @@ export class PlanRepo {
     const rows = await (tx ?? this.prisma).plan.findMany({
       where: { id: { in: [...ids] } },
       include: {
-        application: { select: { name: true, kind: true, catalogStatus: true } },
+        application: { select: { name: true, kind: true, catalogStatus: true, vendorId: true } },
       },
     });
 
@@ -233,6 +243,7 @@ export class PlanRepo {
       applicationName: row.application.name,
       applicationKind: row.application.kind,
       applicationStatus: row.application.catalogStatus,
+      applicationVendorId: row.application.vendorId,
     }));
   }
 
@@ -439,12 +450,7 @@ export class PlanRepo {
   }
 
   async findProfile(planId: string, tx?: DbTx): Promise<WorkspaceProfileRecord | null> {
-    const row = await (tx ?? this.prisma).planWorkspaceProfile.findUnique({
-      where: { planId },
-      include: { members: true },
-    });
-
-    return row ? toProfile(row) : null;
+    return (await this.findProfilesOf([planId], tx)).get(planId) ?? null;
   }
 
   /**
@@ -464,80 +470,127 @@ export class PlanRepo {
     return rows.map((row) => row.id);
   }
 
+  /**
+   * The workspace each of these plans reads its profile from (B2-R5): the only workspace of the vendor of its application; with several, the one that
+   * holds a live subscription of the plan, else the one made first. A plan of no vendor, or of a vendor with no workspace, is absent.
+   */
+  private async workspacesOfPlans(planIds: readonly string[], tx?: DbTx): Promise<Map<string, WorkspaceRow>> {
+    const db = tx ?? this.prisma;
+    const plans = await db.plan.findMany({
+      where: { id: { in: [...planIds] } },
+      select: { id: true, application: { select: { vendorId: true } } },
+    });
+    const vendorIds = [
+      ...new Set(plans.flatMap((plan) => (plan.application.vendorId ? [plan.application.vendorId] : []))),
+    ];
+    if (vendorIds.length === 0) return new Map();
+    const workspaces = await db.workspace.findMany({
+      where: { vendorId: { in: vendorIds } },
+      include: { admins: true },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+    const several = plans.filter(
+      (plan) => workspaces.filter((workspace) => workspace.vendorId === plan.application.vendorId).length > 1,
+    );
+    const live =
+      several.length === 0
+        ? []
+        : await db.subscription.findMany({
+            where: {
+              planId: { in: several.map((plan) => plan.id) },
+              workspaceId: { not: null },
+              status: { in: ['DRAFT', 'ACTIVE'] },
+              renewedBy: null,
+            },
+            select: { planId: true, workspaceId: true },
+            orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+          });
+    const chosen = new Map<string, WorkspaceRow>();
+    for (const plan of plans) {
+      const ofVendor = workspaces.filter((workspace) => workspace.vendorId === plan.application.vendorId);
+      const held = live.find((row) => row.planId === plan.id)?.workspaceId;
+      const workspace = ofVendor.length > 1 ? (ofVendor.find((row) => row.id === held) ?? ofVendor[0]) : ofVendor[0];
+      if (workspace) chosen.set(plan.id, workspace);
+    }
+
+    return chosen;
+  }
+
   /** The profiles of these plans in one read, by plan; a plan with none is absent. */
   async findProfilesOf(planIds: readonly string[], tx?: DbTx): Promise<Map<string, WorkspaceProfileRecord>> {
     if (planIds.length === 0) return new Map();
-    const rows = await (tx ?? this.prisma).planWorkspaceProfile.findMany({
-      where: { planId: { in: [...planIds] } },
-      include: { members: true },
-    });
+    const profiles = new Map<string, WorkspaceProfileRecord>();
+    for (const [planId, workspace] of await this.workspacesOfPlans(planIds, tx)) {
+      const profile = toProfile(planId, workspace);
+      if (profile) profiles.set(planId, profile);
+    }
 
-    return new Map(rows.map((row) => [row.planId, toProfile(row)]));
+    return profiles;
   }
 
-  /** The workspaces these people own or administer, one row for each person and plan, the primary owner first (one read, `US-03-04` AC-28). */
+  /**
+   * The workspaces these people own or administer, one row for each person and workspace, the primary owner first (one read, `US-03-04` AC-28). A
+   * row names the plan the workspace is known by: the first plan (by name) with a live subscription in it, else the first plan of the vendor the company
+   * administers at the vendor; a workspace with no such plan is left out.
+   */
   async findWorkspaceDuties(employeeIds: readonly string[], tx?: DbTx): Promise<WorkspaceDuty[]> {
     if (employeeIds.length === 0) return [];
+    const db = tx ?? this.prisma;
     const ids = [...employeeIds];
-    const profiles = await (tx ?? this.prisma).planWorkspaceProfile.findMany({
-      where: { OR: [{ primaryOwnerEmployeeId: { in: ids } }, { members: { some: { employeeId: { in: ids } } } }] },
-      select: {
-        planId: true,
-        primaryOwnerEmployeeId: true,
-        emergencyIdentity: true,
-        members: { where: { employeeId: { in: ids } }, select: { employeeId: true, role: true } },
-        plan: { select: { name: true, application: { select: { name: true } } } },
+    const workspaces = await db.workspace.findMany({
+      where: { OR: [{ primaryOwnerEmployeeId: { in: ids } }, { admins: { some: { employeeId: { in: ids } } } }] },
+      include: { admins: true },
+      orderBy: { id: 'asc' },
+    });
+    if (workspaces.length === 0) return [];
+    const plans = await db.plan.findMany({
+      where: {
+        application: { vendorId: { in: [...new Set(workspaces.map((workspace) => workspace.vendorId))] } },
+        OR: [{ provisioningType: 'K2' }, { provisioningType: 'K4', hasAdminConsole: true }],
       },
-      orderBy: { planId: 'asc' },
+      select: { id: true, name: true, application: { select: { name: true, vendorId: true } } },
+      orderBy: [{ name: 'asc' }, { id: 'asc' }],
+    });
+    const live = await db.subscription.findMany({
+      where: {
+        workspaceId: { in: workspaces.map((workspace) => workspace.id) },
+        status: { in: ['DRAFT', 'ACTIVE'] },
+        renewedBy: null,
+      },
+      select: { planId: true, workspaceId: true },
     });
 
-    return profiles.flatMap((profile) => {
+    return workspaces.flatMap((workspace) => {
+      const livePlans = new Set(live.filter((row) => row.workspaceId === workspace.id).map((row) => row.planId));
+      const ofVendor = plans.filter((plan) => plan.application.vendorId === workspace.vendorId);
+      const plan = ofVendor.find((candidate) => livePlans.has(candidate.id)) ?? ofVendor[0];
+      if (!plan) return [];
       const named = {
-        planId: profile.planId,
-        planName: profile.plan.name,
-        applicationName: profile.plan.application.name,
-        emergencyAccountDeclared: profile.emergencyIdentity !== null,
+        planId: plan.id,
+        planName: plan.name,
+        applicationName: plan.application.name,
+        emergencyAccountDeclared: workspace.emergencyIdentity !== null,
+        workspace: {
+          id: workspace.id,
+          name: workspace.name,
+          vendorId: workspace.vendorId,
+          responsibleItAdminEmployeeId: workspace.responsibleItAdminEmployeeId,
+          members: workspace.admins.map((member) => ({ employeeId: member.employeeId, role: member.role })),
+        },
       };
-      const owner = ids.includes(profile.primaryOwnerEmployeeId) ? profile.primaryOwnerEmployeeId : null;
-      const members = profile.members.filter((member) => member.employeeId !== owner);
+      const owner =
+        workspace.primaryOwnerEmployeeId && ids.includes(workspace.primaryOwnerEmployeeId)
+          ? workspace.primaryOwnerEmployeeId
+          : null;
+      const members = workspace.admins.filter(
+        (member) => ids.includes(member.employeeId) && member.employeeId !== owner,
+      );
 
       return [
         ...(owner ? [{ ...named, employeeId: owner, role: 'PRIMARY_OWNER' as const }] : []),
         ...members.map((member) => ({ ...named, employeeId: member.employeeId, role: member.role })),
       ];
     });
-  }
-
-  /** Writes the whole profile of the plan: the profile row, then its members replaced by the given list. */
-  async replaceProfile(tx: DbTx, profile: Omit<WorkspaceProfileRecord, 'updatedAt'>): Promise<WorkspaceProfileRecord> {
-    const data = {
-      primaryOwnerEmployeeId: profile.primaryOwnerEmployeeId,
-      ownerLimit: profile.ownerLimit,
-      adminLimit: profile.adminLimit,
-      ownerTransferProcedure: profile.ownerTransferProcedure,
-      emergencyIdentity: profile.emergencyAccount?.identity ?? null,
-      emergencyOccupiesSeat: profile.emergencyAccount?.occupiesSeat ?? null,
-      emergencyHolderEmployeeId: profile.emergencyAccount?.holderEmployeeId ?? null,
-      emergencyLastReviewedOn: profile.emergencyAccount ? toDateColumn(profile.emergencyAccount.lastReviewedOn) : null,
-      ownerAccountEmail: profile.ownerAccountEmail,
-      adminNote: profile.adminNote,
-    };
-    await tx.planWorkspaceProfile.upsert({
-      where: { planId: profile.planId },
-      create: { planId: profile.planId, ...data },
-      update: data,
-    });
-    await tx.planWorkspaceAdmin.deleteMany({ where: { planId: profile.planId } });
-    await tx.planWorkspaceAdmin.createMany({
-      data: profile.members.map((member) => ({
-        planId: profile.planId,
-        employeeId: member.employeeId,
-        role: member.role,
-      })),
-    });
-    const stored = await this.findProfile(profile.planId, tx);
-
-    return stored as WorkspaceProfileRecord;
   }
 
   /** The name of each of these plans as a sentence names it ("application – plan"), by id, in one read; an id that does not exist is absent. */

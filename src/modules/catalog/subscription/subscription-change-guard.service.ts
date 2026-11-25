@@ -37,6 +37,16 @@ export class SubscriptionChangeGuard {
     return this.seatIncrease.toldReduction(tx, reduction);
   }
 
+  /** The workspace of a subscription of this plan, locked (W3-14): see `SubscriptionPoolService.workspaceFor`. */
+  workspaceFor(...args: Parameters<SubscriptionPoolService['workspaceFor']>): Promise<string | null> {
+    return this.poolRules.workspaceFor(...args);
+  }
+
+  /** The workspaces of a move, locked in id order: see `SubscriptionPoolService.lockWorkspaces`. */
+  lockWorkspaces(...args: Parameters<SubscriptionPoolService['lockWorkspaces']>): Promise<void> {
+    return this.poolRules.lockWorkspaces(...args);
+  }
+
   /** The rules of the shared pool on the state a change leaves (`QĐ-103e`): see `SubscriptionPoolService.judgeChange`. */
   judgePool(tx: DbTx, change: PoolChange): Promise<void> {
     return this.poolRules.judgeChange(tx, change);

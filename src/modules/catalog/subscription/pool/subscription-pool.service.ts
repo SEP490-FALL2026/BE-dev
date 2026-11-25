@@ -13,6 +13,8 @@ import {
   SubscriptionDuplicatePlanError,
   SubscriptionPrimaryNotEligibleError,
   SubscriptionResponsibleNotItAdminError,
+  SubscriptionStaleError,
+  SubscriptionWorkspaceMovedError,
 } from '../subscription.errors';
 import {
   assertPoolTerms,
@@ -24,15 +26,36 @@ import {
   liveSiblingsOf,
 } from './subscription-pool.policy';
 import { SubscriptionSeatIncreaseService } from '../seat-increase/subscription-seat-increase.service';
+import { WorkspaceForSubscriptionService } from '../../workspace/workspace-for-subscription.service';
 import { stateOf } from '../subscription.mapper';
 import { SubscriptionRepo } from '../subscription.repo';
 import type {
   BillingCycle,
   CommitmentTermMonths,
+  SeatCounting,
   SubscriptionKind,
   SubscriptionRecord,
   SubscriptionState,
 } from '../subscription.types';
+
+/** How many times a write whose workspace moved under it starts again before it says the subscription is stale (W3-14, N5). */
+const WORKSPACE_MOVE_TRIES = 3;
+
+/**
+ * Runs a write that locks the workspace of a subscription before its period: it reads the workspace without a lock, locks it, locks the period, and
+ * reads the workspace again; when it moved the write rolls back and starts again (the work throws SubscriptionWorkspaceMovedError). Three tries,
+ * then SubscriptionStaleError.
+ */
+export async function retryOnWorkspaceMove<T>(work: () => Promise<T>): Promise<T> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await work();
+    } catch (error) {
+      if (!(error instanceof SubscriptionWorkspaceMovedError)) throw error;
+      if (attempt >= WORKSPACE_MOVE_TRIES) throw new SubscriptionStaleError(error.currentUpdatedAt);
+    }
+  }
+}
 
 /** What an update of a subscription names of the fields the shared pool governs. */
 export interface PoolChangeInput {
@@ -40,6 +63,9 @@ export interface PoolChangeInput {
   commitmentTermMonths?: CommitmentTermMonths;
   responsibleItAdminEmployeeId?: string;
   isPrimaryForPlan?: boolean;
+  /** How the seats are counted and the payment day: a write that names them is judged by the members rules (W3-11). */
+  seatCounting?: SeatCounting;
+  renewalDate?: string | null;
 }
 
 /** A change of a subscription as the pool judges it: who writes, in which organization, and the state the write leaves. */
@@ -67,7 +93,37 @@ export class SubscriptionPoolService {
     private readonly baselinePhase: SeatBaselinePhaseHook,
     private readonly planFacts: PlanFactsService,
     private readonly seatIncrease: SubscriptionSeatIncreaseService,
+    private readonly workspaces: WorkspaceForSubscriptionService,
   ) {}
+
+  /**
+   * The workspace a subscription of this plan is held in, locked for the rest of the transaction (W3-11, W3-14): the one named, else the default
+   * of the vendor for a plan the company administers there. Taken before the plan and the period are locked. Throws WorkspaceNotFoundError,
+   * WorkspaceVendorMismatchError and WorkspaceRequiredError.
+   */
+  workspaceFor(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    organizationId: string,
+    plan: LockedPlan,
+    named: string | null | undefined,
+  ): Promise<string | null> {
+    return this.workspaces.resolveAndLock(
+      tx,
+      actor,
+      organizationId,
+      {
+        vendorId: plan.applicationVendorId ?? null,
+        needsWorkspace: needsVendorAdmins(plan.provisioningType, plan.hasAdminConsole),
+      },
+      named,
+    );
+  }
+
+  /** Locks the workspaces of a move in id order, each held at the vendor of the plan. */
+  lockWorkspaces(tx: DbTx, plan: LockedPlan, ids: readonly (string | null)[]): Promise<void> {
+    return this.workspaces.lockBoth(tx, ids, plan.applicationVendorId ?? null);
+  }
 
   /**
    * The IT Admin a subscription being declared answers to (`QĐ-111g`): the one the declaration names, else the one responsible for the
@@ -98,6 +154,8 @@ export class SubscriptionPoolService {
       billingCycle: BillingCycle | null;
       commitmentTermMonths: CommitmentTermMonths | null;
       responsibleItAdminEmployeeId: string | null;
+      seatCounting?: SeatCounting | undefined;
+      renewalDate?: string | null | undefined;
     },
     activating: boolean,
   ): void {
@@ -107,6 +165,8 @@ export class SubscriptionPoolService {
       billingCycle: state.billingCycle,
       commitmentTermMonths: state.commitmentTermMonths,
       activating,
+      seatCounting: state.seatCounting,
+      renewalDate: state.renewalDate,
     });
     assertResponsibleNamed(state.responsibleItAdminEmployeeId, activating);
   }
@@ -126,6 +186,8 @@ export class SubscriptionPoolService {
       billingCycle: BillingCycle | null;
       commitmentTermMonths: CommitmentTermMonths | null;
       responsibleItAdminEmployeeId: string | null;
+      seatCounting?: SeatCounting | undefined;
+      renewalDate?: string | null | undefined;
     },
     continuesPeriod: boolean,
     organizationId: string,
@@ -166,7 +228,11 @@ export class SubscriptionPoolService {
     const { plan, current, state, input, organizationId } = change;
     const activating = current.status === 'DRAFT' && state.status === 'ACTIVE';
     // Changing only the person who answers does not judge a commitment and cycle the write did not touch (F-009).
-    const touches = input.billingCycle !== undefined || input.commitmentTermMonths !== undefined;
+    const touches =
+      input.billingCycle !== undefined ||
+      input.commitmentTermMonths !== undefined ||
+      input.seatCounting !== undefined ||
+      input.renewalDate !== undefined;
     if (activating) {
       await this.assertActivation(tx, plan, current.kind, state, current.renewedFromId !== null, organizationId);
     } else if (touches) this.assert(plan, current.kind, state, false);

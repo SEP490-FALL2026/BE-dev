@@ -87,6 +87,17 @@ export class WorkspaceRepo {
     return this.find(id, tx);
   }
 
+  /** The workspaces that hold a subscription in use (an active one): the ones a reader of the flags counts. */
+  async findInUse(tx?: DbTx): Promise<WorkspaceRecord[]> {
+    const rows = await (tx ?? this.prisma).workspace.findMany({
+      where: { subscriptions: { some: { status: 'ACTIVE' } } },
+      include: WITH_PARTS,
+      orderBy: { id: 'asc' },
+    });
+
+    return rows.map(toRecord);
+  }
+
   /** The workspaces of a vendor, oldest first (the default of a subscription is the only one, or the first). */
   async findOfVendor(vendorId: string, tx?: DbTx): Promise<WorkspaceRecord[]> {
     const rows = await (tx ?? this.prisma).workspace.findMany({
@@ -153,6 +164,31 @@ export class WorkspaceRepo {
     }
   }
 
+  /**
+   * Inserts a workspace unless the vendor already holds one of that name, in which case it inserts nothing and returns null. A simultaneous
+   * insert of the same workspace waits for the first to commit, then also finds the row (the transaction is not aborted, as it would be by a
+   * unique violation).
+   */
+  async insertIfAbsent(
+    tx: DbTx,
+    input: {
+      organizationId: string;
+      vendorId: string;
+      name: string;
+      normalizedName: string;
+      responsibleItAdminEmployeeId: string;
+    },
+  ): Promise<string | null> {
+    const rows = await tx.$queryRaw<{ id: string }[]>`
+      INSERT INTO workspaces (id, organization_id, vendor_id, name, normalized_name, responsible_it_admin_employee_id, updated_at)
+      VALUES (gen_random_uuid(), ${input.organizationId}::uuid, ${input.vendorId}::uuid, ${input.name}, ${input.normalizedName},
+              ${input.responsibleItAdminEmployeeId}::uuid, now())
+      ON CONFLICT DO NOTHING
+      RETURNING id`;
+
+    return rows.length === 0 ? null : rows[0].id;
+  }
+
   /** Writes the fields the change names (and the normalized name with the name); the version moves on. Throws WorkspaceNameTakenError. */
   async update(tx: DbTx, id: string, changes: WorkspaceChanges & { normalizedName?: string }): Promise<void> {
     try {
@@ -188,6 +224,20 @@ export class WorkspaceRepo {
       data: admins.map((admin) => ({ workspaceId: id, employeeId: admin.employeeId, role: admin.role })),
     });
     await tx.workspace.update({ where: { id }, data: { primaryOwnerEmployeeId } });
+  }
+
+  /**
+   * Hands every workspace this person answers for to another (the hand-over of an IT Admin who leaves, `SBF-16`, `QĐ-116o`): the rows locked `FOR UPDATE`
+   * in id order (tier 5b), then written; answers their ids.
+   */
+  async reassignResponsible(tx: DbTx, fromEmployeeId: string, toEmployeeId: string): Promise<string[]> {
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT id FROM workspaces WHERE responsible_it_admin_employee_id = ${fromEmployeeId}::uuid ORDER BY id FOR UPDATE`;
+    const ids = locked.map((row) => row.id);
+    if (ids.length === 0) return [];
+    await tx.workspace.updateMany({ where: { id: { in: ids } }, data: { responsibleItAdminEmployeeId: toEmployeeId } });
+
+    return ids;
   }
 
   /** Names who answers for the workspace; the version moves on. */

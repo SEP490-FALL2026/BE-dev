@@ -41,14 +41,30 @@ const NOT_FOUND = {
   description: 'The subscription does not exist (SUBSCRIPTION.NOT_FOUND).',
   examples: [SUBSCRIPTION_ERROR_EXAMPLES.NOT_FOUND],
 } as const;
+/** The workspace named does not exist (a declaration or an update that names one). */
+const WORKSPACE_NOT_FOUND = {
+  status: HttpStatus.NOT_FOUND,
+  description: 'The workspace named does not exist (WORKSPACE.NOT_FOUND).',
+  examples: [SUBSCRIPTION_ERROR_EXAMPLES.WORKSPACE_NOT_FOUND],
+} as const;
+const NOT_FOUND_OR_WORKSPACE = {
+  status: HttpStatus.NOT_FOUND,
+  description:
+    'The subscription does not exist (SUBSCRIPTION.NOT_FOUND) or the workspace named does not exist (WORKSPACE.NOT_FOUND).',
+  examples: [SUBSCRIPTION_ERROR_EXAMPLES.NOT_FOUND, SUBSCRIPTION_ERROR_EXAMPLES.WORKSPACE_NOT_FOUND],
+} as const;
 const INVALID_UPDATE_NOTE =
   ' Changing purchasedQuantity requires expectedUpdatedAt (SUBSCRIPTION.VERSION_REQUIRED) and increasing it on an active K2 subscription requires quantityChangeReason (SUBSCRIPTION.QUANTITY_REASON_REQUIRED). An update that would put the seats bought under the seats taken is refused with SUBSCRIPTION.QUANTITY_BELOW_OCCUPIED (details.occupied, details.requested). An active subscription is never lowered to a draft by an update: one still priced in another currency (an earlier release could not convert it) is refused with SUBSCRIPTION.STILL_DRAFT (details.missing is UNIT_PRICE) until the update enters the price in dong, and it stays active.';
 const INVALID = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
   description:
-    'The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION.PLAN_NOT_FOUND and APPLICATION_RETIRED (declaring only), PLAN_HAS_NO_SUBSCRIPTION, PERPETUAL_NEEDS_LICENSED_APPLICATION, PERPETUAL_HAS_NO_TERM, DATES_INVALID or UPDATE_EMPTY; the shared-pool rules refuse COMMITMENT_TERM_REQUIRED (a term that becomes active names 1 or 12 months), COMMITMENT_TERM_NOT_ALLOWED (a perpetual purchase), K1_MONTHLY_ONLY (R-E01), K4_PERPETUAL_ONLY (a K4 plan is bought once: only a perpetual purchase is written for it), BILLING_LONGER_THAN_COMMITMENT (R-G01), BILLING_CYCLE_UNSUPPORTED (only MONTHLY and ANNUAL are written; QUARTERLY and OTHER stay readable on older data), RESPONSIBLE_REQUIRED (an active subscription names the IT Admin who answers for it), RESPONSIBLE_NOT_IT_ADMIN and VENDOR_ADMINS_REQUIRED (a plan that needs admins at the vendor, a K2 plan or a K4 plan with an admin console, is not activated as a new subscription, nor its pool made, once the seat baseline is closed while fewer than two different working IT Admins are recorded in its workspace profile; while the seat baseline is open it is let through and carries vendorAdminsBelowMinimum when read; the period a renewal continues is never asked, it only carries the flag vendorAdminsBelowMinimum), and an update may also be refused with PRIMARY_NOT_ELIGIBLE (details.reason); the unit price is refused with PRICE_NOT_VND (it is entered in dong only, details.currency) or PRICE_MISMATCH (when monthlyUnitPrice and unitPrice disagree, details.expectedUnitPrice), and the unit price and the original price with MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE or CURRENCY_NOT_SUPPORTED (the currency of the original price).',
+    'The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION.PLAN_NOT_FOUND and APPLICATION_RETIRED (declaring only), PLAN_HAS_NO_SUBSCRIPTION, PERPETUAL_NEEDS_LICENSED_APPLICATION, PERPETUAL_HAS_NO_TERM, DATES_INVALID or UPDATE_EMPTY; the shared-pool rules refuse COMMITMENT_TERM_REQUIRED (a term that becomes active names 1 or 12 months), COMMITMENT_TERM_NOT_ALLOWED (a perpetual purchase), K1_MONTHLY_ONLY (R-E01), K4_PERPETUAL_ONLY (a K4 plan is bought once: only a perpetual purchase is written for it), BILLING_LONGER_THAN_COMMITMENT (R-G01), BILLING_CYCLE_UNSUPPORTED (only MONTHLY and ANNUAL are written; QUARTERLY and OTHER stay readable on older data), RESPONSIBLE_REQUIRED (an active subscription names the IT Admin who answers for it), RESPONSIBLE_NOT_IT_ADMIN and VENDOR_ADMINS_REQUIRED (a plan that needs admins at the vendor, a K2 plan or a K4 plan with an admin console, is not activated as a new subscription, nor its pool made, once the seat baseline is closed while fewer than two different working IT Admins are recorded in its workspace profile; while the seat baseline is open it is let through and carries vendorAdminsBelowMinimum when read; the period a renewal continues is never asked, it only carries the flag vendorAdminsBelowMinimum), and an update may also be refused with PRIMARY_NOT_ELIGIBLE (details.reason); the unit price is refused with PRICE_NOT_VND (it is entered in dong only, details.currency) or PRICE_MISMATCH (when monthlyUnitPrice and unitPrice disagree, details.expectedUnitPrice), and the unit price and the original price with MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE or CURRENCY_NOT_SUPPORTED (the currency of the original price). The workspace the subscription is held in is judged too: WORKSPACE_VENDOR_MISMATCH (it is held at another vendor than the plan), WORKSPACE_REQUIRED (the vendor has several workspaces and none is named, details.workspaceIds), MEMBERS_MONTHLY_ONLY (seats counted by the members commit for one month) and MEMBERS_PAYMENT_DAY_REQUIRED (an active one names its payment day in renewalDate); an update may also be refused with SEAT_COUNTING_FIXED (how the seats are counted does not change once active).',
   examples: [
     VALIDATION_EXAMPLE,
+    SUBSCRIPTION_ERROR_EXAMPLES.WORKSPACE_VENDOR_MISMATCH,
+    SUBSCRIPTION_ERROR_EXAMPLES.WORKSPACE_REQUIRED,
+    SUBSCRIPTION_ERROR_EXAMPLES.MEMBERS_MONTHLY_ONLY,
+    SUBSCRIPTION_ERROR_EXAMPLES.MEMBERS_PAYMENT_DAY_REQUIRED,
     SUBSCRIPTION_ERROR_EXAMPLES.PLAN_NOT_FOUND,
     SUBSCRIPTION_ERROR_EXAMPLES.APPLICATION_RETIRED,
     SUBSCRIPTION_ERROR_EXAMPLES.PLAN_HAS_NO_SUBSCRIPTION,
@@ -76,6 +92,11 @@ const INVALID_UPDATE = {
   description: INVALID.description + INVALID_UPDATE_NOTE,
   examples: [
     VALIDATION_EXAMPLE,
+    SUBSCRIPTION_ERROR_EXAMPLES.SEAT_COUNTING_FIXED,
+    SUBSCRIPTION_ERROR_EXAMPLES.WORKSPACE_VENDOR_MISMATCH,
+    SUBSCRIPTION_ERROR_EXAMPLES.WORKSPACE_REQUIRED,
+    SUBSCRIPTION_ERROR_EXAMPLES.MEMBERS_MONTHLY_ONLY,
+    SUBSCRIPTION_ERROR_EXAMPLES.MEMBERS_PAYMENT_DAY_REQUIRED,
     SUBSCRIPTION_ERROR_EXAMPLES.UPDATE_EMPTY,
     SUBSCRIPTION_ERROR_EXAMPLES.VERSION_REQUIRED,
     SUBSCRIPTION_ERROR_EXAMPLES.QUANTITY_REASON_REQUIRED,
@@ -177,7 +198,7 @@ export class SubscriptionsController {
     description:
       'The subscription is stored: it has no owning department and a plan has one subscription; a K1 subscription is the shared record of the personal purchases of the plan, and each grant adds one seat to it. It is a draft while its data is incomplete, with what is missing; the unit price is in dong, and the price in the currency of the vendor is kept beside it when given.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, INVALID, DUPLICATE_PLAN_CONFLICT)
+  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, INVALID, WORKSPACE_NOT_FOUND, DUPLICATE_PLAN_CONFLICT)
   async declare(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: DeclareSubscriptionBodyDto) {
     try {
       return toWire(await this.subscriptions.declare(actor, body));
@@ -215,7 +236,7 @@ export class SubscriptionsController {
     description:
       'The subscription as it is after the change; a new unit price is in dong and nothing is converted; a change of nothing is answered the same and not audited. The plan and the kind cannot change. The IT Admin who answers for the subscription is not changed here: the Super Admin does it with subscriptionResponsibleItAdminChange (POST /subscriptions/{id}/responsible-it-admin).',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, INVALID_UPDATE, NOT_FOUND, UPDATE_CONFLICT)
+  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, INVALID_UPDATE, NOT_FOUND_OR_WORKSPACE, UPDATE_CONFLICT)
   async update(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: SubscriptionIdParamDto,

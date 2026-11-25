@@ -100,7 +100,7 @@ describe('Subscription primary lock order', () => {
 
       const service = new SubscriptionChangeService(
         { find, lockPrimaryCandidates, update } as unknown as SubscriptionRepo,
-        { lockExclusive } as unknown as PlanFactsService,
+        { lockExclusive, lookups: jest.fn(() => Promise.resolve([plan])) } as unknown as PlanFactsService,
         pricing,
         view,
         audit,
@@ -123,7 +123,7 @@ describe('Subscription primary lock order', () => {
           find: jest.fn(() => Promise.resolve(stored({ updatedAt: new Date('2026-11-19T00:00:00Z') }))),
           lockPrimaryCandidates,
         } as unknown as SubscriptionRepo,
-        { lockExclusive } as unknown as PlanFactsService,
+        { lockExclusive, lookups: jest.fn(() => Promise.resolve([plan])) } as unknown as PlanFactsService,
         pricing,
         view,
         audit,
@@ -172,6 +172,7 @@ describe('Subscription primary lock order', () => {
       ({
         assertActivation: jest.fn(),
         assertNoLiveDuplicate: jest.fn(),
+        workspaceFor: jest.fn(() => Promise.resolve(null)),
         takePrimaryFromPrevious: jest.fn(() => Promise.resolve(true)),
       }) as unknown as SubscriptionPoolService;
 
@@ -194,7 +195,7 @@ describe('Subscription primary lock order', () => {
 
       const service = new SubscriptionService(
         { find, lockPrimaryCandidates, update } as unknown as SubscriptionRepo,
-        { lockExclusive } as unknown as PlanFactsService,
+        { lockExclusive, lookups: jest.fn(() => Promise.resolve([plan])) } as unknown as PlanFactsService,
         pricing,
         view,
         organization,
@@ -206,7 +207,8 @@ describe('Subscription primary lock order', () => {
       await service.complete(actor, 'sub-1');
 
       expect(lockPrimaryCandidates).toHaveBeenCalledWith(tx, 'plan-1', ['sub-1', 'sub-prev']);
-      expect(order).toEqual(['find', 'lockPrimaryCandidates', 'find', 'lockExclusive']);
+      // The first read is the one that tells which workspace to lock (W3-14): the workspace comes before the period and the plan.
+      expect(order).toEqual(['find', 'find', 'lockPrimaryCandidates', 'find', 'lockExclusive']);
     });
 
     it('locks only the subscription before plans.lockExclusive when renewedFromId is null', async () => {
@@ -229,7 +231,7 @@ describe('Subscription primary lock order', () => {
 
       const service = new SubscriptionService(
         { find, lock, lockPrimaryCandidates, update } as unknown as SubscriptionRepo,
-        { lockExclusive } as unknown as PlanFactsService,
+        { lockExclusive, lookups: jest.fn(() => Promise.resolve([plan])) } as unknown as PlanFactsService,
         pricing,
         view,
         organization,
@@ -241,7 +243,7 @@ describe('Subscription primary lock order', () => {
       await service.complete(actor, 'sub-1');
 
       expect(lockPrimaryCandidates).not.toHaveBeenCalled();
-      expect(order).toEqual(['find', 'lock', 'lockExclusive']);
+      expect(order).toEqual(['find', 'find', 'lock', 'lockExclusive']);
     });
 
     it('throws SubscriptionNotFoundError when subscription does not exist', async () => {

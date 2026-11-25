@@ -66,12 +66,16 @@ describe('QĐ-113g: no owning department on a subscription', () => {
     const insert = jest.fn(() => Promise.resolve(stored({})));
     const service = new SubscriptionService(
       { insert } as unknown as SubscriptionRepo,
-      { lockExclusive: jest.fn(() => Promise.resolve(plan)) } as unknown as PlanFactsService,
+      {
+        lockExclusive: jest.fn(() => Promise.resolve(plan)),
+        lookups: jest.fn(() => Promise.resolve([plan])),
+      } as unknown as PlanFactsService,
       pricing,
       view,
       { ...organization, lockDepartmentShared } as unknown as OrganizationReadApi,
       {
         assertNoLiveDuplicate: jest.fn(),
+        workspaceFor: jest.fn(() => Promise.resolve(null)),
         responsibleOfDeclaration: jest.fn(() => Promise.resolve(null)),
         assert: jest.fn(),
         assertVendorAdmins: jest.fn(),
@@ -146,12 +150,16 @@ describe('QĐ-113g: no owning department on a subscription', () => {
     } as unknown as SubscriptionPricingService;
     const service = new SubscriptionService(
       { insert } as unknown as SubscriptionRepo,
-      { lockExclusive: jest.fn(() => Promise.resolve(planWithCommitment)) } as unknown as PlanFactsService,
+      {
+        lockExclusive: jest.fn(() => Promise.resolve(planWithCommitment)),
+        lookups: jest.fn(() => Promise.resolve([planWithCommitment])),
+      } as unknown as PlanFactsService,
       priceService,
       view,
       { ...organization, lockDepartmentShared } as unknown as OrganizationReadApi,
       {
         assertNoLiveDuplicate: jest.fn(),
+        workspaceFor: jest.fn(() => Promise.resolve(null)),
         responsibleOfDeclaration: jest.fn(() => Promise.resolve('it-1')),
         assert: jest.fn(),
         assertVendorAdmins: jest.fn(),
@@ -208,12 +216,14 @@ describe('QĐ-113g: no owning department on a subscription', () => {
       { insert } as unknown as SubscriptionRepo,
       {
         lockExclusive: jest.fn(() => Promise.resolve({ ...plan, referenceCommitmentMonths: 1 })),
+        lookups: jest.fn(() => Promise.resolve([{ ...plan, referenceCommitmentMonths: 1 }])),
       } as unknown as PlanFactsService,
       priceService,
       view,
       { ...organization, lockDepartmentShared } as unknown as OrganizationReadApi,
       {
         assertNoLiveDuplicate: jest.fn(),
+        workspaceFor: jest.fn(() => Promise.resolve(null)),
         responsibleOfDeclaration: jest.fn(() => Promise.resolve('it-1')),
         assert: jest.fn(),
         assertVendorAdmins: jest.fn(),

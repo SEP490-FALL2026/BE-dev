@@ -19,6 +19,7 @@ import type {
   PlanKeyBinding,
   PlanPricingModel,
   ProvisioningType,
+  SeatCounting,
   SubscriptionKind,
   SubscriptionStatus,
   SubscriptionWarning,
@@ -190,6 +191,9 @@ export function nextStateOf<B extends string, C extends number>(
     responsibleItAdminEmployeeId: string | null;
     vendorMinimumSeats: number | null;
     isPrimaryForPlan: boolean;
+    seatCounting?: SeatCounting | undefined;
+    minimumSeatsTotal?: number | null | undefined;
+    invoicedLater?: boolean | undefined;
   },
   input: {
     purchasedQuantity?: number;
@@ -204,6 +208,9 @@ export function nextStateOf<B extends string, C extends number>(
     allowsMidTermReduction?: boolean;
     vendorMinimumSeats?: number | null;
     isPrimaryForPlan?: boolean;
+    seatCounting?: SeatCounting;
+    minimumSeatsTotal?: number | null;
+    invoicedLater?: boolean;
   },
 ) {
   return {
@@ -221,6 +228,10 @@ export function nextStateOf<B extends string, C extends number>(
     responsibleItAdminEmployeeId: current.responsibleItAdminEmployeeId,
     vendorMinimumSeats: given(input.vendorMinimumSeats, current.vendorMinimumSeats),
     isPrimaryForPlan: given(input.isPrimaryForPlan, current.isPrimaryForPlan),
+    // The way the seats are counted, the least seats across the workspace and the invoice after the period stay as stored when the update says nothing.
+    seatCounting: given(input.seatCounting, current.seatCounting),
+    minimumSeatsTotal: given(input.minimumSeatsTotal, current.minimumSeatsTotal),
+    invoicedLater: given(input.invoicedLater, current.invoicedLater),
   };
 }
 
@@ -283,6 +294,9 @@ export function declaredStateOf<B extends string, C extends number>(input: {
   noticePeriodDays?: number;
   autoRenew?: boolean;
   allowsMidTermReduction?: boolean;
+  seatCounting?: SeatCounting;
+  minimumSeatsTotal?: number;
+  invoicedLater?: boolean;
 }) {
   return {
     purchasedQuantity: orStart<number | null>(input.purchasedQuantity, null),
@@ -298,6 +312,10 @@ export function declaredStateOf<B extends string, C extends number>(input: {
     responsibleItAdminEmployeeId: orStart<string | null>(input.responsibleItAdminEmployeeId, null),
     vendorMinimumSeats: orStart<number | null>(input.vendorMinimumSeats, null),
     isPrimaryForPlan: false,
+    // Not given, these are not written and the column defaults stand (a fixed count, no minimum, no invoice after the period).
+    seatCounting: input.seatCounting,
+    minimumSeatsTotal: input.minimumSeatsTotal,
+    invoicedLater: input.invoicedLater,
   };
 }
 

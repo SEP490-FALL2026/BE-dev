@@ -39,6 +39,9 @@ export interface OriginalPriceRecord {
   currency: string;
 }
 
+/** How the seats of a subscription are counted (QĐ-115g): a number bought, or the members the vendor counts (one-month commitment only). */
+export type SeatCounting = 'FIXED' | 'MEMBERS';
+
 export interface SubscriptionRecord {
   id: string;
   planId: string;
@@ -77,6 +80,12 @@ export interface SubscriptionRecord {
   isPrimaryForPlan: boolean;
   /** The period this one continues (`QĐ-16`); null for a first period. */
   renewedFromId: string | null;
+  /** The workspace the subscription is held in (W3-11); null only for data older than the rule. */
+  workspace: { id: string; name: string } | null;
+  seatCounting: SeatCounting;
+  minimumSeatsTotal: number | null;
+  /** The vendor invoices after the period. */
+  invoicedLater: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -105,6 +114,11 @@ export interface NewSubscription {
   isPrimaryForPlan: boolean;
   /** Only the period a renewal records names the one it continues; set at insert and never changed. */
   renewedFromId?: string | null;
+  /** The workspace (W3-11) and how the seats are counted: left out, a write leaves them as they are (an insert takes the column defaults). */
+  workspaceId?: string | null;
+  seatCounting?: SeatCounting;
+  minimumSeatsTotal?: number | null;
+  invoicedLater?: boolean;
 }
 
 /** What a write stores: the whole mutable state of the subscription, as computed. */
@@ -112,6 +126,8 @@ export type SubscriptionState = Omit<NewSubscription, 'organizationId' | 'planId
 
 export interface SubscriptionListFilter {
   applicationId?: string;
+  /** Only the subscriptions held in this workspace. */
+  workspaceId?: string;
   planId?: string;
   status?: SubscriptionStatus;
   kind?: SubscriptionKind;
@@ -177,6 +193,10 @@ export interface SubscriptionView {
   /** Who answers for the subscription, by name; null when none is named. */
   responsibleItAdmin: { employeeId: string; employeeCode: string; fullName: string } | null;
   vendorMinimumSeats: number | null;
+  workspace: { id: string; name: string } | null;
+  seatCounting: SeatCounting;
+  minimumSeatsTotal: number | null;
+  invoicedLater: boolean;
   isPrimaryForPlan: boolean;
   /** Near (SOON) or past (EXPIRED) the point of adjustment today (`QĐ-111o`); null before it, for a purchase made once and with no date to count from. */
   expiry: ExpiryState | null;

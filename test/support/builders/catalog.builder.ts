@@ -34,7 +34,7 @@ export async function declareApplication(ctx: HttpTestApp, itAdminToken: string,
 /**
  * A plan that needs admins at the vendor (a K2 plan, or a K4 plan with an admin console) is not activated without a profile of two different people
  * (X-IT.5, `QĐ-110k`): a suite that only needs such a plan as a precondition gets the profile by the row, the declaring IT Admin as the owner and
- * another employee as the admin, as the seed of the demo does. Nothing happens for a plan that needs none, or that already has a profile. A suite
+ * another employee as the admin, as the seed of the demo does (the profile is the workspace of the vendor of the plan, W3-10). Nothing happens for a plan that needs none, or that already has a profile. A suite
  * that proves the rule or the profile calls the routes itself and removes it. No assertion lives here.
  */
 export async function ensureVendorAdmins(ctx: HttpTestApp, planId: string, ownerEmployeeId: string): Promise<void> {
@@ -57,15 +57,38 @@ export async function ensureVendorAdmins(ctx: HttpTestApp, planId: string, owner
       LIMIT 1`,
     [ownerEmployeeId],
   );
-  const profile = await ctx.sql.query(
-    `INSERT INTO plan_workspace_profiles (plan_id, primary_owner_employee_id) VALUES ($1, $2) ON CONFLICT (plan_id) DO NOTHING`,
-    [planId, ownerEmployeeId],
+  // The profile of a plan is the workspace of its vendor (W3-10): one for the vendor, answered for by the declaring IT Admin, with its two administrators.
+  const vendor = await ctx.sql.query<{
+    organization_id: string;
+    vendor_id: string;
+    name: string;
+    normalized_name: string;
+  }>(
+    `SELECT a.organization_id, a.vendor_id, v.name, v.normalized_name
+       FROM plans p JOIN applications a ON a.id = p.application_id JOIN vendors v ON v.id = a.vendor_id WHERE p.id = $1`,
+    [planId],
   );
-  if (profile.rowCount === 0) return;
+  if (!vendor.rows[0]) return;
+  const { organization_id: organizationId, vendor_id: vendorId, name, normalized_name: normalized } = vendor.rows[0];
   await ctx.sql.query(
-    `INSERT INTO plan_workspace_admins (plan_id, employee_id, role) VALUES ($1, $2, 'OWNER'::"WorkspaceRole"), ($1, $3, 'ADMIN'::"WorkspaceRole")`,
-    [planId, ownerEmployeeId, other.rows[0].id],
+    `INSERT INTO workspaces (id, organization_id, vendor_id, name, normalized_name, responsible_it_admin_employee_id, updated_at)
+     VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, now()) ON CONFLICT DO NOTHING`,
+    [organizationId, vendorId, name, normalized, ownerEmployeeId],
   );
+  const workspace = await ctx.sql.query<{ id: string; admins: string }>(
+    `SELECT w.id, (SELECT count(*) FROM workspace_admins x WHERE x.workspace_id = w.id)::text AS admins
+       FROM workspaces w WHERE w.vendor_id = $1 ORDER BY w.created_at, w.id LIMIT 1`,
+    [vendorId],
+  );
+  if (Number(workspace.rows[0].admins) > 0) return;
+  await ctx.sql.query(
+    `INSERT INTO workspace_admins (workspace_id, employee_id, role) VALUES ($1, $2, 'OWNER'::"WorkspaceRole"), ($1, $3, 'ADMIN'::"WorkspaceRole")`,
+    [workspace.rows[0].id, ownerEmployeeId, other.rows[0].id],
+  );
+  await ctx.sql.query(`UPDATE workspaces SET primary_owner_employee_id = $2, updated_at = now() WHERE id = $1`, [
+    workspace.rows[0].id,
+    ownerEmployeeId,
+  ]);
 }
 
 /** The IT Admin declares a plan of an application (`POST /plans`) and gets its id. */

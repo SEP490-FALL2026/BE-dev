@@ -9,8 +9,21 @@ import {
   SubscriptionPlanNotFoundError,
   SubscriptionStaleError,
   SubscriptionStillDraftError,
+  SubscriptionSeatCountingFixedError,
   SubscriptionUpdateEmptyError,
+  SubscriptionWorkspaceMovedError,
 } from './subscription.errors';
+import { retryOnWorkspaceMove } from './pool/subscription-pool.service';
+
+/** How the seats are counted does not change once the subscription is active (W3-11). Throws SubscriptionSeatCountingFixedError. */
+function assertSeatCountingOpen(
+  current: SubscriptionRecord,
+  requested: SubscriptionRecord['seatCounting'] | undefined,
+): void {
+  if (current.status === 'ACTIVE' && requested !== undefined && requested !== current.seatCounting) {
+    throw new SubscriptionSeatCountingFixedError();
+  }
+}
 import { sameState, snapshotOf, stateOf } from './subscription.mapper';
 import {
   assertSubscriptionShape,
@@ -81,8 +94,17 @@ export class SubscriptionChangeService {
       : input.originalPrice;
     const organizationId = await this.guard.requireOrganizationId();
 
-    const record = await this.runner.run((tx) =>
-      this.changeIn(tx, actor, id, { input, sentUnit, sentMonthly, originalPrice, organizationId, expectedUpdatedAt }),
+    const record = await retryOnWorkspaceMove(() =>
+      this.runner.run((tx) =>
+        this.changeIn(tx, actor, id, {
+          input,
+          sentUnit,
+          sentMonthly,
+          originalPrice,
+          organizationId,
+          expectedUpdatedAt,
+        }),
+      ),
     );
 
     return (await this.views.viewAll([record]))[0];
@@ -103,18 +125,11 @@ export class SubscriptionChangeService {
     },
   ): Promise<SubscriptionRecord> {
     const { input, sentUnit, sentMonthly, originalPrice, organizationId, expectedUpdatedAt } = change;
-    const current = input.isPrimaryForPlan
-      ? await this.lockForPrimaryChange(tx, id, expectedUpdatedAt)
-      : await this.lockFresh(tx, id, expectedUpdatedAt);
-    // The plan is locked for writing when this subscription is to price it: the subscriptions of one plan take turns.
-    const plan = input.isPrimaryForPlan
-      ? await this.plans.lockExclusive(tx, current.planId)
-      : await this.plans.lockShared(tx, current.planId);
-    if (!plan) throw new SubscriptionPlanNotFoundError();
+    const { current, plan } = await this.lockForChange(tx, id, input, expectedUpdatedAt);
     const quantityChangeReason = this.quantityReasonOf(current, input);
     await this.guard.assertNotBelowOccupied(tx, id, current.purchasedQuantity, input.purchasedQuantity);
 
-    const next = nextStateOf(current, input);
+    const next = { ...nextStateOf(current, input), workspaceId: input.workspaceId ?? current.workspace?.id ?? null };
     assertSubscriptionShape({
       kind: current.kind,
       applicationKind: plan.applicationKind,
@@ -152,6 +167,42 @@ export class SubscriptionChangeService {
     await this.notifySeatChange(tx, actor, current, updated, organizationId);
 
     return updated;
+  }
+
+  /**
+   * The locks of a change, in the order of the lock table: the workspaces of a move first (tier 5b, W3-14, N5: read without a lock, lock, lock the
+   * period, read again, a subscription that moved meanwhile starts the write again), then the period, then the plan (for writing when this subscription
+   * is to price it). Judges how the seats are counted on what is stored under the lock. Throws SubscriptionWorkspaceMovedError,
+   * SubscriptionSeatCountingFixedError, SubscriptionPlanNotFoundError.
+   */
+  private async lockForChange(tx: DbTx, id: string, input: UpdateSubscriptionInput, expectedUpdatedAt?: Date) {
+    const probe = input.workspaceId === undefined ? null : await this.subscriptions.find(id, tx);
+    if (probe) await this.lockMove(tx, probe, input.workspaceId);
+    const current = input.isPrimaryForPlan
+      ? await this.lockForPrimaryChange(tx, id, expectedUpdatedAt)
+      : await this.lockFresh(tx, id, expectedUpdatedAt);
+    const plan = input.isPrimaryForPlan
+      ? await this.plans.lockExclusive(tx, current.planId)
+      : await this.plans.lockShared(tx, current.planId);
+    if (!plan) throw new SubscriptionPlanNotFoundError();
+    this.assertNotMoved(probe, current);
+    assertSeatCountingOpen(current, input.seatCounting);
+
+    return { current, plan };
+  }
+
+  /** The workspace the subscription is in is the one read before the locks: else the write starts again (W3-14, N5). */
+  private assertNotMoved(probe: SubscriptionRecord | null, current: SubscriptionRecord): void {
+    if (probe && (current.workspace?.id ?? null) !== (probe.workspace?.id ?? null)) {
+      throw new SubscriptionWorkspaceMovedError(current.updatedAt);
+    }
+  }
+
+  /** Locks the workspace the subscription is in and the one it moves to, in id order, each held at the vendor of its plan. */
+  private async lockMove(tx: DbTx, probe: SubscriptionRecord, to: string | undefined): Promise<void> {
+    const [plan] = await this.plans.lookups([probe.planId], tx);
+    if (!plan) throw new SubscriptionPlanNotFoundError();
+    await this.guard.lockWorkspaces(tx, plan, [probe.workspace?.id ?? null, to ?? null]);
   }
 
   private async notifySeatChange(

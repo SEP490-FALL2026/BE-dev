@@ -4,6 +4,7 @@ import type { OrganizationReadApi } from '../../organization/public/organization
 import type { ApplicationRepo } from '../catalog-entry/application.repo';
 import type { PlanFactsService } from '../plan/plan-facts.service';
 import type { SubscriptionRepo } from '../subscription/subscription.repo';
+import type { WorkspaceRepo } from '../workspace/workspace.repo';
 import { ResponsibilityHandoverService } from './responsibility-handover.service';
 
 const TX = {} as DbTx;
@@ -17,6 +18,7 @@ function setup(subscriptionIds: string[], workingIds: string[]) {
     { workingAdminsAmong } as unknown as PlanFactsService,
     {} as OrganizationReadApi,
     {} as AuditApi,
+    {} as WorkspaceRepo,
   );
 
   return { service, findActiveResponsibleItAdminIdsOfPlan, workingAdminsAmong };
@@ -39,5 +41,75 @@ describe('ResponsibilityHandoverService.usableSubscriptionItAdminsOfPlan', () =>
     await expect(service.usableSubscriptionItAdminsOfPlan('plan-1', TX)).resolves.toEqual(['it-1', 'it-2']);
     expect(findActiveResponsibleItAdminIdsOfPlan).toHaveBeenCalledWith('plan-1', TX);
     expect(workingAdminsAmong).toHaveBeenCalledWith(['it-1', 'it-locked', 'it-2'], TX);
+  });
+});
+
+describe('ResponsibilityHandoverService.transfer: the workspaces of the IT Admin who leaves (W3-10, SBF-16)', () => {
+  const actor = { appUserId: 'app-sa', sessionId: 'sess-1', roles: ['SUPER_ADMIN'] } as never;
+
+  function build() {
+    const order: string[] = [];
+    const applications = {
+      reassignResponsible: jest.fn(() => {
+        order.push('applications');
+
+        return Promise.resolve(['app-1']);
+      }),
+    };
+    const workspaces = {
+      reassignResponsible: jest.fn(() => {
+        order.push('workspaces');
+
+        return Promise.resolve(['ws-1', 'ws-2']);
+      }),
+    };
+    const subscriptions = {
+      reassignResponsible: jest.fn(() => {
+        order.push('subscriptions');
+
+        return Promise.resolve(['sub-1']);
+      }),
+    };
+    const audit = { record: jest.fn().mockResolvedValue(undefined) };
+    const service = new ResponsibilityHandoverService(
+      applications as unknown as ApplicationRepo,
+      subscriptions as unknown as SubscriptionRepo,
+      { workingAdminsAmong: jest.fn().mockResolvedValue(new Set(['it-nam'])) } as unknown as PlanFactsService,
+      { getOrganization: jest.fn().mockResolvedValue({ id: 'org-1' }) } as unknown as OrganizationReadApi,
+      audit as unknown as AuditApi,
+      workspaces as unknown as WorkspaceRepo,
+    );
+
+    return { service, order, audit, workspaces };
+  }
+
+  it('hands the workspaces over in the same transaction, between the applications and the subscriptions, and audits each one', async () => {
+    const { service, order, audit, workspaces } = build();
+
+    const moved = await service.transfer(TX, actor, 'it-khoa', 'it-nam', { kind: 'OffboardingCase', id: 'case-1' });
+
+    expect(moved).toEqual({ applicationIds: ['app-1'], subscriptionIds: ['sub-1'], workspaceIds: ['ws-1', 'ws-2'] });
+    expect(order).toEqual(['applications', 'workspaces', 'subscriptions']);
+    expect(workspaces.reassignResponsible).toHaveBeenCalledWith(TX, 'it-khoa', 'it-nam');
+    const actions = audit.record.mock.calls.map((call: unknown[]) => (call[1] as { action: string }).action);
+    expect(actions.filter((action: string) => action === 'WORKSPACE.RESPONSIBLE_TRANSFERRED')).toHaveLength(2);
+    expect(audit.record).toHaveBeenCalledWith(
+      TX,
+      expect.objectContaining({
+        action: 'WORKSPACE.RESPONSIBLE_TRANSFERRED',
+        resourceId: 'ws-1',
+        before: { responsibleItAdminEmployeeId: 'it-khoa' },
+        after: { responsibleItAdminEmployeeId: 'it-nam', sourceKind: 'OffboardingCase', sourceId: 'case-1' },
+      }),
+    );
+  });
+
+  it('refuses a receiver who is not working, before it writes anything', async () => {
+    const { service, workspaces } = build();
+
+    await expect(service.transfer(TX, actor, 'it-khoa', 'it-locked')).rejects.toMatchObject({
+      name: 'ResponsibilityHandoverRefusedError',
+    });
+    expect(workspaces.reassignResponsible).not.toHaveBeenCalled();
   });
 });

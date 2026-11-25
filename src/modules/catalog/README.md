@@ -60,7 +60,7 @@ subscription → plan`; `licensing/license-key` và `licensing/device-activation
 - Vendor: `vendors`, `vendor_groups`, `vendor_service_lines`, `vendor_dictionary_proposals`.
 - Ứng dụng: `applications`, `application_business_owners`, `application_retirement_confirmations`, `functional_groups`.
 - Plan: `plans`, `plan_workspace_profiles`, `plan_workspace_admins` (dữ liệu cũ, thôi là nguồn từ M4), `plan_terms`, `plan_term_opinions`.
-- Workspace của nhà cung cấp: `workspaces`, `workspace_admins` (W3-10).
+- Workspace của nhà cung cấp: `workspaces`, `workspace_admins` (W3-10). `subscriptions.workspace_id` (trigger `subscriptions_workspace_vendor`: hãng của workspace = hãng của gói), `seat_counting` (`FIXED`/`MEMBERS`), `minimum_seats_total`, `invoiced_later` (W3-11).
 - Subscription: `subscriptions`. Hợp đồng: `contracts`, `contract_subscriptions`, `document_attachments`.
 - Nguồn: `prisma/models/catalog.prisma`; hồ sơ thuế vendor (`VendorTaxProfile*`) thuộc `finance`.
 
@@ -124,7 +124,7 @@ file thuần xuống tầng thấp, hoặc đưa dịch vụ điều phối lên
   đọc cho `IT_ADMIN`/`FINANCE`/`SUPER_ADMIN`; `workspaceCreate` mọi IT Admin, người tạo là người phụ trách; `workspaceUpdate`, `workspaceAdminsSet` chỉ IT phụ trách,
   `expectedUpdatedAt` bắt buộc; `workspaceResponsibleItAdminChange` chỉ `SUPER_ADMIN`); `WorkspaceService`, `WorkspaceAdminsService` (≥ 2 IT Admin khác nhau, chủ chính
   là OWNER trong danh sách), `WorkspaceResponsibleService`, `WorkspaceViewService` (tên, admin còn làm việc, cờ); `workspace.policy.ts` là hàm thuần. Audit:
-  `WORKSPACE.CREATED`, `WORKSPACE.UPDATED`, `WORKSPACE.ADMINS_SET`, `WORKSPACE.RESPONSIBLE_CHANGED`. Khóa: workspace `FOR UPDATE` (tầng 5b). Facade `WorkspaceApi`
+  `WORKSPACE.CREATED`, `WORKSPACE.UPDATED`, `WORKSPACE.ADMINS_SET`, `WORKSPACE.RESPONSIBLE_CHANGED`. Khóa: workspace `FOR UPDATE` (tầng 5b). Hồ sơ của gói (`planGet.workspaceProfile`, cổng ≥ 2 admin, `VendorAdminRole`, `workspaceDutiesOf`) đọc workspace của hãng của gói (một workspace ⟹ nó; nhiều ⟹ workspace có thuê bao sống của gói, không có ⟹ tạo sớm nhất); route cũ `planWorkspaceProfileSet` ghi vào workspace đó qua `WorkspaceAdminsService`/`WorkspaceService` (mã lỗi cũ giữ; `409 PLAN.WORKSPACE_AMBIGUOUS`, `422 PLAN.WORKSPACE_VENDOR_REQUIRED`, `403 WORKSPACE.NOT_RESPONSIBLE`). Khai/hoàn tất/đổi thuê bao khóa workspace trước kỳ và gói (`WorkspaceForSubscriptionService`, `retryOnWorkspaceMove`). `transferResponsibilities` (SBF-16) chuyển cả workspace (`WORKSPACE.RESPONSIBLE_TRANSFERRED`). Facade `WorkspaceApi`
   (`public/workspace.api.ts`): `adminsOf`, `workingAdminCount`, `responsibleOf`, `defaultWorkspaceOfVendor`.
 - `plan-terms/` — điều khoản, cảnh báo review (US-04-11; ý kiến Business Owner đã gỡ, `QĐ-111g`); `plan-terms.controller.ts`;
   `PlanTermsService`.

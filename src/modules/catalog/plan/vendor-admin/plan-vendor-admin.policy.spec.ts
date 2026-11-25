@@ -1,4 +1,4 @@
-import { notYetBlocked, othersWorking, workingAdminCount } from './vendor-admin-roles.policy';
+import { notYetBlocked, othersWorking, workingAdminCount } from './plan-vendor-admin.policy';
 
 describe('vendor-admin-roles.policy (QĐ-110k: what is left of a plan at the vendor without one admin)', () => {
   const members = [{ employeeId: 'a' }, { employeeId: 'b' }, { employeeId: 'c' }];

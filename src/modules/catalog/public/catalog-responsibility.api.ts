@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { ResponsibilityHandoverService } from '../application-responsibility/responsibility-handover.service';
-import { VendorAdminMinimumService } from '../plan/vendor-admin-minimum.service';
-import { VendorAdminRolesService } from '../plan/vendor-admin-roles.service';
+import { VendorAdminMinimumService } from '../plan/vendor-admin/vendor-admin-minimum.service';
+import { VendorAdminRolesService } from '../plan/vendor-admin/vendor-admin-roles.service';
 import type {
   ResponsibilitiesTransferred,
   ResponsibilityCounts,
@@ -31,6 +31,11 @@ export class CatalogResponsibilityApi {
   /** Working IT Admins currently named responsible on active subscriptions of the plan. */
   usableSubscriptionItAdminsOfPlan(planId: string, tx?: DbTx): Promise<string[]> {
     return this.handover.usableSubscriptionItAdminsOfPlan(planId, tx);
+  }
+
+  /** How many workspaces in use are short of administrators who work now (W3-12): the same judgment as the flag of the workspace. */
+  countWorkspacesBelowMinimum(tx?: DbTx): Promise<number> {
+    return this.minimum.countWorkspacesBelowMinimum(tx);
   }
 
   /**

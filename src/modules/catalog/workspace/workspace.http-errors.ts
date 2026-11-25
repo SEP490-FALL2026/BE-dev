@@ -72,7 +72,7 @@ export const WORKSPACE_ERROR_EXAMPLES = {
   NOT_RESPONSIBLE: example(new WorkspaceNotResponsibleError()),
   // The same stand-in date as `SUBSCRIPTION.STALE`: an example never carries a real timestamp.
   STALE: example(new WorkspaceStaleError(new Date('2026-01-01T00:00:00.000Z'))),
-  ADMIN_NOT_IT_ADMIN: example(new WorkspaceAdminNotItAdminError('00000000-0000-4000-8000-000000000001')),
+  ADMIN_NOT_IT_ADMIN: example(new WorkspaceAdminNotItAdminError('<employee-id>')),
   PRIMARY_OWNER_NOT_ADMIN: example(new WorkspacePrimaryOwnerNotAdminError()),
   ADMINS_TOO_FEW: example(new WorkspaceAdminsTooFewError(1, 2)),
   LIMIT_EXCEEDED: example(new WorkspaceLimitExceededError('OWNER')),

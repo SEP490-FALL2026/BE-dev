@@ -48,8 +48,8 @@ import { FunctionalGroupsController } from './functional-group/functional-groups
 import { PlanFactsService } from './plan/plan-facts.service';
 import { PlanUsageRepo } from './plan/plan-usage.repo';
 import { PlanWorkspaceService } from './plan/plan-workspace.service';
-import { VendorAdminMinimumService } from './plan/vendor-admin-minimum.service';
-import { VendorAdminRolesService } from './plan/vendor-admin-roles.service';
+import { VendorAdminMinimumService } from './plan/vendor-admin/vendor-admin-minimum.service';
+import { VendorAdminRolesService } from './plan/vendor-admin/vendor-admin-roles.service';
 import { PlanRepo } from './plan/plan.repo';
 import { PlanService } from './plan/plan.service';
 import { PlanQuotePriceService } from './plan/plan-quote-price.service';
@@ -97,6 +97,7 @@ import { VendorsController } from './vendor/vendors.controller';
 import { VendorRepo } from './vendor/vendor.repo';
 import { WorkspaceApi } from './public/workspace.api';
 import { WorkspaceAdminsService } from './workspace/workspace-admins.service';
+import { WorkspaceForSubscriptionService } from './workspace/workspace-for-subscription.service';
 import { WorkspaceResponsibleService } from './workspace/workspace-responsible.service';
 import { WorkspaceService } from './workspace/workspace.service';
 import { WorkspaceRepo } from './workspace/workspace.repo';
@@ -171,6 +172,7 @@ import { WorkspacesController } from './workspace/workspaces.controller';
     WorkspaceAdminsService,
     WorkspaceResponsibleService,
     WorkspaceViewService,
+    WorkspaceForSubscriptionService,
     WorkspaceRepo,
     WorkspaceApi,
     VendorAdminRolesService,

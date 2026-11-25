@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { VendorAdminRole } from '../public/catalog-responsibility.types';
-import { PlanFactsService } from './plan-facts.service';
-import { PlanRepo } from './plan.repo';
-import { othersWorking } from './vendor-admin-roles.policy';
+import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
+import type { VendorAdminRole } from '../../public/catalog-responsibility.types';
+import { PlanFactsService } from '../plan-facts.service';
+import { PlanRepo } from '../plan.repo';
+import { othersWorking } from './plan-vendor-admin.policy';
 
 /**
  * The plans one person administers at the vendor and what is left of them without the person (`QĐ-110k`, SPEC P23, X-IT.6): read from the
@@ -18,14 +18,14 @@ export class VendorAdminRolesService {
   ) {}
 
   async of(employeeId: string, tx?: DbTx): Promise<VendorAdminRole[]> {
-    const duties = await this.plans.findWorkspaceDuties([employeeId], tx);
+    // One entry for each workspace the person administers (W3-10): the other administrators are those of that workspace.
+    const duties = (await this.plans.findWorkspaceDuties([employeeId], tx)).filter(
+      (duty): duty is typeof duty & { workspace: NonNullable<typeof duty.workspace> } => duty.workspace !== undefined,
+    );
     if (duties.length === 0) return [];
     const planIds = [...new Set(duties.map((duty) => duty.planId))];
-    const profiles = await this.plans.findProfilesOf(planIds, tx);
     const lookups = new Map((await this.plans.findLookups(planIds, tx)).map((plan) => [plan.id, plan]));
-    const everyone = [
-      ...new Set([...profiles.values()].flatMap((profile) => profile.members.map((m) => m.employeeId))),
-    ];
+    const everyone = [...new Set(duties.flatMap((duty) => duty.workspace.members.map((m) => m.employeeId)))];
     const usable = await this.facts.workingAdminsAmong(everyone, tx);
 
     return duties.map((duty) => ({
@@ -34,7 +34,11 @@ export class VendorAdminRolesService {
       applicationId: lookups.get(duty.planId)?.applicationId ?? '',
       applicationName: duty.applicationName,
       role: duty.role === 'ADMIN' ? 'ADMIN' : 'OWNER',
-      othersWorking: othersWorking(profiles.get(duty.planId)?.members ?? [], usable, employeeId),
+      othersWorking: othersWorking(duty.workspace.members, usable, employeeId),
+      workspaceId: duty.workspace.id,
+      workspaceName: duty.workspace.name,
+      vendorId: duty.workspace.vendorId,
+      responsibleItAdminEmployeeId: duty.workspace.responsibleItAdminEmployeeId,
     }));
   }
 }

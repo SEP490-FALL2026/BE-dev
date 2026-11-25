@@ -26481,6 +26481,13 @@
           },
           { "name": "planId", "required": false, "in": "query", "schema": { "format": "uuid", "type": "string" } },
           {
+            "name": "workspaceId",
+            "required": false,
+            "in": "query",
+            "description": "Only the subscriptions held in this workspace.",
+            "schema": { "format": "uuid", "type": "string" }
+          },
+          {
             "name": "status",
             "required": false,
             "in": "query",
@@ -26773,6 +26780,27 @@
               }
             }
           },
+          "404": {
+            "description": "The workspace named does not exist (WORKSPACE.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "WORKSPACE.NOT_FOUND": {
+                    "summary": "The workspace does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "WORKSPACE.NOT_FOUND",
+                        "message": "The workspace does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
           "409": {
             "description": "The plan is a K2 or K4 plan, another subscription of it is live (a draft, or active and not continued by a later period, not ended) and the seat baseline is closed: add seats to that one or renew it instead (SUBSCRIPTION.DUPLICATE_PLAN, details.subscriptionIds, nothing is written). While the baseline is open the write is accepted and the answer says SHOULD_MERGE in warnings.",
             "content": {
@@ -26838,7 +26866,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION.PLAN_NOT_FOUND and APPLICATION_RETIRED (declaring only), PLAN_HAS_NO_SUBSCRIPTION, PERPETUAL_NEEDS_LICENSED_APPLICATION, PERPETUAL_HAS_NO_TERM, DATES_INVALID or UPDATE_EMPTY; the shared-pool rules refuse COMMITMENT_TERM_REQUIRED (a term that becomes active names 1 or 12 months), COMMITMENT_TERM_NOT_ALLOWED (a perpetual purchase), K1_MONTHLY_ONLY (R-E01), K4_PERPETUAL_ONLY (a K4 plan is bought once: only a perpetual purchase is written for it), BILLING_LONGER_THAN_COMMITMENT (R-G01), BILLING_CYCLE_UNSUPPORTED (only MONTHLY and ANNUAL are written; QUARTERLY and OTHER stay readable on older data), RESPONSIBLE_REQUIRED (an active subscription names the IT Admin who answers for it), RESPONSIBLE_NOT_IT_ADMIN and VENDOR_ADMINS_REQUIRED (a plan that needs admins at the vendor, a K2 plan or a K4 plan with an admin console, is not activated as a new subscription, nor its pool made, once the seat baseline is closed while fewer than two different working IT Admins are recorded in its workspace profile; while the seat baseline is open it is let through and carries vendorAdminsBelowMinimum when read; the period a renewal continues is never asked, it only carries the flag vendorAdminsBelowMinimum), and an update may also be refused with PRIMARY_NOT_ELIGIBLE (details.reason); the unit price is refused with PRICE_NOT_VND (it is entered in dong only, details.currency) or PRICE_MISMATCH (when monthlyUnitPrice and unitPrice disagree, details.expectedUnitPrice), and the unit price and the original price with MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE or CURRENCY_NOT_SUPPORTED (the currency of the original price).",
+            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION.PLAN_NOT_FOUND and APPLICATION_RETIRED (declaring only), PLAN_HAS_NO_SUBSCRIPTION, PERPETUAL_NEEDS_LICENSED_APPLICATION, PERPETUAL_HAS_NO_TERM, DATES_INVALID or UPDATE_EMPTY; the shared-pool rules refuse COMMITMENT_TERM_REQUIRED (a term that becomes active names 1 or 12 months), COMMITMENT_TERM_NOT_ALLOWED (a perpetual purchase), K1_MONTHLY_ONLY (R-E01), K4_PERPETUAL_ONLY (a K4 plan is bought once: only a perpetual purchase is written for it), BILLING_LONGER_THAN_COMMITMENT (R-G01), BILLING_CYCLE_UNSUPPORTED (only MONTHLY and ANNUAL are written; QUARTERLY and OTHER stay readable on older data), RESPONSIBLE_REQUIRED (an active subscription names the IT Admin who answers for it), RESPONSIBLE_NOT_IT_ADMIN and VENDOR_ADMINS_REQUIRED (a plan that needs admins at the vendor, a K2 plan or a K4 plan with an admin console, is not activated as a new subscription, nor its pool made, once the seat baseline is closed while fewer than two different working IT Admins are recorded in its workspace profile; while the seat baseline is open it is let through and carries vendorAdminsBelowMinimum when read; the period a renewal continues is never asked, it only carries the flag vendorAdminsBelowMinimum), and an update may also be refused with PRIMARY_NOT_ELIGIBLE (details.reason); the unit price is refused with PRICE_NOT_VND (it is entered in dong only, details.currency) or PRICE_MISMATCH (when monthlyUnitPrice and unitPrice disagree, details.expectedUnitPrice), and the unit price and the original price with MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE or CURRENCY_NOT_SUPPORTED (the currency of the original price). The workspace the subscription is held in is judged too: WORKSPACE_VENDOR_MISMATCH (it is held at another vendor than the plan), WORKSPACE_REQUIRED (the vendor has several workspaces and none is named, details.workspaceIds), MEMBERS_MONTHLY_ONLY (seats counted by the members commit for one month) and MEMBERS_PAYMENT_DAY_REQUIRED (an active one names its payment day in renewalDate); an update may also be refused with SEAT_COUNTING_FIXED (how the seats are counted does not change once active).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -26851,6 +26879,51 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.WORKSPACE_VENDOR_MISMATCH": {
+                    "summary": "The workspace is held at another vendor than the plan.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.WORKSPACE_VENDOR_MISMATCH",
+                        "message": "The workspace is held at another vendor than the plan.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.WORKSPACE_REQUIRED": {
+                    "summary": "The vendor has several workspaces: name the one the subscription is held in.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.WORKSPACE_REQUIRED",
+                        "message": "The vendor has several workspaces: name the one the subscription is held in.",
+                        "details": { "workspaceIds": ["<workspace-id>", "<other-workspace-id>"] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.MEMBERS_MONTHLY_ONLY": {
+                    "summary": "A subscription whose seats are the members the vendor counts commits for one month only.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.MEMBERS_MONTHLY_ONLY",
+                        "message": "A subscription whose seats are the members the vendor counts commits for one month only.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.MEMBERS_PAYMENT_DAY_REQUIRED": {
+                    "summary": "An active subscription counted by its members needs renewalDate, its payment day.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.MEMBERS_PAYMENT_DAY_REQUIRED",
+                        "message": "An active subscription counted by its members needs renewalDate, its payment day.",
                         "requestId": "req_example"
                       }
                     }
@@ -27419,7 +27492,7 @@
             }
           },
           "404": {
-            "description": "The subscription does not exist (SUBSCRIPTION.NOT_FOUND).",
+            "description": "The subscription does not exist (SUBSCRIPTION.NOT_FOUND) or the workspace named does not exist (WORKSPACE.NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -27431,6 +27504,17 @@
                       "error": {
                         "code": "SUBSCRIPTION.NOT_FOUND",
                         "message": "The subscription does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "WORKSPACE.NOT_FOUND": {
+                    "summary": "The workspace does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "WORKSPACE.NOT_FOUND",
+                        "message": "The workspace does not exist.",
                         "requestId": "req_example"
                       }
                     }
@@ -27526,7 +27610,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION.PLAN_NOT_FOUND and APPLICATION_RETIRED (declaring only), PLAN_HAS_NO_SUBSCRIPTION, PERPETUAL_NEEDS_LICENSED_APPLICATION, PERPETUAL_HAS_NO_TERM, DATES_INVALID or UPDATE_EMPTY; the shared-pool rules refuse COMMITMENT_TERM_REQUIRED (a term that becomes active names 1 or 12 months), COMMITMENT_TERM_NOT_ALLOWED (a perpetual purchase), K1_MONTHLY_ONLY (R-E01), K4_PERPETUAL_ONLY (a K4 plan is bought once: only a perpetual purchase is written for it), BILLING_LONGER_THAN_COMMITMENT (R-G01), BILLING_CYCLE_UNSUPPORTED (only MONTHLY and ANNUAL are written; QUARTERLY and OTHER stay readable on older data), RESPONSIBLE_REQUIRED (an active subscription names the IT Admin who answers for it), RESPONSIBLE_NOT_IT_ADMIN and VENDOR_ADMINS_REQUIRED (a plan that needs admins at the vendor, a K2 plan or a K4 plan with an admin console, is not activated as a new subscription, nor its pool made, once the seat baseline is closed while fewer than two different working IT Admins are recorded in its workspace profile; while the seat baseline is open it is let through and carries vendorAdminsBelowMinimum when read; the period a renewal continues is never asked, it only carries the flag vendorAdminsBelowMinimum), and an update may also be refused with PRIMARY_NOT_ELIGIBLE (details.reason); the unit price is refused with PRICE_NOT_VND (it is entered in dong only, details.currency) or PRICE_MISMATCH (when monthlyUnitPrice and unitPrice disagree, details.expectedUnitPrice), and the unit price and the original price with MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE or CURRENCY_NOT_SUPPORTED (the currency of the original price). Changing purchasedQuantity requires expectedUpdatedAt (SUBSCRIPTION.VERSION_REQUIRED) and increasing it on an active K2 subscription requires quantityChangeReason (SUBSCRIPTION.QUANTITY_REASON_REQUIRED). An update that would put the seats bought under the seats taken is refused with SUBSCRIPTION.QUANTITY_BELOW_OCCUPIED (details.occupied, details.requested). An active subscription is never lowered to a draft by an update: one still priced in another currency (an earlier release could not convert it) is refused with SUBSCRIPTION.STILL_DRAFT (details.missing is UNIT_PRICE) until the update enters the price in dong, and it stays active.",
+            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION.PLAN_NOT_FOUND and APPLICATION_RETIRED (declaring only), PLAN_HAS_NO_SUBSCRIPTION, PERPETUAL_NEEDS_LICENSED_APPLICATION, PERPETUAL_HAS_NO_TERM, DATES_INVALID or UPDATE_EMPTY; the shared-pool rules refuse COMMITMENT_TERM_REQUIRED (a term that becomes active names 1 or 12 months), COMMITMENT_TERM_NOT_ALLOWED (a perpetual purchase), K1_MONTHLY_ONLY (R-E01), K4_PERPETUAL_ONLY (a K4 plan is bought once: only a perpetual purchase is written for it), BILLING_LONGER_THAN_COMMITMENT (R-G01), BILLING_CYCLE_UNSUPPORTED (only MONTHLY and ANNUAL are written; QUARTERLY and OTHER stay readable on older data), RESPONSIBLE_REQUIRED (an active subscription names the IT Admin who answers for it), RESPONSIBLE_NOT_IT_ADMIN and VENDOR_ADMINS_REQUIRED (a plan that needs admins at the vendor, a K2 plan or a K4 plan with an admin console, is not activated as a new subscription, nor its pool made, once the seat baseline is closed while fewer than two different working IT Admins are recorded in its workspace profile; while the seat baseline is open it is let through and carries vendorAdminsBelowMinimum when read; the period a renewal continues is never asked, it only carries the flag vendorAdminsBelowMinimum), and an update may also be refused with PRIMARY_NOT_ELIGIBLE (details.reason); the unit price is refused with PRICE_NOT_VND (it is entered in dong only, details.currency) or PRICE_MISMATCH (when monthlyUnitPrice and unitPrice disagree, details.expectedUnitPrice), and the unit price and the original price with MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE or CURRENCY_NOT_SUPPORTED (the currency of the original price). The workspace the subscription is held in is judged too: WORKSPACE_VENDOR_MISMATCH (it is held at another vendor than the plan), WORKSPACE_REQUIRED (the vendor has several workspaces and none is named, details.workspaceIds), MEMBERS_MONTHLY_ONLY (seats counted by the members commit for one month) and MEMBERS_PAYMENT_DAY_REQUIRED (an active one names its payment day in renewalDate); an update may also be refused with SEAT_COUNTING_FIXED (how the seats are counted does not change once active). Changing purchasedQuantity requires expectedUpdatedAt (SUBSCRIPTION.VERSION_REQUIRED) and increasing it on an active K2 subscription requires quantityChangeReason (SUBSCRIPTION.QUANTITY_REASON_REQUIRED). An update that would put the seats bought under the seats taken is refused with SUBSCRIPTION.QUANTITY_BELOW_OCCUPIED (details.occupied, details.requested). An active subscription is never lowered to a draft by an update: one still priced in another currency (an earlier release could not convert it) is refused with SUBSCRIPTION.STILL_DRAFT (details.missing is UNIT_PRICE) until the update enters the price in dong, and it stays active.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -27539,6 +27623,62 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.SEAT_COUNTING_FIXED": {
+                    "summary": "How the seats of an active subscription are counted cannot change.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.SEAT_COUNTING_FIXED",
+                        "message": "How the seats of an active subscription are counted cannot change.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.WORKSPACE_VENDOR_MISMATCH": {
+                    "summary": "The workspace is held at another vendor than the plan.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.WORKSPACE_VENDOR_MISMATCH",
+                        "message": "The workspace is held at another vendor than the plan.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.WORKSPACE_REQUIRED": {
+                    "summary": "The vendor has several workspaces: name the one the subscription is held in.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.WORKSPACE_REQUIRED",
+                        "message": "The vendor has several workspaces: name the one the subscription is held in.",
+                        "details": { "workspaceIds": ["<workspace-id>", "<other-workspace-id>"] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.MEMBERS_MONTHLY_ONLY": {
+                    "summary": "A subscription whose seats are the members the vendor counts commits for one month only.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.MEMBERS_MONTHLY_ONLY",
+                        "message": "A subscription whose seats are the members the vendor counts commits for one month only.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.MEMBERS_PAYMENT_DAY_REQUIRED": {
+                    "summary": "An active subscription counted by its members needs renewalDate, its payment day.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.MEMBERS_PAYMENT_DAY_REQUIRED",
+                        "message": "An active subscription counted by its members needs renewalDate, its payment day.",
                         "requestId": "req_example"
                       }
                     }
@@ -29259,7 +29399,7 @@
                       "error": {
                         "code": "WORKSPACE.ADMIN_NOT_IT_ADMIN",
                         "message": "Every person named for a workspace must be an IT Admin with an account that can sign in.",
-                        "details": { "employeeId": "00000000-0000-4000-8000-000000000001" },
+                        "details": { "employeeId": "<employee-id>" },
                         "requestId": "req_example"
                       }
                     }
@@ -29558,7 +29698,7 @@
                       "error": {
                         "code": "WORKSPACE.ADMIN_NOT_IT_ADMIN",
                         "message": "Every person named for a workspace must be an IT Admin with an account that can sign in.",
-                        "details": { "employeeId": "00000000-0000-4000-8000-000000000001" },
+                        "details": { "employeeId": "<employee-id>" },
                         "requestId": "req_example"
                       }
                     }
@@ -117869,6 +118009,25 @@
                       "maximum": 9007199254740991,
                       "nullable": true
                     },
+                    "workspace": {
+                      "type": "object",
+                      "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                      "required": ["id", "name"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "seatCounting": {
+                      "type": "string",
+                      "enum": ["FIXED", "MEMBERS"],
+                      "description": "FIXED: a number of seats bought (the default). MEMBERS: the members the vendor counts; a one-month commitment only, with the payment day in renewalDate. It cannot change once the subscription is active."
+                    },
+                    "minimumSeatsTotal": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "nullable": true
+                    },
+                    "invoicedLater": { "type": "boolean" },
                     "isPrimaryForPlan": { "type": "boolean" },
                     "expiry": {
                       "type": "string",
@@ -118018,6 +118177,10 @@
                     "responsibleItAdminEmployeeId",
                     "responsibleItAdmin",
                     "vendorMinimumSeats",
+                    "workspace",
+                    "seatCounting",
+                    "minimumSeatsTotal",
+                    "invoicedLater",
                     "isPrimaryForPlan",
                     "expiry",
                     "daysLeft",
@@ -118154,7 +118317,24 @@
             "type": "string",
             "format": "uuid"
           },
-          "vendorMinimumSeats": { "type": "integer", "minimum": 1, "maximum": 1000000000 }
+          "vendorMinimumSeats": { "type": "integer", "minimum": 1, "maximum": 1000000000 },
+          "workspaceId": {
+            "description": "The workspace the subscription is held in; its vendor must be the vendor of the plan. Left out, a subscription of a plan the company administers at the vendor takes the only workspace of the vendor, or a workspace named after the vendor is made when it has none; with several the caller must say which.",
+            "type": "string",
+            "format": "uuid"
+          },
+          "seatCounting": {
+            "type": "string",
+            "enum": ["FIXED", "MEMBERS"],
+            "description": "FIXED: a number of seats bought (the default). MEMBERS: the members the vendor counts; a one-month commitment only, with the payment day in renewalDate. It cannot change once the subscription is active."
+          },
+          "minimumSeatsTotal": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000000,
+            "description": "The least number of seats the vendor sells across the workspace, when it says one."
+          },
+          "invoicedLater": { "description": "The vendor invoices after the period.", "type": "boolean" }
         },
         "required": ["planId", "kind"],
         "additionalProperties": false
@@ -118259,6 +118439,25 @@
                 "maximum": 9007199254740991,
                 "nullable": true
               },
+              "workspace": {
+                "type": "object",
+                "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                "required": ["id", "name"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "seatCounting": {
+                "type": "string",
+                "enum": ["FIXED", "MEMBERS"],
+                "description": "FIXED: a number of seats bought (the default). MEMBERS: the members the vendor counts; a one-month commitment only, with the payment day in renewalDate. It cannot change once the subscription is active."
+              },
+              "minimumSeatsTotal": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991,
+                "nullable": true
+              },
+              "invoicedLater": { "type": "boolean" },
               "isPrimaryForPlan": { "type": "boolean" },
               "expiry": {
                 "type": "string",
@@ -118408,6 +118607,10 @@
               "responsibleItAdminEmployeeId",
               "responsibleItAdmin",
               "vendorMinimumSeats",
+              "workspace",
+              "seatCounting",
+              "minimumSeatsTotal",
+              "invoicedLater",
               "isPrimaryForPlan",
               "expiry",
               "daysLeft",
@@ -118503,6 +118706,24 @@
           "autoRenew": { "type": "boolean" },
           "allowsMidTermReduction": { "type": "boolean" },
           "vendorMinimumSeats": { "type": "integer", "minimum": 1, "maximum": 1000000000, "nullable": true },
+          "workspaceId": {
+            "description": "Moves the subscription to another workspace of the same vendor, unless it would duplicate a live plan there.",
+            "type": "string",
+            "format": "uuid"
+          },
+          "seatCounting": {
+            "type": "string",
+            "enum": ["FIXED", "MEMBERS"],
+            "description": "FIXED: a number of seats bought (the default). MEMBERS: the members the vendor counts; a one-month commitment only, with the payment day in renewalDate. It cannot change once the subscription is active."
+          },
+          "minimumSeatsTotal": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000000,
+            "description": "The least number of seats the vendor sells across the workspace, when it says one.",
+            "nullable": true
+          },
+          "invoicedLater": { "type": "boolean" },
           "isPrimaryForPlan": { "type": "boolean" },
           "quantityChangeReason": {
             "description": "Reason for increasing purchasedQuantity on an active K2 subscription (1-500 characters after trimming; required when increasing, ignored when not increasing).",
@@ -118636,6 +118857,25 @@
                 "maximum": 9007199254740991,
                 "nullable": true
               },
+              "workspace": {
+                "type": "object",
+                "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                "required": ["id", "name"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "seatCounting": {
+                "type": "string",
+                "enum": ["FIXED", "MEMBERS"],
+                "description": "FIXED: a number of seats bought (the default). MEMBERS: the members the vendor counts; a one-month commitment only, with the payment day in renewalDate. It cannot change once the subscription is active."
+              },
+              "minimumSeatsTotal": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991,
+                "nullable": true
+              },
+              "invoicedLater": { "type": "boolean" },
               "isPrimaryForPlan": { "type": "boolean" },
               "expiry": {
                 "type": "string",
@@ -118789,6 +119029,10 @@
               "responsibleItAdminEmployeeId",
               "responsibleItAdmin",
               "vendorMinimumSeats",
+              "workspace",
+              "seatCounting",
+              "minimumSeatsTotal",
+              "invoicedLater",
               "isPrimaryForPlan",
               "expiry",
               "daysLeft",

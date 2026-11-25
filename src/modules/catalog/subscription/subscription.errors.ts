@@ -219,6 +219,41 @@ export class SubscriptionQuantityReasonRequiredError extends Error {
   }
 }
 
+/** A subscription counted by its members commits for one month only (QĐ-115g, C4). */
+export class SubscriptionMembersMonthlyOnlyError extends Error {
+  constructor() {
+    super('A subscription whose seats are the members the vendor counts commits for one month only.');
+    this.name = 'SubscriptionMembersMonthlyOnlyError';
+  }
+}
+
+/** An active subscription counted by its members names its payment day in renewalDate. */
+export class SubscriptionMembersPaymentDayRequiredError extends Error {
+  constructor() {
+    super('An active subscription counted by its members needs renewalDate, its payment day.');
+    this.name = 'SubscriptionMembersPaymentDayRequiredError';
+  }
+}
+
+/** How the seats are counted does not change once the subscription is active. */
+export class SubscriptionSeatCountingFixedError extends Error {
+  constructor() {
+    super('How the seats of an active subscription are counted cannot change.');
+    this.name = 'SubscriptionSeatCountingFixedError';
+  }
+}
+
+/**
+ * The workspace of the subscription changed between the read that told which workspace to lock and the lock of the period (W3-14, N5): the write
+ * starts again with the workspace it now holds. Never reaches a caller: after three tries it is a SubscriptionStaleError.
+ */
+export class SubscriptionWorkspaceMovedError extends Error {
+  constructor(readonly currentUpdatedAt: Date) {
+    super('The subscription moved to another workspace while it was being written.');
+    this.name = 'SubscriptionWorkspaceMovedError';
+  }
+}
+
 export class SubscriptionPriceMismatchError extends Error {
   constructor(
     readonly expectedUnitPriceMinor: bigint,
