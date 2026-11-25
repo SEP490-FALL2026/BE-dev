@@ -34,8 +34,8 @@ và duyệt. Quy trình: [`docs/guides/quy-trinh-code-ai.md`](../../guides/quy-t
 - **Làn `biz`:** mọi luật và mọi ghi: `prisma/**`, migration, `src/infrastructure/database/database-role-judgement.ts`, `m/requests/request-ticket/**`,
   `m/requests/request-reply/**`, `m/requests/request-ticket-submission/**`, `m/requests/request-intake/**` (trừ spec T1 tạo — bàn giao), `m/requests/need-decision/**`
   (như trên), `m/requests/spend-approval/**` (như trên), `m/requests/spend-submission/**` (gồm `spend-queue`), `m/requests/spend/spend-submission.dto.ts`,
-  `spend.errors.ts`*, `spend.http-errors.ts`*, `m/requests/withdraw/**`, `m/requests/access-request/access-request.repo.ts`, `access-request.types.ts`,
-  `access-request-record.mapper.ts`, `access-request.errors.ts`*, `access-request.http-errors.ts`*, `withdrawal.policy.ts`, `m/requests/reassignment/**`,
+  `spend.errors.ts`\*, `spend.http-errors.ts`\*, `m/requests/withdraw/**`, `m/requests/access-request/access-request.repo.ts`, `access-request.types.ts`,
+  `access-request-record.mapper.ts`, `access-request.errors.ts`\*, `access-request.http-errors.ts`\*, `withdrawal.policy.ts`, `m/requests/reassignment/**`,
   `m/requests/step-routing/**`, `m/requests/request-submission/access-requests.controller.ts` (+spec), `docs/rules/database-business.md`; integration/http spec
   của gói mình (viết).
 - **Làn `tech`:** mọi đường **đọc/hiện** còn lại: `m/requests/request-ticket-view/**`, `m/requests/access-request/access-request.dto.ts`, `m/requests/request-view/**`,
@@ -53,9 +53,9 @@ và duyệt. Quy trình: [`docs/guides/quy-trinh-code-ai.md`](../../guides/quy-t
 | File (`m/` = `src/modules/`)                                                                                      | Gói                          | Làn                                         |
 | ----------------------------------------------------------------------------------------------------------------- | ---------------------------- | ------------------------------------------- |
 | **mới** `m/requests/request-intake/access-request.service.spec.ts`, `m/requests/need-decision/need-decision.service.spec.ts`, `m/requests/spend-approval/spend-decision.service.spec.ts` | T1 → B2a, B3, B4a | **tech T1 → biz** (đổi tay một lần, sau khi T1 ở `int`; `biz` chỉ **thêm** ca, không đổi kỳ vọng cũ) |
-| `prisma/models/requests.prisma`, `organization.prisma`*, `database-role-judgement.ts`                              | B1, B5a                      | biz                                         |
-| `m/requests/requests.module.ts`*                                                                                   | B2b, B3, B4a, B6, T2         | chung, chỉ thêm dòng                        |
-| manifest OpenAPI*, registry collection w4*                                                                         | B2b–B6, T2, T3               | chung, chỉ thêm dòng                        |
+| `prisma/models/requests.prisma`, `organization.prisma`\*, `database-role-judgement.ts`                              | B1, B5a                      | biz                                         |
+| `m/requests/requests.module.ts`\*                                                                                   | B2b, B3, B4a, B6, T2         | chung, chỉ thêm dòng                        |
+| manifest OpenAPI\*, registry collection w4\*                                                                         | B2b–B6, T2, T3               | chung, chỉ thêm dòng                        |
 | `m/requests/access-request/access-request.repo.ts`, `.types.ts`, `access-request-record.mapper.ts`                 | B1                           | biz (T2/T3 chỉ **đọc** `ticket`)            |
 | `m/requests/request-ticket/request-ticket.repo.ts`, `.dto.ts`, `.mapper.ts`                                        | B1 → B5a, B2b, B3, B4a, B6   | biz (T2 chỉ gọi `view`)                     |
 | `m/requests/request-ticket/request-ticket.policy.ts` (+spec), `.errors.ts`, `.http-errors.ts`                      | B1 → B2b, B4b                | biz                                         |
@@ -147,7 +147,7 @@ OpenAPI không mã nội bộ.
 
 ### B1 — biz · M
 
-- **File:** `prisma/models/requests.prisma`, `prisma/models/organization.prisma`*; `prisma/migrations/20261210000000_w4_request_tickets/migration.sql`;
+- **File:** `prisma/models/requests.prisma`, `prisma/models/organization.prisma`\*; `prisma/migrations/20261210000000_w4_request_tickets/migration.sql`;
   `src/infrastructure/database/database-role-judgement.ts` (`request_tickets`); **mới** `m/requests/request-ticket/request-ticket.repo.ts`, `request-ticket.types.ts`,
   `request-ticket.policy.ts` (+spec), `request-ticket.errors.ts`, `request-ticket.http-errors.ts` (+spec), `request-ticket.dto.ts`, `request-ticket.mapper.ts` (+spec);
   `m/requests/access-request/access-request.repo.ts`, `access-request.types.ts`, `access-request-record.mapper.ts` (+spec nếu có);
@@ -160,11 +160,11 @@ OpenAPI không mã nội bộ.
 
 ### B5a — biz · M
 
-- **File:** `prisma/models/requests.prisma`, `organization.prisma`*; `prisma/migrations/20261210000100_w4_access_request_replies/migration.sql`;
+- **File:** `prisma/models/requests.prisma`, `organization.prisma`\*; `prisma/migrations/20261210000100_w4_access_request_replies/migration.sql`;
   `database-role-judgement.ts` (`access_request_replies`); **mới** `m/requests/request-reply/request-reply.repo.ts`, `request-reply.policy.ts` (+spec),
   `request-reply.types.ts`; `m/requests/request-intake/request-resubmission.service.ts` (+spec), **mới** `request-resubmission.dto.ts`;
-  `m/requests/request-submission/access-requests.controller.ts` (+spec); `m/requests/access-request/access-request.errors.ts`*, `access-request.http-errors.ts`*
-  (`REPLY_NOTE_REQUIRED`); `m/requests/request-ticket/request-ticket.repo.ts` (`latestReply` trong `view`); manifest*;
+  `m/requests/request-submission/access-requests.controller.ts` (+spec); `m/requests/access-request/access-request.errors.ts`\*, `access-request.http-errors.ts`\*
+  (`REPLY_NOTE_REQUIRED`); `m/requests/request-ticket/request-ticket.repo.ts` (`latestReply` trong `view`); manifest\*;
   `test/integration/requests/request-resubmission-reply.integration-spec.ts`, `request-reply-schema.integration-spec.ts`;
   `test/http/requests/one-step-resubmission.http-spec.ts`.
 - **Làm:** SPEC §5 M2, §7.9, §7.11 (phần repo). `request-reply.policy.ts`: bước _Trả về của người_ đang chờ trả lời (ba loại bước). `request-reply.repo.ts`: `insert`,
@@ -176,7 +176,7 @@ OpenAPI không mã nội bộ.
 ### B6 — biz · S
 
 - **File:** **mới** `m/requests/withdraw/ticket-withdrawals.controller.ts`, `ticket-withdrawal.service.ts` (+spec); _(OQ-W4-2 = A)_
-  `m/requests/access-request/withdrawal.policy.ts` (+spec); `m/requests/requests.module.ts`*; manifest*;
+  `m/requests/access-request/withdrawal.policy.ts` (+spec); `m/requests/requests.module.ts`\*; manifest\*;
   `test/integration/requests/request-ticket-withdrawal.integration-spec.ts`, `head-withdraw-submission-queue.integration-spec.ts`.
 - **Làm:** SPEC §7.8 (A–G), §7.12 (đúng `NOT_SUBMITTED`, ca âm). OQ-W4-2 chưa trả lời ⟹ làm theo khuyến nghị A, ghi D-n _cần Owner_.
 - **Xong khi:** ca §7.8 và §7.12 có test.
@@ -192,7 +192,7 @@ OpenAPI không mã nội bộ.
 ### B2b — biz · M
 
 - **File:** **mới** `m/requests/request-ticket-submission/request-tickets.controller.ts`, `request-ticket-submission.service.ts` (+spec),
-  `request-ticket-precheck.service.ts` (+spec); `m/requests/requests.module.ts`*; manifest*; **mới** `test/support/api-collection-registry-nested-w4.ts`,
+  `request-ticket-precheck.service.ts` (+spec); `m/requests/requests.module.ts`\*; manifest\*; **mới** `test/support/api-collection-registry-nested-w4.ts`,
   `api-collection-registry-events-w4.ts` (+ nối `api-collection-registry-nested.ts`, `-events.ts`); `test/integration/requests/request-ticket-submit.integration-spec.ts`,
   `request-ticket-head.integration-spec.ts`; `test/http/requests/request-tickets.http-spec.ts`.
 - **Làm:** SPEC §7.2, §7.3. Lỗi cấp phiếu một lần trước vòng mục; vòng mục chỉ bắt danh sách lớp lỗi của gói; hai pha ghi; comment đầu service ghi thứ tự khóa (§6.2,
@@ -203,7 +203,7 @@ OpenAPI không mã nội bộ.
 ### B3 — biz · M
 
 - **File:** `m/requests/need-decision/need-decision.service.ts` (tham số `judged?`), `need-decision.service.spec.ts` (của T1 — chỉ thêm ca); **mới**
-  `ticket-need-decisions.controller.ts`, `ticket-need-decision.service.ts` (+spec); `m/requests/requests.module.ts`*; manifest*;
+  `ticket-need-decisions.controller.ts`, `ticket-need-decision.service.ts` (+spec); `m/requests/requests.module.ts`\*; manifest\*;
   `test/integration/requests/request-ticket-need-decision.integration-spec.ts`.
 - **Làm:** SPEC §7.5. `ALREADY_DECIDED` dựng từ `needSteps` của record (không repo mới). Giữ mọi lần kiểm (`lockDecidable`: `NOT_FOUND`, `GROUP_USES_LINES`,
   `checkNeedDecision`).
@@ -212,7 +212,7 @@ OpenAPI không mã nội bộ.
 ### B4a — biz · M
 
 - **File:** **mới** `m/requests/spend-approval/spend-item-outcome.policy.ts` (+spec), `ticket-spend-decisions.controller.ts`, `ticket-spend-decision.service.ts` (+spec);
-  `spend-batch-decision.service.ts`; `spend-decision.service.spec.ts` (của T1 — chỉ thêm ca); `m/requests/requests.module.ts`*; manifest*;
+  `spend-batch-decision.service.ts`; `spend-decision.service.spec.ts` (của T1 — chỉ thêm ca); `m/requests/requests.module.ts`\*; manifest\*;
   `test/integration/requests/request-ticket-spend-decision.integration-spec.ts`, `request-ticket-grant-in-charge.integration-spec.ts`.
 - **Làm:** SPEC §7.6, §7.14 (IT). Liệt kê mọi nhánh `catch` của `decideOne` (`TransientDatabaseError`, `AccessRequestNotFoundError`, `AccessRequestGroupUsesLinesError`,
   `NO_SPEND_STEP`, `SpendDecisionRefusedError`, `BudgetCommitment*`) và cách `BOUNCED` ra `RECHECKED_RETURNED_TO_HEAD` vào `Kiểm giữ:`; policy thuần, lô giữ.
@@ -229,7 +229,7 @@ OpenAPI không mã nội bộ.
 ### B5b — biz · S
 
 - **File:** `m/requests/spend-submission/spend-batch.service.ts`, `spend-queue.service.ts`, `spend-batch-view.service.ts` (mục lô); `m/requests/spend/spend-submission.dto.ts`
-  (thân `replyNotes`, `stopReason`, mục hàng đợi `ticketRef`/`replyNoteRequired`, mục lô `ticketRef`), `spend.errors.ts`*, `spend.http-errors.ts`*; manifest*;
+  (thân `replyNotes`, `stopReason`, mục hàng đợi `ticketRef`/`replyNoteRequired`, mục lô `ticketRef`), `spend.errors.ts`\*, `spend.http-errors.ts`\*; manifest\*;
   `test/integration/requests/spend-batch-reply-note.integration-spec.ts`.
 - **Làm:** SPEC §7.10 (chỉ lưu khi mục đi tiếp), §7.4 dòng hàng đợi trình (RB-5). Dùng `request-reply.policy.ts` của B5a.
 - **Xong khi:** 5 ca §7.10 có test.
@@ -256,7 +256,7 @@ OpenAPI không mã nội bộ.
 - **File:** **mới** `m/requests/request-ticket-view/request-ticket-view.controller.ts`, `request-ticket-view.service.ts` (+spec); `m/requests/access-request/access-request.dto.ts`;
   `m/requests/request-view/access-request.mapper.ts`, `access-request-query.service.ts`; `m/requests/my-requests/my-requests.dto.ts`, `my-requests.mapper.ts`,
   `my-requests.repo.ts`; `m/requests/need-decision-queue/need-decision-queue.dto.ts`, `.mapper.ts`, `.repo.ts`; `m/requests/spend-approval-view/spend-approval.dto.ts`,
-  `spend-approval.mapper.ts`, `spend-approval-queue.service.ts`; `m/requests/requests.module.ts`*; manifest*; registry w4* (`requestTicketGet#ticket.items`);
+  `spend-approval.mapper.ts`, `spend-approval-queue.service.ts`; `m/requests/requests.module.ts`\*; manifest\*; registry w4\* (`requestTicketGet#ticket.items`);
   `test/integration/requests/request-ticket-view.integration-spec.ts`, `test/http/requests/request-ticket-get.http-spec.ts`.
 - **Làm:** SPEC §7.4 (route GET dùng `RequestTicketRepo.view` + `ticketSchema` của B1; `ticketRef` đọc từ `record.ticket`, không câu riêng).
 - **Xong khi:** 4 tiêu chí §7.4 xanh trên Docker; gate collection xanh hoặc dừng hỏi.
