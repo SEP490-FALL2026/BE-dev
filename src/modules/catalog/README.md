@@ -59,7 +59,8 @@ subscription → plan`; `licensing/license-key` và `licensing/device-activation
 
 - Vendor: `vendors`, `vendor_groups`, `vendor_service_lines`, `vendor_dictionary_proposals`.
 - Ứng dụng: `applications`, `application_business_owners`, `application_retirement_confirmations`, `functional_groups`.
-- Plan: `plans`, `plan_workspace_profiles`, `plan_workspace_admins`, `plan_terms`, `plan_term_opinions`.
+- Plan: `plans`, `plan_workspace_profiles`, `plan_workspace_admins` (dữ liệu cũ, thôi là nguồn từ M4), `plan_terms`, `plan_term_opinions`.
+- Workspace của nhà cung cấp: `workspaces`, `workspace_admins` (W3-10).
 - Subscription: `subscriptions`. Hợp đồng: `contracts`, `contract_subscriptions`, `document_attachments`.
 - Nguồn: `prisma/models/catalog.prisma`; hồ sơ thuế vendor (`VendorTaxProfile*`) thuộc `finance`.
 
@@ -119,6 +120,12 @@ file thuần xuống tầng thấp, hoặc đưa dịch vụ điều phối lên
   Giá tham chiếu (`QĐ-113a`): `referencePrice { amount, currency }` không bắt buộc ở `POST/PATCH /plans` và gói đầu của `POST /applications` (`null` xóa khi sửa); chỉ `K1`/`K2`/`K4`,
   chỉ VND (`PLAN.REFERENCE_PRICE_NOT_VND`, `PLAN.REFERENCE_PRICE_NOT_APPLICABLE`); CHECK ở bảng (`plans_reference_price_whole/_valid`). Đổi kiểu sang `K5` hoặc giữa
   `K1`/`K2` và `K4` ⟹ xóa giá (nhập lại; audit `PLAN.UPDATED` giữ giá cũ); `K1`↔`K2` giữ. Requestable-software không lộ số (chỉ trạng thái giá).
+- `workspace/` — workspace công ty giữ ở một nhà cung cấp (W3-10, `QĐ-115c`): `workspaces.controller.ts` (sáu route: `workspaceList`, `workspaceGet`
+  đọc cho `IT_ADMIN`/`FINANCE`/`SUPER_ADMIN`; `workspaceCreate` mọi IT Admin, người tạo là người phụ trách; `workspaceUpdate`, `workspaceAdminsSet` chỉ IT phụ trách,
+  `expectedUpdatedAt` bắt buộc; `workspaceResponsibleItAdminChange` chỉ `SUPER_ADMIN`); `WorkspaceService`, `WorkspaceAdminsService` (≥ 2 IT Admin khác nhau, chủ chính
+  là OWNER trong danh sách), `WorkspaceResponsibleService`, `WorkspaceViewService` (tên, admin còn làm việc, cờ); `workspace.policy.ts` là hàm thuần. Audit:
+  `WORKSPACE.CREATED`, `WORKSPACE.UPDATED`, `WORKSPACE.ADMINS_SET`, `WORKSPACE.RESPONSIBLE_CHANGED`. Khóa: workspace `FOR UPDATE` (tầng 5b). Facade `WorkspaceApi`
+  (`public/workspace.api.ts`): `adminsOf`, `workingAdminCount`, `responsibleOf`, `defaultWorkspaceOfVendor`.
 - `plan-terms/` — điều khoản, cảnh báo review (US-04-11; ý kiến Business Owner đã gỡ, `QĐ-111g`); `plan-terms.controller.ts`;
   `PlanTermsService`.
 - `subscription/` — subscription và mua đứt (US-04-03, US-04-05), đích ghế, giá; `subscriptions.controller.ts` (`subscriptionCreate` từ

@@ -101,6 +101,7 @@ model Vendor {
   assessments     AccessRequestAssessment[]
   invoices        Invoice[]
   contracts       Contract[]
+  workspaces      Workspace[]
 
   @@unique([organizationId, normalizedName])
   @@unique([organizationId, dictionaryGroupId])
@@ -592,4 +593,54 @@ model DocumentAttachment {
   @@index([outOfProcessCaseId])
   @@index([uploadedByAppUserId, status])
   @@map("document_attachments")
+}
+
+// The workspace the company holds at one vendor (W3-10, QĐ-115c): who owns and administers it there, the company account that owns it, the
+// emergency account, and the IT Admin who answers for it. It replaces the profile of a plan (`plan_workspace_profiles`, kept as old data).
+// No secret is stored.
+model Workspace {
+  id                           String    @id @default(uuid(7)) @db.Uuid
+  organizationId               String    @map("organization_id") @db.Uuid
+  vendorId                     String    @map("vendor_id") @db.Uuid
+  name                         String
+  normalizedName               String    @map("normalized_name")
+  ownerAccountEmail            String?   @map("owner_account_email")
+  primaryOwnerEmployeeId       String?   @map("primary_owner_employee_id") @db.Uuid
+  // The person who created it; only the Super Admin (or the hand-over of an IT Admin who leaves) changes it. Null raises the flag NO_RESPONSIBLE.
+  responsibleItAdminEmployeeId String?   @map("responsible_it_admin_employee_id") @db.Uuid
+  ownerLimit                   Int?      @map("owner_limit")
+  adminLimit                   Int?      @map("admin_limit")
+  ownerTransferProcedure       String?   @map("owner_transfer_procedure")
+  emergencyIdentity            String?   @map("emergency_identity")
+  emergencyOccupiesSeat        Boolean?  @map("emergency_occupies_seat")
+  emergencyHolderEmployeeId    String?   @map("emergency_holder_employee_id") @db.Uuid
+  emergencyLastReviewedOn      DateTime? @map("emergency_last_reviewed_on") @db.Date
+  adminNote                    String?   @map("admin_note")
+  createdAt                    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization       Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  vendor             Vendor           @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  primaryOwner       Employee?        @relation("WorkspaceOwnerOfWorkspace", fields: [primaryOwnerEmployeeId], references: [id], onDelete: Restrict)
+  responsibleItAdmin Employee?        @relation("WorkspaceInCharge", fields: [responsibleItAdminEmployeeId], references: [id], onDelete: Restrict)
+  emergencyHolder    Employee?        @relation("WorkspaceEmergencyHolderOfWorkspace", fields: [emergencyHolderEmployeeId], references: [id], onDelete: Restrict)
+  admins             WorkspaceAdmin[]
+
+  @@unique([organizationId, vendorId, normalizedName])
+  @@index([vendorId])
+  @@index([responsibleItAdminEmployeeId])
+  @@map("workspaces")
+}
+
+model WorkspaceAdmin {
+  workspaceId String        @map("workspace_id") @db.Uuid
+  employeeId  String        @map("employee_id") @db.Uuid
+  role        WorkspaceRole
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  employee  Employee  @relation("WorkspaceAdminOfWorkspace", fields: [employeeId], references: [id], onDelete: Restrict)
+
+  @@id([workspaceId, employeeId])
+  @@index([employeeId])
+  @@map("workspace_admins")
 }

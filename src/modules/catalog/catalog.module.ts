@@ -95,6 +95,13 @@ import { VendorQueryService } from './vendor/vendor-query.service';
 import { VendorTaxService } from './vendor/vendor-tax.service';
 import { VendorsController } from './vendor/vendors.controller';
 import { VendorRepo } from './vendor/vendor.repo';
+import { WorkspaceApi } from './public/workspace.api';
+import { WorkspaceAdminsService } from './workspace/workspace-admins.service';
+import { WorkspaceResponsibleService } from './workspace/workspace-responsible.service';
+import { WorkspaceService } from './workspace/workspace.service';
+import { WorkspaceRepo } from './workspace/workspace.repo';
+import { WorkspaceViewService } from './workspace/workspace-view.service';
+import { WorkspacesController } from './workspace/workspaces.controller';
 
 /**
  * The catalog context (C1, G3 part): the shared vendor dictionary, the application catalog and its vendors and
@@ -124,6 +131,7 @@ import { VendorRepo } from './vendor/vendor.repo';
     VendorsController,
     SubscriptionsController,
     SubscriptionResponsibleController,
+    WorkspacesController,
     ApplicationRetirementController,
     ApplicationResponsibilityController,
     ContractsController,
@@ -159,6 +167,12 @@ import { VendorRepo } from './vendor/vendor.repo';
     PlanService,
     PlanQuotePriceService,
     PlanWorkspaceService,
+    WorkspaceService,
+    WorkspaceAdminsService,
+    WorkspaceResponsibleService,
+    WorkspaceViewService,
+    WorkspaceRepo,
+    WorkspaceApi,
     VendorAdminRolesService,
     VendorAdminMinimumService,
     PlanRepo,

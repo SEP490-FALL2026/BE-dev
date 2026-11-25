@@ -60,6 +60,7 @@ model Organization {
   exchangeRates                      ExchangeRate[]
   vendorProposals                    VendorDictionaryProposal[]
   vendors                            Vendor[]
+  workspaces                         Workspace[]
   functionalGroups                   FunctionalGroup[]
   applications                       Application[]
   plans                              Plan[]
@@ -347,6 +348,10 @@ model Employee {
   workspacePrimaryOwnerOf         PlanWorkspaceProfile[]              @relation("WorkspacePrimaryOwner")
   workspaceEmergencyHolderOf      PlanWorkspaceProfile[]              @relation("WorkspaceEmergencyHolder")
   workspaceMemberships            PlanWorkspaceAdmin[]                @relation("WorkspaceMember")
+  workspacesOwned                 Workspace[]                         @relation("WorkspaceOwnerOfWorkspace")
+  workspacesInCharge              Workspace[]                         @relation("WorkspaceInCharge")
+  workspaceEmergencyHolderOfWorkspace Workspace[]                     @relation("WorkspaceEmergencyHolderOfWorkspace")
+  workspaceAdminships             WorkspaceAdmin[]                    @relation("WorkspaceAdminOfWorkspace")
   itAdminHandoversReceived        ItAdminHandover[]                   @relation("ItAdminHandoverReceiver")
   departmentSoftwareProposals     DepartmentSoftwareProposal[]        @relation("DepartmentSoftwareProposer")
   subscriptionsInCharge           Subscription[]                      @relation("SubscriptionResponsibleItAdmin")

@@ -1,6 +1,7 @@
 import type { NestedClassification, RegistryEvent } from './api-collection-registry';
 import { W2_REGISTRY_EVENTS } from './api-collection-registry-events-w2';
 import { QD111_REGISTRY_EVENTS } from './api-collection-registry-events-qd111';
+import { REDESIGN_W3_TECH_REGISTRY_EVENTS } from './api-collection-registry-events-redesign-w3-tech';
 import { W3_REGISTRY_EVENTS } from './api-collection-registry-events-w3';
 
 export const closedException = (
@@ -70,6 +71,7 @@ export const removedByDecision = (key: string, from: NestedClassification): Regi
 export const REGISTRY_EVENTS_SINCE_INITIAL: readonly RegistryEvent[] = [
   ...W2_REGISTRY_EVENTS,
   ...W3_REGISTRY_EVENTS,
+  ...REDESIGN_W3_TECH_REGISTRY_EVENTS,
   ...QD111_REGISTRY_EVENTS,
   // QĐ-93a, D-S19 (Owner 01/11/2026): `GET /me` returns `roles` as one array of the granted roles; the object { direct, derived, effective } goes.
   ...['meGet#roles.direct', 'meGet#roles.derived', 'meGet#roles.effective'].map((key): RegistryEvent => ({

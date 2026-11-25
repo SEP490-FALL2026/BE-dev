@@ -86,6 +86,8 @@ const PRISMA_MODEL_OWNER: Readonly<Record<string, string>> = {
   PlanTermOpinion: 'catalog',
   PlanWorkspaceProfile: 'catalog',
   PlanWorkspaceAdmin: 'catalog',
+  Workspace: 'catalog',
+  WorkspaceAdmin: 'catalog',
   FunctionalGroup: 'catalog',
   Vendor: 'catalog',
   VendorGroup: 'catalog',
