@@ -5,16 +5,17 @@ import { AuditApi } from '../../audit/public/audit.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { catalogAuditEvent } from '../catalog-audit-event.mapper';
 import { PlanFactsService, type LockedPlan } from '../plan/plan-facts.service';
+import { needsVendorAdmins } from '../plan/plan-vendor-admins.policy';
+import { SeatBaselinePhaseHook } from '../public/catalog.extension-points';
 import type { CreateLicenseLotInput } from '../public/license-lot.types';
 import { WorkspaceForSubscriptionService } from '../workspace/workspace-for-subscription.service';
-import { assertCreatable } from './license-lot.policy';
+import { assertCreatable, assertLotVendorAdminsRecorded } from './license-lot.policy';
 import { LicenseLotRepo } from './license-lot.repo';
 import { LicenseLotPriceService } from './license-lot-price.service';
-import type { LicenseLotDetail, LicenseLotRecord } from './license-lot.types';
-import { LicenseLotViewService } from './license-lot-view.service';
+import type { LicenseLotRecord } from './license-lot.types';
 
 /**
- * Makes a lot of licenses of a K4 plan (W3-24). The IT Admin who makes it answers for it.
+ * Makes a lot of licenses of a K4 plan. The IT Admin who makes it answers for it.
  *
  * Lock order: the workspace of the new lot first (tier 5b), then the plan `FOR SHARE` (tier 7); the lot does not exist before it is written, so there is nothing of
  * it to lock. One audit event. The facts other modules own (a lot for a request needs an open grant task of that request) are checked by the module that owns
@@ -24,20 +25,21 @@ import { LicenseLotViewService } from './license-lot-view.service';
 export class LicenseLotCreateService {
   constructor(
     private readonly lots: LicenseLotRepo,
-    private readonly views: LicenseLotViewService,
     private readonly plans: PlanFactsService,
     private readonly workspaces: WorkspaceForSubscriptionService,
     private readonly pricing: LicenseLotPriceService,
     private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
+    private readonly baselinePhase: SeatBaselinePhaseHook,
   ) {}
 
   /**
    * Throws LicenseLotPlanNotK4Error, LicenseLotPurposeNotAvailableError, LicenseLotRequestRequiredError, LicenseLotRequestTakenError, LicenseLotMismatchError
-   * (contract, workspace), the errors of the workspace of the vendor (WorkspaceRequiredError, WorkspaceVendorMismatchError, WorkspaceNotFoundError) and of the money.
+   * (contract, workspace), LicenseLotVendorAdminsRequiredError, the errors of the workspace of the vendor (WorkspaceRequiredError, WorkspaceVendorMismatchError,
+   * WorkspaceNotFoundError) and of the money.
    */
-  async create(actor: AuthenticatedPrincipal, input: CreateLicenseLotInput): Promise<LicenseLotDetail> {
+  async create(actor: AuthenticatedPrincipal, input: CreateLicenseLotInput): Promise<LicenseLotRecord> {
     const unitPrice = await this.pricing.readUnitPrice(input.unitPrice, 'unitPrice');
     const original = input.originalUnitPrice
       ? await this.pricing.readOriginal(input.originalUnitPrice, 'originalUnitPrice')
@@ -45,9 +47,10 @@ export class LicenseLotCreateService {
     const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('A lot was made before installation');
 
-    const record = await this.runner.run(async (tx) => {
+    return this.runner.run(async (tx) => {
       const workspaceId = await this.lockWorkspace(tx, actor, organization.id, input);
-      await this.lockPlan(tx, input);
+      const plan = await this.lockPlan(tx, input);
+      await this.assertVendorAdmins(tx, plan, organization.id, workspaceId);
       const created = await this.lots.insert(tx, {
         organizationId: organization.id,
         planId: input.planId,
@@ -67,8 +70,6 @@ export class LicenseLotCreateService {
 
       return created;
     });
-
-    return (await this.views.viewAll([record]))[0];
   }
 
   /** The plan is judged as it is read without a lock, to find the vendor and say early; the workspace is locked on that vendor (5b). */
@@ -85,14 +86,39 @@ export class LicenseLotCreateService {
       tx,
       actor,
       organizationId,
-      { vendorId: unlocked?.applicationVendorId ?? null, needsWorkspace: unlocked?.hasAdminConsole ?? false },
+      {
+        vendorId: unlocked?.applicationVendorId ?? null,
+        needsWorkspace: needsVendorAdmins(unlocked?.provisioningType ?? 'NONE', unlocked?.hasAdminConsole ?? false),
+      },
       input.workspaceId,
     );
   }
 
   /** The plan held for sharing (7), and judged again as it stands under the lock: a change of its kind waits for this write. */
-  private async lockPlan(tx: DbTx, input: CreateLicenseLotInput): Promise<void> {
-    this.assertFits(await this.plans.lockShared(tx, input.planId), input);
+  private async lockPlan(tx: DbTx, input: CreateLicenseLotInput): Promise<LockedPlan> {
+    const plan = await this.plans.lockShared(tx, input.planId);
+    this.assertFits(plan, input);
+
+    return plan as LockedPlan;
+  }
+
+  /**
+   * A K4 plan with an admin console needs at least two working IT Admins recorded on its workspace once the seat baseline is closed (`QĐ-110k`, `QĐ-117e`).
+   * While the baseline is open, the gate lets creation through. Throws LicenseLotVendorAdminsRequiredError.
+   */
+  private async assertVendorAdmins(
+    tx: DbTx,
+    plan: LockedPlan,
+    organizationId: string,
+    workspaceId: string | null,
+  ): Promise<void> {
+    const needs = needsVendorAdmins(plan.provisioningType, plan.hasAdminConsole);
+    if (!needs) return;
+    // Nobody to say the baseline is still open: take it as closed, so nothing is let through by accident.
+    const closed = !this.baselinePhase.isBound() || (await this.baselinePhase.get().isClosed(tx, organizationId));
+    if (!closed) return;
+    const given = workspaceId === null ? 0 : await this.workspaces.workingAdminCount(tx, workspaceId);
+    assertLotVendorAdminsRecorded({ needs, given, planId: plan.id });
   }
 
   private assertFits(plan: LockedPlan | null, input: CreateLicenseLotInput): void {

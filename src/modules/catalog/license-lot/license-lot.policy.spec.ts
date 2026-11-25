@@ -5,10 +5,12 @@ import {
   LicenseLotPriceLockedError,
   LicenseLotPurposeNotAvailableError,
   LicenseLotRequestRequiredError,
+  LicenseLotVendorAdminsRequiredError,
 } from './license-lot.errors';
 import {
   assertCreatable,
   assertKeysWithinLicenses,
+  assertLotVendorAdminsRecorded,
   assertPriceOpen,
   costBorneOf,
   freeOf,
@@ -102,5 +104,30 @@ describe('the price of a lot and its keys', () => {
     expect(freeOf(3, 5, 12_000_000n)).toEqual({ free: 0, freeValueMinor: 0n });
     expect(grantableOf({ keyBinding: 'ACCOUNT', free: 2, keysInStore: 1 })).toBe(1);
     expect(grantableOf({ keyBinding: 'DEVICE_KEY', free: 2, keysInStore: 1 })).toBeNull();
+  });
+});
+
+describe('workspace working-admin gate for a K4 lot (W3-12, W3-24)', () => {
+  it.each([
+    { needs: false, given: 0, allowed: true },
+    { needs: false, given: 1, allowed: true },
+    { needs: true, given: 2, allowed: true },
+    { needs: true, given: 3, allowed: true },
+    { needs: true, given: 1, allowed: false },
+    { needs: true, given: 0, allowed: false },
+  ])('needs=$needs, given=$given -> allowed=$allowed', ({ needs, given, allowed }) => {
+    const run = () => assertLotVendorAdminsRecorded({ needs, given, planId: 'plan-k4' });
+    if (allowed) {
+      expect(run).not.toThrow();
+    } else {
+      let thrown: unknown;
+      try {
+        run();
+      } catch (error) {
+        thrown = error;
+      }
+      expect(thrown).toBeInstanceOf(LicenseLotVendorAdminsRequiredError);
+      expect(thrown).toMatchObject({ planId: 'plan-k4', given, required: 2 });
+    }
   });
 });

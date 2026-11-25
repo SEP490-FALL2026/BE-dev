@@ -1,3 +1,4 @@
+import { MIN_WORKSPACE_ADMINS } from '../workspace/workspace.policy';
 import {
   LicenseLotContractReasonRequiredError,
   LicenseLotKeysExceedLicensesError,
@@ -5,6 +6,7 @@ import {
   LicenseLotPriceLockedError,
   LicenseLotPurposeNotAvailableError,
   LicenseLotRequestRequiredError,
+  LicenseLotVendorAdminsRequiredError,
 } from './license-lot.errors';
 import type { LicenseLotPurpose } from './license-lot.types';
 
@@ -83,4 +85,14 @@ export function freeOf(
 /** The keys that can be given at once: the licenses free and the keys in the store, whichever is the fewer; only for a plan whose key goes to an account. */
 export function grantableOf(input: { keyBinding: KeyBinding; free: number; keysInStore: number }): number | null {
   return input.keyBinding === 'ACCOUNT' ? Math.min(input.free, input.keysInStore) : null;
+}
+
+/**
+ * A lot of a K4 plan with an admin console needs at least two different working IT Admins on its workspace once the seat baseline is closed (`QĐ-110k`,
+ * `QĐ-117e`). Throws LicenseLotVendorAdminsRequiredError.
+ */
+export function assertLotVendorAdminsRecorded(input: { needs: boolean; given: number; planId: string }): void {
+  if (input.needs && input.given < MIN_WORKSPACE_ADMINS) {
+    throw new LicenseLotVendorAdminsRequiredError(input.planId, input.given, MIN_WORKSPACE_ADMINS);
+  }
 }

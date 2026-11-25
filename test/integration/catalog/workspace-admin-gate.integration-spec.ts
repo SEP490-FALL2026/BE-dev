@@ -52,6 +52,16 @@ describe('workspace >= 2 working admin gate and WORKSPACE_ADMIN_NOT_WORKING aler
     return planId;
   };
 
+  const makeK4Plan = async (hasAdminConsole: boolean): Promise<string> =>
+    declarePlan(h.ctx, khoa.accessToken, {
+      applicationId: appId,
+      name: h.unique(`K4 Plan ${hasAdminConsole ? 'Console' : 'NoConsole'}`),
+      provisioningType: 'K4',
+      keyBinding: 'ACCOUNT',
+      controlLevel: 'FULL',
+      hasAdminConsole,
+    });
+
   const declareTerm = (planId: string, workspaceId: string, extra: Record<string, unknown> = {}) =>
     request(h.server())
       .post('/api/v1/subscriptions')
@@ -321,6 +331,70 @@ describe('workspace >= 2 working admin gate and WORKSPACE_ADMIN_NOT_WORKING aler
         expect(rows[0].recipient_employee_id).toBe(khoa.employeeId);
       } finally {
         await setAccountStatus(nam, 'ACTIVE');
+      }
+    });
+  });
+
+  describe('W3-12 & W3-24: K4 license lot creation workspace >= 2 working admin gate', () => {
+    it.each([
+      {
+        label: '1. K4 hasAdminConsole=true, Khoa & Nam working, baseline closed -> 201',
+        hasAdminConsole: true,
+        baselineClosed: true,
+        lockNam: false,
+        expectedStatus: 201,
+      },
+      {
+        label: '2. K4 hasAdminConsole=true, Nam locked, baseline closed -> 422 LICENSE_LOT.VENDOR_ADMINS_REQUIRED',
+        hasAdminConsole: true,
+        baselineClosed: true,
+        lockNam: true,
+        expectedStatus: 422,
+        expectedCode: 'LICENSE_LOT.VENDOR_ADMINS_REQUIRED',
+      },
+      {
+        label: '3. K4 hasAdminConsole=true, Nam locked, baseline open -> 201',
+        hasAdminConsole: true,
+        baselineClosed: false,
+        lockNam: true,
+        expectedStatus: 201,
+      },
+      {
+        label: '4. K4 hasAdminConsole=false, Nam locked, baseline closed -> 201',
+        hasAdminConsole: false,
+        baselineClosed: true,
+        lockNam: true,
+        expectedStatus: 201,
+      },
+    ])('$label', async ({ hasAdminConsole, baselineClosed, lockNam, expectedStatus, expectedCode }) => {
+      await h.ctx.sql.query(
+        `UPDATE seat_baselines SET closed_at = ${baselineClosed ? 'now()' : 'NULL'} WHERE organization_id = $1`,
+        [h.seed.organizationId],
+      );
+      const ws = h.dataOf<{ id: string; updatedAt: string }>(await postWorkspace(h.unique('WS-LotGate')).expect(201));
+      await setAdmins(ws.id, ws.updatedAt, [
+        { employeeId: khoa.employeeId, role: 'OWNER' },
+        { employeeId: nam.employeeId, role: 'ADMIN' },
+      ]).expect(200);
+      const planId = await makeK4Plan(hasAdminConsole);
+      if (lockNam) await setAccountStatus(nam, 'LOCKED');
+
+      try {
+        const res = await request(h.server())
+          .post('/api/v1/license-lots')
+          .set(h.as(khoa))
+          .send({
+            planId,
+            workspaceId: ws.id,
+            purchasedOn: '2026-11-25',
+            licenseCount: 3,
+            unitPrice: { amount: '12000000', currency: 'VND' },
+            purpose: 'REPLACEMENT',
+          })
+          .expect(expectedStatus);
+        if (expectedCode) expect(h.codeOf(res)).toBe(expectedCode);
+      } finally {
+        if (lockNam) await setAccountStatus(nam, 'ACTIVE');
       }
     });
   });

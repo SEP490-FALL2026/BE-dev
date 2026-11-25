@@ -119,3 +119,15 @@ export class LicenseLotPriceNotVndError extends Error {
     this.name = 'LicenseLotPriceNotVndError';
   }
 }
+
+/** The plan has an admin console and needs at least two different working IT Admins on its workspace once the seat baseline is closed (`QĐ-110k`, `QĐ-117e`). */
+export class LicenseLotVendorAdminsRequiredError extends Error {
+  constructor(
+    readonly planId: string,
+    readonly given: number,
+    readonly required: number,
+  ) {
+    super(`The plan needs at least ${required} different working IT Admins who administer it at the vendor.`);
+    this.name = 'LicenseLotVendorAdminsRequiredError';
+  }
+}
