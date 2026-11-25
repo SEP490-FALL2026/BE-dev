@@ -470,16 +470,9 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
     const s3 = await settlements().settleMonth(h.seed.organizationId, `${h.year}-03-01`, NOW);
     expect(s3.releasedMinor).toBe(50_000n);
 
-    // Ca K & F3: reverse 100k on slice 3 -> next settle releases 100k, third pass = 0
-    await runner().run((tx) => slices().reverseApplied(tx, cD.commitmentId, `${h.year}-03-01`, 100_000n));
-    await prisma().budgetCommitment.update({
-      where: { id: cD.commitmentId },
-      data: {
-        appliedMinor: { decrement: 100_000n },
-        seatMonthReversedMinor: { increment: 100_000n },
-        state: 'HELD',
-      },
-    });
+    // Ca K & F3: re-charge month 3 at 350k -> real SeatMonthSubscriptionService.giveBack reverses 100k on slice 3 -> next settle releases 100k, third pass = 0
+    await setPoolPrice(subscriptionId, 350_000n);
+    await seatMonths().chargeMonth(`${h.year}-03-01`, NOW);
     expect((await settlements().settleMonth(h.seed.organizationId, `${h.year}-03-01`, NOW)).releasedMinor).toBe(
       100_000n,
     );
