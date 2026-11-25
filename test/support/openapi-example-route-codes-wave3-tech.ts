@@ -7,6 +7,7 @@ import type { RouteErrorStatus } from './openapi-example-manifest';
 export const SUCCESS_MESSAGES_WAVE3_TECH: Readonly<Record<string, string>> = {
   subscriptionLineAdd: 'SUBSCRIPTION_LINE.ADDED',
   subscriptionLineSeatChangeList: 'SUBSCRIPTION_LINE_SEAT_CHANGE.LISTED',
+  subscriptionLineSeatPurchase: 'SEAT_PURCHASE.RECORDED',
   subscriptionLineUpdate: 'SUBSCRIPTION_LINE.UPDATED',
 };
 
@@ -110,5 +111,12 @@ export const ROUTE_ERROR_CODES_WAVE3_TECH: Readonly<
   },
   subscriptionLineSeatChangeList: {
     '404': ['SUBSCRIPTION_LINE.NOT_FOUND'],
+  },
+  // W3-18: batch seat purchases on a subscription line.
+  subscriptionLineSeatPurchase: {
+    '403': ['SEAT_PURCHASE.NOT_IN_CHARGE'],
+    '404': ['SUBSCRIPTION_LINE.NOT_FOUND'],
+    '409': ['EMPLOYEE.NOT_STARTED', 'SEAT_PURCHASE.LINE_NOT_PURCHASABLE', 'SEAT_PURCHASE.STOCK_AVAILABLE'],
+    '422': ['SEAT_LEDGER.EFFECTIVE_IN_CLOSED_MONTH', 'SEAT_PURCHASE.ITEM_NOT_PENDING'],
   },
 };

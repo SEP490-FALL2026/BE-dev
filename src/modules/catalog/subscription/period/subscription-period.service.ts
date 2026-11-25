@@ -180,6 +180,7 @@ export class SubscriptionPeriodService {
         noticeDeadline: record.noticeDeadline,
         noticePeriodDays: record.noticePeriodDays,
         autoRenew: record.autoRenew,
+        invoicedLater: record.invoicedLater,
         vendorMinimumSeats: record.vendorMinimumSeats,
         nextPeriodPurchasedQuantity: successor?.purchasedQuantity ?? null,
       };

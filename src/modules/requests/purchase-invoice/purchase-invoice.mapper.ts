@@ -60,6 +60,7 @@ export function toDetail(
     ...summary,
     flags,
     provisioningTaskId: row.provisioningTaskId,
+    seatPurchaseId: row.seatPurchaseId,
     unitPriceOriginal: {
       amount: formatAmount(row.unitPriceOriginalMinor, extra.originalMinorUnits),
       currency: row.unitPriceOriginalCurrency,

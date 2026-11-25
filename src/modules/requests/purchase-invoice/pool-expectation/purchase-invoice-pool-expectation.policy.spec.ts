@@ -322,5 +322,49 @@ describe('purchase-invoice pool expectation policy (W3-05)', () => {
       expect(expectedPoolAmountOf(topUp('ANNUAL', STANDARD_MONTHLY, '2027-07-01', '2027-06-30', []))).toBeNull();
       expect(expectedPoolAmountOf(topUp('ANNUAL', STANDARD_MONTHLY, null, null, ['2026-11-21']))).toBeNull();
     });
+
+    it('computes expectation for SEAT_PURCHASE link (N9) with single rounding', () => {
+      expect(
+        expectedPoolAmountOf({
+          kind: 'SEAT_PURCHASE',
+          billingCycle: 'ANNUAL',
+          monthlyPriceMinor: STANDARD_MONTHLY,
+          quantity: 2,
+          purchasedOn: '2026-11-21',
+          renewalDate: '2027-07-01',
+          endDate: '2027-06-30',
+        }),
+      ).toBe(7_333_333n);
+    });
+
+    it('sums selected subscription lines (N7) and folds prior-month NONE purchases into MONTHLY invoice', () => {
+      expect(
+        expectedPoolAmountOf({
+          kind: 'SUBSCRIPTION_LINES',
+          billingCycle: 'ANNUAL',
+          lines: [
+            { seats: 10, monthlyPriceMinor: STANDARD_MONTHLY },
+            { seats: 2, monthlyPriceMinor: PREMIUM_MONTHLY },
+          ],
+        }),
+      ).toBe(120_000_000n);
+
+      expect(
+        expectedPoolAmountOf({
+          kind: 'SUBSCRIPTION_LINES',
+          billingCycle: 'MONTHLY',
+          lines: [{ seats: 11, monthlyPriceMinor: STANDARD_MONTHLY }],
+          foldedPurchases: [
+            {
+              quantity: 1,
+              monthlyPriceMinor: STANDARD_MONTHLY,
+              purchasedOn: '2026-11-21',
+              renewalDate: '2026-12-01',
+              endDate: '2027-06-30',
+            },
+          ],
+        }),
+      ).toBe(5_666_667n);
+    });
   });
 });

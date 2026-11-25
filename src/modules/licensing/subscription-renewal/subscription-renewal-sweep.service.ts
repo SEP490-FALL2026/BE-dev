@@ -4,6 +4,7 @@ import { SubscriptionPeriodApi } from '../../catalog/public/subscription-period.
 import type { PeriodAdjustment, RenewalPeriodFacts } from '../../catalog/public/subscription-period.types';
 import { describeForOperator } from '../../../infrastructure/observability/operator-error';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { SeatPurchaseInvoiceDueService } from '../shared-pool/seat-purchase-invoice-due.service';
 import {
   candidateNotices,
   dataQualityProblemsOf,
@@ -64,6 +65,7 @@ export class SubscriptionRenewalSweepService {
     private readonly seatsNeeded: RenewalSeatsNeededService,
     private readonly alerts: RenewalAlertsService,
     private readonly deadlines: RenewalDeadlineService,
+    private readonly purchaseDue: SeatPurchaseInvoiceDueService,
   ) {}
 
   async sweep(now: Date = new Date()): Promise<SweepResult> {
@@ -77,6 +79,14 @@ export class SubscriptionRenewalSweepService {
       this.logger.error(`Workspace admin alert sweep failed: ${describeForOperator(error)}`);
     }
     const today = await this.organizationReads.businessToday(now);
+    try {
+      const overdue = await this.purchaseDue.remindOverdue(organization.id, today);
+      result.told += overdue.told;
+      result.failed += overdue.failed;
+    } catch (error) {
+      result.failed += 1;
+      this.logger.error(`Seat purchase invoice due sweep failed: ${describeForOperator(error)}`);
+    }
     const subjects = await this.periods.listAdjustmentSubjects();
     if (subjects.length === 0) return result;
     const ids = subjects.map((period) => period.subscriptionId);

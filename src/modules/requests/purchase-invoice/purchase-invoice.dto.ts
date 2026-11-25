@@ -5,6 +5,8 @@ import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 
 /** The most files that come with one purchase invoice (`D9`). */
 export const PURCHASE_INVOICE_DOCUMENTS_MAX = 20;
+/** The most subscription lines covered by one split period invoice. */
+export const PURCHASE_INVOICE_LINES_MAX = 20;
 /** The most marks laid on one invoice: over what was approved, outside the term, or missing expected pool amount. */
 export const PURCHASE_INVOICE_FLAGS_MAX = 3;
 
@@ -34,12 +36,32 @@ const link = z
       .uuid()
       .optional()
       .meta({ description: 'The subscription the invoice renews; instead of a request.' }),
+    seatPurchaseId: z
+      .uuid()
+      .optional()
+      .meta({ description: 'The seat purchase recorded on this subscription; only with a subscription.' }),
+    subscriptionLineIds: z
+      .array(z.uuid())
+      .min(1)
+      .max(PURCHASE_INVOICE_LINES_MAX)
+      .refine((ids) => new Set(ids).size === ids.length, { message: 'Each subscription line may appear only once.' })
+      .meta({
+        uniqueItems: true,
+        description: 'Selected subscription lines covered by a split period invoice; only with a subscription.',
+      })
+      .optional(),
   })
   .refine(
     (value) =>
       (value.requestId !== undefined) !== (value.subscriptionId !== undefined) &&
-      (value.provisioningTaskId === undefined || value.requestId !== undefined),
-    { message: 'Name a request (with its task if there is one) or a subscription, not both.' },
+      (value.provisioningTaskId === undefined || value.requestId !== undefined) &&
+      (value.seatPurchaseId === undefined || value.subscriptionId !== undefined) &&
+      (value.subscriptionLineIds === undefined || value.subscriptionId !== undefined) &&
+      !(value.seatPurchaseId !== undefined && value.subscriptionLineIds !== undefined),
+    {
+      message:
+        'Name a request (with optional task) or a subscription (with optional seatPurchaseId or subscriptionLineIds), not both.',
+    },
   );
 
 /** What the invoice says and how it was paid, the same for a preview, a submission and a new submission of a returned one. */
@@ -134,6 +156,7 @@ const summarySchema = planView.extend({
 /** One purchase invoice with everything it says and what became of it. */
 const detailSchema = summarySchema.extend({
   provisioningTaskId: z.uuid().nullable(),
+  seatPurchaseId: z.uuid().nullable(),
   unitPriceOriginal: moneyView,
   deductibleTax: moneyView,
   nonDeductibleTax: moneyView,

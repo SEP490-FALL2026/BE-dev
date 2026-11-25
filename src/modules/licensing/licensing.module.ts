@@ -170,6 +170,9 @@ import { SubscriptionRenewalRepo } from './subscription-renewal/subscription-ren
 import { SubscriptionLineTargetRepo } from './subscription-renewal/lines/subscription-line-target.repo';
 import { SubscriptionRenewalAutoRepo } from './subscription-renewal/subscription-renewal-auto.repo';
 import { SubscriptionRenewalsController } from './subscription-renewal/subscription-renewals.controller';
+import { SeatPurchaseInvoiceDueService } from './shared-pool/seat-purchase-invoice-due.service';
+import { SeatPurchaseRouteService } from './seat-purchase/seat-purchase-route.service';
+import { SeatPurchasesController } from './seat-purchase/seat-purchases.controller';
 import { PoliciesTemplateFacadeModule } from '../policies/policies-template-facade.module';
 import { LicenseKeyTemplateListener } from './license-key/license-key-template.listener';
 
@@ -210,6 +213,7 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     MySoftwareController,
     SubscriptionRenewalsController,
     StockSummaryController,
+    SeatPurchasesController,
   ],
   providers: [
     LicenseKeyTemplateListener,
@@ -247,6 +251,8 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     SharedPoolCapacityRepo,
     SharedPoolAvoidedCostRepo,
     SharedPoolService,
+    SeatPurchaseRouteService,
+    SeatPurchaseInvoiceDueService,
     StockSummaryQueryService,
     ProvisioningTaskRepo,
     ProvisioningTaskFrame,

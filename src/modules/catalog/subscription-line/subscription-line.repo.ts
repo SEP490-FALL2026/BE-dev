@@ -120,6 +120,52 @@ export class SubscriptionLineRepo {
     return row ? { billingCycle: row.subscription.billingCycle, invoicedLater: row.subscription.invoicedLater } : null;
   }
 
+  /** Full context of a subscription line needed for seat purchase checks & calculations; null when line not found. */
+  async findWithPurchaseContext(lineId: string, tx?: DbTx) {
+    const row = await (tx ?? this.prisma).subscriptionLine.findUnique({
+      where: { id: lineId },
+      include: {
+        plan: { select: { id: true, provisioningType: true } },
+        subscription: {
+          select: {
+            id: true,
+            organizationId: true,
+            workspaceId: true,
+            kind: true,
+            status: true,
+            seatCounting: true,
+            billingCycle: true,
+            invoicedLater: true,
+            startDate: true,
+            endDate: true,
+            renewalDate: true,
+            responsibleItAdminEmployeeId: true,
+          },
+        },
+      },
+    });
+    if (!row) return null;
+
+    return {
+      line: toRecord(row),
+      plan: { id: row.plan.id, provisioningType: row.plan.provisioningType },
+      period: {
+        id: row.subscription.id,
+        organizationId: row.subscription.organizationId,
+        workspaceId: row.subscription.workspaceId,
+        kind: row.subscription.kind,
+        status: row.subscription.status,
+        seatCounting: row.subscription.seatCounting,
+        billingCycle: row.subscription.billingCycle,
+        invoicedLater: row.subscription.invoicedLater,
+        startDate: row.subscription.startDate ? fromDateColumn(row.subscription.startDate) : null,
+        endDate: row.subscription.endDate ? fromDateColumn(row.subscription.endDate) : null,
+        renewalDate: row.subscription.renewalDate ? fromDateColumn(row.subscription.renewalDate) : null,
+        responsibleItAdminEmployeeId: row.subscription.responsibleItAdminEmployeeId,
+      },
+    };
+  }
+
   /** Batch read of line ledger opening dates and parent period fallback quantities for `seatsOnDays`. */
   async findManyWithPeriod(
     lineIds: readonly string[],
@@ -158,6 +204,30 @@ export class SubscriptionLineRepo {
     }
 
     return byPeriod;
+  }
+
+  /** Maps each `lineId` in `lineIds` to its parent `subscriptionId`. */
+  async findLinePeriodIds(lineIds: readonly string[], tx?: DbTx): Promise<Map<string, string>> {
+    const result = new Map<string, string>();
+    if (lineIds.length === 0) return result;
+    const rows = await (tx ?? this.prisma).subscriptionLine.findMany({
+      where: { id: { in: [...lineIds] } },
+      select: { id: true, subscriptionId: true },
+    });
+    for (const row of rows) result.set(row.id, row.subscriptionId);
+
+    return result;
+  }
+
+  /** Returns lines for the given `lineIds` with their parent `subscriptionId` and `monthlyUnitPriceMinor`. */
+  async ofIds(lineIds: readonly string[], tx?: DbTx): Promise<SubscriptionLineRecord[]> {
+    if (lineIds.length === 0) return [];
+    const rows = await (tx ?? this.prisma).subscriptionLine.findMany({
+      where: { id: { in: [...lineIds] } },
+      orderBy: ORDER,
+    });
+
+    return rows.map(toRecord);
   }
 
   /** The line of a period for a plan, if it has one. */

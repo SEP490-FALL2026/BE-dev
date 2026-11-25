@@ -1,15 +1,24 @@
 import { Injectable } from '@nestjs/common';
-import { formatAmount } from '../../../core/money/money';
+import { DONG, formatAmount } from '../../../core/money/money';
 import { calendarMonthsIn, monthsBeginningIn, type TermRun } from '../../../core/term-limit';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { FinanceApi } from '../../finance/public/finance.api';
 import type { TaxEstimateBasis, TaxGroup } from '../../finance/public/finance.types';
+import { LicensingPoolStockApi } from '../../licensing/public/licensing-pool-stock.api';
 import type { PricingRecord } from '../access-request/access-request.types';
 import { monthlyPriceOf } from '../access-request/pricing.policy';
+import { vendorChargeUntilRenewalOf } from './vendor-charge.policy';
 
 export interface MoneyView {
   amount: string;
   currency: string;
+}
+
+export interface VendorChargeUntilRenewalView {
+  until: string;
+  amount: MoneyView;
+  mode: 'ONE_OFF' | 'MONTHLY';
+  tierStepSeats?: number;
 }
 
 /** What the request costs as a reader sees it: the amounts written with the minor digits of their currency. */
@@ -89,7 +98,26 @@ export interface CostEstimateView {
 /** Writes the money and the estimated tax of a request for a reader; one read of the currencies, never one per amount. */
 @Injectable()
 export class PricingViewService {
-  constructor(private readonly finance: FinanceApi) {}
+  constructor(
+    private readonly finance: FinanceApi,
+    private readonly poolStock?: LicensingPoolStockApi,
+  ) {}
+
+  /** Computes `vendorChargeUntilRenewal` (`W3-20`) at read time when commitment is 12 and `free === 0`. */
+  async vendorChargeUntilRenewalOf(planId: string | null): Promise<VendorChargeUntilRenewalView | undefined> {
+    if (!planId || !this.poolStock) return undefined;
+    const context = await this.poolStock.getVendorChargeContext(planId);
+    if (!context) return undefined;
+    const estimate = vendorChargeUntilRenewalOf(context);
+    if (!estimate) return undefined;
+
+    return {
+      until: estimate.until,
+      amount: await this.moneyView({ amountMinor: estimate.amountMinor, currency: DONG }),
+      mode: estimate.mode,
+      ...(estimate.tierStepSeats !== undefined ? { tierStepSeats: estimate.tierStepSeats } : {}),
+    };
+  }
 
   async view(pricing: PricingRecord): Promise<PricingView> {
     const units = await this.minorUnits(pricing.amount?.currency ?? pricing.unitPrice?.currency);

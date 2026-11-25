@@ -44,6 +44,8 @@ export interface NewPurchaseInvoice {
   requestId: string | null;
   provisioningTaskId: string | null;
   subscriptionId: string | null;
+  seatPurchaseId?: string | null;
+  subscriptionLineIds?: readonly string[];
   vendorId: string;
   number: string;
   issuedOn: BusinessDate;
@@ -169,6 +171,45 @@ export class PurchaseInvoiceRepo {
     return rows[0]?.found === true;
   }
 
+  /** Whether a non-returned purchase invoice already links to `seatPurchaseId`. */
+  async seatPurchaseHasOpenInvoice(seatPurchaseId: string, tx?: DbTx): Promise<boolean> {
+    const found = await (tx ?? this.prisma).purchaseInvoice.findFirst({
+      where: { seatPurchaseId, state: { not: 'RETURNED' } },
+      select: { id: true },
+    });
+
+    return found !== null;
+  }
+
+  /** Returns which lines are already covered by non-returned period `purchase_invoices` for `(subscriptionId, serviceMonth)`. */
+  async invoicedLinesForMonth(
+    subscriptionId: string,
+    serviceMonth: BusinessDate,
+    tx?: DbTx,
+  ): Promise<{ wholePeriodInvoiced: boolean; lineIds: Set<string> }> {
+    const rows = await (tx ?? this.prisma).purchaseInvoice.findMany({
+      where: {
+        linkKind: 'SUBSCRIPTION',
+        subscriptionId,
+        seatPurchaseId: null,
+        serviceMonth: toDateColumn(serviceMonth),
+        state: { not: 'RETURNED' },
+      },
+      select: { subscriptionLineIds: true },
+    });
+    const lineIds = new Set<string>();
+    let wholePeriodInvoiced = false;
+    for (const row of rows) {
+      if (row.subscriptionLineIds.length === 0) {
+        wholePeriodInvoiced = true;
+      } else {
+        for (const id of row.subscriptionLineIds) lineIds.add(id);
+      }
+    }
+
+    return { wholePeriodInvoiced, lineIds };
+  }
+
   async insert(tx: DbTx, input: NewPurchaseInvoice): Promise<PurchaseInvoiceRow> {
     return tx.purchaseInvoice.create({
       data: {
@@ -177,6 +218,8 @@ export class PurchaseInvoiceRepo {
         requestId: input.requestId,
         provisioningTaskId: input.provisioningTaskId,
         subscriptionId: input.subscriptionId,
+        seatPurchaseId: input.seatPurchaseId ?? null,
+        subscriptionLineIds: input.subscriptionLineIds ? [...input.subscriptionLineIds] : [],
         vendorId: input.vendorId,
         number: input.number,
         issuedOn: toDateColumn(input.issuedOn),

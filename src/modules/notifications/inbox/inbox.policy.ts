@@ -226,6 +226,14 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   DEPARTMENT_WITHOUT_HEAD: ['departmentId', 'waitingCount'],
   SUBSCRIPTION_SEATS_INCREASED: ['subscriptionId', 'fromQuantity', 'toQuantity', 'requestId', 'changedByEmployeeId'],
   SUBSCRIPTION_SEATS_REDUCED: ['subscriptionId', 'fromQuantity', 'toQuantity', 'changedByEmployeeId'],
+  SUBSCRIPTION_SEATS_BOUGHT: [
+    'subscriptionId',
+    'subscriptionLineId',
+    'seatPurchaseId',
+    'quantity',
+    'recordedByEmployeeId',
+  ],
+  SEAT_PURCHASE_INVOICE_OVERDUE: ['seatPurchaseId', 'subscriptionId', 'dueOn'],
   SUBSCRIPTION_PRICE_REVIEW: ['subscriptionId', 'purchaseInvoiceId'],
   // What an IT Admin who leaves still answers for, once the day has come and the handover is not done (`QĐ-110j`, `R-26`).
   IT_ADMIN_HANDOVER_PENDING: ['sourceKind', 'sourceId', 'employeeId', 'dueOn'],

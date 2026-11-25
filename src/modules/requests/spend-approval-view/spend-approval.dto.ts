@@ -240,6 +240,14 @@ const approvalDetailSchema = z.strictObject({
    * people): shown beside the amount of the months left (`BR-MF1-07b`). Null when it is not a first purchase of a yearly plan.
    */
   annualVendorAmount: money.nullable(),
+  vendorChargeUntilRenewal: z
+    .strictObject({
+      until: responseBusinessDate,
+      amount: money,
+      mode: z.enum(['ONE_OFF', 'MONTHLY']),
+      tierStepSeats: z.number().int().positive().optional(),
+    })
+    .optional(),
 });
 
 const resultSchema = z.strictObject({

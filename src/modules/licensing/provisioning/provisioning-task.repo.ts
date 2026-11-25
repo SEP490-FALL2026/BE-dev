@@ -487,4 +487,54 @@ export class ProvisioningTaskRepo {
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
     );
   }
+
+  /** Finds open (`QUEUED`/`IN_PROGRESS`) `GRANT` tasks matching any `(requestId, beneficiaryEmployeeId)` for `planId`. */
+  async findOpenGrantTasksForItems(
+    tx: DbTx,
+    items: readonly { requestId: string; beneficiaryEmployeeId: string }[],
+    planId: string,
+  ): Promise<Array<{ taskId: string; requestId: string; employeeId: string; status: 'QUEUED' | 'IN_PROGRESS' }>> {
+    if (items.length === 0) return [];
+    const requestIds = [...new Set(items.map((item) => item.requestId))];
+    const employeeIds = [...new Set(items.map((item) => item.beneficiaryEmployeeId))];
+    const rows = await tx.provisioningTask.findMany({
+      where: {
+        kind: 'GRANT',
+        status: { in: ['QUEUED', 'IN_PROGRESS'] },
+        requestId: { in: requestIds },
+        assignment: { planId, employeeId: { in: employeeIds } },
+      },
+      select: {
+        id: true,
+        requestId: true,
+        status: true,
+        assignment: { select: { employeeId: true } },
+      },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+
+    return rows.flatMap((row) =>
+      row.requestId === null
+        ? []
+        : [
+            {
+              taskId: row.id,
+              requestId: row.requestId,
+              employeeId: row.assignment.employeeId,
+              status: row.status as 'QUEUED' | 'IN_PROGRESS',
+            },
+          ],
+    );
+  }
+
+  /** Counts all open (`QUEUED`/`IN_PROGRESS`) `GRANT` tasks for `planId`. */
+  countPendingGrantTasksOfPlan(tx: DbTx, planId: string): Promise<number> {
+    return tx.provisioningTask.count({
+      where: {
+        kind: 'GRANT',
+        status: { in: ['QUEUED', 'IN_PROGRESS'] },
+        assignment: { planId },
+      },
+    });
+  }
 }

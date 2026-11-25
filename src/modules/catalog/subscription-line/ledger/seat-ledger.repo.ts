@@ -234,4 +234,44 @@ export class SeatLedgerRepo {
 
     return result;
   }
+
+  /** Keys `${requestId}:${beneficiaryEmployeeId}` that already hold a `TOP_UP` `GRANT` ledger entry. */
+  async existingTopUpItems(
+    items: readonly { requestId: string; beneficiaryEmployeeId: string }[],
+    tx?: DbTx,
+  ): Promise<Set<string>> {
+    if (items.length === 0) return new Set();
+    const requestIds = [...new Set(items.map((item) => item.requestId))];
+    const employeeIds = [...new Set(items.map((item) => item.beneficiaryEmployeeId))];
+    const rows = await (tx ?? this.prisma).seatChange.findMany({
+      where: {
+        reason: 'TOP_UP',
+        source: 'GRANT',
+        requestId: { in: requestIds },
+        beneficiaryEmployeeId: { in: employeeIds },
+      },
+      select: { requestId: true, beneficiaryEmployeeId: true },
+    });
+
+    return new Set(
+      rows
+        .filter((row) => row.requestId !== null && row.beneficiaryEmployeeId !== null)
+        .map((row) => `${row.requestId}:${row.beneficiaryEmployeeId}`),
+    );
+  }
+
+  /** Seat purchase ids linked to `TOP_UP` `GRANT` changes for `requestId`. */
+  async topUpPurchaseIdsOfRequest(requestId: string, tx?: DbTx): Promise<string[]> {
+    const rows = await (tx ?? this.prisma).seatChange.findMany({
+      where: {
+        requestId,
+        reason: 'TOP_UP',
+        seatPurchaseId: { not: null },
+      },
+      select: { seatPurchaseId: true },
+      distinct: ['seatPurchaseId'],
+    });
+
+    return rows.flatMap((row) => (row.seatPurchaseId ? [row.seatPurchaseId] : []));
+  }
 }

@@ -211,6 +211,7 @@ import { InvoiceDiscrepancyNotifierService } from './invoice-discrepancy/invoice
 import { InvoiceDiscrepancyOpeningService } from './invoice-discrepancy/invoice-discrepancy-opening.service';
 import { InvoiceDiscrepancyRepo } from './invoice-discrepancy/invoice-discrepancy.repo';
 import { PurchaseInvoicePlanService } from './purchase-invoice/purchase-invoice-plan.service';
+import { PurchaseInvoicePoolService } from './purchase-invoice/pool-expectation/purchase-invoice-pool-expectation.service';
 import { PurchaseInvoiceFacts } from './purchase-invoice/purchase-invoice-facts.listener';
 import { PurchaseInvoiceMissingPeriodsQueryService } from './purchase-invoice/purchase-invoice-missing-periods-query.service';
 import { PurchaseInvoiceQueryService } from './purchase-invoice/purchase-invoice-query.service';
@@ -399,6 +400,7 @@ import { PurchaseInvoicesController } from './purchase-invoice/purchase-invoices
     RenewalSeatFactsService,
     RenewalRequestService,
     PurchaseInvoiceRepo,
+    PurchaseInvoicePoolService,
     PurchaseInvoicePlanService,
     PurchaseInvoiceSubmissionService,
     PurchaseInvoiceQueryService,

@@ -1,8 +1,27 @@
-import { addDays, monthBoundsOf, type BusinessDate } from '../../../../core/business-date';
-import { addMonths, firstGridOffsetFrom } from '../../../../core/fiscal-year';
-import { roundHalfAway } from '../../../../core/seat-month-cost';
+import { addDays, type BusinessDate } from '../../../../core/business-date';
+import {
+  coverFraction,
+  nextBillingBoundary,
+  proratedSeatAmount,
+  roundHalfAway,
+} from '../../../../core/seat-month-cost';
+
+export { coverFraction };
 
 export type PoolInvoiceBillingCycle = 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER';
+
+export interface SubscriptionLineExpectationEntry {
+  seats: number;
+  monthlyPriceMinor: bigint | null;
+}
+
+export interface FoldedMonthlyPurchaseEntry {
+  quantity: number;
+  monthlyPriceMinor: bigint;
+  purchasedOn: BusinessDate;
+  renewalDate: BusinessDate | null;
+  endDate: BusinessDate | null;
+}
 
 export type PoolInvoiceExpectationSource =
   | {
@@ -10,6 +29,21 @@ export type PoolInvoiceExpectationSource =
       billingCycle: PoolInvoiceBillingCycle | null;
       purchasedQuantity: number | null;
       monthlyPriceMinor: bigint | null;
+    }
+  | {
+      kind: 'SUBSCRIPTION_LINES';
+      billingCycle: PoolInvoiceBillingCycle | null;
+      lines: readonly SubscriptionLineExpectationEntry[];
+      foldedPurchases?: readonly FoldedMonthlyPurchaseEntry[];
+    }
+  | {
+      kind: 'SEAT_PURCHASE';
+      billingCycle: PoolInvoiceBillingCycle | null;
+      monthlyPriceMinor: bigint | null;
+      quantity: number;
+      purchasedOn: BusinessDate;
+      renewalDate: BusinessDate | null;
+      endDate: BusinessDate | null;
     }
   | {
       kind: 'REQUEST_TOP_UP';
@@ -42,84 +76,11 @@ export interface PoolInvoiceExpectationResult {
   noExpectedAmount: boolean;
 }
 
-const DAY_MS = 86_400_000;
-
 const PERIOD_CYCLE_MONTHS: Readonly<Record<Exclude<PoolInvoiceBillingCycle, 'OTHER'>, bigint>> = {
   MONTHLY: 1n,
   QUARTERLY: 3n,
   ANNUAL: 12n,
 };
-
-function calendarDays(from: BusinessDate, to: BusinessDate): number {
-  if (to <= from) return 0;
-
-  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS);
-}
-
-function gcd(a: bigint, b: bigint): bigint {
-  let x = a < 0n ? -a : a;
-  let y = b < 0n ? -b : b;
-  while (y !== 0n) {
-    const t = x % y;
-    x = y;
-    y = t;
-  }
-
-  return x === 0n ? 1n : x;
-}
-
-function addFraction(a: { num: bigint; den: bigint }, b: { num: bigint; den: bigint }): { num: bigint; den: bigint } {
-  const num = a.num * b.den + b.num * a.den;
-  const den = a.den * b.den;
-  const divisor = gcd(num, den);
-
-  return { num: num / divisor, den: den / divisor };
-}
-
-/**
- * Exact rational sum of `coveredDays_m / daysInMonth_m` over every calendar month intersecting `[from, toInclusive]`,
- * so each purchase-date group rounds only once at the end. Pure.
- */
-export function coverFraction(from: BusinessDate, toInclusive: BusinessDate): { num: bigint; den: bigint } {
-  if (from > toInclusive) return { num: 0n, den: 1n };
-  const endExclusive = addDays(toInclusive, 1);
-  let total = { num: 0n, den: 1n };
-  let cursor = from;
-
-  while (cursor < endExclusive) {
-    const { start, nextStart } = monthBoundsOf(cursor);
-    const segEnd = endExclusive < nextStart ? endExclusive : nextStart;
-    const daysInMonth = calendarDays(start, nextStart);
-    const coveredDays = calendarDays(cursor, segEnd);
-    const piece =
-      coveredDays === daysInMonth ? { num: 1n, den: 1n } : { num: BigInt(coveredDays), den: BigInt(daysInMonth) };
-    total = addFraction(total, piece);
-    cursor = segEnd;
-  }
-
-  return total;
-}
-
-function topUpEndBoundary(
-  billingCycle: PoolInvoiceBillingCycle | null,
-  renewalDate: BusinessDate | null,
-  endDate: BusinessDate | null,
-  purchaseDate: BusinessDate,
-): BusinessDate | null {
-  if (billingCycle === 'ANNUAL') {
-    return renewalDate ?? (endDate !== null ? addDays(endDate, 1) : null);
-  }
-  if (billingCycle === 'MONTHLY' || billingCycle === 'QUARTERLY') {
-    const anchor = renewalDate ?? endDate;
-    if (anchor === null) return null;
-    const stepMonths = billingCycle === 'MONTHLY' ? 1 : 3;
-    const offset = firstGridOffsetFrom(anchor, stepMonths, addDays(purchaseDate, 1));
-
-    return addMonths(anchor, offset * stepMonths);
-  }
-
-  return null;
-}
 
 function expectedForSubscription(
   source: Extract<PoolInvoiceExpectationSource, { kind: 'SUBSCRIPTION' }>,
@@ -136,6 +97,65 @@ function expectedForSubscription(
   }
 
   return BigInt(source.purchasedQuantity) * source.monthlyPriceMinor * PERIOD_CYCLE_MONTHS[source.billingCycle];
+}
+
+function expectedForSubscriptionLines(
+  source: Extract<PoolInvoiceExpectationSource, { kind: 'SUBSCRIPTION_LINES' }>,
+): bigint | null {
+  if (source.billingCycle === null || source.billingCycle === 'OTHER' || source.lines.length === 0) {
+    return null;
+  }
+  const cycleMonths = PERIOD_CYCLE_MONTHS[source.billingCycle];
+  let total = 0n;
+  for (const line of source.lines) {
+    if (line.seats < 0 || line.monthlyPriceMinor === null || line.monthlyPriceMinor <= 0n) return null;
+    total += BigInt(line.seats) * line.monthlyPriceMinor * cycleMonths;
+  }
+  for (const purchase of source.foldedPurchases ?? []) {
+    const boundary = nextBillingBoundary({
+      billingCycle: 'MONTHLY',
+      renewalDate: purchase.renewalDate,
+      endDate: purchase.endDate,
+      fromDate: purchase.purchasedOn,
+    });
+    if (boundary === null) return null;
+    total += proratedSeatAmount({
+      monthlyMinor: purchase.monthlyPriceMinor,
+      seats: purchase.quantity,
+      from: purchase.purchasedOn,
+      untilExclusive: boundary,
+    });
+  }
+
+  return total;
+}
+
+function expectedForSeatPurchase(
+  source: Extract<PoolInvoiceExpectationSource, { kind: 'SEAT_PURCHASE' }>,
+): bigint | null {
+  if (
+    source.billingCycle === null ||
+    source.billingCycle === 'OTHER' ||
+    source.monthlyPriceMinor === null ||
+    source.monthlyPriceMinor <= 0n ||
+    source.quantity <= 0
+  ) {
+    return null;
+  }
+  const boundary = nextBillingBoundary({
+    billingCycle: source.billingCycle,
+    renewalDate: source.renewalDate,
+    endDate: source.endDate,
+    fromDate: source.purchasedOn,
+  });
+  if (boundary === null) return null;
+
+  return proratedSeatAmount({
+    monthlyMinor: source.monthlyPriceMinor,
+    seats: source.quantity,
+    from: source.purchasedOn,
+    untilExclusive: boundary,
+  });
 }
 
 function expectedForRequestTopUp(
@@ -159,7 +179,12 @@ function expectedForRequestTopUp(
 
   let total = 0n;
   for (const [purchaseDate, count] of countByDate) {
-    const boundary = topUpEndBoundary(source.billingCycle, source.renewalDate, source.endDate, purchaseDate);
+    const boundary = nextBillingBoundary({
+      billingCycle: source.billingCycle,
+      renewalDate: source.renewalDate,
+      endDate: source.endDate,
+      fromDate: purchaseDate,
+    });
     if (boundary === null) return null;
     const cover = coverFraction(purchaseDate, addDays(boundary, -1));
     total += roundHalfAway(BigInt(count) * source.monthlyPriceMinor * cover.num, cover.den);
@@ -170,7 +195,16 @@ function expectedForRequestTopUp(
 
 /** Expected amount in dong for a pooled-quota seat invoice; null when required inputs are absent or non-periodic. Pure. */
 export function expectedPoolAmountOf(source: PoolInvoiceExpectationSource): bigint | null {
-  return source.kind === 'SUBSCRIPTION' ? expectedForSubscription(source) : expectedForRequestTopUp(source);
+  switch (source.kind) {
+    case 'SUBSCRIPTION':
+      return expectedForSubscription(source);
+    case 'SUBSCRIPTION_LINES':
+      return expectedForSubscriptionLines(source);
+    case 'SEAT_PURCHASE':
+      return expectedForSeatPurchase(source);
+    case 'REQUEST_TOP_UP':
+      return expectedForRequestTopUp(source);
+  }
 }
 
 /**

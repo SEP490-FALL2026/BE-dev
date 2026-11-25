@@ -1,4 +1,53 @@
 import { addDays, monthBoundsOf, type BusinessDate } from '../../../core/business-date';
+import { pooledInvoiceCeilingMinor } from './purchase-invoice-match.policy';
+import type { SeatPricing } from './purchase-invoice.types';
+
+const PURCHASABLE_STATES: ReadonlySet<string> = new Set(['AWAITING_EXECUTION', 'EXECUTING', 'COMPLETED']);
+const FAILED_AFTER_PURCHASE_STATES: ReadonlySet<string> = new Set(['FAILED', 'AWAITING_IT_CLOSE']);
+
+export function takesInvoice(state: string): boolean {
+  return PURCHASABLE_STATES.has(state) || FAILED_AFTER_PURCHASE_STATES.has(state);
+}
+
+export function isFailedAfterPurchaseState(state: string): boolean {
+  return FAILED_AFTER_PURCHASE_STATES.has(state);
+}
+
+export function heldByPerson(state: string, provisioningType: string | undefined): boolean {
+  return !FAILED_AFTER_PURCHASE_STATES.has(state) && bearsByHolder(provisioningType);
+}
+
+export function pricingOf(facts: {
+  monthlyPriceMinor: bigint | null;
+  cycleMonths: number | null;
+  renewalDate: BusinessDate | null;
+}): SeatPricing {
+  return {
+    monthlyMinor: facts.monthlyPriceMinor,
+    cycleMonths: facts.cycleMonths,
+    renewalDate: facts.renewalDate,
+  };
+}
+
+export function isOverApprovedInvoice(input: {
+  netMinor: bigint;
+  commitmentRemainingMinor: bigint | null;
+  seatPricing: SeatPricing | null;
+  expectedQuantity: number | null;
+  serviceMonth: BusinessDate;
+}): boolean {
+  if (input.commitmentRemainingMinor !== null) return input.netMinor > input.commitmentRemainingMinor;
+  if (input.seatPricing === null) return false;
+  const ceiling = pooledInvoiceCeilingMinor({
+    quantity: input.expectedQuantity,
+    monthlyMinor: input.seatPricing.monthlyMinor,
+    cycleMonths: input.seatPricing.cycleMonths,
+    serviceMonth: input.serviceMonth,
+    renewalDate: input.seatPricing.renewalDate,
+  });
+
+  return ceiling !== null && input.netMinor > ceiling;
+}
 
 /**
  * Which department bears a purchase invoice (`R-51`, `QĐ-55b`), as pure rules: the one that held the right in the month the invoice pays for. The

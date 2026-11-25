@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { fromDateColumn, toDateColumn } from '../../../../core/business-date';
+import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../../core/business-date';
 import { Prisma } from '../../../../generated/prisma/client';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
@@ -61,6 +61,49 @@ export class SeatPurchaseRepo {
     const row = await (tx ?? this.prisma).seatPurchase.findUnique({ where: { id } });
 
     return row ? toRecord(row) : null;
+  }
+
+  async findMany(ids: readonly string[], tx?: DbTx): Promise<SeatPurchaseRecord[]> {
+    if (ids.length === 0) return [];
+    const rows = await (tx ?? this.prisma).seatPurchase.findMany({
+      where: { id: { in: [...ids] } },
+    });
+
+    return rows.map(toRecord);
+  }
+
+  /** Monthly late-invoiced (`NONE`) purchases of a subscription's lines within `[from, untilExclusive)`. */
+  async ofSubscriptionMonthNoInvoice(
+    subscriptionId: string,
+    from: BusinessDate,
+    untilExclusive: BusinessDate,
+    tx?: DbTx,
+  ): Promise<
+    Array<{
+      purchase: SeatPurchaseRecord;
+      monthlyUnitPriceMinor: bigint;
+    }>
+  > {
+    const db = tx ?? this.prisma;
+    const lines = await db.subscriptionLine.findMany({
+      where: { subscriptionId },
+      select: { id: true, monthlyUnitPriceMinor: true },
+    });
+    if (lines.length === 0) return [];
+    const priceByLine = new Map(lines.map((l) => [l.id, l.monthlyUnitPriceMinor]));
+    const rows = await db.seatPurchase.findMany({
+      where: {
+        invoiceObligation: 'NONE',
+        subscriptionLineId: { in: lines.map((l) => l.id) },
+        purchasedOn: { gte: toDateColumn(from), lt: toDateColumn(untilExclusive) },
+      },
+      orderBy: [{ purchasedOn: 'asc' }, { recordedAt: 'asc' }, { id: 'asc' }],
+    });
+
+    return rows.map((row) => ({
+      purchase: toRecord(row),
+      monthlyUnitPriceMinor: priceByLine.get(row.subscriptionLineId) ?? 0n,
+    }));
   }
 
   /** The purchases of a line, oldest first. */

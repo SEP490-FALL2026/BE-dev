@@ -261,6 +261,41 @@ export class SeatLedgerService {
     return this.ledger.seatsOnOfLines(lineIds, day, tx);
   }
 
+  /** Context of a line and its parent subscription period for seat purchase route checks. */
+  findWithPurchaseContext(lineId: string, tx?: DbTx) {
+    return this.lines.findWithPurchaseContext(lineId, tx);
+  }
+
+  findLinePeriodIds(lineIds: readonly string[], tx?: DbTx): Promise<Map<string, string>> {
+    return this.lines.findLinePeriodIds(lineIds, tx);
+  }
+
+  linesOfIds(lineIds: readonly string[], tx?: DbTx): Promise<SubscriptionLineRecord[]> {
+    return this.lines.ofIds(lineIds, tx);
+  }
+
+  async linesOfSubscription(subscriptionId: string, tx?: DbTx): Promise<SubscriptionLineRecord[]> {
+    return (await this.lines.ofSubscriptions([subscriptionId], tx)).get(subscriptionId) ?? [];
+  }
+
+  /** Locks parent subscription period (`FOR UPDATE`, tier 6) then the line (`FOR UPDATE`, tier 6c). */
+  async lockPeriodAndLine(tx: DbTx, subscriptionId: string, lineId: string): Promise<SubscriptionLineRecord | null> {
+    await this.lines.lockPeriod(tx, subscriptionId, 'UPDATE');
+
+    return this.lines.lock(tx, lineId);
+  }
+
+  existingTopUpItems(
+    items: readonly { requestId: string; beneficiaryEmployeeId: string }[],
+    tx?: DbTx,
+  ): Promise<Set<string>> {
+    return this.ledger.existingTopUpItems(items, tx);
+  }
+
+  topUpPurchaseIdsOfRequest(requestId: string, tx?: DbTx): Promise<string[]> {
+    return this.ledger.topUpPurchaseIdsOfRequest(requestId, tx);
+  }
+
   private async resolveLockedLine(
     tx: DbTx,
     lineRef: LineTargetRef,

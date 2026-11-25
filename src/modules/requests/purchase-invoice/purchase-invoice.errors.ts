@@ -7,6 +7,10 @@ export type PurchaseInvoiceRefusal =
   | 'LINK_NOT_FOUND'
   | 'NOT_FOUND'
   | 'REQUEST_NOT_PURCHASABLE'
+  | 'SEAT_PURCHASE_REQUIRED'
+  | 'SEAT_PURCHASE_INVOICED'
+  | 'LINE_ALREADY_INVOICED'
+  | 'INVALID_LINE_SELECTION'
   | 'NO_VENDOR'
   | 'NUMBER_TAKEN'
   | 'DOCUMENT_INVALID'
@@ -20,8 +24,17 @@ export class PurchaseInvoiceRefusedError extends Error {
   constructor(
     readonly reason: PurchaseInvoiceRefusal,
     readonly problem?: string,
+    readonly extra?: { readonly seatPurchaseIds?: readonly string[]; readonly lineIds?: readonly string[] },
   ) {
     super(`The purchase invoice was refused: ${reason}${problem ? ` (${problem})` : ''}.`);
     this.name = 'PurchaseInvoiceRefusedError';
+  }
+
+  get seatPurchaseIds(): readonly string[] | undefined {
+    return this.extra?.seatPurchaseIds;
+  }
+
+  get lineIds(): readonly string[] | undefined {
+    return this.extra?.lineIds;
   }
 }

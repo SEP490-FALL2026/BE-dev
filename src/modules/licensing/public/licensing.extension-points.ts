@@ -77,6 +77,15 @@ export interface GrantRequestGate {
    * and what was held for it goes back. Returns false, changing nothing, when the request was not waiting for that.
    */
   reportCancelled(tx: DbTx, requestId: string, employeeId?: string): Promise<boolean>;
+  /**
+   * Returns `${requestId}:${beneficiaryEmployeeId}` keys for items whose request is spend-approved and eligible for
+   * seat purchase on `expectedPlanId`.
+   */
+  checkSeatPurchaseItems(
+    tx: DbTx,
+    items: readonly { requestId: string; beneficiaryEmployeeId: string }[],
+    expectedPlanId: string,
+  ): Promise<Set<string>>;
 }
 
 /** The one gate of requests the provisioning asks (bound by requests; every graph that loads licensing loads it). */

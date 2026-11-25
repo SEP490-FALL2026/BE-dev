@@ -18,6 +18,15 @@ import type { PurchaseInvoicePlan } from './purchase-invoice.types';
  * in the transaction (label, period, match, department that bears it), the invoice is kept as it was read, its files are attached to it, and
  * nothing is spent yet: Finance signs the money out. The marks laid on an invoice (more than approved, outside the term) never refuse it.
  */
+const linkPersistenceFields = (link: PurchaseInvoicePlan['link']) => ({
+  linkKind: link.kind,
+  requestId: link.kind === 'REQUEST' ? link.requestId : null,
+  provisioningTaskId: link.kind === 'REQUEST' ? link.provisioningTaskId : null,
+  subscriptionId: link.kind === 'SUBSCRIPTION' ? link.subscriptionId : null,
+  seatPurchaseId: link.kind === 'SUBSCRIPTION' ? link.seatPurchaseId : null,
+  subscriptionLineIds: link.kind === 'SUBSCRIPTION' ? [...link.subscriptionLineIds] : [],
+});
+
 @Injectable()
 export class PurchaseInvoiceSubmissionService {
   constructor(
@@ -59,7 +68,11 @@ export class PurchaseInvoiceSubmissionService {
               requestId: old.requestId as string,
               ...(old.provisioningTaskId ? { provisioningTaskId: old.provisioningTaskId } : {}),
             }
-          : { subscriptionId: old.subscriptionId as string };
+          : {
+              subscriptionId: old.subscriptionId as string,
+              ...(old.seatPurchaseId ? { seatPurchaseId: old.seatPurchaseId } : {}),
+              ...(old.subscriptionLineIds.length > 0 ? { subscriptionLineIds: old.subscriptionLineIds } : {}),
+            };
 
       return this.keep(tx, actor, { ...body, link }, old.id);
     });
@@ -81,10 +94,7 @@ export class PurchaseInvoiceSubmissionService {
     }
     const row = await this.insert(tx, {
       organizationId: plan.organizationId,
-      linkKind: plan.link.kind,
-      requestId: plan.link.kind === 'REQUEST' ? plan.link.requestId : null,
-      provisioningTaskId: plan.link.kind === 'REQUEST' ? plan.link.provisioningTaskId : null,
-      subscriptionId: plan.link.kind === 'SUBSCRIPTION' ? plan.link.subscriptionId : null,
+      ...linkPersistenceFields(plan.link),
       vendorId: plan.vendorId,
       number: input.vendorInvoiceNumber,
       issuedOn: input.issuedOn,
@@ -126,6 +136,9 @@ export class PurchaseInvoiceSubmissionService {
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         const target = JSON.stringify(error.meta?.target ?? '');
+        if (target.includes('seat_purchase')) {
+          throw new PurchaseInvoiceRefusedError('SEAT_PURCHASE_INVOICED');
+        }
         throw new PurchaseInvoiceRefusedError(target.includes('resubmission') ? 'ALREADY_RESUBMITTED' : 'NUMBER_TAKEN');
       }
       throw error;

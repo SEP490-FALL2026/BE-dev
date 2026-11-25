@@ -225,6 +225,59 @@ export class SharedPoolService {
   }
 
   /**
+   * Read-only `chooseLine` context for a K2 plan (`W3-20`): returns `free` seats today and, when `free === 0`, the line
+   * `chooseLine` would select along with its monthly unit price, minimum seats, and seat total today.
+   */
+  async chosenK2LineContext(
+    planId: string,
+    today: BusinessDate,
+  ): Promise<{
+    free: number;
+    chosen: {
+      subscriptionId: string;
+      monthlyUnitPriceMinor: bigint;
+      minimumSeats: number | null;
+      seatsToday: number;
+    } | null;
+  } | null> {
+    const rawSubs = await this.catalog.getGrantableSubscriptions(planId, today);
+    const ending = await this.capacityRepo.endingAmong(rawSubs.map(idOf));
+    const subscriptions = this.withoutEnding(rawSubs, ending);
+    if (subscriptions.length === 0) return null;
+
+    const pairs = subscriptions.map((sub) => ({ subscriptionId: sub.subscriptionId, planId }));
+    const pairOccupancy = await this.capacityRepo.occupancyOfPlanPairs(pairs, today);
+    const lineIds = subscriptions
+      .map((s) => s.subscriptionLineId)
+      .filter((id): id is string => typeof id === 'string' && id.length > 0);
+    const ledgerSeats = lineIds.length > 0 ? await this.seatLedger.seatsOnDays(lineIds, today, today) : undefined;
+    const stock = stockFrom(
+      subscriptions,
+      planOccupancySlice(planId, subscriptions, pairOccupancy),
+      null,
+      ledgerSeats,
+      today,
+    );
+    if (stock.free > 0) return { free: stock.free, chosen: null };
+
+    const chosen = choosePoolLine(subscriptions, stock);
+    if (!chosen?.subscriptionLineId) return { free: 0, chosen: null };
+    const [line] = await this.seatLedger.linesOfIds([chosen.subscriptionLineId]);
+    if (!line) return { free: 0, chosen: null };
+    const seatsToday = ledgerSeats?.get(chosen.subscriptionLineId)?.get(today) ?? chosen.purchasedQuantity ?? 0;
+
+    return {
+      free: 0,
+      chosen: {
+        subscriptionId: chosen.subscriptionId,
+        monthlyUnitPriceMinor: line.monthlyUnitPriceMinor,
+        minimumSeats: line.minimumSeats,
+        seatsToday,
+      },
+    };
+  }
+
+  /**
    * Whether the purchase the IT Admin asks for with a grant may be recorded (`BR-MF1-09a`, `BR-MF1-09b`), with the stock the answer was
    * read from. A K2 or K4 grant always reads the stock: the grant that buys nothing is told how many seats the other subscriptions of the plan
    * hold free when its own subscription is full.

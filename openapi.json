@@ -49373,6 +49373,333 @@
         "tags": ["stock-summary"]
       }
     },
+    "/api/v1/subscription-lines/{id}/purchases": {
+      "post": {
+        "operationId": "subscriptionLineSeatPurchase",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SeatPurchaseBodyDto" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "Records a batch seat purchase (TOP_UP) and matching GRANT seat changes for pending spend-approved grant tasks.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/SeatPurchaseResponseDto" },
+                    { "properties": { "message": { "example": "SEAT_PURCHASE.RECORDED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller does not hold IT_ADMIN or does not act for one or more beneficiaries.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SEAT_PURCHASE.NOT_IN_CHARGE": {
+                    "summary": "Only the acting IT Admin of the beneficiary department may record this purchase.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SEAT_PURCHASE.NOT_IN_CHARGE",
+                        "message": "Only the acting IT Admin of the beneficiary department may record this purchase.",
+                        "details": {
+                          "items": [{ "requestId": "<request-id>", "beneficiaryEmployeeId": "<employee-id>" }]
+                        },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Subscription line was not found.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "SUBSCRIPTION_LINE.NOT_FOUND": {
+                    "summary": "Subscription line was not found.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION_LINE.NOT_FOUND",
+                        "message": "Subscription line was not found.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Line cannot take purchases, beneficiary has not started yet, or pool already has free capacity for the need.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SEAT_PURCHASE.LINE_NOT_PURCHASABLE": {
+                    "summary": "This subscription line cannot accept a seat purchase: PERIOD_NOT_ACTIVE.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SEAT_PURCHASE.LINE_NOT_PURCHASABLE",
+                        "message": "This subscription line cannot accept a seat purchase: PERIOD_NOT_ACTIVE.",
+                        "details": { "reason": "PERIOD_NOT_ACTIVE" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SEAT_PURCHASE.STOCK_AVAILABLE": {
+                    "summary": "Cannot buy more seats than needed beyond the 1 free seat(s) already available in the pool.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SEAT_PURCHASE.STOCK_AVAILABLE",
+                        "message": "Cannot buy more seats than needed beyond the 1 free seat(s) already available in the pool.",
+                        "details": { "free": 1 },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed, effective date falls in a closed month, or items are not pending.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SEAT_LEDGER.EFFECTIVE_IN_CLOSED_MONTH": {
+                    "summary": "The effective date cannot be before the start of the current month (2026-12-01).",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SEAT_LEDGER.EFFECTIVE_IN_CLOSED_MONTH",
+                        "message": "The effective date cannot be before the start of the current month (2026-12-01).",
+                        "details": { "earliestOn": "2026-12-01" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SEAT_PURCHASE.ITEM_NOT_PENDING": {
+                    "summary": "One or more items do not match a spend-approved pending grant task of this plan without a prior purchase.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SEAT_PURCHASE.ITEM_NOT_PENDING",
+                        "message": "One or more items do not match a spend-approved pending grant task of this plan without a prior purchase.",
+                        "details": {
+                          "items": [{ "requestId": "<request-id>", "beneficiaryEmployeeId": "<employee-id>" }]
+                        },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Record a seat purchase on a subscription line",
+        "tags": ["subscription-lines"]
+      }
+    },
     "/api/v1/access-requests/drafts": {
       "post": {
         "operationId": "accessRequestDraftSave",
@@ -60799,7 +61126,7 @@
             }
           },
           "409": {
-            "description": "The request is not one whose purchase was approved to be spent (PURCHASE_INVOICE.REQUEST_NOT_PURCHASABLE), or the plan of the request has no subscription of the pool that can be taken from today, so there is nowhere to book the invoice (PURCHASE_INVOICE.NO_PLACE).",
+            "description": "The request is not one whose purchase was approved to be spent (PURCHASE_INVOICE.REQUEST_NOT_PURCHASABLE), seat purchase already invoiced (PURCHASE_INVOICE.SEAT_PURCHASE_INVOICED), or the plan of the request has no subscription of the pool that can be taken from today, so there is nowhere to book the invoice (PURCHASE_INVOICE.NO_PLACE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -60812,6 +61139,17 @@
                         "code": "PURCHASE_INVOICE.REQUEST_NOT_PURCHASABLE",
                         "message": "The purchase invoice was refused: REQUEST_NOT_PURCHASABLE (STATE).",
                         "details": { "reason": "STATE" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PURCHASE_INVOICE.SEAT_PURCHASE_INVOICED": {
+                    "summary": "The purchase invoice was refused: SEAT_PURCHASE_INVOICED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.SEAT_PURCHASE_INVOICED",
+                        "message": "The purchase invoice was refused: SEAT_PURCHASE_INVOICED.",
                         "requestId": "req_example"
                       }
                     }
@@ -60874,7 +61212,7 @@
             }
           },
           "422": {
-            "description": "The form is invalid (VALIDATION_ERROR), an amount is not a plain number (VALIDATION_ERROR), has more decimals than its currency (MONEY_SCALE_EXCEEDED), is too large, below nothing, or nothing where it must be more (MONEY_OUT_OF_RANGE), or a currency is not one the system prices in (CURRENCY_NOT_SUPPORTED), or the software has no vendor (PURCHASE_INVOICE.NO_VENDOR).",
+            "description": "The form is invalid (VALIDATION_ERROR), an amount is not a plain number (VALIDATION_ERROR), has more decimals than its currency (MONEY_SCALE_EXCEEDED), is too large, below nothing, or nothing where it must be more (MONEY_OUT_OF_RANGE), or a currency is not one the system prices in (CURRENCY_NOT_SUPPORTED), a seat purchase invoice is required (PURCHASE_INVOICE.SEAT_PURCHASE_REQUIRED), selected subscription lines are invalid or already invoiced (PURCHASE_INVOICE.INVALID_LINE_SELECTION, LINE_ALREADY_INVOICED), or the software has no vendor (PURCHASE_INVOICE.NO_VENDOR).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -60923,6 +61261,41 @@
                         "code": "CURRENCY_NOT_SUPPORTED",
                         "message": "The currency ZZZ is not supported.",
                         "details": { "currency": "ZZZ", "path": "unitPriceOriginal" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PURCHASE_INVOICE.SEAT_PURCHASE_REQUIRED": {
+                    "summary": "The purchase invoice was refused: SEAT_PURCHASE_REQUIRED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.SEAT_PURCHASE_REQUIRED",
+                        "message": "The purchase invoice was refused: SEAT_PURCHASE_REQUIRED.",
+                        "details": { "seatPurchaseIds": ["<seat-purchase-id>"] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PURCHASE_INVOICE.LINE_ALREADY_INVOICED": {
+                    "summary": "The purchase invoice was refused: LINE_ALREADY_INVOICED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.LINE_ALREADY_INVOICED",
+                        "message": "The purchase invoice was refused: LINE_ALREADY_INVOICED.",
+                        "details": { "lineIds": ["<subscription-line-id>"] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PURCHASE_INVOICE.INVALID_LINE_SELECTION": {
+                    "summary": "The purchase invoice was refused: INVALID_LINE_SELECTION.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.INVALID_LINE_SELECTION",
+                        "message": "The purchase invoice was refused: INVALID_LINE_SELECTION.",
                         "requestId": "req_example"
                       }
                     }
@@ -61121,7 +61494,7 @@
             }
           },
           "409": {
-            "description": "The request is not one whose purchase was approved to be spent (PURCHASE_INVOICE.REQUEST_NOT_PURCHASABLE), the vendor has an invoice with this number that was not returned, whatever the case and the white space of either number (PURCHASE_INVOICE.NUMBER_TAKEN), or the plan of the request has no subscription of the pool that can be taken from today, so there is nowhere to book the invoice (PURCHASE_INVOICE.NO_PLACE).",
+            "description": "The request is not one whose purchase was approved to be spent (PURCHASE_INVOICE.REQUEST_NOT_PURCHASABLE), the vendor has an invoice with this number that was not returned, whatever the case and the white space of either number (PURCHASE_INVOICE.NUMBER_TAKEN), seat purchase already invoiced (PURCHASE_INVOICE.SEAT_PURCHASE_INVOICED), or the plan of the request has no subscription of the pool that can be taken from today, so there is nowhere to book the invoice (PURCHASE_INVOICE.NO_PLACE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -61145,6 +61518,17 @@
                       "error": {
                         "code": "PURCHASE_INVOICE.NUMBER_TAKEN",
                         "message": "The purchase invoice was refused: NUMBER_TAKEN.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PURCHASE_INVOICE.SEAT_PURCHASE_INVOICED": {
+                    "summary": "The purchase invoice was refused: SEAT_PURCHASE_INVOICED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.SEAT_PURCHASE_INVOICED",
+                        "message": "The purchase invoice was refused: SEAT_PURCHASE_INVOICED.",
                         "requestId": "req_example"
                       }
                     }
@@ -61207,7 +61591,7 @@
             }
           },
           "422": {
-            "description": "The form is invalid (VALIDATION_ERROR: at least one file, at most twenty), an amount is not a plain number (VALIDATION_ERROR), has more decimals than its currency (MONEY_SCALE_EXCEEDED), is too large, below nothing, or nothing where it must be more (MONEY_OUT_OF_RANGE), or a currency is not one the system prices in (CURRENCY_NOT_SUPPORTED), the software has no vendor (PURCHASE_INVOICE.NO_VENDOR), or a file is not a finished purchase document of the person who submits it (PURCHASE_INVOICE.DOCUMENT_INVALID, with the reason in details).",
+            "description": "The form is invalid (VALIDATION_ERROR: at least one file, at most twenty), an amount is not a plain number (VALIDATION_ERROR), has more decimals than its currency (MONEY_SCALE_EXCEEDED), is too large, below nothing, or nothing where it must be more (MONEY_OUT_OF_RANGE), or a currency is not one the system prices in (CURRENCY_NOT_SUPPORTED), a seat purchase invoice is required (PURCHASE_INVOICE.SEAT_PURCHASE_REQUIRED), selected subscription lines are invalid or already invoiced (PURCHASE_INVOICE.INVALID_LINE_SELECTION, LINE_ALREADY_INVOICED), the software has no vendor (PURCHASE_INVOICE.NO_VENDOR), or a file is not a finished purchase document of the person who submits it (PURCHASE_INVOICE.DOCUMENT_INVALID, with the reason in details).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -61256,6 +61640,41 @@
                         "code": "CURRENCY_NOT_SUPPORTED",
                         "message": "The currency ZZZ is not supported.",
                         "details": { "currency": "ZZZ", "path": "unitPriceOriginal" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PURCHASE_INVOICE.SEAT_PURCHASE_REQUIRED": {
+                    "summary": "The purchase invoice was refused: SEAT_PURCHASE_REQUIRED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.SEAT_PURCHASE_REQUIRED",
+                        "message": "The purchase invoice was refused: SEAT_PURCHASE_REQUIRED.",
+                        "details": { "seatPurchaseIds": ["<seat-purchase-id>"] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PURCHASE_INVOICE.LINE_ALREADY_INVOICED": {
+                    "summary": "The purchase invoice was refused: LINE_ALREADY_INVOICED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.LINE_ALREADY_INVOICED",
+                        "message": "The purchase invoice was refused: LINE_ALREADY_INVOICED.",
+                        "details": { "lineIds": ["<subscription-line-id>"] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PURCHASE_INVOICE.INVALID_LINE_SELECTION": {
+                    "summary": "The purchase invoice was refused: INVALID_LINE_SELECTION.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.INVALID_LINE_SELECTION",
+                        "message": "The purchase invoice was refused: INVALID_LINE_SELECTION.",
                         "requestId": "req_example"
                       }
                     }
@@ -61703,6 +62122,17 @@
                       }
                     }
                   },
+                  "PURCHASE_INVOICE.SEAT_PURCHASE_INVOICED": {
+                    "summary": "The purchase invoice was refused: SEAT_PURCHASE_INVOICED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.SEAT_PURCHASE_INVOICED",
+                        "message": "The purchase invoice was refused: SEAT_PURCHASE_INVOICED.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
                   "PURCHASE_INVOICE.NO_PLACE": {
                     "summary": "The purchase invoice was refused: NO_PLACE.",
                     "value": {
@@ -61783,7 +62213,7 @@
             }
           },
           "422": {
-            "description": "The form is invalid (VALIDATION_ERROR: at least one file, at most twenty), an amount is not a plain number (VALIDATION_ERROR), has more decimals than its currency (MONEY_SCALE_EXCEEDED), is too large, below nothing, or nothing where it must be more (MONEY_OUT_OF_RANGE), or a currency is not one the system prices in (CURRENCY_NOT_SUPPORTED), the software has no vendor (PURCHASE_INVOICE.NO_VENDOR), or a file is not a finished purchase document of the person who submits it (PURCHASE_INVOICE.DOCUMENT_INVALID, with the reason in details).",
+            "description": "The form is invalid (VALIDATION_ERROR: at least one file, at most twenty), an amount is not a plain number (VALIDATION_ERROR), has more decimals than its currency (MONEY_SCALE_EXCEEDED), is too large, below nothing, or nothing where it must be more (MONEY_OUT_OF_RANGE), or a currency is not one the system prices in (CURRENCY_NOT_SUPPORTED), a seat purchase invoice is required (PURCHASE_INVOICE.SEAT_PURCHASE_REQUIRED), selected subscription lines are invalid or already invoiced (PURCHASE_INVOICE.INVALID_LINE_SELECTION, LINE_ALREADY_INVOICED), the software has no vendor (PURCHASE_INVOICE.NO_VENDOR), or a file is not a finished purchase document of the person who submits it (PURCHASE_INVOICE.DOCUMENT_INVALID, with the reason in details).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -61832,6 +62262,41 @@
                         "code": "CURRENCY_NOT_SUPPORTED",
                         "message": "The currency ZZZ is not supported.",
                         "details": { "currency": "ZZZ", "path": "unitPriceOriginal" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PURCHASE_INVOICE.SEAT_PURCHASE_REQUIRED": {
+                    "summary": "The purchase invoice was refused: SEAT_PURCHASE_REQUIRED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.SEAT_PURCHASE_REQUIRED",
+                        "message": "The purchase invoice was refused: SEAT_PURCHASE_REQUIRED.",
+                        "details": { "seatPurchaseIds": ["<seat-purchase-id>"] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PURCHASE_INVOICE.LINE_ALREADY_INVOICED": {
+                    "summary": "The purchase invoice was refused: LINE_ALREADY_INVOICED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.LINE_ALREADY_INVOICED",
+                        "message": "The purchase invoice was refused: LINE_ALREADY_INVOICED.",
+                        "details": { "lineIds": ["<subscription-line-id>"] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PURCHASE_INVOICE.INVALID_LINE_SELECTION": {
+                    "summary": "The purchase invoice was refused: INVALID_LINE_SELECTION.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.INVALID_LINE_SELECTION",
+                        "message": "The purchase invoice was refused: INVALID_LINE_SELECTION.",
                         "requestId": "req_example"
                       }
                     }
@@ -128428,6 +128893,124 @@
         "required": ["success", "message", "data"],
         "additionalProperties": false
       },
+      "SeatPurchaseBodyDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "minItems": 1,
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "requestId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Approved request identifier waiting for a seat purchase."
+                },
+                "beneficiaryEmployeeId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Beneficiary employee identifier for that request item."
+                },
+                "taskId": {
+                  "description": "Open grant task identifier (required when the beneficiary is not placed in a department).",
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "required": ["requestId", "beneficiaryEmployeeId"],
+              "additionalProperties": false
+            },
+            "description": "Unique pending request items receiving newly bought seats."
+          },
+          "purchasedOn": {
+            "type": "string",
+            "format": "date",
+            "description": "Business date when the seats are purchased from the vendor."
+          }
+        },
+        "required": ["items", "purchasedOn"],
+        "additionalProperties": false
+      },
+      "SeatPurchaseResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "code": { "type": "string" },
+              "quantity": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+              "purchasedOn": { "type": "string", "format": "date", "description": "A calendar date as YYYY-MM-DD." },
+              "invoiceObligation": { "type": "string", "enum": ["WORKING_DAYS", "NONE", "LATE_INVOICE"] },
+              "invoiceDueOn": {
+                "type": "string",
+                "format": "date",
+                "description": "A calendar date as YYYY-MM-DD.",
+                "nullable": true
+              },
+              "expectedAmount": {
+                "type": "object",
+                "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                "required": ["amount", "currency"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "changes": {
+                "maxItems": 50,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "effectiveOn": {
+                      "type": "string",
+                      "format": "date",
+                      "description": "A calendar date as YYYY-MM-DD."
+                    },
+                    "delta": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                    "reason": { "type": "string", "enum": ["INITIAL", "TOP_UP", "RENEWAL", "REDUCE"] },
+                    "source": { "type": "string", "enum": ["GRANT", "ADJUSTMENT", "VENDOR_RECORD", "MEMBER"] },
+                    "basis": { "type": "string", "enum": ["REQUEST_ITEM", "NONE"] },
+                    "requestId": { "type": "string", "format": "uuid", "nullable": true },
+                    "beneficiaryEmployeeId": { "type": "string", "format": "uuid", "nullable": true },
+                    "seatPurchaseId": { "type": "string", "format": "uuid", "nullable": true }
+                  },
+                  "required": [
+                    "id",
+                    "effectiveOn",
+                    "delta",
+                    "reason",
+                    "source",
+                    "basis",
+                    "requestId",
+                    "beneficiaryEmployeeId",
+                    "seatPurchaseId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "id",
+              "code",
+              "quantity",
+              "purchasedOn",
+              "invoiceObligation",
+              "invoiceDueOn",
+              "expectedAmount",
+              "changes"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
       "AugmentedZodDto": {
         "oneOf": [
           {
@@ -128949,6 +129532,27 @@
                     "required": ["currentYear", "nextYear", "termCutAt", "months"],
                     "additionalProperties": false,
                     "nullable": true
+                  },
+                  "vendorChargeUntilRenewal": {
+                    "type": "object",
+                    "properties": {
+                      "until": { "type": "string", "format": "date", "description": "A calendar date as YYYY-MM-DD." },
+                      "amount": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false
+                      },
+                      "mode": { "type": "string", "enum": ["ONE_OFF", "MONTHLY"] },
+                      "tierStepSeats": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 9007199254740991,
+                        "minimum": 0
+                      }
+                    },
+                    "required": ["until", "amount", "mode"],
+                    "additionalProperties": false
                   },
                   "policy": {
                     "type": "object",
@@ -129535,6 +130139,27 @@
                     "required": ["currentYear", "nextYear", "termCutAt", "months"],
                     "additionalProperties": false,
                     "nullable": true
+                  },
+                  "vendorChargeUntilRenewal": {
+                    "type": "object",
+                    "properties": {
+                      "until": { "type": "string", "format": "date", "description": "A calendar date as YYYY-MM-DD." },
+                      "amount": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false
+                      },
+                      "mode": { "type": "string", "enum": ["ONE_OFF", "MONTHLY"] },
+                      "tierStepSeats": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 9007199254740991,
+                        "minimum": 0
+                      }
+                    },
+                    "required": ["until", "amount", "mode"],
+                    "additionalProperties": false
                   },
                   "policy": {
                     "type": "object",
@@ -130542,6 +131167,31 @@
                         "required": ["currentYear", "nextYear", "termCutAt", "months"],
                         "additionalProperties": false,
                         "nullable": true
+                      },
+                      "vendorChargeUntilRenewal": {
+                        "type": "object",
+                        "properties": {
+                          "until": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "A calendar date as YYYY-MM-DD."
+                          },
+                          "amount": {
+                            "type": "object",
+                            "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "mode": { "type": "string", "enum": ["ONE_OFF", "MONTHLY"] },
+                          "tierStepSeats": {
+                            "type": "integer",
+                            "exclusiveMinimum": true,
+                            "maximum": 9007199254740991,
+                            "minimum": 0
+                          }
+                        },
+                        "required": ["until", "amount", "mode"],
+                        "additionalProperties": false
                       },
                       "policy": {
                         "type": "object",
@@ -131896,6 +132546,27 @@
                     "required": ["currentYear", "nextYear", "termCutAt", "months"],
                     "additionalProperties": false,
                     "nullable": true
+                  },
+                  "vendorChargeUntilRenewal": {
+                    "type": "object",
+                    "properties": {
+                      "until": { "type": "string", "format": "date", "description": "A calendar date as YYYY-MM-DD." },
+                      "amount": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false
+                      },
+                      "mode": { "type": "string", "enum": ["ONE_OFF", "MONTHLY"] },
+                      "tierStepSeats": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 9007199254740991,
+                        "minimum": 0
+                      }
+                    },
+                    "required": ["until", "amount", "mode"],
+                    "additionalProperties": false
                   },
                   "policy": {
                     "type": "object",
@@ -133834,6 +134505,27 @@
                     "required": ["amount", "currency"],
                     "additionalProperties": false,
                     "nullable": true
+                  },
+                  "vendorChargeUntilRenewal": {
+                    "type": "object",
+                    "properties": {
+                      "until": { "type": "string", "format": "date", "description": "A calendar date as YYYY-MM-DD." },
+                      "amount": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false
+                      },
+                      "mode": { "type": "string", "enum": ["ONE_OFF", "MONTHLY"] },
+                      "tierStepSeats": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 9007199254740991,
+                        "minimum": 0
+                      }
+                    },
+                    "required": ["until", "amount", "mode"],
+                    "additionalProperties": false
                   }
                 },
                 "required": [
@@ -135236,6 +135928,27 @@
                     "additionalProperties": false,
                     "nullable": true
                   },
+                  "vendorChargeUntilRenewal": {
+                    "type": "object",
+                    "properties": {
+                      "until": { "type": "string", "format": "date", "description": "A calendar date as YYYY-MM-DD." },
+                      "amount": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false
+                      },
+                      "mode": { "type": "string", "enum": ["ONE_OFF", "MONTHLY"] },
+                      "tierStepSeats": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 9007199254740991,
+                        "minimum": 0
+                      }
+                    },
+                    "required": ["until", "amount", "mode"],
+                    "additionalProperties": false
+                  },
                   "policy": {
                     "type": "object",
                     "properties": {
@@ -135443,6 +136156,19 @@
                 "description": "The subscription the invoice renews; instead of a request.",
                 "type": "string",
                 "format": "uuid"
+              },
+              "seatPurchaseId": {
+                "description": "The seat purchase recorded on this subscription; only with a subscription.",
+                "type": "string",
+                "format": "uuid"
+              },
+              "subscriptionLineIds": {
+                "minItems": 1,
+                "maxItems": 20,
+                "type": "array",
+                "items": { "type": "string", "format": "uuid" },
+                "uniqueItems": true,
+                "description": "Selected subscription lines covered by a split period invoice; only with a subscription."
               }
             },
             "additionalProperties": false
@@ -135603,6 +136329,19 @@
                 "description": "The subscription the invoice renews; instead of a request.",
                 "type": "string",
                 "format": "uuid"
+              },
+              "seatPurchaseId": {
+                "description": "The seat purchase recorded on this subscription; only with a subscription.",
+                "type": "string",
+                "format": "uuid"
+              },
+              "subscriptionLineIds": {
+                "minItems": 1,
+                "maxItems": 20,
+                "type": "array",
+                "items": { "type": "string", "format": "uuid" },
+                "uniqueItems": true,
+                "description": "Selected subscription lines covered by a split period invoice; only with a subscription."
               }
             },
             "additionalProperties": false
@@ -135735,6 +136474,7 @@
               "submittedAt": { "type": "string", "format": "date-time" },
               "decidedAt": { "type": "string", "format": "date-time", "nullable": true },
               "provisioningTaskId": { "type": "string", "format": "uuid", "nullable": true },
+              "seatPurchaseId": { "type": "string", "format": "uuid", "nullable": true },
               "unitPriceOriginal": {
                 "type": "object",
                 "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
@@ -135827,6 +136567,7 @@
               "submittedAt",
               "decidedAt",
               "provisioningTaskId",
+              "seatPurchaseId",
               "unitPriceOriginal",
               "deductibleTax",
               "nonDeductibleTax",
@@ -137465,6 +138206,27 @@
                     "required": ["currentYear", "nextYear", "termCutAt", "months"],
                     "additionalProperties": false,
                     "nullable": true
+                  },
+                  "vendorChargeUntilRenewal": {
+                    "type": "object",
+                    "properties": {
+                      "until": { "type": "string", "format": "date", "description": "A calendar date as YYYY-MM-DD." },
+                      "amount": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false
+                      },
+                      "mode": { "type": "string", "enum": ["ONE_OFF", "MONTHLY"] },
+                      "tierStepSeats": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 9007199254740991,
+                        "minimum": 0
+                      }
+                    },
+                    "required": ["until", "amount", "mode"],
+                    "additionalProperties": false
                   },
                   "policy": {
                     "type": "object",

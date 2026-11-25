@@ -54,13 +54,18 @@ const NO_PLACE =
   'the plan of the request has no subscription of the pool that can be taken from today, so there is nowhere to book the invoice (PURCHASE_INVOICE.NO_PLACE)';
 const NOT_PURCHASABLE_OR_NO_PLACE = {
   status: HttpStatus.CONFLICT,
-  description: `${REFUSED_STATE}, or ${NO_PLACE}.`,
-  examples: [EXAMPLES.REQUEST_NOT_PURCHASABLE, EXAMPLES.NO_PLACE],
+  description: `${REFUSED_STATE}, seat purchase already invoiced (PURCHASE_INVOICE.SEAT_PURCHASE_INVOICED), or ${NO_PLACE}.`,
+  examples: [EXAMPLES.REQUEST_NOT_PURCHASABLE, EXAMPLES.SEAT_PURCHASE_INVOICED, EXAMPLES.NO_PLACE],
 } as const;
 const NOT_PURCHASABLE_TAKEN_OR_NO_PLACE = {
   status: HttpStatus.CONFLICT,
-  description: `${REFUSED_STATE}, ${TAKEN_NUMBER}, or ${NO_PLACE}.`,
-  examples: [EXAMPLES.REQUEST_NOT_PURCHASABLE, EXAMPLES.NUMBER_TAKEN, EXAMPLES.NO_PLACE],
+  description: `${REFUSED_STATE}, ${TAKEN_NUMBER}, seat purchase already invoiced (PURCHASE_INVOICE.SEAT_PURCHASE_INVOICED), or ${NO_PLACE}.`,
+  examples: [
+    EXAMPLES.REQUEST_NOT_PURCHASABLE,
+    EXAMPLES.NUMBER_TAKEN,
+    EXAMPLES.SEAT_PURCHASE_INVOICED,
+    EXAMPLES.NO_PLACE,
+  ],
 } as const;
 const NOT_PURCHASABLE_TAKEN_OR_NOT_RETURNED = {
   status: HttpStatus.CONFLICT,
@@ -68,6 +73,7 @@ const NOT_PURCHASABLE_TAKEN_OR_NOT_RETURNED = {
   examples: [
     EXAMPLES.REQUEST_NOT_PURCHASABLE,
     EXAMPLES.NUMBER_TAKEN,
+    EXAMPLES.SEAT_PURCHASE_INVOICED,
     EXAMPLES.NO_PLACE,
     EXAMPLES.NOT_RETURNED,
     EXAMPLES.ALREADY_RESUBMITTED,
@@ -80,13 +86,28 @@ const MONEY_EXAMPLES = [EXAMPLES.MONEY_SCALE_EXCEEDED, EXAMPLES.MONEY_OUT_OF_RAN
 
 const INVALID_PREVIEW = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
-  description: `The form is invalid (VALIDATION_ERROR), ${UNREADABLE_MONEY}, or the software has no vendor (PURCHASE_INVOICE.NO_VENDOR).`,
-  examples: [VALIDATION_EXAMPLE, ...MONEY_EXAMPLES, EXAMPLES.NO_VENDOR],
+  description: `The form is invalid (VALIDATION_ERROR), ${UNREADABLE_MONEY}, a seat purchase invoice is required (PURCHASE_INVOICE.SEAT_PURCHASE_REQUIRED), selected subscription lines are invalid or already invoiced (PURCHASE_INVOICE.INVALID_LINE_SELECTION, LINE_ALREADY_INVOICED), or the software has no vendor (PURCHASE_INVOICE.NO_VENDOR).`,
+  examples: [
+    VALIDATION_EXAMPLE,
+    ...MONEY_EXAMPLES,
+    EXAMPLES.SEAT_PURCHASE_REQUIRED,
+    EXAMPLES.LINE_ALREADY_INVOICED,
+    EXAMPLES.INVALID_LINE_SELECTION,
+    EXAMPLES.NO_VENDOR,
+  ],
 } as const;
 const INVALID_SUBMISSION = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
-  description: `The form is invalid (VALIDATION_ERROR: at least one file, at most twenty), ${UNREADABLE_MONEY}, the software has no vendor (PURCHASE_INVOICE.NO_VENDOR), or a file is not a finished purchase document of the person who submits it (PURCHASE_INVOICE.DOCUMENT_INVALID, with the reason in details).`,
-  examples: [VALIDATION_EXAMPLE, ...MONEY_EXAMPLES, EXAMPLES.NO_VENDOR, EXAMPLES.DOCUMENT_INVALID],
+  description: `The form is invalid (VALIDATION_ERROR: at least one file, at most twenty), ${UNREADABLE_MONEY}, a seat purchase invoice is required (PURCHASE_INVOICE.SEAT_PURCHASE_REQUIRED), selected subscription lines are invalid or already invoiced (PURCHASE_INVOICE.INVALID_LINE_SELECTION, LINE_ALREADY_INVOICED), the software has no vendor (PURCHASE_INVOICE.NO_VENDOR), or a file is not a finished purchase document of the person who submits it (PURCHASE_INVOICE.DOCUMENT_INVALID, with the reason in details).`,
+  examples: [
+    VALIDATION_EXAMPLE,
+    ...MONEY_EXAMPLES,
+    EXAMPLES.SEAT_PURCHASE_REQUIRED,
+    EXAMPLES.LINE_ALREADY_INVOICED,
+    EXAMPLES.INVALID_LINE_SELECTION,
+    EXAMPLES.NO_VENDOR,
+    EXAMPLES.DOCUMENT_INVALID,
+  ],
 } as const;
 
 const PREVIEW_ERRORS = [

@@ -44,4 +44,115 @@ describe('PurchaseInvoicePlanService acting scope (S2-2)', () => {
     expect(getItAdminActingScope).toHaveBeenCalledWith('it-1', expect.any(Function), tx);
     expect(findUsableItAdminEmployeeIds).toHaveBeenCalledWith(['it-1'], tx);
   });
+
+  it('rejects REQUEST link for K2 when request has seat purchases with SEAT_PURCHASE_REQUIRED', async () => {
+    const service = new PurchaseInvoicePlanService(
+      {
+        requestFacts: jest.fn().mockResolvedValue({
+          organizationId: 'org-1',
+          departmentId: 'dept-1',
+          state: 'AWAITING_EXECUTION',
+          planId: 'plan-1',
+          type: 'GRANT',
+        }),
+      } as never,
+      {
+        getPlanVendorId: jest.fn().mockResolvedValue('vendor-1'),
+        findPlanSeatTargets: jest.fn().mockResolvedValue([{ planId: 'plan-1', provisioningType: 'K2' }]),
+      } as never,
+      {
+        topUpPurchaseIdsOfRequest: jest.fn().mockResolvedValue(['purchase-1']),
+      } as never,
+      {} as never,
+      {} as never,
+      { getItAdminActingScope: jest.fn().mockResolvedValue(['dept-1']) } as never,
+      { findUsableItAdminEmployeeIds: jest.fn().mockResolvedValue(new Set(['it-1'])) } as never,
+      {} as never,
+    );
+
+    let caught: unknown;
+    try {
+      await service.plan(
+        actor,
+        {
+          link: { requestId: 'req-1' },
+          servicePeriodMonth: '2026-11',
+          netAmount: { amount: '500000' },
+          unitPriceOriginal: { amount: '500000', currency: 'VND' },
+          quantity: 1,
+        } as never,
+        tx,
+      );
+    } catch (e) {
+      caught = e;
+    }
+
+    expect(caught).toBeInstanceOf(PurchaseInvoiceRefusedError);
+    expect((caught as PurchaseInvoiceRefusedError).reason).toBe('SEAT_PURCHASE_REQUIRED');
+    expect((caught as PurchaseInvoiceRefusedError).seatPurchaseIds).toEqual(['purchase-1']);
+  });
+
+  it('rejects SUBSCRIPTION link with subscriptionLineIds when any line is already invoiced for that serviceMonth', async () => {
+    const service = new PurchaseInvoicePlanService(
+      {
+        invoicedLinesForMonth: jest
+          .fn()
+          .mockResolvedValue({ wholePeriodInvoiced: false, lineIds: new Set(['line-1']) }),
+      } as never,
+      {
+        getPlanVendorId: jest.fn().mockResolvedValue('vendor-1'),
+        getSubscriptionOriginalPrice: jest.fn().mockResolvedValue(null),
+      } as never,
+      {
+        getPurchaseFacts: jest.fn().mockResolvedValue([
+          {
+            subscriptionId: 'sub-1',
+            planId: 'plan-1',
+            provisioningType: 'K2',
+            billingCycle: 'ANNUAL',
+            purchasedQuantity: 10,
+            monthlyPriceMinor: 500_000n,
+            cycleMonths: 12,
+            startDate: '2026-07-01',
+            endDate: '2027-06-30',
+            renewalDate: '2027-07-01',
+            invoicedLater: false,
+          },
+        ]),
+        linesOfSubscription: jest
+          .fn()
+          .mockResolvedValue([
+            { id: 'line-1', subscriptionId: 'sub-1', monthlyUnitPriceMinor: 500_000n, closedReason: null },
+          ]),
+      } as never,
+      {} as never,
+      {} as never,
+      {
+        getItAdminActingScope: jest.fn().mockResolvedValue([]),
+        getOrganization: jest.fn().mockResolvedValue({ id: 'org-1', timeZone: 'Asia/Ho_Chi_Minh' }),
+      } as never,
+      { findUsableItAdminEmployeeIds: jest.fn().mockResolvedValue(new Set()) } as never,
+      {} as never,
+    );
+
+    let caught: unknown;
+    try {
+      await service.plan(
+        actor,
+        {
+          link: { subscriptionId: 'sub-1', subscriptionLineIds: ['line-1'] },
+          servicePeriodMonth: '2026-11',
+          netAmount: { amount: '500000' },
+          unitPriceOriginal: { amount: '500000', currency: 'VND' },
+          quantity: 10,
+        } as never,
+        tx,
+      );
+    } catch (e) {
+      caught = e;
+    }
+
+    expect(caught).toBeInstanceOf(PurchaseInvoiceRefusedError);
+    expect((caught as PurchaseInvoiceRefusedError).reason).toBe('LINE_ALREADY_INVOICED');
+  });
 });

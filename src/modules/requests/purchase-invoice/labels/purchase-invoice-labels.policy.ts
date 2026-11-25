@@ -13,6 +13,8 @@ export type PurchaseInvoiceFlag = 'OVER_APPROVED' | 'OUTSIDE_TERM' | 'NO_EXPECTE
 
 export interface PurchaseInvoiceLabelInput {
   link: 'REQUEST' | 'SUBSCRIPTION' | 'LICENSE_LOT';
+  /** Subscription invoice is tied to a specific seat purchase (`SEAT_PURCHASE`, N9). */
+  hasSeatPurchase?: boolean;
   /** The request is one that goes on using a right that ended (`QĐ-111l`); its invoices are renewals. */
   continuation: boolean;
   /** An invoice of this request exists that was not returned. */
@@ -53,6 +55,9 @@ export function monthsBetween(from: BusinessDate, to: BusinessDate): number {
 }
 
 export function labelOfPurchaseInvoice(input: PurchaseInvoiceLabelInput): PurchaseInvoiceLabelResult {
+  if (input.link === 'SUBSCRIPTION' && input.hasSeatPurchase) {
+    return { label: 'SEAT_PURCHASE', periodIndex: null, periodCount: null, outsideTerm: false };
+  }
   if (input.link === 'SUBSCRIPTION' || input.continuation || input.startMonth === null) {
     return { label: 'RENEWAL', periodIndex: null, periodCount: null, outsideTerm: false };
   }

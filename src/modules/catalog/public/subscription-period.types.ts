@@ -142,6 +142,7 @@ export interface SubscriptionPurchaseFacts {
   noticeDeadline: BusinessDate | null;
   noticePeriodDays: number | null;
   autoRenew: boolean;
+  invoicedLater?: boolean;
   vendorMinimumSeats: number | null;
   /** Purchased quantity recorded on a direct successor subscription, if one already exists. */
   nextPeriodPurchasedQuantity: number | null;

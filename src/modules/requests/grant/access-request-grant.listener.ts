@@ -205,6 +205,24 @@ export class AccessRequestGrantGate implements GrantRequestGate, OnModuleInit {
     return true;
   }
 
+  async checkSeatPurchaseItems(
+    tx: DbTx,
+    items: readonly { requestId: string; beneficiaryEmployeeId: string }[],
+    expectedPlanId: string,
+  ): Promise<Set<string>> {
+    const requestIds = [...new Set(items.map((item) => item.requestId))];
+    const requests = await this.repo.findByIds(requestIds, tx);
+    const byId = new Map(requests.map((r) => [r.id, r]));
+    const valid = new Set<string>();
+    for (const item of items) {
+      if (isSeatPurchaseItemEligible(byId.get(item.requestId), item.beneficiaryEmployeeId, expectedPlanId)) {
+        valid.add(`${item.requestId}:${item.beneficiaryEmployeeId}`);
+      }
+    }
+
+    return valid;
+  }
+
   private record(
     tx: DbTx,
     organizationId: string,
@@ -223,4 +241,22 @@ export class AccessRequestGrantGate implements GrantRequestGate, OnModuleInit {
       correlationId: requestId,
     });
   }
+}
+
+function isSeatPurchaseItemEligible(
+  request: Awaited<ReturnType<AccessRequestRepo['findByIds']>>[number] | undefined,
+  beneficiaryEmployeeId: string,
+  expectedPlanId: string,
+): boolean {
+  if (!request || request.planId !== expectedPlanId || request.type === 'RENEWAL') return false;
+  if (request.type === 'GROUP_GRANT') {
+    const line = request.lines?.find((l) => l.employeeId === beneficiaryEmployeeId);
+    return line !== undefined && (line.state === 'APPROVED' || line.state === 'EXECUTING');
+  }
+  const openState = request.state === 'AWAITING_EXECUTION' || request.state === 'EXECUTING';
+  const matchesPerson =
+    request.beneficiaryEmployeeIds.includes(beneficiaryEmployeeId) ||
+    request.serviceAccount?.responsibleEmployeeId === beneficiaryEmployeeId;
+
+  return openState && matchesPerson;
 }

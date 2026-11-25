@@ -198,6 +198,29 @@ export const SUBSCRIPTION_TEXTS = {
         '{changedByEmployeeId:name} reduced the seats of subscription {subscriptionId:name} from {fromQuantity} to {toQuantity}.',
     },
   },
+  SUBSCRIPTION_SEATS_BOUGHT: {
+    vi: {
+      title: 'Đã ghi nhận mua thêm chỗ',
+      message: '{recordedByEmployeeId:name} đã ghi nhận mua thêm {quantity} chỗ cho thuê bao {subscriptionId:name}.',
+    },
+    en: {
+      title: 'Additional seats purchased',
+      message:
+        '{recordedByEmployeeId:name} recorded a purchase of {quantity} seat(s) for subscription {subscriptionId:name}.',
+    },
+  },
+  SEAT_PURCHASE_INVOICE_OVERDUE: {
+    vi: {
+      title: 'Hóa đơn mua thêm chỗ quá hạn',
+      message:
+        'Lần mua chỗ trên thuê bao {subscriptionId:name} đã quá hạn nộp hóa đơn ({dueOn:date}). Vui lòng nộp hóa đơn.',
+    },
+    en: {
+      title: 'Seat purchase invoice overdue',
+      message:
+        'A seat purchase on subscription {subscriptionId:name} has passed its invoice due date ({dueOn:date}). Please submit the invoice.',
+    },
+  },
   IDLE_SEAT_COST_RATIO_HIGH: {
     vi: {
       title: 'Chi phí seat trống vượt ngưỡng 10 %',

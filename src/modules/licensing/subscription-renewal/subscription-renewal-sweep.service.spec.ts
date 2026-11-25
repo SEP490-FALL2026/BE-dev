@@ -3,6 +3,7 @@ import type { SubscriptionPeriodApi } from '../../catalog/public/subscription-pe
 import type { PeriodAdjustment, RenewalPeriodFacts } from '../../catalog/public/subscription-period.types';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { RenewalAlertsService } from './alerts/renewal-alerts.service';
+import type { SeatPurchaseInvoiceDueService } from '../shared-pool/seat-purchase-invoice-due.service';
 import type { RenewalDeadlineService } from './deadline/renewal-deadline.service';
 import type { RenewalSeatsNeededService } from './seats-needed/renewal-seats-needed.service';
 import type { RenewalPartiesService } from './subscription-renewal-parties.service';
@@ -66,6 +67,9 @@ function build(
     { countFor } as unknown as RenewalSeatsNeededService,
     { sendDue, dataQualityWarning, sweepWorkspaceAdmins: workspaceAdminSweep } as unknown as RenewalAlertsService,
     { recordPassedRenewalDay } as unknown as RenewalDeadlineService,
+    {
+      remindOverdue: jest.fn().mockResolvedValue({ told: 0, failed: 0 }),
+    } as unknown as SeatPurchaseInvoiceDueService,
   );
 
   return {
