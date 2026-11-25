@@ -237,7 +237,9 @@ export class InvoiceRepo {
    * expense belongs to its year even before the budget of that year is approved, every invoice booked to the Cost Center with no commitment
    * (`PI-1`, `R-51`), and the seat-months of the shared pool of seats (`K2`) that Cost Center bore (`SM-1`, `MG-03`): an invoice of the pool is a
    * line of the pool and costs no department anything, so what a department bears of it is its seat-months, once. The year is the one of the month
-   * the invoice or the seat-month pays for; an invoice of before has no such month and keeps the year of its commitment. With `before`, only what pays for a month
+   * the invoice or the seat-month pays for; an invoice of before has no such month and keeps the year of its commitment. An invoice that has allocation lines
+   * (W3-26) is read by its lines, month by month: what its Cost Center lines say for the month, in the year of that month; one with no line is read as it always was.
+   * With `before`, only what pays for a month
    * before that day (the month of an invoice with none is the one it was issued in): what had been spent through the end of a month, whenever it is asked (`RV1-03`).
    */
   async spentOf(
@@ -250,6 +252,7 @@ export class InvoiceRepo {
     const invoiceBound =
       before === undefined ? Prisma.empty : Prisma.sql`AND COALESCE(i.service_month, i.issued_on) < ${before}::date`;
     const seatBound = before === undefined ? Prisma.empty : Prisma.sql`AND s.month < ${before}::date`;
+    const lineBound = before === undefined ? Prisma.empty : Prisma.sql`AND l.month < ${before}::date`;
     const wanted = Prisma.join(pairs.map((pair) => Prisma.sql`(${pair.costCenterId}::uuid, ${pair.year}::int)`));
     const rows = await (tx ?? this.prisma).$queryRaw<{ cost_center_id: string; year: number; spent: string }[]>`
       SELECT cost_center_id, year, SUM(amount)::text AS spent
@@ -260,6 +263,11 @@ export class InvoiceRepo {
             FROM invoices i
             LEFT JOIN budget_commitments c ON c.id = i.commitment_id
            WHERE (COALESCE(i.cost_center_id, c.cost_center_id), COALESCE(EXTRACT(YEAR FROM i.service_month)::int, c.year)) IN (${wanted}) ${invoiceBound}
+             AND NOT EXISTS (SELECT 1 FROM invoice_allocations a WHERE a.invoice_id = i.id)
+          UNION ALL
+          SELECT l.cost_center_id, EXTRACT(YEAR FROM l.month)::int AS year, l.amount_minor AS amount
+            FROM invoice_allocations l
+           WHERE l.bucket = 'COST_CENTER' AND (l.cost_center_id, EXTRACT(YEAR FROM l.month)::int) IN (${wanted}) ${lineBound}
           UNION ALL
           SELECT s.cost_center_id, EXTRACT(YEAR FROM s.month)::int AS year, s.amount_minor AS amount
             FROM seat_month_charges s

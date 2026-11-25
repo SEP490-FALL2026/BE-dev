@@ -404,6 +404,9 @@ model Subscription {
   minimumSeatsTotal      Int?               @map("minimum_seats_total")
   // The vendor invoices after the period (the flag "vendor invoices later", KHO-14).
   invoicedLater          Boolean            @default(false) @map("invoiced_later")
+  // A subscription of a K1 plan, which has none since W3-17, is closed and kept as history (closed_reason K1_WITHOUT_SUBSCRIPTION).
+  closedAt               DateTime?          @map("closed_at") @db.Timestamptz(3)
+  closedReason           String?            @map("closed_reason")
   createdAt              DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt              DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 

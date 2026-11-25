@@ -143,6 +143,8 @@ model CostCenter {
   budgetVersions     BudgetVersion[]
   budgetCommitments  BudgetCommitment[]
   licenseLotCharges  LicenseLotCharge[]
+  invoiceAllocations InvoiceAllocation[]
+  invoiceYearApplications InvoiceYearApplication[]
 
   @@unique([organizationId, code])
   @@map("cost_centers")

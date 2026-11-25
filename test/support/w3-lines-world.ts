@@ -76,7 +76,7 @@ export async function lineWorld(sql: Client) {
   const plan = async (
     vendorId: string,
     name: string,
-    type: 'K2' | 'K3' | 'K4' = 'K2',
+    type: 'K1' | 'K2' | 'K3' | 'K4' = 'K2',
     binding: 'ACCOUNT' | 'DEVICE_KEY' | 'DEVICE_BUNDLED' | null = type === 'K4' ? 'ACCOUNT' : null,
   ): Promise<string> => {
     const applicationId = randomUUID();
@@ -89,7 +89,7 @@ export async function lineWorld(sql: Client) {
     await sql.query(
       `INSERT INTO plans (id, organization_id, application_id, name, normalized_name, provisioning_type, pricing_model, control_level, key_binding)
        VALUES ($1, $2, $3, $4, lower($4), $5::"ProvisioningType", $6::"PricingModel", 'FULL'::"ControlLevel", $7::"PlanKeyBinding")`,
-      [planId, organizationId, applicationId, name, type, type === 'K2' ? 'PER_SEAT' : null, binding],
+      [planId, organizationId, applicationId, name, type, type === 'K1' || type === 'K2' ? 'PER_SEAT' : null, binding],
     );
 
     return planId;
@@ -141,7 +141,7 @@ export async function lineWorld(sql: Client) {
   };
 
   /** A period (a subscription) of a plan in a workspace; by default an active monthly one that began two months ago and ends in ten months. */
-  const period = async (planId: string, workspaceId: string, options: PeriodOptions = {}): Promise<string> => {
+  const period = async (planId: string, workspaceId: string | null, options: PeriodOptions = {}): Promise<string> => {
     const id = randomUUID();
     const status = options.status ?? 'ACTIVE';
     const startDate = options.startDate === undefined ? dayFromToday(-60) : options.startDate;

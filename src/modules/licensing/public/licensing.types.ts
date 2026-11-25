@@ -29,6 +29,9 @@ export interface AssignmentRecord {
   /** A personal seat of an IT Admin used for a machine account (`QĐ-110m`, `R-9`): INV-02 leaves it out; `machineAccountNote` says why. */
   isMachineAccount: boolean;
   machineAccountNote: string | null;
+  /** A personal right of a K1 plan: the months it commits to (1 or 12) and the day its billing counts from (W3-17); null for every other right. */
+  personalCommitmentMonths?: 1 | 12 | null;
+  billingAnchorOn?: BusinessDate | null;
   /** Set when the grant it was made for was closed as failed: the period is then empty and no seat is taken. */
   failedAt: Date | null;
   /** Set when the grant it was made for was cancelled because the request was withdrawn: the period is empty as well. */

@@ -45,6 +45,9 @@ model LicenseAssignment {
   expectedEndDate             DateTime?           @map("expected_end_date") @db.Date
   // The day the task of the grant was completed: the day the right really begins (`BR-MF1-06a`); null until then and for a seat that was not granted by a task.
   grantedOn                   DateTime?           @map("granted_on") @db.Date
+  // A personal right of a K1 plan (W3-17): the months it commits to (1 or 12) and the day its billing months count from; written with the right, never changed.
+  personalCommitmentMonths    Int?                @map("personal_commitment_months") @db.SmallInt
+  billingAnchorOn             DateTime?           @map("billing_anchor_on") @db.Date
   // Set once when the grant it was made for is closed as failed: the period is then empty, so no seat is taken.
   failedAt                    DateTime?           @map("failed_at") @db.Timestamptz(3)
   // Set once when the grant it was made for was cancelled because the request was withdrawn: the period is empty as well.
