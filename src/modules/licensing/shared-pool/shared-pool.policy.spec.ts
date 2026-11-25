@@ -1,4 +1,4 @@
-import { judgePurchase, type PoolStock } from './shared-pool.policy';
+import { choosePoolLine, judgePurchase, type PoolStock } from './shared-pool.policy';
 import { PurchaseNotAllowedError, PurchaseNotApplicableError, PurchaseReasonRequiredError } from './shared-pool.errors';
 
 const EMPTY: PoolStock = { free: 0, inRevocation: 0, freeSubscriptionIds: [], freeBySubscription: new Map() };
@@ -61,5 +61,71 @@ describe('judgePurchase', () => {
     for (const provisioningType of ['K1', 'K3', 'K5'] as const) {
       expect(() => judgePurchase({ provisioningType, purchase: {}, stock: EMPTY })).toThrow(PurchaseNotApplicableError);
     }
+  });
+});
+
+describe('choosePoolLine', () => {
+  it('prefers lines with free seats, then orders by lineCreatedAt and subscriptionLineId', () => {
+    const olderFull = {
+      subscriptionId: 'sub-1',
+      subscriptionLineId: 'line-1',
+      lineCreatedAt: new Date('2026-01-01T00:00:00.000Z'),
+      purchasedQuantity: 2,
+      isPrimaryForPlan: true,
+    };
+    const newerFreeB = {
+      subscriptionId: 'sub-2',
+      subscriptionLineId: 'line-b',
+      lineCreatedAt: new Date('2026-02-01T00:00:00.000Z'),
+      purchasedQuantity: 2,
+      isPrimaryForPlan: false,
+    };
+    const newerFreeA = {
+      subscriptionId: 'sub-3',
+      subscriptionLineId: 'line-a',
+      lineCreatedAt: new Date('2026-02-01T00:00:00.000Z'),
+      purchasedQuantity: 1,
+      isPrimaryForPlan: false,
+    };
+    const stock: PoolStock = {
+      free: 2,
+      inRevocation: 0,
+      freeSubscriptionIds: ['sub-2', 'sub-3'],
+      freeBySubscription: new Map([
+        ['sub-1', 0],
+        ['sub-2', 1],
+        ['sub-3', 1],
+      ]),
+    };
+
+    expect(choosePoolLine([olderFull, newerFreeB, newerFreeA], stock)?.subscriptionLineId).toBe('line-a');
+  });
+
+  it('when all lines are full, picks oldest lineCreatedAt then subscriptionLineId', () => {
+    const lineB = {
+      subscriptionId: 'sub-2',
+      subscriptionLineId: 'line-b',
+      lineCreatedAt: new Date('2026-01-01T00:00:00.000Z'),
+      purchasedQuantity: 1,
+      isPrimaryForPlan: false,
+    };
+    const lineA = {
+      subscriptionId: 'sub-1',
+      subscriptionLineId: 'line-a',
+      lineCreatedAt: new Date('2026-01-01T00:00:00.000Z'),
+      purchasedQuantity: 1,
+      isPrimaryForPlan: true,
+    };
+    const stock: PoolStock = {
+      free: 0,
+      inRevocation: 0,
+      freeSubscriptionIds: [],
+      freeBySubscription: new Map([
+        ['sub-1', 0],
+        ['sub-2', 0],
+      ]),
+    };
+
+    expect(choosePoolLine([lineB, lineA], stock)?.subscriptionLineId).toBe('line-a');
   });
 });

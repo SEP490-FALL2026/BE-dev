@@ -38,7 +38,7 @@ describe('subscription quantity change rules (real PostgreSQL)', () => {
     const catalog = h.ctx.app.get(CatalogApi, { strict: false });
     await h.ctx.app.get(TransactionRunner).run(async (tx) => {
       await catalog.lockSeatTarget(tx, { subscriptionId: id });
-      await catalog.addPoolSeat(tx, principal(h.it1.employeeId), id, null);
+      await catalog.incrementLegacyPoolSeat(tx, principal(h.it1.employeeId), id, null);
     });
 
     const res = await patch(id, {

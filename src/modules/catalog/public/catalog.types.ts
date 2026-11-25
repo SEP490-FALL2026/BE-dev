@@ -1,7 +1,7 @@
 import type { BusinessDate } from '../../../core/business-date';
 
-/** What a seat is held against: a subscription of a paid plan, or an internal plan that has no subscription. */
-export type SeatTargetRef = { subscriptionId: string } | { planId: string };
+/** What a seat is held against: a subscription of a paid plan (optionally naming the line and serving day), or an internal plan that has no subscription. */
+export type SeatTargetRef = { subscriptionId: string; planId?: string; servingOn?: BusinessDate } | { planId: string };
 
 /** What holds a set of plans: a bounded list of assignments and the counts that are not bounded. */
 export interface OpenSeatHoldings {
@@ -22,6 +22,8 @@ export interface OpenSeatHolding {
 export interface SeatTarget {
   kind: 'SUBSCRIPTION' | 'PLAN';
   subscriptionId: string | null;
+  /** The subscription line serving `servingOn` for K2 targets; null for PLAN, K1, K4, or when no line serves that day. */
+  subscriptionLineId?: string | null;
   planId: string;
   planName: string;
   applicationId: string;
@@ -47,6 +49,10 @@ export interface SeatTarget {
 /** A subscription a seat can be taken from today, with the seats bought; a draft takes no seat (`US-04-03` AC-6). */
 export interface PoolSubscription {
   subscriptionId: string;
+  /** The line of the plan on this period for K2; undefined/null for K1, K4, or legacy periods without lines. */
+  subscriptionLineId?: string | null;
+  /** Creation time of the line (used for deterministic line selection ordering). */
+  lineCreatedAt?: Date;
   purchasedQuantity: number | null;
   /** The subscription that prices the plan (`Q-04`): the one a grant that names no subscription takes first. */
   isPrimaryForPlan: boolean;

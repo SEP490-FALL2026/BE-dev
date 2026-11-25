@@ -1,7 +1,10 @@
 import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/business-date';
 import { DONG } from '../../../core/money/money';
 import { Prisma } from '../../../generated/prisma/client';
-import type { BillingCycle } from './subscription.types';
+import type { PrismaService } from '../../../infrastructure/database/prisma.service';
+import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { pickPriceSource } from './pool/subscription-pool.policy';
+import type { BillingCycle, SubscriptionKind } from './subscription.types';
 
 /** The queries that tell which subscription prices a plan: shared by the price reads of `SubscriptionRepo`. */
 
@@ -122,4 +125,202 @@ export function toPricedOfPlan(row: {
     billingCycle: row.billingCycle ?? 'OTHER',
     allowsMidTermReduction: row.allowsMidTermReduction,
   };
+}
+
+const LINE_CYCLE_MONTHS: Readonly<Record<BillingCycle, number>> = {
+  MONTHLY: 1,
+  QUARTERLY: 3,
+  ANNUAL: 12,
+  OTHER: 1,
+};
+
+/** Lines of active non-superseded periods that can price their plan (`B2-R7`). */
+export const livePricedLineOf = (): Prisma.SubscriptionLineWhereInput => ({
+  OR: [{ closedOn: null }, { closedOn: { gte: new Date(new Date().toISOString().slice(0, 10)) } }],
+  subscription: {
+    status: 'ACTIVE',
+    AND: [
+      { OR: [{ renewedBy: null }, { renewedBy: { is: { status: { not: 'ACTIVE' } } } }] },
+      { OR: [{ billingCycle: { not: null } }, { kind: 'PERPETUAL' }] },
+      { OR: [{ endDate: null }, { endDate: { gte: new Date(new Date().toISOString().slice(0, 10)) } }] },
+    ],
+  },
+});
+
+/** Lines whose period and service window cover `on` (`B2-R7`). */
+export const pricedLineOn = (on: BusinessDate): Prisma.SubscriptionLineWhereInput => {
+  const day = toDateColumn(on);
+
+  return {
+    AND: [
+      { OR: [{ closedOn: null }, { closedOn: { gte: day } }] },
+      { OR: [{ ledgerOpenedOn: null }, { ledgerOpenedOn: { lte: day } }] },
+      {
+        subscription: {
+          status: 'ACTIVE',
+          AND: [
+            { OR: [{ billingCycle: { not: null } }, { kind: 'PERPETUAL' }] },
+            { OR: [{ startDate: null }, { startDate: { lte: day } }] },
+            { OR: [{ endDate: null }, { endDate: { gte: day } }] },
+            { OR: [{ renewedBy: { is: null } }, { renewedBy: { is: { startDate: { gt: day } } } }] },
+          ],
+        },
+      },
+    ],
+  };
+};
+
+export const LINE_PRICE_SELECT = {
+  id: true,
+  planId: true,
+  monthlyUnitPriceMinor: true,
+  plan: { select: { provisioningType: true, referenceCommitmentMonths: true } },
+  subscription: {
+    select: {
+      id: true,
+      planId: true,
+      kind: true,
+      startDate: true,
+      isPrimaryForPlan: true,
+      unitPriceMinor: true,
+      unitPriceCurrency: true,
+      monthlyUnitPriceMinor: true,
+      priceReportingMinor: true,
+      priceReportingCurrency: true,
+      billingCycle: true,
+      allowsMidTermReduction: true,
+    },
+  },
+} as const;
+
+export type LinePriceRow = Prisma.SubscriptionLineGetPayload<{ select: typeof LINE_PRICE_SELECT }>;
+
+/** Adapts a `subscription_lines` row into a `PriceSource` using line-level `monthlyUnitPriceMinor` (`B2-R7`). */
+export function withLinePriceSource(row: LinePriceRow) {
+  const { subscription } = row;
+  const billingCycle = subscription.billingCycle ?? 'OTHER';
+  const matchesSub =
+    subscription.planId === row.planId &&
+    subscription.monthlyUnitPriceMinor === row.monthlyUnitPriceMinor &&
+    subscription.unitPriceMinor !== null &&
+    subscription.unitPriceCurrency === DONG;
+  const unitPriceMinor = matchesSub
+    ? (subscription.unitPriceMinor as bigint)
+    : row.monthlyUnitPriceMinor * BigInt(LINE_CYCLE_MONTHS[billingCycle]);
+  const reportingMinor =
+    matchesSub && subscription.priceReportingMinor !== null ? subscription.priceReportingMinor : unitPriceMinor;
+
+  return {
+    id: subscription.id,
+    startDate: subscription.startDate ? fromDateColumn(subscription.startDate) : null,
+    isPrimaryForPlan: subscription.isPrimaryForPlan,
+    unitPriceMinor,
+    reportingPriceMinor: reportingMinor,
+    billingCycle,
+    lineRow: row,
+    derivedUnitPriceMinor: unitPriceMinor,
+    derivedReportingMinor: reportingMinor,
+  };
+}
+
+/** Maps a line-backed `pickPriceSource` winner into `PricedOfPlanResult` (`B2-R7`). */
+export function toPricedLineOfPlan(winner: ReturnType<typeof withLinePriceSource>): PricedOfPlanResult {
+  const { lineRow, derivedUnitPriceMinor, derivedReportingMinor } = winner;
+  const { subscription, plan } = lineRow;
+
+  return {
+    subscriptionId: subscription.id,
+    subscriptionKind: plan.provisioningType === 'K4' ? 'PERPETUAL' : subscription.kind,
+    provisioningType: plan.provisioningType,
+    referenceCommitmentMonths:
+      plan.referenceCommitmentMonths === 1 || plan.referenceCommitmentMonths === 12
+        ? plan.referenceCommitmentMonths
+        : null,
+    unitPriceMinor: derivedUnitPriceMinor,
+    monthlyUnitPriceMinor: lineRow.monthlyUnitPriceMinor,
+    currency: DONG,
+    reporting: { amountMinor: derivedReportingMinor, currency: DONG },
+    billingCycle: subscription.billingCycle ?? 'OTHER',
+    allowsMidTermReduction: subscription.allowsMidTermReduction,
+  };
+}
+
+/** Finds the line-level pricing source for `planId` (on `on`, or latest live), returning null when no lines match. */
+export async function findPricedLineOfPlan(
+  db: DbTx | PrismaService,
+  planId: string,
+  on?: BusinessDate,
+): Promise<PricedOfPlanResult | null> {
+  let chosen =
+    on === undefined
+      ? null
+      : pickPriceSource(
+          (
+            await db.subscriptionLine.findMany({
+              where: { planId, ...pricedLineOn(on) },
+              select: LINE_PRICE_SELECT,
+            })
+          ).map(withLinePriceSource),
+        );
+  chosen ??= pickPriceSource(
+    (
+      await db.subscriptionLine.findMany({
+        where: { planId, ...livePricedLineOf() },
+        select: LINE_PRICE_SELECT,
+      })
+    ).map(withLinePriceSource),
+  );
+
+  return chosen ? toPricedLineOfPlan(chosen) : null;
+}
+
+/** Collects billing cycles from `subscription_lines` for `planIds` into `cycles`. */
+export async function collectLineCycles(
+  db: DbTx | PrismaService,
+  planIds: readonly string[],
+  cycles: Map<string, 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER' | 'ONE_TIME'>,
+): Promise<void> {
+  const lineRows = await db.subscriptionLine.findMany({
+    where: { planId: { in: [...planIds] }, ...livePricedLineOf() },
+    select: LINE_PRICE_SELECT,
+  });
+  const byPlan = new Map<string, ReturnType<typeof withLinePriceSource>[]>();
+  for (const row of lineRows) {
+    byPlan.set(row.planId, [...(byPlan.get(row.planId) ?? []), withLinePriceSource(row)]);
+  }
+  for (const [planId, sources] of byPlan) {
+    const chosen = pickPriceSource(sources);
+    if (!chosen) continue;
+    const isPerpetual =
+      chosen.lineRow.plan.provisioningType === 'K4' || chosen.lineRow.subscription.kind === 'PERPETUAL';
+    cycles.set(planId, isPerpetual ? 'ONE_TIME' : chosen.billingCycle);
+  }
+}
+
+/** Resolves billing cycles for `planIds` preferring line-level pricing and falling back to legacy subscriptions. */
+export async function findPricedCyclesInDb(
+  db: DbTx | PrismaService,
+  planIds: readonly string[],
+): Promise<Map<string, 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER' | 'ONE_TIME'>> {
+  const cycles = new Map<string, 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER' | 'ONE_TIME'>();
+  if (planIds.length === 0) return cycles;
+  await collectLineCycles(db, planIds, cycles);
+
+  const remaining = planIds.filter((id) => !cycles.has(id));
+  if (remaining.length === 0) return cycles;
+  const rows = await db.subscription.findMany({
+    where: { planId: { in: remaining }, ...livePricedOf(), lines: { none: {} } },
+    select: { id: true, planId: true, startDate: true, isPrimaryForPlan: true, ...PRICE_FIELDS, ...PLAN_KIND },
+  });
+  const byPlan = new Map<string, Array<ReturnType<typeof withPriceSource> & { kind: SubscriptionKind }>>();
+  for (const row of rows) {
+    const kind: SubscriptionKind = row.plan.provisioningType === 'K4' ? 'PERPETUAL' : row.kind;
+    byPlan.set(row.planId, [...(byPlan.get(row.planId) ?? []), { ...withPriceSource(row), kind }]);
+  }
+  for (const [planId, sources] of byPlan) {
+    const chosen = pickPriceSource(sources);
+    if (chosen) cycles.set(planId, chosen.kind === 'PERPETUAL' ? 'ONE_TIME' : chosen.billingCycle);
+  }
+
+  return cycles;
 }

@@ -295,12 +295,11 @@ export class SubscriptionPoolService {
   }
 
   /**
-   * Buys one more seat on the subscription, in the transaction of the caller, which holds the subscription `FOR UPDATE` (a grant that finds
-   * the pool empty, or a K1 grant that buys its own seat): `purchased_quantity` rises by one, on a term bought by the year too, with an
-   * audit event. No gate of a Cost Center is asked: the request that takes the seat is charged to the department of its beneficiary
-   * (`QĐ-103d`(2)). Throws PoolSeatNotAddableError.
+   * Legacy seat increment kept for K1 (until P13a) and K4 (until P20), plus pre-P15 K2 subscriptions without a line:
+   * raises `purchased_quantity` by 1 under the caller's subscription lock, records audit, and notifies K2/K4 responsible IT Admin.
+   * Throws PoolSeatNotAddableError.
    */
-  async addSeat(
+  async incrementLegacySeat(
     tx: DbTx,
     actor: AuthenticatedPrincipal,
     subscriptionId: string,

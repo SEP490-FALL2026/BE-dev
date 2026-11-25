@@ -4,25 +4,40 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { SeatTargetNotFoundError } from '../public/licensing.errors';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import type { PoolSubscription } from '../../catalog/public/catalog.types';
+import { SeatLedgerApi } from '../../catalog/public/seat-ledger.api';
 import type { PlanStock } from '../public/licensing.types';
 import type { SubscriptionOccupancy } from './shared-pool-capacity.repo';
 import { SharedPoolAvoidedCostRepo } from './shared-pool-avoided-cost.repo';
 import { SharedPoolCapacityRepo } from './shared-pool-capacity.repo';
-import { judgePurchase, type PoolStock, type PurchaseDecision } from './shared-pool.policy';
+import { choosePoolLine, judgePurchase, type PoolStock, type PurchaseDecision } from './shared-pool.policy';
 
 const idOf = (subscription: PoolSubscription): string => subscription.subscriptionId;
 
 type ProvisioningType = 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
 
-/**
- * The stock of a plan from its grantable subscriptions and what is taken of them: free seats are the seats bought less the most assignments
- * held on any day from today on (as the database counts them), so a seat already promised from a later day is not free today. A K4 plan
- * also needs a key for each seat: its free seats are never more than the free keys of the subscription (`keys`).
- */
+function freeSeatsOfSubscription(
+  subscription: PoolSubscription,
+  taken: SubscriptionOccupancy | undefined,
+  keys: ReadonlyMap<string, number> | null,
+  ledgerSeats: ReadonlyMap<string, ReadonlyMap<BusinessDate, number | null>> | undefined,
+  today: BusinessDate | undefined,
+): number {
+  const ledgerTotal =
+    subscription.subscriptionLineId && today !== undefined
+      ? (ledgerSeats?.get(subscription.subscriptionLineId)?.get(today) ?? null)
+      : null;
+  const totalSeats = ledgerTotal ?? subscription.purchasedQuantity ?? 0;
+  const seats = Math.max(0, totalSeats - (taken?.occupied ?? 0));
+
+  return keys === null ? seats : Math.min(seats, keys.get(subscription.subscriptionId) ?? 0);
+}
+
 function stockFrom(
   subscriptions: readonly PoolSubscription[],
   occupancy: ReadonlyMap<string, SubscriptionOccupancy>,
   keys: ReadonlyMap<string, number> | null = null,
+  ledgerSeats?: ReadonlyMap<string, ReadonlyMap<BusinessDate, number | null>>,
+  today?: BusinessDate,
 ): PoolStock {
   let free = 0;
   let inRevocation = 0;
@@ -30,8 +45,7 @@ function stockFrom(
   const freeBySubscription = new Map<string, number>();
   for (const subscription of subscriptions) {
     const taken = occupancy.get(subscription.subscriptionId);
-    const seats = Math.max(0, (subscription.purchasedQuantity ?? 0) - (taken?.occupied ?? 0));
-    const left = keys === null ? seats : Math.min(seats, keys.get(subscription.subscriptionId) ?? 0);
+    const left = freeSeatsOfSubscription(subscription, taken, keys, ledgerSeats, today);
     free += left;
     inRevocation += taken?.inRevocation ?? 0;
     freeBySubscription.set(subscription.subscriptionId, left);
@@ -39,6 +53,20 @@ function stockFrom(
   }
 
   return { free, inRevocation, freeSubscriptionIds, freeBySubscription };
+}
+
+function planOccupancySlice(
+  planId: string,
+  subscriptions: readonly PoolSubscription[],
+  pairOccupancy: ReadonlyMap<string, SubscriptionOccupancy>,
+): Map<string, SubscriptionOccupancy> {
+  const slice = new Map<string, SubscriptionOccupancy>();
+  for (const sub of subscriptions) {
+    const found = pairOccupancy.get(`${sub.subscriptionId}:${planId}`);
+    if (found) slice.set(sub.subscriptionId, found);
+  }
+
+  return slice;
 }
 
 /**
@@ -52,6 +80,7 @@ export class SharedPoolService {
     private readonly catalog: CatalogApi,
     private readonly capacityRepo: SharedPoolCapacityRepo,
     private readonly avoidedCosts: SharedPoolAvoidedCostRepo,
+    private readonly seatLedger: SeatLedgerApi,
   ) {}
 
   /**
@@ -81,21 +110,27 @@ export class SharedPoolService {
   ): Promise<PoolStock> {
     const subscriptions = await this.grantableOf(tx, planId, today);
 
-    return this.stockOfSubscriptions(tx, subscriptions, today, provisioningType === 'K4');
+    return this.stockOfSubscriptions(tx, planId, subscriptions, today, provisioningType === 'K4');
   }
 
   /** The stock of these subscriptions under the transaction; a K4 plan counts its free keys too (`QĐ-103d`). */
   private async stockOfSubscriptions(
     tx: DbTx,
+    planId: string,
     subscriptions: readonly PoolSubscription[],
     today: BusinessDate,
     withKeys: boolean,
   ): Promise<PoolStock> {
     const ids = subscriptions.map((subscription) => subscription.subscriptionId);
-    const occupancy = await this.capacityRepo.occupancyOf(tx, ids, today);
+    const occupancy = await this.capacityRepo.occupancyOfPlan(tx, ids, planId, today);
+    const lineIds = subscriptions
+      .map((s) => s.subscriptionLineId)
+      .filter((id): id is string => typeof id === 'string' && id.length > 0);
+    const ledgerSeats =
+      !withKeys && lineIds.length > 0 ? await this.seatLedger.seatsOnDays(lineIds, today, today, tx) : undefined;
     const keys = withKeys ? await this.capacityRepo.freeKeysOf(tx, ids) : null;
 
-    return stockFrom(subscriptions, occupancy, keys);
+    return stockFrom(subscriptions, occupancy, keys, ledgerSeats, today);
   }
 
   /** The kind of provisioning of the plan. Throws SeatTargetNotFoundError when the plan does not exist. */
@@ -124,13 +159,19 @@ export class SharedPoolService {
     const grantable = new Map(
       [...grantableOfPlans].map(([planId, subscriptions]) => [planId, this.withoutEnding(subscriptions, ending)]),
     );
-    const occupancy = await this.capacityRepo.occupancyOfMany(
-      [...grantable.values()].flat().map((subscription) => subscription.subscriptionId),
-      today,
+    const pairs = [...grantable.entries()].flatMap(([planId, subs]) =>
+      subs.map((subscription) => ({ subscriptionId: subscription.subscriptionId, planId })),
     );
+    const pairOccupancy = await this.capacityRepo.occupancyOfPlanPairs(pairs, today);
     const keyPlans = new Set(
       pooled.filter((target) => target.provisioningType === 'K4').map((target) => target.planId),
     );
+    const k2LineIds = [...grantable.entries()]
+      .filter(([planId]) => !keyPlans.has(planId))
+      .flatMap(([, subs]) =>
+        subs.map((s) => s.subscriptionLineId).filter((id): id is string => typeof id === 'string' && id.length > 0),
+      );
+    const ledgerSeats = k2LineIds.length > 0 ? await this.seatLedger.seatsOnDays(k2LineIds, today, today) : undefined;
     const keys = await this.capacityRepo.freeKeysOfMany(
       [...grantable.entries()]
         .filter(([planId]) => keyPlans.has(planId))
@@ -141,10 +182,14 @@ export class SharedPoolService {
         stocks.set(target.planId, { kind: 'NONE', free: 0, inRevocation: 0 });
         continue;
       }
+      const subs = grantable.get(target.planId) ?? [];
+      const occupancy = planOccupancySlice(target.planId, subs, pairOccupancy);
       const { free, inRevocation } = stockFrom(
-        grantable.get(target.planId) ?? [],
+        subs,
         occupancy,
         keyPlans.has(target.planId) ? keys : null,
+        keyPlans.has(target.planId) ? undefined : ledgerSeats,
+        today,
       );
       stocks.set(target.planId, { kind: target.provisioningType === 'K2' ? 'SEATS' : 'KEYS', free, inRevocation });
     }
@@ -153,23 +198,26 @@ export class SharedPoolService {
   }
 
   /**
-   * The subscription a grant takes its seat from when the IT Admin names none (`P0-05`): for a K2 or K4 plan the primary subscription of the
-   * plan, or the one that would price it, among those that still have a free seat, and when none has one the first of all (a purchase tops it
-   * up); for a K1 plan, which has no pool, the first. Null when the plan has no subscription a seat can be taken from today.
+   * The subscription/line a grant takes its seat from when the IT Admin names none (`P0-05`): for K2/K4, prefers
+   * candidates that still have free seats ordered deterministically by `lineCreatedAt ASC`, `subscriptionLineId ASC`.
    */
-  async chooseSubscription(
+  async chooseLine(
     tx: DbTx,
     input: { planId: string; provisioningType: ProvisioningType; today: BusinessDate },
   ): Promise<string | null> {
     const subscriptions = await this.grantableOf(tx, input.planId, input.today);
-    if (input.provisioningType !== 'K2' && input.provisioningType !== 'K4')
+    if (input.provisioningType !== 'K2' && input.provisioningType !== 'K4') {
       return subscriptions[0]?.subscriptionId ?? null;
-    const stock = await this.stockOfSubscriptions(tx, subscriptions, input.today, input.provisioningType === 'K4');
-    const withRoom = subscriptions.find(
-      (subscription) => (stock.freeBySubscription.get(subscription.subscriptionId) ?? 0) > 0,
+    }
+    const stock = await this.stockOfSubscriptions(
+      tx,
+      input.planId,
+      subscriptions,
+      input.today,
+      input.provisioningType === 'K4',
     );
 
-    return (withRoom ?? subscriptions[0])?.subscriptionId ?? null;
+    return choosePoolLine(subscriptions, stock)?.subscriptionId ?? null;
   }
 
   /**

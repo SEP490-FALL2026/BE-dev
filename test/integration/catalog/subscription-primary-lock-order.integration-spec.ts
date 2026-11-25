@@ -65,7 +65,7 @@ describe('Subscription primary change and pool seat addition lock order (integra
       const barrier = new Barrier(2);
       const addSeatTask = (async () => {
         await barrier.wait();
-        return runner.run((tx) => catalog.addPoolSeat(tx, actor, currentPrimary, null));
+        return runner.run((tx) => catalog.incrementLegacyPoolSeat(tx, actor, currentPrimary, null));
       })();
       const makePrimaryTask = (async () => {
         await barrier.wait();

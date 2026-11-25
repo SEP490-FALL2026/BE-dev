@@ -64,13 +64,59 @@ export class SubscriptionLineRepo {
     return row ? toRecord(row) : null;
   }
 
-  /** The line with this id, locked for writing (tier 6a); null when it does not exist. */
+  /** The line with this id, locked for writing (tier 6c); null when it does not exist. */
   async lock(tx: DbTx, id: string): Promise<SubscriptionLineRecord | null> {
     const locked = await tx.$queryRaw<
       { id: string }[]
     >`SELECT id FROM subscription_lines WHERE id = ${id}::uuid FOR UPDATE`;
 
     return locked.length === 0 ? null : this.find(id, tx);
+  }
+
+  /** The line of a period for a plan, locked for writing (tier 6c); null when it does not exist. */
+  async lockByPeriodAndPlan(tx: DbTx, subscriptionId: string, planId: string): Promise<SubscriptionLineRecord | null> {
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT id FROM subscription_lines
+       WHERE subscription_id = ${subscriptionId}::uuid AND plan_id = ${planId}::uuid
+       FOR UPDATE`;
+
+    return locked.length === 0 ? null : this.find(locked[0].id, tx);
+  }
+
+  /** Billing cycle and late-invoicing flag of the line's parent period; null when the line does not exist. */
+  async periodFactsOf(
+    lineId: string,
+    tx?: DbTx,
+  ): Promise<{ billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER' | null; invoicedLater: boolean } | null> {
+    const row = await (tx ?? this.prisma).subscriptionLine.findUnique({
+      where: { id: lineId },
+      select: { subscription: { select: { billingCycle: true, invoicedLater: true } } },
+    });
+
+    return row ? { billingCycle: row.subscription.billingCycle, invoicedLater: row.subscription.invoicedLater } : null;
+  }
+
+  /** Batch read of line ledger opening dates and parent period fallback quantities for `seatsOnDays`. */
+  async findManyWithPeriod(
+    lineIds: readonly string[],
+    tx?: DbTx,
+  ): Promise<{ id: string; ledgerOpenedOn: BusinessDate | null; fallbackQuantity: number | null }[]> {
+    if (lineIds.length === 0) return [];
+    const rows = await (tx ?? this.prisma).subscriptionLine.findMany({
+      where: { id: { in: [...lineIds] } },
+      select: {
+        id: true,
+        ledgerOpenedOn: true,
+        subscription: { select: { purchasedQuantity: true } },
+      },
+      orderBy: ORDER,
+    });
+
+    return rows.map((row) => ({
+      id: row.id,
+      ledgerOpenedOn: row.ledgerOpenedOn ? fromDateColumn(row.ledgerOpenedOn) : null,
+      fallbackQuantity: row.subscription.purchasedQuantity,
+    }));
   }
 
   /** The lines of these periods in one read, oldest first within a period (the first of a period is the one `subscriptions.plan_id` follows). */

@@ -6,7 +6,13 @@ import { declareSubscriptionBodySchema, updateSubscriptionBodySchema } from './s
 import { SubscriptionPriceMismatchError, SubscriptionPriceNotVndError } from './subscription.errors';
 import { toSubscriptionApiException } from './subscription.http-errors';
 import { resolveSubscriptionPrices } from './subscription.policy';
+import type { SubscriptionLineRepo } from '../subscription-line/subscription-line.repo';
+import type { SubscriptionPoolService } from './pool/subscription-pool.service';
+import type { SubscriptionPriceService } from './price/subscription-price.service';
+import { SubscriptionFactsService } from './subscription-facts.service';
+import type { SubscriptionGrantingRepo } from './subscription-granting.repo';
 import { SubscriptionPricingService } from './subscription-pricing.service';
+import type { SubscriptionRepo } from './subscription.repo';
 
 describe('QĐ-111an: the pricing of a subscription reads dong and no exchange rate', () => {
   const parseMoney = jest.fn(({ amount, currency }: { amount: string; currency: string }) =>
@@ -189,4 +195,80 @@ describe('W3-02 #4: resolveSubscriptionPrices & write DTO billingCycle', () => {
       expect(updateSubscriptionBodySchema.safeParse({ billingCycle: 'MONTHLY' }).success).toBe(true);
     },
   );
+});
+
+describe('SubscriptionFactsService.priceOfSubscription (B2-R7)', () => {
+  it('reads monthlyUnitPriceMinor from subscription line when present, overriding stale subscription column', async () => {
+    const subscriptions = {
+      find: jest.fn().mockResolvedValue({
+        id: 'sub-1',
+        planId: 'plan-1',
+        kind: 'TERM',
+        billingCycle: 'ANNUAL',
+        unitPrice: { amountMinor: 6_000_000n, currency: 'VND', recordedOn: '2026-07-01' },
+        monthlyUnitPriceMinor: 500_000n,
+        priceSnapshot: { reportingMinor: 6_000_000n, reportingCurrency: 'VND' },
+      }),
+    };
+    const lines = {
+      findOfPlan: jest.fn().mockResolvedValue({
+        id: 'line-1',
+        planId: 'plan-1',
+        monthlyUnitPriceMinor: 550_000n,
+      }),
+      ofSubscriptions: jest.fn(),
+    };
+
+    const service = new SubscriptionFactsService(
+      subscriptions as unknown as SubscriptionRepo,
+      {} as unknown as SubscriptionPoolService,
+      {} as unknown as SubscriptionGrantingRepo,
+      {} as unknown as SubscriptionPriceService,
+      lines as unknown as SubscriptionLineRepo,
+    );
+
+    const price = await service.priceOfSubscription('sub-1');
+    expect(price).toEqual({
+      kind: 'RECURRING',
+      unitPrice: { amountMinor: 6_600_000n, currency: 'VND' },
+      reportingUnitPrice: { amountMinor: 6_600_000n, currency: 'VND' },
+      monthlyPriceMinor: 550_000n,
+      billingCycle: 'ANNUAL',
+    });
+  });
+
+  it('falls back to subscription price columns when no line exists (historical / PERPETUAL)', async () => {
+    const subscriptions = {
+      find: jest.fn().mockResolvedValue({
+        id: 'sub-legacy',
+        planId: 'plan-k4',
+        kind: 'PERPETUAL',
+        billingCycle: null,
+        unitPrice: { amountMinor: 12_000_000n, currency: 'VND', recordedOn: '2026-01-05' },
+        monthlyUnitPriceMinor: null,
+        priceSnapshot: { reportingMinor: 12_000_000n, reportingCurrency: 'VND' },
+      }),
+    };
+    const lines = {
+      findOfPlan: jest.fn().mockResolvedValue(null),
+      ofSubscriptions: jest.fn().mockResolvedValue(new Map()),
+    };
+
+    const service = new SubscriptionFactsService(
+      subscriptions as unknown as SubscriptionRepo,
+      {} as unknown as SubscriptionPoolService,
+      {} as unknown as SubscriptionGrantingRepo,
+      {} as unknown as SubscriptionPriceService,
+      lines as unknown as SubscriptionLineRepo,
+    );
+
+    const price = await service.priceOfSubscription('sub-legacy');
+    expect(price).toEqual({
+      kind: 'ONE_TIME',
+      unitPrice: { amountMinor: 12_000_000n, currency: 'VND' },
+      reportingUnitPrice: { amountMinor: 12_000_000n, currency: 'VND' },
+      monthlyPriceMinor: null,
+      billingCycle: 'OTHER',
+    });
+  });
 });

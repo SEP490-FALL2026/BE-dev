@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
+import { DONG } from '../../../core/money/money';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { SubscriptionLineRepo } from '../subscription-line/subscription-line.repo';
 import { SubscriptionPoolService } from './pool/subscription-pool.service';
 import { SubscriptionGrantingRepo } from './subscription-granting.repo';
 import { monthlyPriceOf, type PlanPriceFacts } from './price/subscription-price.policy';
@@ -14,7 +16,14 @@ import type {
   StockPlanPage,
   SubscriptionPrice,
 } from '../public/catalog.types';
-import type { SubscriptionKind } from './subscription.types';
+import type { BillingCycle, SubscriptionKind, SubscriptionRecord } from './subscription.types';
+
+const LINE_CYCLE_MONTHS: Readonly<Record<BillingCycle, number>> = {
+  MONTHLY: 1,
+  QUARTERLY: 3,
+  ANNUAL: 12,
+  OTHER: 1,
+};
 
 /** What the rules of another capability need to know of the subscriptions of some plans: their kind and their end. */
 @Injectable()
@@ -24,16 +33,20 @@ export class SubscriptionFactsService {
     private readonly pool: SubscriptionPoolService,
     private readonly granting: SubscriptionGrantingRepo,
     private readonly pricing: SubscriptionPriceService,
+    private readonly lines: SubscriptionLineRepo,
   ) {}
 
-  /** Buys one more seat on a subscription the caller holds locked, for the request that asks for it when there is one (see `CatalogApi.addPoolSeat`). Throws PoolSeatNotAddableError. */
-  addSeat(
+  /**
+   * Temporary legacy seat increment kept only for K1 (until P13a) and K4 (until P20), plus pre-P15 K2 periods without a line.
+   * Throws PoolSeatNotAddableError.
+   */
+  incrementLegacySeat(
     tx: DbTx,
     actor: AuthenticatedPrincipal,
     subscriptionId: string,
     requestId: string | null = null,
   ): Promise<number> {
-    return this.pool.addSeat(tx, actor, subscriptionId, requestId);
+    return this.pool.incrementLegacySeat(tx, actor, subscriptionId, requestId);
   }
 
   /** Every active subscription of the company, for the baseline of the budget: one statement. */
@@ -88,14 +101,17 @@ export class SubscriptionFactsService {
   }
 
   /**
-   * What this one subscription is bought at, with the price converted to the reporting currency when it was recorded; null when it does
-   * not exist or has no price yet. A perpetual purchase has a price and no billing cycle (`QĐ-106d`): its cycle reads `OTHER`.
+   * What this one subscription (or its line for `planId`) is bought at, with the price converted to the reporting currency when it was recorded;
+   * null when it does not exist or has no price yet. Reads the line price first when lines exist, falling back to legacy subscription columns.
    */
-  async priceOfSubscription(subscriptionId: string, tx?: DbTx): Promise<SubscriptionPrice | null> {
+  async priceOfSubscription(subscriptionId: string, tx?: DbTx, planId?: string): Promise<SubscriptionPrice | null> {
     const record = await this.subscriptions.find(subscriptionId, tx);
-    if (!record?.unitPrice) return null;
+    if (!record) return null;
+    const line = await this.resolveLineForPrice(subscriptionId, planId ?? record.planId, tx);
     const perpetual = record.kind === 'PERPETUAL';
     if (!perpetual && !record.billingCycle) return null;
+    if (line) return this.priceFromLine(record, line);
+    if (!record.unitPrice) return null;
 
     return {
       kind: perpetual ? 'ONE_TIME' : 'RECURRING',
@@ -106,6 +122,42 @@ export class SubscriptionFactsService {
       },
       monthlyPriceMinor: monthlyPriceOf(record),
       billingCycle: record.billingCycle ?? 'OTHER',
+    };
+  }
+
+  private async resolveLineForPrice(subscriptionId: string, planId: string, tx?: DbTx) {
+    const exact = await this.lines.findOfPlan(subscriptionId, planId, tx);
+    if (exact) return exact;
+    const all = (await this.lines.ofSubscriptions([subscriptionId], tx)).get(subscriptionId);
+
+    return all?.[0] ?? null;
+  }
+
+  private priceFromLine(
+    record: SubscriptionRecord,
+    line: { planId: string; monthlyUnitPriceMinor: bigint },
+  ): SubscriptionPrice {
+    const cycle = record.billingCycle ?? 'OTHER';
+    const matchesSubscription =
+      record.unitPrice !== null &&
+      record.planId === line.planId &&
+      record.monthlyUnitPriceMinor === line.monthlyUnitPriceMinor;
+    const derivedMinor = line.monthlyUnitPriceMinor * BigInt(LINE_CYCLE_MONTHS[cycle]);
+    const unitPrice =
+      matchesSubscription && record.unitPrice
+        ? { amountMinor: record.unitPrice.amountMinor, currency: record.unitPrice.currency }
+        : { amountMinor: derivedMinor, currency: DONG };
+    const reportingUnitPrice =
+      matchesSubscription && record.priceSnapshot
+        ? { amountMinor: record.priceSnapshot.reportingMinor, currency: record.priceSnapshot.reportingCurrency }
+        : { amountMinor: derivedMinor, currency: DONG };
+
+    return {
+      kind: record.kind === 'PERPETUAL' ? 'ONE_TIME' : 'RECURRING',
+      unitPrice,
+      reportingUnitPrice,
+      monthlyPriceMinor: line.monthlyUnitPriceMinor,
+      billingCycle: cycle,
     };
   }
 

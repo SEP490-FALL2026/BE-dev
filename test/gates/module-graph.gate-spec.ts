@@ -92,6 +92,8 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'CatalogModule: SubscriptionPeriodApi',
   // Redesign wave 3 (W3-24): licensing reads and locks the lots of licenses of a K4 plan (a grant, a key given to a person, an activation of a machine) through this facade.
   'CatalogModule: LicenseLotApi',
+  // Redesign wave 3 (W3-16): the single write facade for `seat_changes` and `seat_purchases` on subscription lines.
+  'CatalogModule: SeatLedgerApi',
   // H8.3 (A4-10): the data-import facade; onboarding reads the latest people import through it.
   'DataImportModule: DataImportApi',
   // G7: the register of company machines; personnel ends the registrations of a person who left through it.

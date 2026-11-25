@@ -179,7 +179,7 @@ describe('the notice of a rise of the seats bought of a subscription (X-IT.7)', 
         const catalog = h.ctx.app.get(CatalogApi, { strict: false });
         await h.ctx.app.get(TransactionRunner).run(async (tx) => {
           await catalog.lockSeatTarget(tx, { subscriptionId: id });
-          await catalog.addPoolSeat(tx, principal(h.it1.employeeId), id, null);
+          await catalog.incrementLegacyPoolSeat(tx, principal(h.it1.employeeId), id, null);
         });
         expect(await quantityOf(id)).toBe(5);
 

@@ -1,3 +1,4 @@
+import type { PoolSubscription } from '../../catalog/public/catalog.types';
 import { PurchaseNotAllowedError, PurchaseNotApplicableError, PurchaseReasonRequiredError } from './shared-pool.errors';
 
 type ProvisioningType = 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
@@ -44,6 +45,32 @@ export interface AvoidedCost {
   /** Unused after `W3-09` (stored as null for new rows); retained on row writer for schema compatibility (`D-12`). */
   months: number | null;
   unitMinor: bigint;
+  /** The unit price converted to the reporting currency when it was recorded; null when it was not converted. */
   amountMinor: bigint;
   currency: string;
+}
+
+function compareLineCandidate(a: PoolSubscription, b: PoolSubscription): number {
+  const createdA = a.lineCreatedAt ? a.lineCreatedAt.getTime() : Number.MAX_SAFE_INTEGER;
+  const createdB = b.lineCreatedAt ? b.lineCreatedAt.getTime() : Number.MAX_SAFE_INTEGER;
+  if (createdA !== createdB) return createdA - createdB;
+  const idA = a.subscriptionLineId ?? a.subscriptionId;
+  const idB = b.subscriptionLineId ?? b.subscriptionId;
+  if (idA < idB) return -1;
+  if (idA > idB) return 1;
+  return 0;
+}
+
+/**
+ * Selects the pool line/subscription to take a seat from (`W3-15`, `P0-05`):
+ * prefers candidates that still have free seats (`free > 0`), then sorts deterministically by
+ * `lineCreatedAt ASC`, `subscriptionLineId ASC` (falling back to `subscriptionId` for legacy periods without lines).
+ */
+export function choosePoolLine(candidates: readonly PoolSubscription[], stock: PoolStock): PoolSubscription | null {
+  if (candidates.length === 0) return null;
+  const withRoom = candidates.filter((candidate) => (stock.freeBySubscription.get(candidate.subscriptionId) ?? 0) > 0);
+  const pool = withRoom.length > 0 ? [...withRoom] : [...candidates];
+  pool.sort(compareLineCandidate);
+
+  return pool[0] ?? null;
 }

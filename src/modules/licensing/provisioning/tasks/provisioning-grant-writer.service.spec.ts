@@ -1,5 +1,6 @@
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { CatalogApi } from '../../../catalog/public/catalog.api';
+import type { SeatLedgerApi } from '../../../catalog/public/seat-ledger.api';
 import type { AssignmentService } from '../../assignment/assignment.service';
 import type { GrantRequestGateHook } from '../../public/licensing.extension-points';
 import { GrantRequestRefusedError, ProvisioningPlanBoundToDeviceError } from '../../public/licensing.errors';
@@ -49,6 +50,7 @@ function makeWriter(overrides: WriterOverrides = {}) {
     } as unknown as ProvisioningGrantTaskService,
     {
       lockPersonalEmployee: overrides.lockPersonalEmployee ?? jest.fn(),
+      requireActingItAdmin: overrides.requireActingItAdmin ?? jest.fn(() => Promise.resolve({ bySubstitute: false })),
       personal: jest.fn(() => Promise.resolve({ selfExecuted: null })),
       service: jest.fn(() => Promise.resolve({ selfExecuted: null })),
     } as unknown as ProvisioningHolderService,
@@ -63,7 +65,7 @@ function makeWriter(overrides: WriterOverrides = {}) {
     } as unknown as CatalogApi,
     { get: () => ({ claimForGrant }) } as unknown as GrantRequestGateHook,
     {
-      chooseSubscription: jest.fn(() => Promise.resolve('sub-1')),
+      chooseLine: jest.fn(() => Promise.resolve('sub-1')),
       judgePurchase: jest.fn(() => Promise.resolve({ decision: { purchased: false }, stock: null })),
     } as unknown as SharedPoolService,
     {
@@ -71,8 +73,8 @@ function makeWriter(overrides: WriterOverrides = {}) {
       endReplacedRight: overrides.endReplacedRight ?? jest.fn(() => Promise.resolve(null)),
     } as unknown as ProvisioningReplacementService,
     {
-      requireActingItAdmin: overrides.requireActingItAdmin ?? jest.fn(() => Promise.resolve({ bySubstitute: false })),
-    } as unknown as ProvisioningTaskFrame,
+      buyForItems: jest.fn(),
+    } as unknown as SeatLedgerApi,
   );
 }
 

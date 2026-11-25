@@ -4,6 +4,7 @@ import type { DbTx } from '../../../../infrastructure/database/transaction-runne
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import { CatalogApi } from '../../../catalog/public/catalog.api';
 import type { SeatTarget } from '../../../catalog/public/catalog.types';
+import { SeatLedgerApi } from '../../../catalog/public/seat-ledger.api';
 import { AssignmentService } from '../../assignment/assignment.service';
 import {
   AssignmentConflictError,
@@ -18,7 +19,6 @@ import type { GrantRequestAnswer } from '../../public/licensing.types';
 import type { PoolStock } from '../../shared-pool/shared-pool.policy';
 import { SharedPoolService } from '../../shared-pool/shared-pool.service';
 import type { ProvisioningTaskRecord } from '../provisioning-task.types';
-import { ProvisioningTaskFrame } from '../provisioning-task-frame.service';
 import type { GrantInput, ProvisioningGrantPlanner } from './provisioning-grant-planner.service';
 import { ProvisioningGrantTaskService } from './provisioning-grant-task.service';
 import { claimMatchesAnswer } from './provisioning-grant.policy';
@@ -29,7 +29,7 @@ type Planned = Awaited<ReturnType<ProvisioningGrantPlanner['plan']>>;
 
 /**
  * Writes the grant of the seat of a request in its own transaction following the standard lock order in
- * `docs/rules/database-business.md` (`employee` -> `revocation task` -> `request` -> `subscription` -> `plan` -> `assignment`):
+ * `docs/rules/database-business.md` (`employee` -> `revocation task` -> `request` -> `subscription` -> `line` -> `plan` -> `assignment`):
  * for a personal seat the beneficiary employee is held `FOR SHARE` first, then any live revocation task on the replaced
  * assignment is locked `FOR UPDATE`, then the request is locked and claimed, the seat target is locked, any replaced right
  * is ended, the holder and assignment are written, and the manual task is inserted and claimed for the IT Admin.
@@ -44,7 +44,7 @@ export class ProvisioningGrantWriter {
     private readonly gate: GrantRequestGateHook,
     private readonly sharedPool: SharedPoolService,
     private readonly replacements: ProvisioningReplacementService,
-    private readonly frame: ProvisioningTaskFrame,
+    private readonly seatLedger: SeatLedgerApi,
   ) {}
 
   async write(
@@ -66,7 +66,7 @@ export class ProvisioningGrantWriter {
     }
     const subscriptionId = await this.subscriptionOf(tx, plan, input.subscriptionId, today);
     await this.requireGrantable(tx, plan, input.subscriptionId, today);
-    const target = await this.lockTarget(tx, plan, subscriptionId);
+    const target = await this.lockTarget(tx, plan, subscriptionId, today);
     const replaced = await this.replacements.endReplacedRight(tx, actor, {
       claimed,
       target,
@@ -82,6 +82,7 @@ export class ProvisioningGrantWriter {
       today,
       carriesOn: replaced !== null,
       requestId: input.requestId,
+      beneficiaryEmployeeId: claimed.employeeId,
     });
     const holder = await this.holderOf(tx, actor, { input, answer, claimed, serviceIdentifier, today });
     const assignment = await this.assignments.createFromRequest(tx, actor, {
@@ -113,7 +114,7 @@ export class ProvisioningGrantWriter {
     if (answer.seat === 'PERSONAL') {
       await this.holders.lockPersonalEmployee(tx, answer.employeeId);
     }
-    const { bySubstitute } = await this.frame.requireActingItAdmin(tx, actor, {
+    const { bySubstitute } = await this.holders.requireActingItAdmin(tx, actor, {
       beneficiaryEmployeeId: answer.employeeId,
       ...(answer.seat === 'SERVICE' ? { departmentId: answer.serviceAccount.departmentId } : {}),
     });
@@ -135,6 +136,7 @@ export class ProvisioningGrantWriter {
       today: string;
       carriesOn: boolean;
       requestId: string;
+      beneficiaryEmployeeId: string;
     },
   ) {
     const { plan, target, today, carriesOn } = facts;
@@ -151,14 +153,16 @@ export class ProvisioningGrantWriter {
       stock,
       carriesOn,
       requestId: facts.requestId,
+      beneficiaryEmployeeId: facts.beneficiaryEmployeeId,
+      today,
     });
 
     return decision;
   }
 
   /**
-   * The subscription the seat is taken from: the one the IT Admin names, else the one the shared pool of the plan gives (the primary
-   * subscription, the one with a free seat first). Read before the subscription is locked; the lock that follows holds it for the grant.
+   * The subscription the seat is taken from: the one the IT Admin names, else the one the shared pool of the plan gives (the line
+   * with a free seat first, then `lineCreatedAt, subscriptionLineId`). Read before the subscription is locked; the lock that follows holds it for the grant.
    * Throws SeatTargetNotFoundError when the plan has no subscription a seat can be taken from today.
    */
   private async subscriptionOf(
@@ -168,7 +172,7 @@ export class ProvisioningGrantWriter {
     today: string,
   ): Promise<string | undefined> {
     if (named !== undefined || plan.provisioningType === 'K5') return named;
-    const chosen = await this.sharedPool.chooseSubscription(tx, {
+    const chosen = await this.sharedPool.chooseLine(tx, {
       planId: plan.planId,
       provisioningType: plan.provisioningType,
       today,
@@ -203,12 +207,25 @@ export class ProvisioningGrantWriter {
       stock: PoolStock | null;
       carriesOn: boolean;
       requestId: string;
+      beneficiaryEmployeeId: string;
+      today: string;
     },
   ): Promise<void> {
     const { plan, target, purchased, stock, carriesOn } = facts;
     if (target.subscriptionId === null) return;
     if ((plan.provisioningType === 'K1' && !carriesOn) || purchased) {
-      await this.catalog.addPoolSeat(tx, actor, target.subscriptionId, facts.requestId);
+      if (plan.provisioningType === 'K2' && target.subscriptionLineId) {
+        await this.seatLedger.buyForItems(
+          tx,
+          target.subscriptionLineId,
+          [{ requestId: facts.requestId, beneficiaryEmployeeId: facts.beneficiaryEmployeeId }],
+          facts.today,
+          { actor, alreadyLocked: true, today: facts.today },
+        );
+
+        return;
+      }
+      await this.catalog.incrementLegacyPoolSeat(tx, actor, target.subscriptionId, facts.requestId);
 
       return;
     }
@@ -264,8 +281,16 @@ export class ProvisioningGrantWriter {
   }
 
   /** K5: the plan itself (no seat); K1 and K2: the subscription, which must be of the plan and have a quantity. */
-  private async lockTarget(tx: DbTx, plan: SeatTarget, subscriptionId: string | undefined): Promise<SeatTarget> {
-    const target = await this.catalog.lockSeatTarget(tx, subscriptionId ? { subscriptionId } : { planId: plan.planId });
+  private async lockTarget(
+    tx: DbTx,
+    plan: SeatTarget,
+    subscriptionId: string | undefined,
+    servingOn: string,
+  ): Promise<SeatTarget> {
+    const target = await this.catalog.lockSeatTarget(
+      tx,
+      subscriptionId ? { subscriptionId, planId: plan.planId, servingOn } : { planId: plan.planId },
+    );
     if (!target) throw new SeatTargetNotFoundError(subscriptionId ? 'SUBSCRIPTION' : 'PLAN');
     if (target.planId !== plan.planId) throw new ProvisioningSubscriptionError('PLAN_MISMATCH');
     if (target.keyBinding === 'DEVICE_KEY' || target.keyBinding === 'DEVICE_BUNDLED') {

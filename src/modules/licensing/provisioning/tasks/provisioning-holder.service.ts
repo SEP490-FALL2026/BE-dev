@@ -46,6 +46,15 @@ export class ProvisioningHolderService {
     return this.organizationReads.lockEmployeeForShare(tx, employeeId);
   }
 
+  /** Delegates acting IT Admin authorization for the beneficiary/department to the shared task frame. */
+  requireActingItAdmin(
+    tx: DbTx | undefined,
+    actor: AuthenticatedPrincipal,
+    target: { beneficiaryEmployeeId: string; departmentId?: string; taskId?: string; now?: Date },
+  ): Promise<{ bySubstitute: boolean }> {
+    return this.frame.requireActingItAdmin(tx, actor, target);
+  }
+
   /**
    * No task to grant begins for a beneficiary who has left, nor from the day a departure blocks their access although they are not marked
    * left yet (`QĐ-77f`, `QĐ-110d`); a task already being worked is not touched. The grant and the claim of a queued task both ask it, in the

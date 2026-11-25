@@ -2,11 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { normalizeAccountIdentifier } from '../public/account-identifier.policy';
 import { fromDateColumn, type BusinessDate } from '../../../core/business-date';
 import { endAfterGrant } from '../../../core/term-limit';
-import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
+import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import type { SeatTarget, SeatTargetRef } from '../../catalog/public/catalog.types';
 import { CatalogApi } from '../../catalog/public/catalog.api';
+import { SeatLedgerApi } from '../../catalog/public/seat-ledger.api';
 import { SubscriptionPeriodApi } from '../../catalog/public/subscription-period.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import {
@@ -87,7 +88,7 @@ export class AssignmentService {
     private readonly organizationReads: OrganizationReadApi,
     private readonly catalog: CatalogApi,
     private readonly audit: AuditApi,
-    private readonly runner: TransactionRunner,
+    private readonly seatLedger: SeatLedgerApi,
     private readonly periods: SubscriptionPeriodApi,
     private readonly carrying: AssignmentCarryRepo,
   ) {}
@@ -439,14 +440,20 @@ export class AssignmentService {
       startDate,
       actorAppUserId: actor.appUserId,
     };
-    await this.carryOrBuy(tx, actor, { carrying, next, requestId: input.requestId });
+    await this.carryOrBuy(tx, actor, {
+      carrying,
+      next,
+      planId: seat.planId,
+      beneficiaryEmployeeId: seat.employeeId,
+      today: input.today,
+      requestId: input.requestId,
+    });
   }
 
   /**
    * Carries the seat; when the next period holds no free seat for it and is the shared pool (no department owns it), buys one seat on it for the
-   * request and carries again: the person who comes in after the adjustment was recorded is a seat the IT Admin buys for the period (`QĐ-103q`),
-   * told like any seat a grant buys (`QĐ-110v`). Throws ProvisioningSubscriptionError
-   * (`NEXT_PERIOD_SEATS`).
+   * request (`SeatLedgerApi.buyForItems` with `effectiveOn = startDate`) and carries again (`QĐ-103q`, `QĐ-110v`). Throws ProvisioningSubscriptionError
+   * (`NEXT_PERIOD_SEATS`) when a department-owned next period cannot take the carried seat.
    */
   private async carryOrBuy(
     tx: DbTx,
@@ -454,6 +461,9 @@ export class AssignmentService {
     input: {
       carrying: Parameters<AssignmentCarryRepo['carry']>[1];
       next: { subscriptionId: string };
+      planId: string;
+      beneficiaryEmployeeId: string;
+      today: BusinessDate;
       requestId: string;
     },
   ): Promise<void> {
@@ -461,8 +471,22 @@ export class AssignmentService {
     if (refused === null) return;
     this.requireNoRoom(refused);
     const { subscriptionId } = input.next;
-    await this.catalog.lockSeatTarget(tx, { subscriptionId });
-    await this.catalog.addPoolSeat(tx, actor, subscriptionId, input.requestId);
+    const nextTarget = await this.catalog.lockSeatTarget(tx, {
+      subscriptionId,
+      planId: input.planId,
+      servingOn: input.carrying.startDate,
+    });
+    if (nextTarget?.subscriptionLineId) {
+      await this.seatLedger.buyForItems(
+        tx,
+        nextTarget.subscriptionLineId,
+        [{ requestId: input.requestId, beneficiaryEmployeeId: input.beneficiaryEmployeeId }],
+        input.carrying.startDate,
+        { actor, today: input.today, alreadyLocked: true, checkClosedMonth: false },
+      );
+    } else {
+      await this.catalog.incrementLegacyPoolSeat(tx, actor, subscriptionId, input.requestId);
+    }
     try {
       await this.carrying.carry(tx, input.carrying);
     } catch (error) {

@@ -9,9 +9,11 @@ import { pickPriceSource, type LivenessFacts } from './pool/subscription-pool.po
 import { monthlyPriceOf } from './price/subscription-price.policy';
 import { derivedMonthlyUnitPriceMinor } from './subscription.policy';
 import {
-  livePricedOf,
   PLAN_KIND,
   PRICE_FIELDS,
+  findPricedCyclesInDb,
+  findPricedLineOfPlan,
+  livePricedOf,
   pricedOn,
   toPricedOfPlan,
   withPriceSource,
@@ -380,42 +382,33 @@ export class SubscriptionRepo {
    */
   async findPricedOfPlan(planId: string, tx?: DbTx, on?: BusinessDate): Promise<PricedOfPlanResult | null> {
     const db = tx ?? this.prisma;
+    const fromLines = await findPricedLineOfPlan(db, planId, on);
+    if (fromLines) return fromLines;
+
     const select = { id: true, startDate: true, isPrimaryForPlan: true, ...PRICE_FIELDS, ...PLAN_KIND } as const;
     let row =
       on === undefined
         ? null
         : pickPriceSource(
-            (await db.subscription.findMany({ where: { planId, ...pricedOn(on) }, select })).map(withPriceSource),
+            (await db.subscription.findMany({ where: { planId, ...pricedOn(on), lines: { none: {} } }, select })).map(
+              withPriceSource,
+            ),
           );
     row ??= pickPriceSource(
-      (await db.subscription.findMany({ where: { planId, ...livePricedOf() }, select })).map(withPriceSource),
+      (await db.subscription.findMany({ where: { planId, ...livePricedOf(), lines: { none: {} } }, select })).map(
+        withPriceSource,
+      ),
     );
 
     return row ? toPricedOfPlan(row) : null;
   }
 
   /** The billing cycles of the main subscriptions pricing these plans, one per plan (`ONE_TIME` for a perpetual purchase); no department is asked. */
-  async findPricedCyclesOfPlans(
+  findPricedCyclesOfPlans(
     planIds: readonly string[],
     tx?: DbTx,
   ): Promise<Map<string, 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER' | 'ONE_TIME'>> {
-    const cycles = new Map<string, 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER' | 'ONE_TIME'>();
-    if (planIds.length === 0) return cycles;
-    const rows = await (tx ?? this.prisma).subscription.findMany({
-      where: { planId: { in: [...planIds] }, ...livePricedOf() },
-      select: { id: true, planId: true, startDate: true, isPrimaryForPlan: true, ...PRICE_FIELDS, ...PLAN_KIND },
-    });
-    const byPlan = new Map<string, Array<ReturnType<typeof withPriceSource> & { kind: SubscriptionKind }>>();
-    for (const row of rows) {
-      const kind: SubscriptionKind = row.plan.provisioningType === 'K4' ? 'PERPETUAL' : row.kind;
-      byPlan.set(row.planId, [...(byPlan.get(row.planId) ?? []), { ...withPriceSource(row), kind }]);
-    }
-    for (const [planId, sources] of byPlan) {
-      const chosen = pickPriceSource(sources);
-      if (chosen) cycles.set(planId, chosen.kind === 'PERPETUAL' ? 'ONE_TIME' : chosen.billingCycle);
-    }
-
-    return cycles;
+    return findPricedCyclesInDb(tx ?? this.prisma, planIds);
   }
 
   async find(id: string, tx?: DbTx): Promise<SubscriptionRecord | null> {

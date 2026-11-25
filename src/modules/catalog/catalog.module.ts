@@ -112,8 +112,12 @@ import { LicenseLotsController } from './license-lot/license-lots.controller';
 import { LicenseLotRepo } from './license-lot/license-lot.repo';
 import { LicenseLotApi } from './public/license-lot.api';
 import { SeatLedgerRepo } from './subscription-line/ledger/seat-ledger.repo';
+import { SeatLedgerService } from './subscription-line/ledger/seat-ledger.service';
 import { SeatPurchaseRepo } from './subscription-line/purchase/seat-purchase.repo';
+import { SeatPurchaseService } from './subscription-line/purchase/seat-purchase.service';
 import { SubscriptionLineRepo } from './subscription-line/subscription-line.repo';
+import { SubscriptionLineSeatsService } from './subscription-line/subscription-line-seats.service';
+import { SeatLedgerApi } from './public/seat-ledger.api';
 import { WorkspaceViewService } from './workspace/workspace-view.service';
 import { WorkspacesController } from './workspace/workspaces.controller';
 
@@ -189,6 +193,7 @@ import { WorkspacesController } from './workspace/workspaces.controller';
     WorkspaceForSubscriptionService,
     WorkspaceRepo,
     SubscriptionLineRepo,
+    SubscriptionLineSeatsService,
     SubscriptionLotResponsibleService,
     LicenseLotRepo,
     LicenseLotLockService,
@@ -199,7 +204,10 @@ import { WorkspacesController } from './workspace/workspaces.controller';
     LicenseLotResponsibleService,
     LicenseLotApi,
     SeatLedgerRepo,
+    SeatLedgerService,
     SeatPurchaseRepo,
+    SeatPurchaseService,
+    SeatLedgerApi,
     WorkspaceApi,
     VendorAdminRolesService,
     VendorAdminMinimumService,
@@ -259,6 +267,7 @@ import { WorkspacesController } from './workspace/workspaces.controller';
     CatalogContractApi,
     CatalogResponsibilityApi,
     LicenseLotApi,
+    SeatLedgerApi,
     SubscriptionPeriodApi,
     SeatOccupancyHook,
     SeatBaselinePhaseHook,

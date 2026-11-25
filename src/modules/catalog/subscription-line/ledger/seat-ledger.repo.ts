@@ -147,4 +147,31 @@ export class SeatLedgerRepo {
 
     return rows.map(toRecord);
   }
+
+  /** All rows of these lines taking effect on or before `until`, ordered chronologically. */
+  async ofLinesUpTo(lineIds: readonly string[], until: BusinessDate, tx?: DbTx): Promise<SeatChangeRecord[]> {
+    if (lineIds.length === 0) return [];
+    const rows = await (tx ?? this.prisma).seatChange.findMany({
+      where: { subscriptionLineId: { in: [...lineIds] }, effectiveOn: { lte: toDateColumn(until) } },
+      orderBy: ORDER,
+    });
+
+    return rows.map(toRecord);
+  }
+
+  /** Seat totals on `day` for each of `lineIds` that has ledger entries up to `day`. */
+  async seatsOnOfLines(lineIds: readonly string[], day: BusinessDate, tx?: DbTx): Promise<Map<string, number>> {
+    const result = new Map<string, number>();
+    if (lineIds.length === 0) return result;
+    const rows = await (tx ?? this.prisma).seatChange.groupBy({
+      by: ['subscriptionLineId'],
+      where: { subscriptionLineId: { in: [...lineIds] }, effectiveOn: { lte: toDateColumn(day) } },
+      _sum: { delta: true },
+    });
+    for (const row of rows) {
+      result.set(row.subscriptionLineId, row._sum.delta ?? 0);
+    }
+
+    return result;
+  }
 }

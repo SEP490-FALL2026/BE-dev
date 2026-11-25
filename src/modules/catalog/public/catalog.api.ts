@@ -200,18 +200,16 @@ export class CatalogApi {
   }
 
   /**
-   * Buys one more seat on the subscription, in the transaction of the caller, which holds it locked through `lockSeatTarget`: `purchased_quantity`
-   * rises by one (a K2 or K4 pool topped up with a grant, or the seat a K1 grant buys for its holder). It asks no Cost Center of the department
-   * that owns the subscription, if any. A rise of a K2 or K4 pool is told to the IT Admin who answers for it, with `requestId` (the request the seat is
-   * bought for) when the caller has one (`QĐ-110v`); a K1 purchase tells nobody (`S-4`). Throws PoolSeatNotAddableError for a subscription that is absent or a draft.
+   * Temporary legacy seat increment kept only for K1 (until P13a) and K4 (until P20), plus pre-P15 K2 periods with no line.
+   * K2 line purchases must use `SeatLedgerApi.buyForItems`. Throws PoolSeatNotAddableError.
    */
-  addPoolSeat(
+  incrementLegacyPoolSeat(
     tx: DbTx,
     actor: AuthenticatedPrincipal,
     subscriptionId: string,
     requestId: string | null = null,
   ): Promise<number> {
-    return this.subscriptions.addSeat(tx, actor, subscriptionId, requestId);
+    return this.subscriptions.incrementLegacySeat(tx, actor, subscriptionId, requestId);
   }
 
   /**
@@ -264,9 +262,9 @@ export class CatalogApi {
     return this.subscriptions.originalPriceOfSubscription(subscriptionId, tx);
   }
 
-  /** What one subscription is bought at (unit price and billing cycle); null when it has no price. */
-  getSubscriptionPrice(subscriptionId: string, tx?: DbTx): Promise<SubscriptionPrice | null> {
-    return this.subscriptions.priceOfSubscription(subscriptionId, tx);
+  /** What one subscription (or a specific plan line of it) is bought at (unit price and billing cycle); null when it has no price. */
+  getSubscriptionPrice(subscriptionId: string, tx?: DbTx, planId?: string): Promise<SubscriptionPrice | null> {
+    return this.subscriptions.priceOfSubscription(subscriptionId, tx, planId);
   }
 
   /**
