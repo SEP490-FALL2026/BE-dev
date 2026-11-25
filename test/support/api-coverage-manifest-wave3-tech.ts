@@ -17,4 +17,8 @@ export const API_COVERAGE_WAVE3_TECH: readonly string[] = [
   'PATCH /api/v1/license-lots/{id}',
   'POST /api/v1/license-lots/{id}/keys',
   'POST /api/v1/license-lots/{id}/responsible-it-admin',
+  // W3-15: subscription lines and seat changes.
+  'POST /api/v1/subscriptions/{id}/lines',
+  'PATCH /api/v1/subscription-lines/{id}',
+  'GET /api/v1/subscription-lines/{id}/seat-changes',
 ];

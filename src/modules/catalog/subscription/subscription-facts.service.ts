@@ -3,6 +3,7 @@ import type { BusinessDate } from '../../../core/business-date';
 import { DONG } from '../../../core/money/money';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { isLineServingOn } from '../subscription-line/subscription-line.policy';
 import { SubscriptionLineRepo } from '../subscription-line/subscription-line.repo';
 import { SubscriptionPoolService } from './pool/subscription-pool.service';
 import { SubscriptionGrantingRepo } from './subscription-granting.repo';
@@ -36,8 +37,29 @@ export class SubscriptionFactsService {
     private readonly lines: SubscriptionLineRepo,
   ) {}
 
-  /**
-   * Temporary legacy seat increment kept only for K1 (until P13a) and K4 (until P20), plus pre-P15 K2 periods without a line.
+  async servingLineIdsOfSubscription(
+    subscriptionId: string,
+    day: BusinessDate,
+    tx?: DbTx,
+  ): Promise<{ hasLines: boolean; servingLineIds: string[] }> {
+    const period = await this.subscriptions.find(subscriptionId, tx);
+    const lines = (await this.lines.ofSubscriptions([subscriptionId], tx)).get(subscriptionId) ?? [];
+    if (lines.length === 0) return { hasLines: false, servingLineIds: [] };
+
+    const servingLineIds = lines
+      .filter((line) =>
+        isLineServingOn(line, day, {
+          status: period?.status ?? 'ACTIVE',
+          startDate: period?.startDate ?? null,
+          endDate: period?.endDate ?? null,
+        }),
+      )
+      .map((line) => line.id);
+
+    return { hasLines: true, servingLineIds };
+  }
+
+  /** Temporary legacy seat increment kept only for K1 (until P13a) and K4 (until P20), plus pre-P15 K2 periods without a line.
    * Throws PoolSeatNotAddableError.
    */
   incrementLegacySeat(

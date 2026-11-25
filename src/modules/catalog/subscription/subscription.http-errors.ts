@@ -16,6 +16,12 @@ import {
   WorkspaceVendorMismatchError,
 } from '../workspace/workspace.errors';
 import {
+  SubscriptionLineLiveTakenError,
+  SubscriptionLinePlanNotK2Error,
+  SubscriptionLinePlanTakenError,
+  SubscriptionLinePriceNotVndError,
+} from '../subscription-line/subscription-line.errors';
+import {
   SubscriptionApplicationRetiredError,
   SubscriptionPriceMismatchError,
   SubscriptionPriceNotVndError,
@@ -33,6 +39,7 @@ import {
   SubscriptionPerpetualIsLicenseLotError,
   SubscriptionPrimaryConflictError,
   SubscriptionPrimaryRetiredError,
+  SubscriptionLinesXorPlanError,
   SubscriptionSeatCountViaLedgerError,
   SubscriptionQuantityReasonRequiredError,
   SubscriptionStaleError,
@@ -90,6 +97,21 @@ export function toSubscriptionApiException(error: unknown): unknown {
   }
   if (error instanceof SubscriptionPerpetualIsLicenseLotError) {
     return refuse(UNPROCESSABLE, 'SUBSCRIPTION.PERPETUAL_IS_LICENSE_LOT', error.message);
+  }
+  if (error instanceof SubscriptionLinesXorPlanError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.LINES_XOR_PLAN', error.message);
+  }
+  if (error instanceof SubscriptionLinePlanNotK2Error) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION_LINE.PLAN_NOT_K2', error.message);
+  }
+  if (error instanceof SubscriptionLinePriceNotVndError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION_LINE.PRICE_NOT_VND', error.message, { currency: error.currency });
+  }
+  if (error instanceof SubscriptionLineLiveTakenError) {
+    return refuse(HttpStatus.CONFLICT, 'SUBSCRIPTION.DUPLICATE_PLAN', error.message);
+  }
+  if (error instanceof SubscriptionLinePlanTakenError) {
+    return refuse(HttpStatus.CONFLICT, 'SUBSCRIPTION.DUPLICATE_PLAN', error.message);
   }
   if (error instanceof ApiException) return error;
 
@@ -249,6 +271,8 @@ export const SUBSCRIPTION_ERROR_EXAMPLES = {
   PRIMARY_RETIRED: example(new SubscriptionPrimaryRetiredError()),
   K1_HAS_NO_SUBSCRIPTION: example(new SubscriptionK1HasNoSubscriptionError()),
   PERPETUAL_IS_LICENSE_LOT: example(new SubscriptionPerpetualIsLicenseLotError()),
+  LINES_XOR_PLAN: example(new SubscriptionLinesXorPlanError()),
+  LINE_PLAN_NOT_K2: example(new SubscriptionLinePlanNotK2Error()),
   MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(2, 'unitPrice')),
   MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError('unitPrice')),
   CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('XYZ', 'originalPrice')),

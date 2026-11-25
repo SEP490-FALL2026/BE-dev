@@ -117,6 +117,11 @@ import { SeatPurchaseRepo } from './subscription-line/purchase/seat-purchase.rep
 import { SeatPurchaseService } from './subscription-line/purchase/seat-purchase.service';
 import { SubscriptionLineRepo } from './subscription-line/subscription-line.repo';
 import { SubscriptionLineSeatsService } from './subscription-line/subscription-line-seats.service';
+import { SeatChangeQueryService } from './subscription-line/seat-change-query.service';
+import { SubscriptionLineService } from './subscription-line/subscription-line.service';
+import { SubscriptionLinesController } from './subscription-line/subscription-lines.controller';
+import { SubscriptionPeriodLinesService } from './subscription-line/subscription-period-lines.service';
+import { SubscriptionMultiLineService } from './subscription/lines/subscription-lines.service';
 import { SeatLedgerApi } from './public/seat-ledger.api';
 import { WorkspaceViewService } from './workspace/workspace-view.service';
 import { WorkspacesController } from './workspace/workspaces.controller';
@@ -149,6 +154,7 @@ import { WorkspacesController } from './workspace/workspaces.controller';
     PlanTermsController,
     VendorsController,
     SubscriptionsController,
+    SubscriptionLinesController,
     SubscriptionResponsibleController,
     WorkspacesController,
     ApplicationRetirementController,
@@ -194,6 +200,10 @@ import { WorkspacesController } from './workspace/workspaces.controller';
     WorkspaceRepo,
     SubscriptionLineRepo,
     SubscriptionLineSeatsService,
+    SubscriptionLineService,
+    SeatChangeQueryService,
+    SubscriptionPeriodLinesService,
+    SubscriptionMultiLineService,
     SubscriptionLotResponsibleService,
     LicenseLotRepo,
     LicenseLotLockService,

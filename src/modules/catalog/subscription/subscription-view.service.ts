@@ -20,7 +20,10 @@ import {
 import { alertDates, deriveNotice, missingData, noticeInputOf, noticeWarnings } from './subscription.policy';
 import { isPricedInDong } from './price/subscription-price.policy';
 import { poolWarnings, vendorAdminFlags } from './pool/subscription-pool.policy';
-import { SubscriptionLotResponsibleService } from './responsible/subscription-lot-responsible.service';
+import {
+  SubscriptionLotResponsibleService,
+  type SubscriptionLineWithSeats,
+} from './responsible/subscription-lot-responsible.service';
 import { SubscriptionGrantingRepo } from './subscription-granting.repo';
 import { WorkspaceForSubscriptionService } from '../workspace/workspace-for-subscription.service';
 import { SubscriptionWindowsService } from './subscription-windows.service';
@@ -43,6 +46,12 @@ export interface ExpiryReadingView {
 }
 
 /** The seats of a shared pool: only a K2 plan has them (a key, a personal right and an internal tool are counted by what they are, `IA-2`). */
+const listSeatsTodayOf = (lineCount: number, servingSeatsSum: number, record: SubscriptionRecord): number => {
+  if (lineCount > 0) return servingSeatsSum;
+
+  return record.planProvisioningType === 'K2' ? (record.purchasedQuantity ?? 0) : 0;
+};
+
 const seatsOfPool = (record: SubscriptionRecord, counts: SeatCounts): SubscriptionView['seats'] => {
   if (record.planProvisioningType !== 'K2') return null;
   const taken = counts.get(record.id);
@@ -245,25 +254,30 @@ export class SubscriptionViewService {
     const answerer = await this.answerersOf(records);
     // A period that has lines is priced by its lines: the mark of the subscription that prices its plan is retired for it (W3-27).
     const lined = await this.lotFacts.withLines(records.map((record) => record.id));
-    const adjustment = (record: SubscriptionRecord) => ({
+    const linesCtx = await this.readLinesContext(records, today);
+    const adjustment = (record: SubscriptionRecord, effectivePurchasedQuantity: number | null) => ({
       logoUrl: record.applicationLogoUrl,
       responsibleItAdmin: answerer(record),
       expiry: readings.get(record.id)?.state ?? null,
       daysLeft: readings.get(record.id)?.daysLeft ?? null,
       deadlineKind: readings.get(record.id)?.deadlineKind ?? null,
-      seats: seatsOfPool(record, seatCounts),
+      seats: seatsOfPool({ ...record, purchasedQuantity: effectivePurchasedQuantity }, seatCounts),
       isPrimaryForPlan: record.isPrimaryForPlan && !lined.has(record.id),
     });
     const views: SubscriptionView[] = [];
     for (const record of records) {
+      const { lineViews, listSeatsToday, lineCount, effectivePurchasedQuantity, hasLine } = this.resolveRecordLines(
+        record,
+        linesCtx,
+      );
       const notice = deriveNotice(noticeInputOf(record));
       const missing = missingData({
         kind: record.kind,
         planPricingModel: record.planPricingModel,
-        quantity: record.purchasedQuantity,
+        quantity: effectivePurchasedQuantity,
         startDate: record.startDate,
         billingCycle: record.billingCycle,
-        hasPrice: isPricedInDong(record),
+        hasPrice: isPricedInDong(record) || hasLine,
       });
       let group: TaxEstimateResult['group'] | null = groups.get(record.vendor.id)?.group ?? null;
       let taxEstimate: TaxEstimateSummary | null = null;
@@ -303,7 +317,7 @@ export class SubscriptionViewService {
         status: record.status,
         missingFinancialData: record.status === 'DRAFT',
         missing,
-        purchasedQuantity: record.purchasedQuantity,
+        purchasedQuantity: effectivePurchasedQuantity,
         unitPrice,
         monthlyUnitPrice: monthlyUnitPriceWire(record.monthlyUnitPriceMinor),
         originalPrice,
@@ -321,11 +335,14 @@ export class SubscriptionViewService {
         seatCounting: record.seatCounting,
         minimumSeatsTotal: record.minimumSeatsTotal,
         invoicedLater: record.invoicedLater,
-        ...adjustment(record),
+        ...adjustment(record, effectivePurchasedQuantity),
         noticeDeadline: { value: notice.deadline, source: notice.source },
         alerts: alertsOf(points.get(record.id) ?? null, record, windows.get(record.id)),
         warnings: [...noticeWarnings(notice.source), ...poolWarnings(record)],
         mergeCandidateIds: [],
+        lines: lineViews,
+        lineCount,
+        seatsToday: listSeatsToday,
         ...vendorAdmins(record),
         taxProfile: { status: group ? 'DECLARED' : 'MISSING', group },
         taxEstimate,
@@ -335,6 +352,63 @@ export class SubscriptionViewService {
     }
 
     return views;
+  }
+
+  private async readLinesContext(records: readonly SubscriptionRecord[], today: BusinessDate) {
+    const linesBySub: ReadonlyMap<string, SubscriptionLineWithSeats[]> = this.lotFacts.linesForSubscriptions
+      ? await this.lotFacts.linesForSubscriptions(records, today)
+      : new Map();
+    const allLinePlanIds = [...new Set([...linesBySub.values()].flat().map((entry) => entry.line.planId))];
+    const linePlans = allLinePlanIds.length > 0 ? await this.planFacts.lookups(allLinePlanIds) : [];
+    const planNameById = new Map(
+      linePlans.filter((plan): plan is NonNullable<typeof plan> => plan !== null).map((plan) => [plan.id, plan.name]),
+    );
+    const reader = this.occupancy.get();
+    const lineOccupied: ReadonlyMap<string, number> =
+      allLinePlanIds.length > 0 && reader.occupiedBySubscriptionPlans
+        ? await reader.occupiedBySubscriptionPlans(
+            records.map((record) => record.id),
+            today,
+          )
+        : new Map();
+
+    return { linesBySub, planNameById, lineOccupied };
+  }
+
+  private resolveRecordLines(
+    record: SubscriptionRecord,
+    ctx: {
+      linesBySub: ReadonlyMap<string, SubscriptionLineWithSeats[]>;
+      planNameById: ReadonlyMap<string, string>;
+      lineOccupied: ReadonlyMap<string, number>;
+    },
+  ) {
+    const subLines = ctx.linesBySub.get(record.id) ?? [];
+    const lineViews = subLines.map(({ line, seatsToday }) => {
+      const assignedToday = ctx.lineOccupied.get(`${record.id}:${line.planId}`) ?? 0;
+
+      return {
+        id: line.id,
+        plan: { id: line.planId, name: ctx.planNameById.get(line.planId) ?? record.planName },
+        monthlyUnitPrice: { amount: formatAmount(line.monthlyUnitPriceMinor, 0), currency: 'VND' },
+        minimumSeats: line.minimumSeats,
+        seatsToday,
+        assignedToday,
+        freeToday: Math.max(0, seatsToday - assignedToday),
+        closedOn: line.closedOn,
+        closedReason: line.closedReason,
+      };
+    });
+    const servingSeatsSum = subLines.reduce((sum, entry) => (entry.isServing ? sum + entry.seatsToday : sum), 0);
+    const lineCount = subLines.length;
+
+    return {
+      lineViews,
+      listSeatsToday: listSeatsTodayOf(lineCount, servingSeatsSum, record),
+      lineCount,
+      hasLine: lineCount > 0,
+      effectivePurchasedQuantity: lineCount > 0 ? servingSeatsSum : record.purchasedQuantity,
+    };
   }
 
   /**

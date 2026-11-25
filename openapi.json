@@ -28451,6 +28451,28 @@
                         "requestId": "req_example"
                       }
                     }
+                  },
+                  "SUBSCRIPTION.LINES_XOR_PLAN": {
+                    "summary": "Send either lines or planId when declaring a subscription, never both or neither.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.LINES_XOR_PLAN",
+                        "message": "Send either lines or planId when declaring a subscription, never both or neither.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION_LINE.PLAN_NOT_K2": {
+                    "summary": "Only seat-managed K2 plans can be added as subscription lines.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION_LINE.PLAN_NOT_K2",
+                        "message": "Only seat-managed K2 plans can be added as subscription lines.",
+                        "requestId": "req_example"
+                      }
+                    }
                   }
                 }
               }
@@ -29593,6 +29615,922 @@
         "security": [{ "bearer": [] }],
         "summary": "Complete a draft subscription",
         "tags": ["subscriptions"]
+      }
+    },
+    "/api/v1/subscriptions/{id}/lines": {
+      "post": {
+        "operationId": "subscriptionLineAdd",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AddSubscriptionLineBodyDto" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "Creates a live line for a K2 plan of the same vendor on the subscription period and opens its seat ledger when the period is already active.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/SubscriptionLineResponseDto" },
+                    { "properties": { "message": { "example": "SUBSCRIPTION_LINE.ADDED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the IT Admin responsible for the subscription may add a line.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION_LINE.NOT_RESPONSIBLE": {
+                    "summary": "Only the IT Admin responsible for this subscription may change its lines.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION_LINE.NOT_RESPONSIBLE",
+                        "message": "Only the IT Admin responsible for this subscription may change its lines.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Subscription period or workspace not found.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "SUBSCRIPTION.NOT_FOUND": {
+                    "summary": "The subscription period was not found.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.NOT_FOUND",
+                        "message": "The subscription period was not found.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Period changed concurrently (SUBSCRIPTION.STALE) or live line already exists (SUBSCRIPTION.DUPLICATE_PLAN).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "SUBSCRIPTION.STALE": {
+                    "summary": "The subscription period has changed since it was last read; reload and try again.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.STALE",
+                        "message": "The subscription period has changed since it was last read; reload and try again.",
+                        "details": { "currentUpdatedAt": "2026-01-01T00:00:00.000Z" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.DUPLICATE_PLAN": {
+                    "summary": "The workspace already has a live line of this plan: add the seats to that subscription.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.DUPLICATE_PLAN",
+                        "message": "The workspace already has a live line of this plan: add the seats to that subscription.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed or business rule rejected the line.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION_LINE.QUANTITY_VIA_PURCHASE": {
+                    "summary": "The seat baseline phase is closed: add seats through a seat purchase on the line.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION_LINE.QUANTITY_VIA_PURCHASE",
+                        "message": "The seat baseline phase is closed: add seats through a seat purchase on the line.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "WORKSPACE_VENDOR_MISMATCH": {
+                    "summary": "The workspace is held at another vendor than the plan.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "WORKSPACE_VENDOR_MISMATCH",
+                        "message": "The workspace is held at another vendor than the plan.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION_LINE.PLAN_NOT_K2": {
+                    "summary": "Only seat-managed K2 plans can be added as subscription lines.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION_LINE.PLAN_NOT_K2",
+                        "message": "Only seat-managed K2 plans can be added as subscription lines.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION_LINE.NOT_TERM": {
+                    "summary": "Only term subscriptions have seat lines.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION_LINE.NOT_TERM",
+                        "message": "Only term subscriptions have seat lines.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION_LINE.PRICE_NOT_VND": {
+                    "summary": "Subscription line prices must be entered in dong (VND).",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION_LINE.PRICE_NOT_VND",
+                        "message": "Subscription line prices must be entered in dong (VND).",
+                        "details": { "currency": "USD" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PLAN.NOT_FOUND": {
+                    "summary": "The plan does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PLAN.NOT_FOUND",
+                        "message": "The plan does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "APPLICATION.RETIRED": {
+                    "summary": "The application is retired: no plan is declared for it.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "APPLICATION.RETIRED",
+                        "message": "The application is retired: no plan is declared for it.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "MONEY_SCALE_EXCEEDED": {
+                    "summary": "This currency allows at most 0 decimal digit(s).",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "MONEY_SCALE_EXCEEDED",
+                        "message": "This currency allows at most 0 decimal digit(s).",
+                        "details": { "allowedDecimals": 0, "path": "monthlyUnitPrice" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "MONEY_OUT_OF_RANGE": {
+                    "summary": "The amount is outside the range a money value may hold.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "MONEY_OUT_OF_RANGE",
+                        "message": "The amount is outside the range a money value may hold.",
+                        "details": { "path": "monthlyUnitPrice" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Add a seat-managed plan line to an existing subscription period",
+        "tags": ["subscription-lines"]
+      }
+    },
+    "/api/v1/subscription-lines/{id}": {
+      "patch": {
+        "operationId": "subscriptionLineUpdate",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/UpdateSubscriptionLineBodyDto" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updates the monthly unit price (applied to unrun future months) and/or minimum seats of a live line.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/SubscriptionLineResponseDto" },
+                    { "properties": { "message": { "example": "SUBSCRIPTION_LINE.UPDATED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the IT Admin responsible for the subscription may update a line.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION_LINE.NOT_RESPONSIBLE": {
+                    "summary": "Only the IT Admin responsible for this subscription may change its lines.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION_LINE.NOT_RESPONSIBLE",
+                        "message": "Only the IT Admin responsible for this subscription may change its lines.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Subscription line not found.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "SUBSCRIPTION_LINE.NOT_FOUND": {
+                    "summary": "The subscription line does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION_LINE.NOT_FOUND",
+                        "message": "The subscription line does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Line changed concurrently (SUBSCRIPTION_LINE.STALE) or is already closed (SUBSCRIPTION_LINE.CLOSED).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "SUBSCRIPTION_LINE.STALE": {
+                    "summary": "The subscription line has changed since it was last read; reload and try again.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION_LINE.STALE",
+                        "message": "The subscription line has changed since it was last read; reload and try again.",
+                        "details": { "currentUpdatedAt": "2026-01-01T00:00:00.000Z" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION_LINE.CLOSED": {
+                    "summary": "The subscription line is closed and can no longer be changed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION_LINE.CLOSED",
+                        "message": "The subscription line is closed and can no longer be changed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed or price is not in VND.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION_LINE.UPDATE_EMPTY": {
+                    "summary": "Provide monthlyUnitPrice or minimumSeats when updating a subscription line.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION_LINE.UPDATE_EMPTY",
+                        "message": "Provide monthlyUnitPrice or minimumSeats when updating a subscription line.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION_LINE.PRICE_NOT_VND": {
+                    "summary": "Subscription line prices must be entered in dong (VND).",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION_LINE.PRICE_NOT_VND",
+                        "message": "Subscription line prices must be entered in dong (VND).",
+                        "details": { "currency": "USD" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "MONEY_SCALE_EXCEEDED": {
+                    "summary": "This currency allows at most 0 decimal digit(s).",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "MONEY_SCALE_EXCEEDED",
+                        "message": "This currency allows at most 0 decimal digit(s).",
+                        "details": { "allowedDecimals": 0, "path": "monthlyUnitPrice" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "MONEY_OUT_OF_RANGE": {
+                    "summary": "The amount is outside the range a money value may hold.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "MONEY_OUT_OF_RANGE",
+                        "message": "The amount is outside the range a money value may hold.",
+                        "details": { "path": "monthlyUnitPrice" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Update monthly unit price or minimum seats on a live subscription line",
+        "tags": ["subscription-lines"]
+      }
+    },
+    "/api/v1/subscription-lines/{id}/seat-changes": {
+      "get": {
+        "operationId": "subscriptionLineSeatChangeList",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paged history of seat changes on the line, ordered newest effective date and entry first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/SeatChangePageResponseDto" },
+                    { "properties": { "message": { "example": "SUBSCRIPTION_LINE_SEAT_CHANGE.LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Requires IT_ADMIN, FINANCE, or SUPER_ADMIN role.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Subscription line not found.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "SUBSCRIPTION_LINE.NOT_FOUND": {
+                    "summary": "The subscription line does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION_LINE.NOT_FOUND",
+                        "message": "The subscription line does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid identifier or paging query.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List seat-ledger changes for a subscription line",
+        "tags": ["subscription-lines"]
       }
     },
     "/api/v1/subscriptions/{id}/responsible-it-admin": {
@@ -35958,7 +36896,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The seats bought, those taken today in the organization calendar (the assignments occupying and, for a lot of keys on machines, the open activations on machines) and the seats free; purchased and free are null while the subscription has no quantity.",
+            "description": "The seats bought (for K2 subscriptions, the sum of seats today across lines serving today), those taken today in the organization calendar (the assignments occupying and, for a lot of keys on machines, the open activations on machines) and the seats free; purchased and free are null while the subscription has no quantity.",
             "content": {
               "application/json": {
                 "schema": {
@@ -120257,7 +121195,9 @@
                       "nullable": true
                     },
                     "createdAt": { "type": "string", "format": "date-time" },
-                    "updatedAt": { "type": "string", "format": "date-time" }
+                    "updatedAt": { "type": "string", "format": "date-time" },
+                    "lineCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                    "seatsToday": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
                   },
                   "required": [
                     "id",
@@ -120307,7 +121247,9 @@
                     "taxProfile",
                     "taxEstimate",
                     "createdAt",
-                    "updatedAt"
+                    "updatedAt",
+                    "lineCount",
+                    "seatsToday"
                   ],
                   "additionalProperties": false
                 }
@@ -120359,6 +121301,31 @@
         "type": "object",
         "properties": {
           "planId": { "type": "string", "format": "uuid" },
+          "lines": {
+            "minItems": 1,
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "planId": { "type": "string", "format": "uuid" },
+                "monthlyUnitPrice": {
+                  "type": "object",
+                  "properties": {
+                    "amount": { "type": "string", "maxLength": 40 },
+                    "currency": { "type": "string", "pattern": "^[A-Z]{3}$" }
+                  },
+                  "required": ["amount", "currency"],
+                  "additionalProperties": false,
+                  "description": "The monthly unit price per seat in dong (VND). Preferred on new writes; when sent alongside unitPrice, unitPrice must equal monthlyUnitPrice multiplied by the billing cycle months (SUBSCRIPTION.PRICE_MISMATCH)."
+                },
+                "quantity": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+                "minimumSeats": { "type": "integer", "minimum": 1, "maximum": 1000000 }
+              },
+              "required": ["planId", "monthlyUnitPrice", "quantity"],
+              "additionalProperties": false
+            }
+          },
           "kind": { "type": "string", "enum": ["TERM", "PERPETUAL"] },
           "purchasedQuantity": { "type": "integer", "minimum": 0, "maximum": 1000000000 },
           "unitPrice": {
@@ -120445,7 +121412,7 @@
           },
           "invoicedLater": { "description": "The vendor invoices after the period.", "type": "boolean" }
         },
-        "required": ["planId", "kind"],
+        "required": ["kind"],
         "additionalProperties": false
       },
       "SubscriptionResponseDto": {
@@ -120687,7 +121654,59 @@
                 "nullable": true
               },
               "createdAt": { "type": "string", "format": "date-time" },
-              "updatedAt": { "type": "string", "format": "date-time" }
+              "updatedAt": { "type": "string", "format": "date-time" },
+              "lines": {
+                "maxItems": 20,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "plan": {
+                      "type": "object",
+                      "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                      "required": ["id", "name"],
+                      "additionalProperties": false
+                    },
+                    "monthlyUnitPrice": {
+                      "type": "object",
+                      "properties": {
+                        "amount": { "type": "string", "maxLength": 40 },
+                        "currency": { "type": "string", "pattern": "^[A-Z]{3}$" }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "minimumSeats": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "nullable": true
+                    },
+                    "seatsToday": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                    "assignedToday": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                    "freeToday": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                    "closedOn": { "type": "string", "nullable": true },
+                    "closedReason": {
+                      "type": "string",
+                      "enum": ["RENEWED", "ENDED", "REMOVED", null],
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "plan",
+                    "monthlyUnitPrice",
+                    "minimumSeats",
+                    "seatsToday",
+                    "assignedToday",
+                    "freeToday",
+                    "closedOn",
+                    "closedReason"
+                  ],
+                  "additionalProperties": false
+                }
+              }
             },
             "required": [
               "id",
@@ -120737,7 +121756,8 @@
               "taxProfile",
               "taxEstimate",
               "createdAt",
-              "updatedAt"
+              "updatedAt",
+              "lines"
             ],
             "additionalProperties": false,
             "nullable": true
@@ -120854,6 +121874,218 @@
             "format": "date-time"
           }
         },
+        "additionalProperties": false
+      },
+      "AddSubscriptionLineBodyDto": {
+        "type": "object",
+        "properties": {
+          "planId": { "type": "string", "format": "uuid" },
+          "monthlyUnitPrice": {
+            "type": "object",
+            "properties": {
+              "amount": { "type": "string", "maxLength": 40 },
+              "currency": { "type": "string", "pattern": "^[A-Z]{3}$" }
+            },
+            "required": ["amount", "currency"],
+            "additionalProperties": false
+          },
+          "minimumSeats": { "type": "integer", "minimum": 1, "maximum": 1000000 },
+          "quantity": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+          "expectedUpdatedAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["planId", "monthlyUnitPrice", "expectedUpdatedAt"],
+        "additionalProperties": false
+      },
+      "SubscriptionLineResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "plan": {
+                "type": "object",
+                "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                "required": ["id", "name"],
+                "additionalProperties": false
+              },
+              "monthlyUnitPrice": {
+                "type": "object",
+                "properties": {
+                  "amount": { "type": "string", "maxLength": 40 },
+                  "currency": { "type": "string", "pattern": "^[A-Z]{3}$" }
+                },
+                "required": ["amount", "currency"],
+                "additionalProperties": false
+              },
+              "minimumSeats": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991,
+                "nullable": true
+              },
+              "seatsToday": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "assignedToday": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "freeToday": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "closedOn": { "type": "string", "nullable": true },
+              "closedReason": { "type": "string", "enum": ["RENEWED", "ENDED", "REMOVED", null], "nullable": true },
+              "updatedAt": { "type": "string", "format": "date-time" }
+            },
+            "required": [
+              "id",
+              "plan",
+              "monthlyUnitPrice",
+              "minimumSeats",
+              "seatsToday",
+              "assignedToday",
+              "freeToday",
+              "closedOn",
+              "closedReason",
+              "updatedAt"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "UpdateSubscriptionLineBodyDto": {
+        "type": "object",
+        "properties": {
+          "monthlyUnitPrice": {
+            "type": "object",
+            "properties": {
+              "amount": { "type": "string", "maxLength": 40 },
+              "currency": { "type": "string", "pattern": "^[A-Z]{3}$" }
+            },
+            "required": ["amount", "currency"],
+            "additionalProperties": false
+          },
+          "minimumSeats": { "type": "integer", "minimum": 1, "maximum": 1000000, "nullable": true },
+          "expectedUpdatedAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["expectedUpdatedAt"],
+        "additionalProperties": false
+      },
+      "SeatChangePageResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "effectiveOn": { "type": "string" },
+                    "delta": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                    "reason": {
+                      "type": "string",
+                      "enum": [
+                        "INITIAL",
+                        "RENEWAL",
+                        "REQUEST_GRANT",
+                        "REQUEST_REFUND",
+                        "TOP_UP",
+                        "TIER_UP",
+                        "REDUCE",
+                        "CORRECTION"
+                      ]
+                    },
+                    "source": { "type": "string", "enum": ["REQUEST_ITEM", "VENDOR_RECORD", "ADJUSTMENT"] },
+                    "basis": { "type": "string", "enum": ["ACTUAL", "RECORDED", "NONE"] },
+                    "request": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "code": { "type": "string", "nullable": true }
+                      },
+                      "required": ["id", "code"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "beneficiary": {
+                      "type": "object",
+                      "properties": {
+                        "employeeId": { "type": "string", "format": "uuid" },
+                        "employeeCode": { "type": "string" },
+                        "fullName": { "type": "string" }
+                      },
+                      "required": ["employeeId", "employeeCode", "fullName"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "seatPurchase": {
+                      "type": "object",
+                      "properties": { "id": { "type": "string", "format": "uuid" }, "code": { "type": "string" } },
+                      "required": ["id", "code"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "note": { "type": "string", "nullable": true },
+                    "outOfProcess": { "type": "boolean" },
+                    "autoRecorded": { "type": "boolean" },
+                    "recordedBy": {
+                      "type": "object",
+                      "properties": {
+                        "employeeId": { "type": "string", "format": "uuid" },
+                        "fullName": { "type": "string" }
+                      },
+                      "required": ["employeeId", "fullName"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "recordedAt": { "type": "string", "format": "date-time" }
+                  },
+                  "required": [
+                    "id",
+                    "effectiveOn",
+                    "delta",
+                    "reason",
+                    "source",
+                    "basis",
+                    "request",
+                    "beneficiary",
+                    "seatPurchase",
+                    "note",
+                    "outOfProcess",
+                    "autoRecorded",
+                    "recordedBy",
+                    "recordedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
         "additionalProperties": false
       },
       "ChangeResponsibleBodyDto": {
@@ -121114,6 +122346,58 @@
               },
               "createdAt": { "type": "string", "format": "date-time" },
               "updatedAt": { "type": "string", "format": "date-time" },
+              "lines": {
+                "maxItems": 20,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "plan": {
+                      "type": "object",
+                      "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                      "required": ["id", "name"],
+                      "additionalProperties": false
+                    },
+                    "monthlyUnitPrice": {
+                      "type": "object",
+                      "properties": {
+                        "amount": { "type": "string", "maxLength": 40 },
+                        "currency": { "type": "string", "pattern": "^[A-Z]{3}$" }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "minimumSeats": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "nullable": true
+                    },
+                    "seatsToday": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                    "assignedToday": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                    "freeToday": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                    "closedOn": { "type": "string", "nullable": true },
+                    "closedReason": {
+                      "type": "string",
+                      "enum": ["RENEWED", "ENDED", "REMOVED", null],
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "plan",
+                    "monthlyUnitPrice",
+                    "minimumSeats",
+                    "seatsToday",
+                    "assignedToday",
+                    "freeToday",
+                    "closedOn",
+                    "closedReason"
+                  ],
+                  "additionalProperties": false
+                }
+              },
               "changed": {
                 "type": "boolean",
                 "description": "False when the IT Admin named already answered for the subscription and nothing was written."
@@ -121168,6 +122452,7 @@
               "taxEstimate",
               "createdAt",
               "updatedAt",
+              "lines",
               "changed"
             ],
             "additionalProperties": false,

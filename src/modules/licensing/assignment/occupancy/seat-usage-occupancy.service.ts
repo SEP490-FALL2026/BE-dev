@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { CatalogApi } from '../../../catalog/public/catalog.api';
 import { LicenseLotApi } from '../../../catalog/public/license-lot.api';
+import { SeatLedgerApi } from '../../../catalog/public/seat-ledger.api';
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { DeviceActivationRepo } from '../../device-activation/device-activation.repo';
 import { SeatTargetNotFoundError } from '../../public/licensing.errors';
@@ -11,6 +12,7 @@ import { AssignmentRepo } from '../assignment.repo';
  * The seats of a subscription as the IT Admin reads them: bought, taken and free. Taken are the assignments that occupy a seat today
  * plus the open activations of a lot of keys on machines (the same count the catalog reads through the seat-occupancy hook). A lot of a K4 plan is
  * counted by the lot alone: bought are its licenses, taken what the database counts of it, so no seat is counted twice (DL-2).
+ * For K2 subscriptions with lines, bought is the sum of seats today across lines serving today.
  */
 @Injectable()
 export class SubscriptionSeatUsageService {
@@ -20,6 +22,7 @@ export class SubscriptionSeatUsageService {
     private readonly organizationReads: OrganizationReadApi,
     private readonly catalog: CatalogApi,
     private readonly lots: LicenseLotApi,
+    private readonly seatLedger?: SeatLedgerApi,
   ) {}
 
   /** The seats bought, taken and free on today in the organization calendar. Throws SeatTargetNotFoundError. */
@@ -32,7 +35,7 @@ export class SubscriptionSeatUsageService {
       ? await this.deviceActivations.occupiedBySubscription(subscriptionId)
       : (await this.assignments.countOccupying(subscriptionId, asOf)) +
         (await this.deviceActivations.occupiedBySubscription(subscriptionId));
-    const purchased = lot ? lot.licenseCount : target.purchasedQuantity;
+    const purchased = await this.purchasedOf(target, lot?.licenseCount ?? null, asOf);
 
     return {
       subscriptionId,
@@ -41,5 +44,22 @@ export class SubscriptionSeatUsageService {
       free: purchased === null ? null : Math.max(0, purchased - occupied),
       asOf,
     };
+  }
+
+  private async purchasedOf(
+    target: NonNullable<Awaited<ReturnType<CatalogApi['findSeatTarget']>>>,
+    lotLicenseCount: number | null,
+    asOf: string,
+  ): Promise<number | null> {
+    if (lotLicenseCount !== null) return lotLicenseCount;
+    if (target.provisioningType !== 'K2' || !this.seatLedger) return target.purchasedQuantity;
+
+    const lines = await this.catalog.getSubscriptionServingLineIds(target.subscriptionId!, asOf);
+    if (!lines.hasLines) return target.purchasedQuantity;
+    if (lines.servingLineIds.length === 0) return 0;
+
+    const byLine = await this.seatLedger.seatsOnDays(lines.servingLineIds, asOf, asOf);
+
+    return lines.servingLineIds.reduce((sum, lineId) => sum + (byLine.get(lineId)?.get(asOf) ?? 0), 0);
   }
 }

@@ -376,4 +376,12 @@ export class CatalogApi {
   lockSeatTarget(tx: DbTx, ref: SeatTargetRef): Promise<SeatTarget | null> {
     return this.seatTargets.lock(tx, ref);
   }
+
+  getSubscriptionServingLineIds(
+    subscriptionId: string,
+    day: BusinessDate,
+    tx?: DbTx,
+  ): Promise<{ hasLines: boolean; servingLineIds: string[] }> {
+    return this.subscriptions.servingLineIdsOfSubscription(subscriptionId, day, tx);
+  }
 }

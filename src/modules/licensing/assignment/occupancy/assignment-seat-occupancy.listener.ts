@@ -39,6 +39,14 @@ export class AssignmentSeatOccupancy implements SeatOccupancyReader, OnModuleIni
     return (await this.repo.countHolding(subscriptionId, day, tx)) + deviceOccupied;
   }
 
+  occupiedBySubscriptionPlans(
+    subscriptionIds: readonly string[],
+    day: BusinessDate,
+    tx?: DbTx,
+  ): Promise<ReadonlyMap<string, number>> {
+    return this.repo.countOccupyingBySubscriptionPlans(subscriptionIds, day, tx);
+  }
+
   keyCountsOfLots(
     lotIds: readonly string[],
     tx?: DbTx,

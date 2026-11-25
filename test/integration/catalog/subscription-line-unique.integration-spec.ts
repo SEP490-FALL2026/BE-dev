@@ -1,11 +1,13 @@
 import { Client } from 'pg';
+import { fromDateColumn } from '../../../src/core/business-date';
+import { chooseLine } from '../../../src/modules/catalog/subscription-line/subscription-line.policy';
 import { DEPLOY_TIMEOUT_MS, deployMigrations } from '../../support/migration-history';
+import { dayFromToday, lineWorld } from '../../support/w3-lines-world';
 import {
   dropDisposableDatabase,
   provisionDisposableDatabase,
   type DisposableDatabase,
 } from '../../support/disposable-database';
-import { lineWorld } from '../../support/w3-lines-world';
 
 /**
  * Redesign wave 3, W3-15 (M5): the rules of a line the database holds — one live line of a plan in a workspace (C1), one line of a plan on a
@@ -103,5 +105,77 @@ describe('the lines of a subscription period (integration, real PostgreSQL)', ()
       (await sql.query<{ workspace_id: string }>(`SELECT workspace_id FROM subscription_lines WHERE id = $1`, [line]))
         .rows[0].workspace_id,
     ).toBe(secondWorkspace);
+  });
+
+  it('allows new live line alongside RENEWED line (closed_on in future) and chooseLine prefers old line before closed_on (W3-15 ca 4)', async () => {
+    const w = await lineWorld(sql);
+    const { vendorId, workspaceId } = await w.vendor('Atlassian');
+    const plan = await w.plan(vendorId, 'Jira');
+    const period1 = await w.period(plan, workspaceId, {
+      startDate: dayFromToday(-30),
+      endDate: dayFromToday(10),
+    });
+    const closedOn = dayFromToday(10);
+    const oldLine = await w.line(period1, workspaceId, plan, { closedOn, closedReason: 'RENEWED' });
+
+    const period2 = await w.period(plan, workspaceId, {
+      startDate: dayFromToday(11),
+      endDate: dayFromToday(40),
+      renewedFromId: period1,
+    });
+    const newLine = await w.line(period2, workspaceId, plan, { renewedFromLineId: oldLine });
+
+    const rows = await sql.query<{
+      id: string;
+      closed_on: Date | null;
+      closed_reason: string | null;
+      ledger_opened_on: Date | null;
+      status: string;
+      start_date: Date | null;
+      end_date: Date | null;
+      created_at: Date;
+    }>(
+      `SELECT l.id, l.closed_on, l.closed_reason, l.ledger_opened_on, s.status::text, s.start_date, s.end_date, l.created_at
+         FROM subscription_lines l JOIN subscriptions s ON s.id = l.subscription_id
+        WHERE l.id = ANY($1::uuid[])`,
+      [[oldLine, newLine]],
+    );
+    const candidates = rows.rows.map((r) => ({
+      id: r.id,
+      closedOn: r.closed_on ? fromDateColumn(r.closed_on) : null,
+      closedReason: (r.closed_reason as 'RENEWED' | 'ENDED' | 'REMOVED' | null) ?? null,
+      ledgerOpenedOn: r.ledger_opened_on ? fromDateColumn(r.ledger_opened_on) : null,
+      free: 5,
+      subscription: {
+        status: r.status as 'ACTIVE' | 'DRAFT',
+        startDate: r.start_date ? fromDateColumn(r.start_date) : null,
+        endDate: r.end_date ? fromDateColumn(r.end_date) : null,
+      },
+      createdAt: r.created_at,
+    }));
+
+    expect(chooseLine(candidates, dayFromToday(5))?.id).toBe(oldLine);
+    expect(chooseLine(candidates, dayFromToday(11))?.id).toBe(newLine);
+  });
+
+  it('allows re-declaring a live line for the same plan after an ENDED line (W3-15 ca 5)', async () => {
+    const w = await lineWorld(sql);
+    const { vendorId, workspaceId } = await w.vendor('Linear');
+    const plan = await w.plan(vendorId, 'Linear Plus');
+    const expiredPeriod = await w.period(plan, workspaceId, {
+      startDate: dayFromToday(-60),
+      endDate: dayFromToday(-2),
+    });
+    await w.line(expiredPeriod, workspaceId, plan, {
+      closedOn: dayFromToday(-2),
+      closedReason: 'ENDED',
+    });
+
+    const freshPeriod = await w.period(plan, workspaceId, {
+      startDate: dayFromToday(-1),
+      endDate: dayFromToday(30),
+    });
+    const freshLine = await w.line(freshPeriod, workspaceId, plan);
+    expect(freshLine).toBeTruthy();
   });
 });

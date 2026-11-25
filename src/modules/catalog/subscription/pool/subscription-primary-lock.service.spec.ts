@@ -1,7 +1,6 @@
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { TransactionRunner } from '../../../../infrastructure/database/transaction-runner';
 import type { AuditApi } from '../../../audit/public/audit.api';
-import type { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import type { PlanFactsService } from '../../plan/plan-facts.service';
 import type { SubscriptionPoolService } from './subscription-pool.service';
 import { SubscriptionChangeGuard } from '../subscription-change-guard.service';
@@ -66,9 +65,6 @@ describe('Subscription primary lock order', () => {
   const pricing = {
     priceToday: jest.fn(() => Promise.resolve({ unitPrice: null, priceSnapshot: null })),
   } as unknown as SubscriptionPricingService;
-  const organization = {
-    getOrganization: jest.fn(() => Promise.resolve({ id: 'org-1' })),
-  } as unknown as OrganizationReadApi;
 
   beforeEach(() => jest.clearAllMocks());
 
@@ -157,7 +153,12 @@ describe('Subscription primary lock order', () => {
         { lockExclusive, lookups: jest.fn(() => Promise.resolve([plan])) } as unknown as PlanFactsService,
         pricing,
         view,
-        organization,
+        {
+          requireOrganizationId: jest.fn(() => Promise.resolve('org-1')),
+          createForPeriod: jest.fn(),
+          activatePeriod: jest.fn(),
+          hasLines: jest.fn(() => Promise.resolve(false)),
+        } as never,
         makePoolRules(),
         audit,
         runner,
@@ -193,7 +194,12 @@ describe('Subscription primary lock order', () => {
         { lockExclusive, lookups: jest.fn(() => Promise.resolve([plan])) } as unknown as PlanFactsService,
         pricing,
         view,
-        organization,
+        {
+          requireOrganizationId: jest.fn(() => Promise.resolve('org-1')),
+          createForPeriod: jest.fn(),
+          activatePeriod: jest.fn(),
+          hasLines: jest.fn(() => Promise.resolve(false)),
+        } as never,
         makePoolRules(),
         audit,
         runner,
@@ -211,7 +217,12 @@ describe('Subscription primary lock order', () => {
         {} as unknown as PlanFactsService,
         pricing,
         view,
-        organization,
+        {
+          requireOrganizationId: jest.fn(() => Promise.resolve('org-1')),
+          createForPeriod: jest.fn(),
+          activatePeriod: jest.fn(),
+          hasLines: jest.fn(() => Promise.resolve(false)),
+        } as never,
         makePoolRules(),
         audit,
         runner,

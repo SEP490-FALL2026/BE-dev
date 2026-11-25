@@ -160,6 +160,66 @@ export class SeatLedgerRepo {
   }
 
   /** Seat totals on `day` for each of `lineIds` that has ledger entries up to `day`. */
+  async listPagedByLine(
+    lineId: string,
+    page: number,
+    pageSize: number,
+  ): Promise<{
+    total: number;
+    items: Array<{
+      id: string;
+      effectiveOn: BusinessDate;
+      delta: number;
+      reason: string;
+      source: string;
+      basis: string;
+      requestId: string | null;
+      beneficiaryEmployeeId: string | null;
+      seatPurchase: { id: string; code: string } | null;
+      note: string | null;
+      outOfProcess: boolean;
+      autoRecorded: boolean;
+      recordedByEmployeeId: string | null;
+      recordedAt: Date;
+    }>;
+  } | null> {
+    return this.prisma.$transaction(
+      async (tx) => {
+        const line = await tx.subscriptionLine.findUnique({ where: { id: lineId }, select: { id: true } });
+        if (!line) return null;
+        const total = await tx.seatChange.count({ where: { subscriptionLineId: lineId } });
+        const rows = await tx.seatChange.findMany({
+          where: { subscriptionLineId: lineId },
+          include: { seatPurchase: { select: { id: true, code: true } } },
+          orderBy: [{ effectiveOn: 'desc' }, { recordedAt: 'desc' }, { id: 'desc' }],
+          skip: (page - 1) * pageSize,
+          take: pageSize,
+        });
+
+        return {
+          total,
+          items: rows.map((row) => ({
+            id: row.id,
+            effectiveOn: fromDateColumn(row.effectiveOn),
+            delta: row.delta,
+            reason: row.reason,
+            source: row.source,
+            basis: row.basis,
+            requestId: row.requestId,
+            beneficiaryEmployeeId: row.beneficiaryEmployeeId,
+            seatPurchase: row.seatPurchase ? { id: row.seatPurchase.id, code: row.seatPurchase.code } : null,
+            note: row.note,
+            outOfProcess: row.outOfProcess,
+            autoRecorded: row.autoRecorded,
+            recordedByEmployeeId: row.recordedByEmployeeId,
+            recordedAt: row.recordedAt,
+          })),
+        };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
+  }
+
   async seatsOnOfLines(lineIds: readonly string[], day: BusinessDate, tx?: DbTx): Promise<Map<string, number>> {
     const result = new Map<string, number>();
     if (lineIds.length === 0) return result;

@@ -220,6 +220,14 @@ export class SeatLedgerService {
   }
 
   /** Computes seats per line for every day in `[from, until]` inclusive, reading the ledger once open. */
+  listPagedByLine(lineId: string, page: number, pageSize: number) {
+    return this.ledger.listPagedByLine(lineId, page, pageSize);
+  }
+
+  businessToday(): Promise<BusinessDate> {
+    return this.organizationReads.businessToday();
+  }
+
   async seatsOnDays(
     lineIds: readonly string[],
     from: BusinessDate,

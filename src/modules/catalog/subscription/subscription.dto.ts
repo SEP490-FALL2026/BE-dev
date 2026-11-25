@@ -41,8 +41,18 @@ const originalPrice = money.meta({
     'The price the vendor quoted in another currency, kept beside the price in dong so an invoice can be matched against it: a decimal string in major units of its currency. It is only kept, never converted.',
 });
 
-export const declareSubscriptionBodySchema = z.strictObject({
+export const SUBSCRIPTION_LINES_MAX = 20;
+
+const declareSubscriptionLineSchema = z.strictObject({
   planId: z.uuid(),
+  monthlyUnitPrice: monthlyUnitPrice,
+  quantity: z.number().int().min(0).max(1_000_000),
+  minimumSeats: z.number().int().min(1).max(1_000_000).optional(),
+});
+
+export const declareSubscriptionBodySchema = z.strictObject({
+  planId: z.uuid().optional(),
+  lines: z.array(declareSubscriptionLineSchema).min(1).max(SUBSCRIPTION_LINES_MAX).optional(),
   kind,
   purchasedQuantity: quantity.optional(),
   unitPrice: unitPrice.optional(),
@@ -144,7 +154,19 @@ const taxEstimate = z.strictObject({
   nonDeductibleTaxAmount: z.string(),
   estimatedCost: z.string(),
 });
-const subscriptionSchema = z.strictObject({
+const subscriptionLineSummarySchema = z.strictObject({
+  id: z.uuid(),
+  plan: z.strictObject({ id: z.uuid(), name: z.string() }),
+  monthlyUnitPrice: money,
+  minimumSeats: z.number().int().nullable(),
+  seatsToday: z.number().int().nonnegative(),
+  assignedToday: z.number().int().nonnegative(),
+  freeToday: z.number().int().nonnegative(),
+  closedOn: z.string().nullable(),
+  closedReason: z.enum(['RENEWED', 'ENDED', 'REMOVED']).nullable(),
+});
+
+const subscriptionBaseFields = {
   id: z.uuid(),
   planId: z.uuid(),
   planName: z.string(),
@@ -238,6 +260,17 @@ const subscriptionSchema = z.strictObject({
   taxEstimate: taxEstimate.nullable(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
+};
+
+const subscriptionSchema = z.strictObject({
+  ...subscriptionBaseFields,
+  lines: z.array(subscriptionLineSummarySchema).max(SUBSCRIPTION_LINES_MAX),
+});
+
+const subscriptionListItemSchema = z.strictObject({
+  ...subscriptionBaseFields,
+  lineCount: z.number().int().nonnegative(),
+  seatsToday: z.number().int().nonnegative(),
 });
 
 export class DeclareSubscriptionBodyDto extends createZodDto(declareSubscriptionBodySchema) {}
@@ -248,7 +281,7 @@ export class SubscriptionResponseDto extends createZodDto(successEnvelopeSchema(
 export class SubscriptionPageResponseDto extends createZodDto(
   successEnvelopeSchema(
     z.strictObject({
-      items: z.array(subscriptionSchema),
+      items: z.array(subscriptionListItemSchema),
       pagination: z.strictObject({
         page: z.number().int().positive(),
         pageSize: z.number().int().positive(),

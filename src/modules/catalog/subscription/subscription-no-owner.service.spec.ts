@@ -61,7 +61,12 @@ describe('QĐ-113g: no owning department on a subscription', () => {
   const pricing = {
     priceToday: jest.fn(() => Promise.resolve({ unitPrice: null, priceSnapshot: null })),
   } as unknown as SubscriptionPricingService;
-  const organization = { getOrganization: jest.fn(() => Promise.resolve({ id: 'org-1' })) };
+  const multiLineStub = {
+    requireOrganizationId: jest.fn(() => Promise.resolve('org-1')),
+    createForPeriod: jest.fn(),
+    activatePeriod: jest.fn(),
+    hasLines: jest.fn(() => Promise.resolve(false)),
+  };
   const lockDepartmentShared = jest.fn();
 
   beforeEach(() => jest.clearAllMocks());
@@ -76,7 +81,7 @@ describe('QĐ-113g: no owning department on a subscription', () => {
       } as unknown as PlanFactsService,
       pricing,
       view,
-      { ...organization, lockDepartmentShared } as unknown as OrganizationReadApi,
+      multiLineStub as never,
       {
         assertNoLiveDuplicate: jest.fn(),
         workspaceFor: jest.fn(() => Promise.resolve(null)),
@@ -151,7 +156,7 @@ describe('QĐ-113g: no owning department on a subscription', () => {
       } as unknown as PlanFactsService,
       priceService,
       view,
-      { ...organization, lockDepartmentShared } as unknown as OrganizationReadApi,
+      multiLineStub as never,
       {
         assertNoLiveDuplicate: jest.fn(),
         workspaceFor: jest.fn(() => Promise.resolve(null)),
@@ -215,7 +220,7 @@ describe('QĐ-113g: no owning department on a subscription', () => {
       } as unknown as PlanFactsService,
       priceService,
       view,
-      { ...organization, lockDepartmentShared } as unknown as OrganizationReadApi,
+      multiLineStub as never,
       {
         assertNoLiveDuplicate: jest.fn(),
         workspaceFor: jest.fn(() => Promise.resolve(null)),

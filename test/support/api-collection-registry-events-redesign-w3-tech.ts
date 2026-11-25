@@ -34,4 +34,19 @@ export const REDESIGN_W3_TECH_REGISTRY_EVENTS: readonly RegistryEvent[] = [
     'WORKSPACE_FLAGS_MAX',
     'What a reader is warned of about each workspace of a page: at most WORKSPACE_FLAGS_MAX flags (W3-10).',
   ),
+  added(
+    'subscriptionGet#lines',
+    'SUBSCRIPTION_LINES_MAX',
+    'The plan lines of a subscription period: at most SUBSCRIPTION_LINES_MAX (W3-15).',
+  ),
+  {
+    registry: 'exceptions',
+    key: 'subscriptionList#detail-reuse',
+    change: 'closed',
+    finding: 'LD-01',
+    item: 'catalog-subscription-read-model',
+    date: '2026-11-26',
+    reason:
+      'subscriptionGet now includes lines[] while subscriptionList returns summary fields lineCount and seatsToday (W3-15).',
+  },
 ];

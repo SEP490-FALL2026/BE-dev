@@ -36,4 +36,10 @@ export const NESTED_ARRAYS_REDESIGN_W3_TECH: readonly NestedArrayEntry[] = [
     'WORKSPACE_FLAGS_MAX in workspace.dto.ts, the maxItems of the schema: the three flags of a workspace (ADMINS_BELOW_MINIMUM, NO_OWNER_EMAIL, NO_RESPONSIBLE)',
     'What a reader is warned of about each workspace of the page.',
   ),
+  bounded(
+    'subscriptionGet#lines',
+    20,
+    'SUBSCRIPTION_LINES_MAX in subscription.dto.ts, the maxItems of the schema: the plan lines of one subscription period',
+    'The plan lines of a subscription period (at most SUBSCRIPTION_LINES_MAX = 20).',
+  ),
 ];

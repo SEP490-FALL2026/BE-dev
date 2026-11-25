@@ -44,6 +44,7 @@ import { SubscriptionRepo } from './subscription.repo';
 import { SubscriptionChangeGuard } from './subscription-change-guard.service';
 import { SubscriptionPricingService } from './subscription-pricing.service';
 import { SubscriptionViewService } from './subscription-view.service';
+import { SubscriptionPeriodLinesService } from '../subscription-line/subscription-period-lines.service';
 import type {
   OriginalPriceRecord,
   SubscriptionRecord,
@@ -67,6 +68,7 @@ export class SubscriptionChangeService {
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
     private readonly guard: SubscriptionChangeGuard,
+    private readonly periodLines?: SubscriptionPeriodLinesService,
   ) {}
 
   /**
@@ -165,10 +167,32 @@ export class SubscriptionChangeService {
     if (sameState(state, stateOf(current))) return current;
 
     const updated = await this.subscriptions.update(tx, id, state);
+    await this.syncLinesAfterChange(tx, actor, current, updated);
     await this.auditChange(tx, actor, { current, updated, organizationId, quantityChangeReason });
     await this.notifySeatChange(tx, actor, current, updated, organizationId);
 
     return updated;
+  }
+
+  private async syncLinesAfterChange(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    current: SubscriptionRecord,
+    updated: SubscriptionRecord,
+  ): Promise<void> {
+    if (!this.periodLines || updated.planProvisioningType !== 'K2' || updated.kind !== 'TERM') return;
+    if (current.status === 'DRAFT' && updated.status === 'ACTIVE') {
+      await this.periodLines.activatePeriod(tx, updated, actor.employeeId);
+      return;
+    }
+    if (current.status === 'DRAFT' && updated.status === 'DRAFT') {
+      await this.periodLines.syncDraftUpdate(tx, {
+        subscriptionId: updated.id,
+        planId: updated.planId,
+        monthlyUnitPriceMinor: updated.monthlyUnitPriceMinor,
+        minimumSeats: updated.vendorMinimumSeats,
+      });
+    }
   }
 
   /**

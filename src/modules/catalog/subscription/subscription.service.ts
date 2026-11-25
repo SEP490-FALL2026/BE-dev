@@ -4,12 +4,13 @@ import type { BusinessDate } from '../../../core/business-date';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { EmptyState } from '../public/catalog.types';
 import { catalogAuditEvent } from '../catalog-audit-event.mapper';
 import { PlanFactsService, type LockedPlan } from '../plan/plan-facts.service';
+import { SubscriptionMultiLineService } from './lines/subscription-lines.service';
 import {
   SubscriptionApplicationRetiredError,
+  SubscriptionLinesXorPlanError,
   SubscriptionNotFoundError,
   SubscriptionPlanNotFoundError,
   SubscriptionStillDraftError,
@@ -33,6 +34,7 @@ import { SubscriptionViewService } from './subscription-view.service';
 import type {
   BillingCycle,
   CommitmentTermMonths,
+  DeclareSubscriptionInput,
   OriginalPriceRecord,
   SeatCounting,
   SubscriptionRecord,
@@ -43,33 +45,6 @@ import type {
   SubscriptionStatus,
   SubscriptionView,
 } from './subscription.types';
-
-export interface DeclareSubscriptionInput {
-  planId: string;
-  kind: SubscriptionKind;
-  purchasedQuantity?: number;
-  /** The unit price in dong (`QĐ-111an`); another currency is refused with SubscriptionPriceNotVndError. */
-  unitPrice?: { amount: string; currency: string };
-  monthlyUnitPrice?: { amount: string; currency: string };
-  /** The price the vendor quoted in another currency, only kept beside the price in dong (R-44). */
-  originalPrice?: { amount: string; currency: string };
-  billingCycle?: BillingCycle;
-  commitmentTermMonths?: CommitmentTermMonths;
-  startDate?: BusinessDate;
-  endDate?: BusinessDate;
-  renewalDate?: BusinessDate;
-  noticeDeadline?: BusinessDate;
-  noticePeriodDays?: number;
-  autoRenew?: boolean;
-  allowsMidTermReduction?: boolean;
-  responsibleItAdminEmployeeId?: string;
-  vendorMinimumSeats?: number;
-  /** The workspace the subscription is held in (W3-11); left out, the default of the vendor for a plan the company administers there. */
-  workspaceId?: string;
-  seatCounting?: SeatCounting;
-  minimumSeatsTotal?: number;
-  invoicedLater?: boolean;
-}
 
 /** The change of a subscription: the plan and the kind are not fields; only the four dates and the notice period clear. */
 export interface UpdateSubscriptionInput {
@@ -111,7 +86,7 @@ export class SubscriptionService {
     private readonly plans: PlanFactsService,
     private readonly pricing: SubscriptionPricingService,
     private readonly views: SubscriptionViewService,
-    private readonly organizationReads: OrganizationReadApi,
+    private readonly multiLine: SubscriptionMultiLineService,
     private readonly poolRules: SubscriptionPoolService,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
@@ -186,8 +161,19 @@ export class SubscriptionService {
    * finance facade for the unit price and the original price.
    */
   async declare(actor: AuthenticatedPrincipal, input: DeclareSubscriptionInput): Promise<SubscriptionView> {
+    const hasLines = input.lines !== undefined;
+    const hasPlanId = input.planId !== undefined;
+    if (hasLines === hasPlanId) throw new SubscriptionLinesXorPlanError();
     assertDeclarable(input.kind);
     assertDeclarableCycle(input.billingCycle);
+
+    if (input.lines) {
+      const created = await this.multiLine.declare(actor, input, input.lines);
+
+      return (await this.views.viewAll([created]))[0];
+    }
+
+    const planId = input.planId!;
     const sentUnit = input.unitPrice ? await this.pricing.read(input.unitPrice, 'unitPrice') : undefined;
     const sentMonthly = input.monthlyUnitPrice
       ? await this.pricing.read(input.monthlyUnitPrice, 'monthlyUnitPrice')
@@ -204,12 +190,17 @@ export class SubscriptionService {
     if (input.responsibleItAdminEmployeeId) await this.poolRules.requireItAdmin(input.responsibleItAdminEmployeeId);
 
     const record = await this.runner.run((tx) =>
-      this.declareIn(tx, actor, input, {
-        money: resolvedPrice.unitMoney,
-        monthlyUnitPriceMinor: resolvedPrice.monthlyUnitPriceMinor,
-        originalPrice,
-        organizationId,
-      }),
+      this.declareIn(
+        tx,
+        actor,
+        { ...input, planId },
+        {
+          money: resolvedPrice.unitMoney,
+          monthlyUnitPriceMinor: resolvedPrice.monthlyUnitPriceMinor,
+          originalPrice,
+          organizationId,
+        },
+      ),
     );
 
     return (await this.views.viewAll([record]))[0];
@@ -218,7 +209,7 @@ export class SubscriptionService {
   private async declareIn(
     tx: DbTx,
     actor: AuthenticatedPrincipal,
-    input: DeclareSubscriptionInput,
+    input: DeclareSubscriptionInput & { planId: string },
     ctx: {
       money: { amountMinor: bigint; currency: string } | null;
       monthlyUnitPriceMinor: bigint | null;
@@ -256,15 +247,60 @@ export class SubscriptionService {
     const complete = subscriptionStatusOf(plan, input.kind, { ...state, ...priced });
     this.poolRules.assert(plan, input.kind, state, complete === 'ACTIVE');
     if (complete === 'ACTIVE') await this.poolRules.assertVendorAdmins(tx, plan, organizationId, workspaceId);
+
+    return this.persistDeclaredSubscription(tx, actor, {
+      plan,
+      kind: input.kind,
+      state,
+      priced,
+      monthlyUnitPriceMinor,
+      originalPrice,
+      status: complete,
+      organizationId,
+      workspaceId,
+    });
+  }
+
+  private async persistDeclaredSubscription(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    params: {
+      plan: LockedPlan;
+      kind: SubscriptionKind;
+      state: ReturnType<typeof declaredStateOf<BillingCycle, CommitmentTermMonths>> & {
+        responsibleItAdminEmployeeId: string | null;
+      };
+      priced: Awaited<ReturnType<SubscriptionPricingService['priceToday']>>;
+      monthlyUnitPriceMinor: bigint | null;
+      originalPrice: OriginalPriceRecord | null;
+      status: 'DRAFT' | 'ACTIVE';
+      organizationId: string;
+      workspaceId: string | null;
+    },
+  ): Promise<SubscriptionRecord> {
+    const { plan, kind, state, priced, monthlyUnitPriceMinor, originalPrice, status, organizationId, workspaceId } =
+      params;
     const created = await this.subscriptions.insert(tx, {
       organizationId,
       planId: plan.id,
-      kind: input.kind,
+      kind,
       ...state,
       ...priced,
       monthlyUnitPriceMinor,
       originalPrice,
-      status: complete,
+      status,
+      workspaceId,
+    });
+    await this.createK2TermLineIfNeeded({
+      tx,
+      actor,
+      plan,
+      kind,
+      state,
+      status,
+      subscriptionId: created.id,
+      monthlyUnitPriceMinor,
+      organizationId,
       workspaceId,
     });
     await this.audit.record(
@@ -313,7 +349,11 @@ export class SubscriptionService {
 
       const state = { ...stateOf(current), workspaceId: workspaceId ?? current.workspace?.id ?? null };
       const missing = this.missingOf(plan, current.kind, state);
-      if (missing.length > 0) throw new SubscriptionStillDraftError(missing);
+      const effectiveMissing =
+        missing.includes('UNIT_PRICE') && (await this.multiLine.hasLines(id, tx))
+          ? missing.filter((item) => item !== 'UNIT_PRICE')
+          : missing;
+      if (effectiveMissing.length > 0) throw new SubscriptionStillDraftError(effectiveMissing);
       await this.poolRules.assertActivation(
         tx,
         plan,
@@ -331,6 +371,7 @@ export class SubscriptionService {
         status: 'ACTIVE',
         isPrimaryForPlan: takesPrimary || state.isPrimaryForPlan,
       });
+      await this.multiLine.activatePeriod(tx, completed, actor.employeeId);
       await this.audit.record(
         tx,
         catalogAuditEvent(
@@ -425,10 +466,40 @@ export class SubscriptionService {
     });
   }
 
-  private async requireOrganizationId(): Promise<string> {
-    const organization = await this.organizationReads.getOrganization();
-    if (!organization) throw new Error('Subscriptions were used before installation');
+  private async createK2TermLineIfNeeded(params: {
+    tx: DbTx;
+    actor: AuthenticatedPrincipal;
+    plan: LockedPlan;
+    kind: SubscriptionKind;
+    state: ReturnType<typeof declaredStateOf<BillingCycle, CommitmentTermMonths>>;
+    status: 'DRAFT' | 'ACTIVE';
+    subscriptionId: string;
+    monthlyUnitPriceMinor: bigint | null;
+    organizationId: string;
+    workspaceId: string | null;
+  }): Promise<void> {
+    const { tx, actor, plan, kind, state, status, subscriptionId, monthlyUnitPriceMinor, organizationId, workspaceId } =
+      params;
+    if (plan.provisioningType !== 'K2' || kind !== 'TERM' || !workspaceId) return;
+    await this.multiLine.createForPeriod(tx, {
+      organizationId,
+      subscriptionId,
+      workspaceId,
+      startDate: state.startDate,
+      status,
+      recordedByEmployeeId: actor.employeeId,
+      lines: [
+        {
+          planId: plan.id,
+          monthlyUnitPriceMinor: monthlyUnitPriceMinor ?? 0n,
+          minimumSeats: state.vendorMinimumSeats ?? null,
+          quantity: state.purchasedQuantity ?? 0,
+        },
+      ],
+    });
+  }
 
-    return organization.id;
+  private requireOrganizationId(): Promise<string> {
+    return this.multiLine.requireOrganizationId();
   }
 }

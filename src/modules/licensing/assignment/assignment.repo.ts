@@ -210,6 +210,31 @@ export class AssignmentRepo {
     });
   }
 
+  /** How many assignments occupy `day` per `(subscriptionId, planId)` pair, keyed as `${subscriptionId}:${planId}`. */
+  async countOccupyingBySubscriptionPlans(
+    subscriptionIds: readonly string[],
+    day: BusinessDate,
+    tx?: DbTx,
+  ): Promise<Map<string, number>> {
+    if (subscriptionIds.length === 0) return new Map();
+    const date = toDateColumn(day);
+    const rows = await (tx ?? this.prisma).licenseAssignment.groupBy({
+      by: ['subscriptionId', 'planId'],
+      where: {
+        subscriptionId: { in: [...subscriptionIds] },
+        validFrom: { lte: date },
+        OR: [{ validUntil: null }, { validUntil: { gt: date } }],
+      },
+      _count: { _all: true },
+    });
+
+    return new Map(
+      rows
+        .filter((row): row is typeof row & { subscriptionId: string } => row.subscriptionId !== null)
+        .map((row) => [`${row.subscriptionId}:${row.planId}`, row._count._all]),
+    );
+  }
+
   /** The assignments of the subscription that have not ended and have not failed as of `day` (a future start included). */
   async countHolding(subscriptionId: string, day: BusinessDate, tx?: DbTx): Promise<number> {
     return (tx ?? this.prisma).licenseAssignment.count({ where: { subscriptionId, ...HOLDING(day) } });

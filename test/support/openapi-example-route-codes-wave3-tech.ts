@@ -4,6 +4,12 @@ import type { RouteErrorStatus } from './openapi-example-manifest';
  * The error codes of the operations redesign wave 3 adds in the tech lane, a part of ROUTE_ERROR_CODES (reached through ROUTE_ERROR_CODES_LICENSING)
  * kept in a file of its own so the manifest stays under the size of a support file.
  */
+export const SUCCESS_MESSAGES_WAVE3_TECH: Readonly<Record<string, string>> = {
+  subscriptionLineAdd: 'SUBSCRIPTION_LINE.ADDED',
+  subscriptionLineSeatChangeList: 'SUBSCRIPTION_LINE_SEAT_CHANGE.LISTED',
+  subscriptionLineUpdate: 'SUBSCRIPTION_LINE.UPDATED',
+};
+
 export const ROUTE_ERROR_CODES_WAVE3_TECH: Readonly<
   Record<string, Partial<Record<RouteErrorStatus, readonly string[]>>>
 > = {
@@ -73,5 +79,36 @@ export const ROUTE_ERROR_CODES_WAVE3_TECH: Readonly<
   licenseLotResponsibleItAdminChange: {
     '404': ['LICENSE_LOT.NOT_FOUND'],
     '422': ['LICENSE_LOT.RESPONSIBLE_NOT_IT_ADMIN'],
+  },
+  // W3-15: subscription lines.
+  subscriptionLineAdd: {
+    '403': ['SUBSCRIPTION_LINE.NOT_RESPONSIBLE'],
+    '404': ['SUBSCRIPTION.NOT_FOUND'],
+    '409': ['SUBSCRIPTION.DUPLICATE_PLAN', 'SUBSCRIPTION.STALE'],
+    '422': [
+      'APPLICATION.RETIRED',
+      'MONEY_OUT_OF_RANGE',
+      'MONEY_SCALE_EXCEEDED',
+      'PLAN.NOT_FOUND',
+      'SUBSCRIPTION_LINE.NOT_TERM',
+      'SUBSCRIPTION_LINE.PLAN_NOT_K2',
+      'SUBSCRIPTION_LINE.PRICE_NOT_VND',
+      'SUBSCRIPTION_LINE.QUANTITY_VIA_PURCHASE',
+      'WORKSPACE_VENDOR_MISMATCH',
+    ],
+  },
+  subscriptionLineUpdate: {
+    '403': ['SUBSCRIPTION_LINE.NOT_RESPONSIBLE'],
+    '404': ['SUBSCRIPTION_LINE.NOT_FOUND'],
+    '409': ['SUBSCRIPTION_LINE.CLOSED', 'SUBSCRIPTION_LINE.STALE'],
+    '422': [
+      'MONEY_OUT_OF_RANGE',
+      'MONEY_SCALE_EXCEEDED',
+      'SUBSCRIPTION_LINE.PRICE_NOT_VND',
+      'SUBSCRIPTION_LINE.UPDATE_EMPTY',
+    ],
+  },
+  subscriptionLineSeatChangeList: {
+    '404': ['SUBSCRIPTION_LINE.NOT_FOUND'],
   },
 };

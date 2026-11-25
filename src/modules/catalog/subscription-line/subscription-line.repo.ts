@@ -54,6 +54,30 @@ function asLineError(error: unknown): unknown {
  * The one writer of `subscription_lines`: the lines of a subscription period (W3-15). The lock of a line (tier 6a, `FOR UPDATE`) comes after
  * the lock of its period and before the ledger row it guards; the database holds C1 (one live line per workspace and plan) and C2.
  */
+interface PeriodLockSqlRow {
+  id: string;
+  organization_id: string;
+  workspace_id: string | null;
+  kind: string;
+  status: string;
+  start_date: Date | null;
+  end_date: Date | null;
+  responsible_it_admin_employee_id: string | null;
+  updated_at: Date;
+}
+
+const toPeriodLockRecord = (row: PeriodLockSqlRow) => ({
+  id: row.id,
+  organizationId: row.organization_id,
+  workspaceId: row.workspace_id,
+  kind: row.kind as 'TERM' | 'PERPETUAL',
+  status: row.status as 'DRAFT' | 'ACTIVE',
+  startDate: row.start_date ? fromDateColumn(row.start_date) : null,
+  endDate: row.end_date ? fromDateColumn(row.end_date) : null,
+  responsibleItAdminEmployeeId: row.responsible_it_admin_employee_id,
+  updatedAt: row.updated_at,
+});
+
 @Injectable()
 export class SubscriptionLineRepo {
   constructor(private readonly prisma: PrismaService) {}
@@ -223,6 +247,31 @@ export class SubscriptionLineRepo {
   }
 
   /** Ends the service of a line on its last day, once: false when it was closed already. */
+  async readPeriodWorkspace(subscriptionId: string, tx?: DbTx): Promise<string | null | undefined> {
+    const row = await (tx ?? this.prisma).subscription.findUnique({
+      where: { id: subscriptionId },
+      select: { workspaceId: true },
+    });
+
+    return row ? row.workspaceId : undefined;
+  }
+
+  async lockPeriod(tx: DbTx, subscriptionId: string, mode: 'UPDATE' | 'SHARE' = 'UPDATE') {
+    const query =
+      mode === 'SHARE'
+        ? tx.$queryRaw<PeriodLockSqlRow[]>`
+            SELECT id, organization_id, workspace_id, kind::text, status::text, start_date, end_date,
+                   responsible_it_admin_employee_id, updated_at
+              FROM subscriptions WHERE id = ${subscriptionId}::uuid FOR SHARE`
+        : tx.$queryRaw<PeriodLockSqlRow[]>`
+            SELECT id, organization_id, workspace_id, kind::text, status::text, start_date, end_date,
+                   responsible_it_admin_employee_id, updated_at
+              FROM subscriptions WHERE id = ${subscriptionId}::uuid FOR UPDATE`;
+    const rows = await query;
+
+    return rows[0] ? toPeriodLockRecord(rows[0]) : null;
+  }
+
   async close(tx: DbTx, id: string, closedOn: BusinessDate, reason: SubscriptionLineClosedReason): Promise<boolean> {
     const closed = await tx.subscriptionLine.updateMany({
       where: { id, closedReason: null },

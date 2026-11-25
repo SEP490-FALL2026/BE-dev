@@ -55,3 +55,80 @@ export class SeatLedgerClosedError extends Error {
     this.name = 'SeatLedgerClosedError';
   }
 }
+
+export class SubscriptionLineNotResponsibleError extends Error {
+  constructor() {
+    super('Only the IT Admin responsible for this subscription may change its lines.');
+    this.name = 'SubscriptionLineNotResponsibleError';
+  }
+}
+
+export class SubscriptionLineStaleError extends Error {
+  constructor(readonly currentUpdatedAt: Date) {
+    super('The subscription line has changed since it was last read; reload and try again.');
+    this.name = 'SubscriptionLineStaleError';
+  }
+}
+
+export class SubscriptionLineClosedError extends Error {
+  constructor() {
+    super('The subscription line is closed and can no longer be changed.');
+    this.name = 'SubscriptionLineClosedError';
+  }
+}
+
+export class SubscriptionLineQuantityViaPurchaseError extends Error {
+  constructor() {
+    super('The seat baseline phase is closed: add seats through a seat purchase on the line.');
+    this.name = 'SubscriptionLineQuantityViaPurchaseError';
+  }
+}
+
+export class SubscriptionLinePeriodNotFoundError extends Error {
+  constructor() {
+    super('The subscription period was not found.');
+    this.name = 'SubscriptionLinePeriodNotFoundError';
+  }
+}
+
+export class SubscriptionLinePeriodStaleError extends Error {
+  constructor(readonly currentUpdatedAt: Date | null) {
+    super('The subscription period has changed since it was last read; reload and try again.');
+    this.name = 'SubscriptionLinePeriodStaleError';
+  }
+}
+
+export class SubscriptionLineWorkspaceMovedError extends Error {
+  constructor(readonly currentUpdatedAt: Date) {
+    super('The subscription moved to another workspace while acquiring locks.');
+    this.name = 'SubscriptionLineWorkspaceMovedError';
+  }
+}
+
+export class SubscriptionLinePeriodNotTermError extends Error {
+  constructor() {
+    super('Only term subscriptions have seat lines.');
+    this.name = 'SubscriptionLinePeriodNotTermError';
+  }
+}
+
+export class SubscriptionLinePlanNotK2Error extends Error {
+  constructor() {
+    super('Only seat-managed K2 plans can be added as subscription lines.');
+    this.name = 'SubscriptionLinePlanNotK2Error';
+  }
+}
+
+export class SubscriptionLinePriceNotVndError extends Error {
+  constructor(readonly currency: string) {
+    super('Subscription line prices must be entered in dong (VND).');
+    this.name = 'SubscriptionLinePriceNotVndError';
+  }
+}
+
+export class SubscriptionLineUpdateEmptyError extends Error {
+  constructor() {
+    super('Provide monthlyUnitPrice or minimumSeats when updating a subscription line.');
+    this.name = 'SubscriptionLineUpdateEmptyError';
+  }
+}

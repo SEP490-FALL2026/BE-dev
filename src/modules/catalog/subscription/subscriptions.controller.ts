@@ -154,11 +154,32 @@ const UPDATE_CONFLICT = {
   ],
 } as const;
 
-const toWire = (view: SubscriptionView) => ({
-  ...view,
-  createdAt: view.createdAt.toISOString(),
-  updatedAt: view.updatedAt.toISOString(),
-});
+const toWire = (view: SubscriptionView) => {
+  const wire: Record<string, unknown> = {
+    ...view,
+    lines: view.lines ?? [],
+    createdAt: view.createdAt.toISOString(),
+    updatedAt: view.updatedAt.toISOString(),
+  };
+  delete wire.lineCount;
+  delete wire.seatsToday;
+
+  return wire;
+};
+
+const toWireList = (actor: AuthenticatedPrincipal, view: SubscriptionView) => {
+  const base = actor.roles.includes('IT_ADMIN') ? view : withoutVendorAdminDetail(view);
+  const wire: Record<string, unknown> = {
+    ...base,
+    lineCount: base.lineCount ?? 0,
+    seatsToday: base.seatsToday ?? 0,
+    createdAt: base.createdAt.toISOString(),
+    updatedAt: base.updatedAt.toISOString(),
+  };
+  delete wire.lines;
+
+  return wire;
+};
 
 /** What the caller reads: the vendor admins, the email and the note are the IT Admin's (SPEC P19); Finance reads the rest and the flags. */
 const toWireFor = (actor: AuthenticatedPrincipal, view: SubscriptionView) =>
@@ -196,7 +217,7 @@ export class SubscriptionsController {
       const page = await this.subscriptions.list(query, actor.employeeId);
       const emptyState = page.items.length === 0 ? await this.subscriptions.emptyState() : null;
 
-      return { items: page.items.map((item) => toWireFor(actor, item)), pagination: page.pagination, emptyState };
+      return { items: page.items.map((item) => toWireList(actor, item)), pagination: page.pagination, emptyState };
     } catch (error) {
       throw toSubscriptionApiException(error);
     }
@@ -211,7 +232,20 @@ export class SubscriptionsController {
     description:
       'The subscription is stored: it has no owning department and a plan has one subscription; a K1 subscription is the shared record of the personal purchases of the plan, and each grant adds one seat to it. It is a draft while its data is incomplete, with what is missing; the unit price is in dong, and the price in the currency of the vendor is kept beside it when given.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, INVALID, WORKSPACE_NOT_FOUND, DUPLICATE_PLAN_CONFLICT)
+  @ApiErrorResponses(
+    ...AUTH_ERRORS,
+    IT_ONLY,
+    {
+      ...INVALID,
+      examples: [
+        ...INVALID.examples,
+        SUBSCRIPTION_ERROR_EXAMPLES.LINES_XOR_PLAN,
+        SUBSCRIPTION_ERROR_EXAMPLES.LINE_PLAN_NOT_K2,
+      ],
+    },
+    WORKSPACE_NOT_FOUND,
+    DUPLICATE_PLAN_CONFLICT,
+  )
   async declare(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: DeclareSubscriptionBodyDto) {
     try {
       return toWire(await this.subscriptions.declare(actor, body));

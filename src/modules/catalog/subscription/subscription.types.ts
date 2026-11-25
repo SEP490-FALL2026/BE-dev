@@ -164,6 +164,18 @@ export interface VendorAdminView {
 }
 
 /** A subscription as it is answered: the stored data and everything derived from it when it is read. */
+export interface SubscriptionLineSummaryView {
+  id: string;
+  plan: { id: string; name: string };
+  monthlyUnitPrice: { amount: string; currency: string };
+  minimumSeats: number | null;
+  seatsToday: number;
+  assignedToday: number;
+  freeToday: number;
+  closedOn: BusinessDate | null;
+  closedReason: 'RENEWED' | 'ENDED' | 'REMOVED' | null;
+}
+
 export interface SubscriptionView {
   id: string;
   planId: string;
@@ -210,6 +222,9 @@ export interface SubscriptionView {
   warnings: SubscriptionWarning[];
   /** The other live subscriptions of the same K2 or K4 plan: set with the warning `SHOULD_MERGE`, empty otherwise (`QĐ-104k`(3)). */
   mergeCandidateIds: string[];
+  lines?: SubscriptionLineSummaryView[];
+  lineCount?: number;
+  seatsToday?: number;
   /** Who administers the plan at the vendor (`QĐ-110k`, `QĐ-110u`): empty for a plan that needs no admins; `working` says whether the person is an IT Admin who works now. */
   vendorAdmins: VendorAdminView[];
   ownerAccountEmail: string | null;
@@ -227,3 +242,38 @@ export type DeadlineKind = 'PAYMENT_DATE' | 'NOTICE_DEADLINE' | 'RENEWAL_DATE' |
 
 /** Near (SOON) or past (EXPIRED) the point of adjustment today. */
 export type ExpiryState = 'SOON' | 'EXPIRED';
+
+export interface DeclareSubscriptionLineInput {
+  planId: string;
+  monthlyUnitPrice: { amount: string; currency: string };
+  quantity: number;
+  minimumSeats?: number;
+}
+
+export interface DeclareSubscriptionInput {
+  planId?: string;
+  lines?: DeclareSubscriptionLineInput[];
+  kind: SubscriptionKind;
+  purchasedQuantity?: number;
+  /** The unit price in dong (`QĐ-111an`); another currency is refused with SubscriptionPriceNotVndError. */
+  unitPrice?: { amount: string; currency: string };
+  monthlyUnitPrice?: { amount: string; currency: string };
+  /** The price the vendor quoted in another currency, only kept beside the price in dong (R-44). */
+  originalPrice?: { amount: string; currency: string };
+  billingCycle?: BillingCycle;
+  commitmentTermMonths?: CommitmentTermMonths;
+  startDate?: BusinessDate;
+  endDate?: BusinessDate;
+  renewalDate?: BusinessDate;
+  noticeDeadline?: BusinessDate;
+  noticePeriodDays?: number;
+  autoRenew?: boolean;
+  allowsMidTermReduction?: boolean;
+  responsibleItAdminEmployeeId?: string;
+  vendorMinimumSeats?: number;
+  /** The workspace the subscription is held in (W3-11); left out, the default of the vendor for a plan the company administers there. */
+  workspaceId?: string;
+  seatCounting?: SeatCounting;
+  minimumSeatsTotal?: number;
+  invoicedLater?: boolean;
+}

@@ -295,3 +295,10 @@ export class SubscriptionPerpetualIsLicenseLotError extends Error {
     this.name = 'SubscriptionPerpetualIsLicenseLotError';
   }
 }
+
+export class SubscriptionLinesXorPlanError extends Error {
+  constructor() {
+    super('Send either lines or planId when declaring a subscription, never both or neither.');
+    this.name = 'SubscriptionLinesXorPlanError';
+  }
+}
