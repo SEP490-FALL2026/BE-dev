@@ -115,10 +115,11 @@ describe('K2 pool expected figures & SBF-11a variance over PostgreSQL (integrati
     );
     await h.ctx.sql.query(
       `INSERT INTO provisioning_tasks (id, organization_id, assignment_id, kind, channel, status, request_id,
-         max_attempts, purchase_kind, purchased_at, completed_at, completed_by_app_user_id, created_by_system)
+         max_attempts, purchase_kind, purchased_at, claimed_by_app_user_id, claimed_at,
+         completed_by_app_user_id, completed_at, evidence, created_by_system)
        VALUES ($1, $2, $3, 'GRANT'::"ProvisioningTaskKind", 'MANUAL'::"ProvisioningChannel",
          'COMPLETED'::"ProvisioningTaskStatus", $4, 3, 'POOL_TOP_UP'::"ProvisioningPurchaseKind",
-         $5::timestamptz, $5::timestamptz, $6, true)`,
+         $5::timestamptz, $6, $5::timestamptz, $6, $5::timestamptz, 'Granted top-up seat', true)`,
       [randomUUID(), h.seed.organizationId, assignmentId, input.requestId, input.purchasedAt, h.it1.appUserId],
     );
   };
@@ -126,47 +127,40 @@ describe('K2 pool expected figures & SBF-11a variance over PostgreSQL (integrati
   it('enforces invoices_pool_figures CHECK constraint for invalid and valid tuples', async () => {
     const subId = await takeOwnerOff(h, await h.subscription(10, 'K2'));
     const planId = await h.planOf(subId);
-    const { requestId } = await approvedRequest(planId, 'P-W305-CHK');
-    const submitted = h.dataOf<PurchaseWire>(
-      await api('post', '', h.it1)
-        .send({
-          link: { requestId },
-          vendorInvoiceNumber: `CHK-PI-${++numbers}`,
-          issuedOn: `${h.year}-11-02`,
-          servicePeriodMonth: `${h.year}-11`,
-          quantity: 1,
-          unitPriceOriginal: { amount: '1000000', currency: 'VND' },
-          netAmount: { amount: '1000000' },
-          paymentSource: 'COMPANY_CARD',
-          documentIds: [await document()],
-        })
-        .expect(201),
-    );
-    const confirmed = h.dataOf<PurchaseWire>(await api('post', `/${submitted.id}/confirmation`, h.finance).expect(201));
+    const vendorId = (await h.vendorOf(planId)).id;
+    const insertBadPoolInvoice = (cols: string, values: string) =>
+      h.ctx.sql.query(
+        `INSERT INTO invoices (id, organization_id, vendor_id, number, issued_on, currency, net_minor,
+           deductible_tax_minor, non_deductible_tax_minor, actual_cost_minor, applied_minor, match_result,
+           recorded_by_employee_id, recorded_at, subscription_id, service_month, ${cols})
+         VALUES (gen_random_uuid(), $1, $2, $3, $4::date, 'VND', 100, 0, 0, 100, 0, 'MATCHED',
+           $5, now(), $6, $7::date, ${values})`,
+        [
+          h.seed.organizationId,
+          vendorId,
+          `CHK-BAD-${++numbers}`,
+          `${h.year}-11-02`,
+          h.finance.employeeId,
+          subId,
+          `${h.year}-11-01`,
+        ],
+      );
 
     await expect(
-      h.ctx.sql.query(
-        `UPDATE invoices SET pool_expected_minor = 100, pool_variance_minor = NULL, pool_variance_month = NULL
-          WHERE id = $1`,
-        [confirmed.invoiceId],
+      insertBadPoolInvoice('pool_expected_minor, pool_variance_minor, pool_variance_month', '100, NULL, NULL'),
+    ).rejects.toThrow(/invoices_pool_figures/);
+
+    await expect(
+      insertBadPoolInvoice(
+        'pool_expected_minor, pool_variance_minor, pool_variance_month, pool_variance_in_review',
+        `NULL, 100, '${h.year}-11-01'::date, true`,
       ),
     ).rejects.toThrow(/invoices_pool_figures/);
 
     await expect(
-      h.ctx.sql.query(
-        `UPDATE invoices SET pool_expected_minor = NULL, pool_variance_minor = 100,
-           pool_variance_month = $2::date, pool_variance_in_review = true
-          WHERE id = $1`,
-        [confirmed.invoiceId, `${h.year}-11-01`],
-      ),
-    ).rejects.toThrow(/invoices_pool_figures/);
-
-    await expect(
-      h.ctx.sql.query(
-        `UPDATE invoices SET pool_expected_minor = 100, pool_variance_minor = 50,
-           pool_variance_month = $2::date, pool_variance_in_review = false
-          WHERE id = $1`,
-        [confirmed.invoiceId, `${h.year}-11-02`],
+      insertBadPoolInvoice(
+        'pool_expected_minor, pool_variance_minor, pool_variance_month, pool_variance_in_review',
+        `100, 50, '${h.year}-11-02'::date, false`,
       ),
     ).rejects.toThrow(/invoices_pool_figures/);
   });

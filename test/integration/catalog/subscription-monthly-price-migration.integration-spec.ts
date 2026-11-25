@@ -86,6 +86,7 @@ async function seedCatalogFixture(sql: Client) {
   }) => {
     const id = randomUUID();
     const hasPrice = input.unitPriceMinor !== null && input.unitPriceCurrency !== null;
+    const hasSnapshot = hasPrice && input.unitPriceCurrency === 'VND';
     await sql.query(
       `INSERT INTO subscriptions (
          id, organization_id, plan_id, kind, status, purchased_quantity,
@@ -108,11 +109,11 @@ async function seedCatalogFixture(sql: Client) {
         input.unitPriceMinor,
         input.unitPriceCurrency,
         hasPrice ? '2026-10-01' : null,
-        hasPrice ? '1.0000000000' : null,
-        hasPrice ? '2026-10-01' : null,
-        hasPrice ? 'SAME_CURRENCY' : null,
-        hasPrice && input.unitPriceCurrency === 'VND' ? input.unitPriceMinor : null,
-        hasPrice && input.unitPriceCurrency === 'VND' ? 'VND' : null,
+        hasSnapshot ? '1.0000000000' : null,
+        hasSnapshot ? '2026-10-01' : null,
+        hasSnapshot ? 'SAME_CURRENCY' : null,
+        hasSnapshot ? input.unitPriceMinor : null,
+        hasSnapshot ? 'VND' : null,
         input.billingCycle,
         input.commitmentTermMonths ?? null,
         input.status === 'ACTIVE' ? '2026-10-01' : null,

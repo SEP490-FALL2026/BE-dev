@@ -93,7 +93,7 @@ describe('Realised renewal saving on first confirmed invoice (integration, Postg
   };
 
   it('defers realised saving at IT outcome and records T=12 saving once on first-month invoice (not on second month)', async () => {
-    const unit = await h.unit(2);
+    const unit = await h.unit(11);
     const { subscriptionId } = await h.termWithSeats(unit, 20, {
       quantity: 12,
       unitPrice: '500000',
@@ -154,7 +154,7 @@ describe('Realised renewal saving on first confirmed invoice (integration, Postg
   });
 
   it('defers realised saving when first invoice opens SBF-11a, then records it on discrepancy closure', async () => {
-    const unit = await h.unit(2);
+    const unit = await h.unit(11);
     const { subscriptionId } = await h.termWithSeats(unit, 20, {
       quantity: 12,
       unitPrice: '6000000',
@@ -198,7 +198,7 @@ describe('Realised renewal saving on first confirmed invoice (integration, Postg
     expect(openCase).toBeDefined();
 
     await discrepancyCases('post', `/${openCase?.id}/closure`, h.finance)
-      .send({ outcome: 'EXPLAINED', reason: 'Vendor FX fee', differenceAmount: { amount: '6000000', currency: 'VND' } })
+      .send({ outcome: 'EXPLAINED', reason: 'Vendor FX fee', differenceAmount: { amount: '6000000' } })
       .expect(201);
 
     expect(await readSavings(renewalId)).toMatchObject({
@@ -209,9 +209,9 @@ describe('Realised renewal saving on first confirmed invoice (integration, Postg
   });
 
   it('clamps higher-unit-price seat reduction to 0 via max(0, baseline - compared)', async () => {
-    const unit = await h.unit(2);
+    const unit = await h.unit(8);
     const { subscriptionId } = await h.termWithSeats(unit, 20, {
-      quantity: 100,
+      quantity: 10,
       unitPrice: '1800000',
       billingCycle: 'ANNUAL',
       startDate: h.inDays(-300),
@@ -221,11 +221,11 @@ describe('Realised renewal saving on first confirmed invoice (integration, Postg
     const { id: renewalId, nextSubscriptionId } = await h.recordedRenewal({
       subscriptionId,
       choice: 'REDUCE',
-      proposedQuantity: 88,
+      proposedQuantity: 8,
       outcome: 'AS_DECIDED',
       nextPeriod: {
-        purchasedQuantity: 88,
-        unitPrice: { amount: '2160000', currency: 'VND' },
+        purchasedQuantity: 8,
+        unitPrice: { amount: '2400000', currency: 'VND' },
         billingCycle: 'ANNUAL',
         startDate: nextStart,
         endDate: h.inDays(429),
@@ -240,9 +240,9 @@ describe('Realised renewal saving on first confirmed invoice (integration, Postg
       subscriptionId: newId,
       servicePeriodMonth: nextStart.slice(0, 7),
       issuedOn: nextStart,
-      quantity: 88,
-      unitAmount: '2160000',
-      netAmount: '190080000',
+      quantity: 8,
+      unitAmount: '2400000',
+      netAmount: '19200000',
     });
 
     expect((await readSavings(renewalId)).realised_savings_minor).toBe('0');

@@ -17,7 +17,7 @@ const dongInput = z.strictObject({ amount: z.string().max(40) });
 export const invoiceDiscrepancyClosureSchema = z.strictObject({
   outcome: outcome.meta({
     description:
-      'EXPLAINED when the difference has a reason; OUT_OF_PROCESS_SUSPECTED when someone may have paid for the software outside the process (it needs a difference above nothing, and is sent on to the review of the accounts at the vendor); EXCHANGE_RATE_LINE_PRICE_UPDATED when exchange rate or card fee differences require the responsible IT Admin to review the subscription monthly price.',
+      'EXPLAINED when the difference has a reason; OUT_OF_PROCESS_SUSPECTED when someone may have paid for the software outside the process (it needs a difference above nothing, and is sent on to the review of the accounts at the vendor); the third outcome when currency or card fee differences require the responsible IT Admin to review the subscription monthly price.',
   }),
   reason: z
     .string()

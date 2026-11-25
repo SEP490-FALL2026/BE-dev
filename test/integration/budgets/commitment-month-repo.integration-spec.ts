@@ -51,10 +51,19 @@ describe('budget_commitment_months, invoices_pool_figures, and M2/M3 schema guar
   });
 
   describe('budget_commitment_months constraints and immutability trigger', () => {
+    let m1: string;
+    let m2: string;
+    let m3: string;
+
     it('writes slices, locks ordered keys, updates applied/released/settled_at, and counts held months', async () => {
-      const m1 = `${h.year}-01-01`;
-      const m2 = `${h.year}-02-01`;
-      const settledAt = new Date(`${h.year}-02-05T00:00:00.000Z`);
+      const existing = new Set((await months.ofCommitment(commitmentId)).map((row) => row.month));
+      const available = Array.from(
+        { length: 12 },
+        (_, idx) => `${h.year}-${String(idx + 1).padStart(2, '0')}-01`,
+      ).filter((month) => !existing.has(month));
+      [m1, m2, m3] = available;
+      const settledAt = new Date(`${m2.slice(0, 8)}05T00:00:00.000Z`);
+      const beforeCount = await months.countHeldByYear(organizationId, h.year);
 
       await runner.run(async (tx) => {
         await months.lockOrganizationMonth(tx, organizationId, m1);
@@ -73,7 +82,7 @@ describe('budget_commitment_months, invoices_pool_figures, and M2/M3 schema guar
         await months.reverseApplied(tx, commitmentId, m1, 200_000n);
       });
 
-      const rows = await months.ofCommitment(commitmentId);
+      const rows = (await months.ofCommitment(commitmentId)).filter((row) => row.month === m1 || row.month === m2);
       expect(rows[0]).toMatchObject({
         commitmentId,
         month: m1,
@@ -85,9 +94,9 @@ describe('budget_commitment_months, invoices_pool_figures, and M2/M3 schema guar
       });
 
       expect(await months.countHeldByYear(organizationId, h.year)).toEqual({
-        commitments: 1,
-        months: 2,
-        unsettledMonths: 2,
+        commitments: beforeCount.commitments,
+        months: beforeCount.months + 2,
+        unsettledMonths: beforeCount.unsettledMonths + 2,
       });
 
       await runner.run((tx) => months.markSettled(tx, commitmentId, m1, settledAt));
@@ -97,7 +106,6 @@ describe('budget_commitment_months, invoices_pool_figures, and M2/M3 schema guar
     });
 
     it('rejects applied_minor + released_minor > share_minor, non-first day, and non-positive seat_count', async () => {
-      const m3 = `${h.year}-03-01`;
       await runner.run((tx) =>
         months.insertMany(tx, [{ commitmentId, month: m3, seatCount: 1, shareMinor: 500_000n }]),
       );
@@ -121,14 +129,12 @@ describe('budget_commitment_months, invoices_pool_figures, and M2/M3 schema guar
         h.ctx.sql.query(
           `INSERT INTO budget_commitment_months (commitment_id, month, seat_count, share_minor)
            VALUES ($1, $2::date, 0, 100)`,
-          [commitmentId, `${h.year}-04-01`],
+          [commitmentId, `${m3.slice(0, 8)}01`],
         ),
       ).rejects.toThrow(/budget_commitment_months_seat_count_positive/);
     });
 
     it('refuses changes to commitment_id, month, seat_count, share_minor and refuses DELETE', async () => {
-      const m1 = `${h.year}-01-01`;
-
       await expect(
         h.ctx.sql.query(
           `UPDATE budget_commitment_months SET share_minor = share_minor + 1 WHERE commitment_id = $1 AND month = $2::date`,

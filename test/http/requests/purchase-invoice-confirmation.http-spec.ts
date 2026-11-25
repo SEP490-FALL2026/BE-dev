@@ -214,7 +214,7 @@ describe('purchase invoice confirmation & pool variance (http contract, no datab
   it('serializes NO_EXPECTED_AMOUNT, null poolExpected with non-null poolVariance, and 3 flags max on GET', async () => {
     readableInvoice.mockResolvedValueOnce(
       makePurchaseRow({
-        flags: ['WITH_TAX', 'SELF_SIGNED'],
+        flags: ['OVER_APPROVED', 'OUTSIDE_TERM'],
         nonDeductibleTaxMinor: 100_000n,
       }),
     );
@@ -235,7 +235,7 @@ describe('purchase invoice confirmation & pool variance (http contract, no datab
     const body = response.body as PurchaseInvoiceDetailBody;
     expect(body.data.poolExpected).toBeNull();
     expect(body.data.poolVariance).toEqual({ amount: '12460000', currency: 'VND' });
-    expect(body.data.flags).toEqual(['WITH_TAX', 'SELF_SIGNED', 'NO_EXPECTED_AMOUNT']);
+    expect(body.data.flags).toEqual(['OVER_APPROVED', 'OUTSIDE_TERM', 'NO_EXPECTED_AMOUNT']);
   });
 
   it('serializes null poolExpected & poolVariance when K1/K4 poolFigures is null', async () => {
@@ -257,7 +257,7 @@ describe('purchase invoice confirmation & pool variance (http contract, no datab
       .send({
         outcome: 'EXCHANGE_RATE_LINE_PRICE_UPDATED',
         reason: 'Vendor adjusted list price and exchange rate',
-        differenceAmount: { amount: '0', currency: 'VND' },
+        differenceAmount: { amount: '0' },
       })
       .expect(201);
 
@@ -278,7 +278,7 @@ describe('purchase invoice confirmation & pool variance (http contract, no datab
       .send({
         outcome: 'INVALID_OUTCOME',
         reason: 'Test',
-        differenceAmount: { amount: '0', currency: 'VND' },
+        differenceAmount: { amount: '0' },
       })
       .expect(422);
 
@@ -288,7 +288,7 @@ describe('purchase invoice confirmation & pool variance (http contract, no datab
       .send({
         outcome: 'EXCHANGE_RATE_LINE_PRICE_UPDATED',
         reason: '   ',
-        differenceAmount: { amount: '0', currency: 'VND' },
+        differenceAmount: { amount: '0' },
       })
       .expect(422);
     expect(closeCase).not.toHaveBeenCalled();

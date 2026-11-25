@@ -108,12 +108,30 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
       );
       return { requestId, commitmentId: res.created[0].commitmentId };
     }
+    const check = await prisma().requestBudgetCheck.create({
+      data: {
+        organizationId: h.seed.organizationId,
+        requestId,
+        number: 1,
+        trigger: 'SPEND_DECISION',
+        route: 'SPEND_APPROVAL',
+        staleCostEvidence: false,
+        planLineOverdue: false,
+        periodClosed: false,
+        offPlan: false,
+        outcome: 'WITHIN_BASE',
+        blockReasons: [],
+        costCenterId: input.unit.department.unitId,
+        currency: 'VND',
+        bindingTotalMinor: input.amountMinor,
+      },
+    });
     const [held] = await runner().run((tx) =>
       budgets().holdForRequest(tx, actor(), {
         organizationId: h.seed.organizationId,
         requestId,
         costCenterId: input.unit.department.unitId,
-        snapshotCheckId: randomUUID(),
+        snapshotCheckId: check.id,
         currency: 'VND',
         now: NOW,
         items: [{ year: input.year, amountMinor: input.amountMinor }],
