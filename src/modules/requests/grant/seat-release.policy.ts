@@ -130,10 +130,13 @@ const ZERO_BREAKDOWN: SeatReleaseBreakdown = { amountMinor: 0n, months: [] };
 
 function monthlyRevocationBreakdown(
   commitment: SeatCommitment & { seatMonthlyMinor: bigint },
+  coverage: SeatCoverage,
   endsOn: BusinessDate,
 ): SeatReleaseBreakdown {
   const sliceMonths = [...(commitment.months ?? [])].sort();
   if (sliceMonths.length === 0) return ZERO_BREAKDOWN;
+  const last = lastMonthOf(commitment.year, coverage.endDate);
+  if (last <= 0) return ZERO_BREAKDOWN;
   const first = monthOf(sliceMonths[0]);
   const endYear = fiscalYearOf(endsOn);
   const endMonth = monthOf(endsOn);
@@ -142,6 +145,7 @@ function monthlyRevocationBreakdown(
 
   for (const month of sliceMonths) {
     const m = monthOf(month);
+    if (m > last) continue;
     if (allFromStart || m > endMonth) {
       months.push({ month, amountMinor: commitment.seatMonthlyMinor });
     } else if (m === endMonth) {
@@ -194,7 +198,7 @@ export function revocationBreakdown(input: {
   const endYear = fiscalYearOf(endsOn);
   if (commitment.year < endYear) return ZERO_BREAKDOWN;
   if ((commitment.months?.length ?? 0) > 0) {
-    return monthlyRevocationBreakdown(commitment, endsOn);
+    return monthlyRevocationBreakdown(commitment, coverage, endsOn);
   }
   const first = firstMonthOf(commitment, coverage);
   const last = lastMonthOf(commitment.year, lastDayOf(coverage));

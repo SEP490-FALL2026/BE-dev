@@ -1,4 +1,5 @@
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { SeatReleaseRepo } from './seat-release.repo';
 import { SeatReleaseService } from './seat-release.service';
 
 const TX = {} as DbTx;
@@ -153,6 +154,121 @@ describe('SeatReleaseService (W3-07 monthly breakdown)', () => {
           ],
         },
       ],
+      now: NOW,
+    });
+  });
+
+  it('FIX-B1 F2 (A-I2): group 2 seats (A ends 31/03, B ends 31/12) only releases Feb-Mar for A on revocation, transfer, and replacement', async () => {
+    const queryRaw = jest.fn().mockResolvedValue([
+      {
+        id: 'req-group',
+        request_type: 'GROUP_GRANT',
+        budget_year: 2027,
+        amount_months: 12,
+        term_months: null,
+        end_date: null,
+        previous_end: null,
+        by_hand: false,
+      },
+    ]);
+    const tx = { $queryRaw: queryRaw } as unknown as DbTx;
+    const realRepo = new SeatReleaseRepo();
+    const releaseForRequest = jest
+      .fn()
+      .mockResolvedValue([
+        { id: 'c-grp', year: 2027, releasedMinor: 750_000n, heldMinor: 6_750_000n, released: false },
+      ]);
+    const groupCommitment = {
+      requestId: 'req-group',
+      year: 2027,
+      origin: 'APPROVAL',
+      seatMonthlyMinor: 500_000n,
+      heldMinor: 7_500_000n,
+      months: Array.from({ length: 12 }, (_, i) => `2027-${String(i + 1).padStart(2, '0')}-01`),
+      transferReleases: [],
+    };
+    const budgets = {
+      lockSeatCommitments: jest.fn().mockResolvedValue([groupCommitment]),
+      releaseForRequest,
+      committedByRequests: jest.fn().mockResolvedValue([{ requestId: 'req-group', currency: 'VND' }]),
+    };
+    const organizationReads = { businessToday: jest.fn().mockResolvedValue('2027-02-15') };
+    const licensing = {
+      listRightChainsOf: jest.fn().mockResolvedValue([
+        {
+          assignmentId: 'assign-A',
+          grantRequestId: 'req-group',
+          chainAssignmentIds: ['assign-A'],
+          grantedStartDate: '2027-01-01',
+          grantedEndDate: '2027-03-31',
+        },
+      ]),
+    };
+    const service = new SeatReleaseService(budgets as never, organizationReads as never, realRepo, licensing as never);
+    const expectedAmounts = [
+      {
+        year: 2027,
+        amountMinor: 750_000n,
+        months: [
+          { month: '2027-02-01', amountMinor: 250_000n },
+          { month: '2027-03-01', amountMinor: 500_000n },
+        ],
+      },
+    ];
+
+    await service.afterRevocation(
+      tx,
+      {
+        id: 'rev-A',
+        status: 'COMPLETED',
+        completed: {
+          grantRequestId: 'req-group',
+          chainAssignmentIds: ['assign-A'],
+          grantedStartDate: '2027-01-01',
+          grantedEndDate: '2027-03-31',
+          provisioningType: 'K2',
+          endedOn: '2027-02-15',
+          paidThroughOn: null,
+        },
+      } as never,
+      NOW,
+    );
+    expect(releaseForRequest).toHaveBeenLastCalledWith(tx, {
+      requestId: 'req-group',
+      reason: 'REVOKED',
+      reference: 'revocationTask:rev-A',
+      amounts: expectedAmounts,
+      now: NOW,
+    });
+
+    await service.afterTransferEffective(
+      tx,
+      {
+        transferId: 'tr-1',
+        effectiveOn: '2027-02-15',
+        rights: [{ assignmentId: 'assign-A', provisioningType: 'K2' }],
+      },
+      NOW,
+    );
+    expect(releaseForRequest).toHaveBeenLastCalledWith(tx, {
+      requestId: 'req-group',
+      reason: 'TRANSFER_EFFECTIVE',
+      reference: 'transfer:tr-1:assignment:assign-A',
+      amounts: expectedAmounts,
+      now: NOW,
+    });
+
+    await service.afterRightReplaced(tx, {
+      assignmentId: 'assign-A',
+      provisioningType: 'K2',
+      endedOn: '2027-02-15',
+      now: NOW,
+    });
+    expect(releaseForRequest).toHaveBeenLastCalledWith(tx, {
+      requestId: 'req-group',
+      reason: 'TRANSFER_EFFECTIVE',
+      reference: 'transfer:regrant:assignment:assign-A',
+      amounts: expectedAmounts,
       now: NOW,
     });
   });

@@ -107,4 +107,34 @@ describe('seat-release policy W3-07 F1 / F2 / F15 monthly-sliced K2 breakdowns',
       months: [{ month: '2027-02-01', amountMinor: 357_143n }],
     });
   });
+
+  it('FIX-B1 F2 (A-I2): caps monthly revocation breakdown at coverage.endDate so another seat months (4-12) stay intact', () => {
+    const groupCommitment = commitment({
+      year: 2027,
+      seatMonthlyMinor: 500_000n,
+      heldMinor: 7_500_000n,
+      months: Array.from({ length: 12 }, (_, i) => `2027-${String(i + 1).padStart(2, '0')}-01`),
+    });
+    const seatACoverage = coverage({
+      budgetYear: 2027,
+      endDate: '2027-03-31',
+      lastMonthBeginsOn: null,
+      amountMonths: 12,
+    });
+
+    const breakdown = revocationBreakdown({
+      commitment: groupCommitment,
+      coverage: seatACoverage,
+      endsOn: '2027-02-15',
+      currentYear: 2027,
+    });
+
+    expect(breakdown).toEqual({
+      amountMinor: 750_000n,
+      months: [
+        { month: '2027-02-01', amountMinor: 250_000n },
+        { month: '2027-03-01', amountMinor: 500_000n },
+      ],
+    });
+  });
 });
