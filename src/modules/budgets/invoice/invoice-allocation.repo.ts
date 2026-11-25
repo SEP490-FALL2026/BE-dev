@@ -88,11 +88,31 @@ export class InvoiceAllocationRepo {
     return written;
   }
 
+  /** Acquires Tier 0 transaction advisory locks for `(subjectKey, year)` ascending to serialize K1 allocation vs 01/01 commitment passes. */
+  async lockK1AllocationYears(tx: DbTx, subjectKey: string, years: readonly number[]): Promise<void> {
+    const sortedYears = [...new Set(years)].sort((a, b) => a - b);
+    for (const year of sortedYears) {
+      const key = `k1-allocation:${subjectKey}:${year}`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`;
+    }
+  }
+
   /** The lines of an invoice, by month then bucket. */
   async ofInvoice(invoiceId: string, tx?: DbTx): Promise<InvoiceAllocationRecord[]> {
     const rows = await (tx ?? this.prisma).invoiceAllocation.findMany({
       where: { invoiceId },
       orderBy: [{ month: 'asc' }, { bucket: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+    });
+
+    return rows.map(toRecord);
+  }
+
+  /** All allocation lines across multiple invoices, deterministically ordered. */
+  async ofInvoices(invoiceIds: readonly string[], tx?: DbTx): Promise<InvoiceAllocationRecord[]> {
+    if (invoiceIds.length === 0) return [];
+    const rows = await (tx ?? this.prisma).invoiceAllocation.findMany({
+      where: { invoiceId: { in: [...new Set(invoiceIds)] } },
+      orderBy: [{ invoiceId: 'asc' }, { month: 'asc' }, { bucket: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
     });
 
     return rows.map(toRecord);

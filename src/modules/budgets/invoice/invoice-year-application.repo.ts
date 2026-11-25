@@ -77,6 +77,17 @@ export class InvoiceYearApplicationRepo {
     return rows.map(toRecord);
   }
 
+  /** All application rows for a batch of invoices, oldest first. */
+  async ofInvoices(invoiceIds: readonly string[], tx?: DbTx): Promise<InvoiceYearApplicationRecord[]> {
+    if (invoiceIds.length === 0) return [];
+    const rows = await (tx ?? this.prisma).invoiceYearApplication.findMany({
+      where: { invoiceId: { in: [...new Set(invoiceIds)] } },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+
+    return rows.map(toRecord);
+  }
+
   /** What an invoice was applied to a Cost Center for in a year, summed over its rows; zero when it was not. */
   async appliedOf(invoiceId: string, year: number, costCenterId: string, tx?: DbTx): Promise<bigint> {
     const sum = await (tx ?? this.prisma).invoiceYearApplication.aggregate({

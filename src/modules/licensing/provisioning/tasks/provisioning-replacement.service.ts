@@ -78,6 +78,7 @@ export class ProvisioningReplacementService {
         provisioningType: target.provisioningType,
         endedOn: today,
         now: new Date(),
+        newRequestId: requestId,
       });
     }
 

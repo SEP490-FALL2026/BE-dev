@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { BusinessDate } from '../../../core/business-date';
+import { addDays, type BusinessDate } from '../../../core/business-date';
 import { DONG } from '../../../core/money/money';
-import { termEndOf } from '../../../core/term-limit';
+import { k1PaidThroughOn, termEndOf } from '../../../core/term-limit';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
 import { BudgetsApi } from '../../budgets/public/budgets.api';
@@ -117,7 +117,14 @@ export class YearStartCommitmentsBatchService {
   async commitBatch(tx: DbTx, pass: YearStartPassContext, afterId: string | null): Promise<YearStartBatchResult> {
     const locked = await this.repo.lockBatch(tx, pass.organizationId, afterId, YEAR_START_BATCH_SIZE);
     const lastId = locked.length === 0 ? null : locked[locked.length - 1].id;
-    const judged = await this.judgeBatch(tx, pass, locked);
+    await this.lockK1AnnualAllocations(tx, locked, pass.year);
+    const confirmedInvoices = this.repo.confirmedInvoiceIdsByRequests
+      ? await this.repo.confirmedInvoiceIdsByRequests(
+          tx,
+          locked.map((row) => row.id),
+        )
+      : new Map<string, string[]>();
+    const judged = await this.judgeBatch(tx, pass, locked, confirmedInvoices);
     if (judged === null) return { lastId, created: 0, skipped: 0 };
 
     const { items, leftOut, ignored } = judged;
@@ -132,6 +139,23 @@ export class YearStartCommitmentsBatchService {
       throw new Error(
         `The approved budget of the year ${pass.year} is not in dong: ${held.refused.length} commitment(s) of 01/01 cannot be held`,
       );
+    }
+    const k1ApplyItems = held.created.flatMap((created) => {
+      const invoiceIds = confirmedInvoices.get(created.requestId) ?? [];
+
+      return invoiceIds.length === 0
+        ? []
+        : [
+            {
+              requestId: created.requestId,
+              commitmentId: created.commitmentId,
+              costCenterId: created.costCenterId,
+              invoiceIds,
+            },
+          ];
+    });
+    if (k1ApplyItems.length > 0) {
+      await this.budgets.applyK1YearStartAllocations(tx, { year: pass.year, items: k1ApplyItems });
     }
     for (const left of leftOut) await this.recordSkipped(tx, pass, left);
     for (const number of ignored) await this.recordIgnored(tx, pass, number);
@@ -148,11 +172,36 @@ export class YearStartCommitmentsBatchService {
     tx: DbTx,
     pass: YearStartPassContext,
     rows: readonly YearStartCandidate[],
+    confirmedInvoices?: ReadonlyMap<string, string[]>,
   ): Promise<YearStartJudgedBatch | null> {
     const { paidRows, kindsByPlan } = await this.ofPaidKinds(tx, rows);
     const candidates = await this.withoutCommitment(tx, paidRows, pass.year);
 
-    return candidates.length === 0 ? null : this.judgeAll(tx, pass, candidates, kindsByPlan);
+    return candidates.length === 0 ? null : this.judgeAll(tx, pass, candidates, kindsByPlan, confirmedInvoices);
+  }
+
+  private async lockK1AnnualAllocations(tx: DbTx, rows: readonly YearStartCandidate[], year: number): Promise<void> {
+    if (rows.length === 0 || !this.catalog.findPlanSeatTargets || !this.budgets.lockK1AllocationYears) return;
+    const planIds = [...new Set(rows.map((row) => row.planId))];
+    const targets = await this.catalog.findPlanSeatTargets(planIds, tx);
+    const k1AnnualPlans = new Set(
+      targets
+        .filter((target) => target.provisioningType === 'K1' && target.referenceCommitmentMonths === 12)
+        .map((target) => target.planId),
+    );
+    const k1Candidates = rows.filter((row) => k1AnnualPlans.has(row.planId));
+    if (k1Candidates.length === 0) return;
+
+    const namedRoots = await this.repo.renewalSuccessors(tx, k1Candidates);
+    const rootByRequest = await this.grants.listK1AnnualRootsOfRequests(
+      {
+        grantRequestIds: k1Candidates.filter((c) => c.type !== 'RENEWAL').map((c) => c.id),
+        namedRoots,
+      },
+      tx,
+    );
+    const subjectKeys = k1Candidates.map((c) => rootByRequest.get(c.id) ?? `req:${c.id}`);
+    await this.budgets.lockK1AllocationYears(tx, subjectKeys, [year]);
   }
 
   /** What each candidate holds, in dong and the Cost Center of the department that bears it, or why it is left out. */
@@ -161,9 +210,10 @@ export class YearStartCommitmentsBatchService {
     pass: YearStartPassContext,
     candidates: readonly YearStartCandidate[],
     kindsByPlan: ReadonlyMap<string, string>,
+    confirmedInvoices?: ReadonlyMap<string, string[]>,
   ): Promise<YearStartJudgedBatch> {
     const yearStart: BusinessDate = `${pass.year}-01-01`;
-    const { seats, ignored } = await this.seatsOf(tx, candidates, pass.year);
+    const { seats, ignored } = await this.seatsOf(tx, candidates, pass.year, confirmedInvoices);
     const bearing = new Map(
       candidates.map((candidate) => [
         candidate.id,
@@ -250,13 +300,14 @@ export class YearStartCommitmentsBatchService {
     tx: DbTx,
     candidates: readonly YearStartCandidate[],
     year: number,
+    confirmedInvoices?: ReadonlyMap<string, string[]>,
   ): Promise<{ seats: Map<string, YearStartSeat[]>; ignored: IgnoredSaved[] }> {
     const { keptOf, ignored } = await this.keptNumbersOf(tx, candidates, year);
     const priceOf = approvalPriceOf(candidates);
     const seats = new Map<string, YearStartSeat[]>();
     for (const [requestId, seat] of [
       ...(await this.unclaimedSeatsOf(tx, candidates, year, keptOf)),
-      ...(await this.grantedSeatsOf(tx, candidates, year, keptOf)),
+      ...(await this.grantedSeatsOf(tx, candidates, year, keptOf, confirmedInvoices)),
     ]) {
       const approvalPrice =
         !seat.termLimited && seat.savedMinor !== null
@@ -377,36 +428,62 @@ export class YearStartCommitmentsBatchService {
     candidates: readonly YearStartCandidate[],
     year: number,
     keptOf: KeptOf,
+    confirmedInvoices?: ReadonlyMap<string, string[]>,
   ): Promise<[string, YearStartSeat][]> {
     const termOf = new Map(candidates.map((candidate) => [candidate.id, candidate.termMonths]));
-    const granted = await this.grants.listHeldSeatsOfRequests(
-      {
-        grantRequestIds: candidates
-          .filter((candidate) => candidate.type !== 'RENEWAL')
-          .map((candidate) => candidate.id),
-        namedRoots: await this.repo.renewalSuccessors(tx, candidates),
-      },
-      `${year}-01-01`,
-      tx,
-    );
+    const roots = {
+      grantRequestIds: candidates.filter((candidate) => candidate.type !== 'RENEWAL').map((candidate) => candidate.id),
+      namedRoots: await this.repo.renewalSuccessors(tx, candidates),
+    };
+    const yearStart: BusinessDate = `${year}-01-01`;
+    const granted = await this.grants.listHeldSeatsOfRequests(roots, yearStart, tx);
+    const closedPaid =
+      confirmedInvoices && confirmedInvoices.size > 0 && this.grants.listK1AnnualPaidSeatsOn
+        ? await this.grants.listK1AnnualPaidSeatsOn(roots, yearStart, tx)
+        : [];
+    const seenRoots = new Set(granted.map((seat) => `${seat.requestId}:${seat.rootAssignmentId}`));
+    const extraPaid = closedPaid.filter((seat) => {
+      if (seenRoots.has(`${seat.requestId}:${seat.rootAssignmentId}`)) return false;
+      if ((confirmedInvoices?.get(seat.requestId)?.length ?? 0) === 0) return false;
+      const asOf =
+        seat.validUntil && seat.validUntil > seat.billingAnchorOn ? addDays(seat.validUntil, -1) : seat.billingAnchorOn;
+
+      return k1PaidThroughOn(seat.billingAnchorOn, asOf, 12) >= yearStart;
+    });
+    const combined = [...granted, ...extraPaid];
     const renewedBy = await this.repo.renewalsThatBegan(
       tx,
-      granted.flatMap((seat) => seat.laterAssignmentIds),
+      combined.flatMap((seat) => seat.laterAssignmentIds),
     );
+    const paidSeatByKey = new Map(extraPaid.map((seat) => [`${seat.requestId}:${seat.rootAssignmentId}`, seat]));
 
-    return granted
+    return combined
       .filter((seat) => !seat.laterAssignmentIds.some((id) => (renewedBy.get(id) ?? seat.requestId) !== seat.requestId))
-      .map((seat): [string, YearStartSeat] => [
-        seat.requestId,
-        {
-          expectedEndDate: seat.expectedEndDate,
-          validUntil: seat.validUntil,
-          departmentId: seat.owningDepartmentId,
-          termLimited: (termOf.get(seat.requestId) ?? null) !== null || seat.expectedEndDate !== null,
-          savedMinor: keptOf(seat.requestId, seat.employeeId),
-          approvalPrice: null,
-        },
-      ]);
+      .map((seat): [string, YearStartSeat] => {
+        const paidSeat = paidSeatByKey.get(`${seat.requestId}:${seat.rootAssignmentId}`);
+        const isPaidRevoked = paidSeat !== undefined;
+        const paidThrough = paidSeat
+          ? k1PaidThroughOn(
+              paidSeat.billingAnchorOn,
+              paidSeat.validUntil && paidSeat.validUntil > paidSeat.billingAnchorOn
+                ? addDays(paidSeat.validUntil, -1)
+                : paidSeat.billingAnchorOn,
+              12,
+            )
+          : null;
+
+        return [
+          seat.requestId,
+          {
+            expectedEndDate: seat.expectedEndDate ?? paidThrough,
+            validUntil: isPaidRevoked ? null : seat.validUntil,
+            departmentId: seat.owningDepartmentId,
+            termLimited: (termOf.get(seat.requestId) ?? null) !== null || seat.expectedEndDate !== null,
+            savedMinor: keptOf(seat.requestId, seat.employeeId),
+            approvalPrice: null,
+          },
+        ];
+      });
   }
 
   /** The price of each plan on 01/01 (`BR-MF1-09e`), whatever day the pass runs: the main subscription of the plan, never a department's (`S1-02`). */

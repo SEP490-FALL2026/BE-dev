@@ -81,3 +81,25 @@ export interface PoolTopUpPurchase {
   taskId: string;
   purchasedAt: Date | null;
 }
+
+/** One holder segment along the chain of a K1 annual assignment (initial grant, handover, or transfer replacement). */
+export interface K1AnnualHolderSegment {
+  assignmentId: string;
+  requestId: string | null;
+  owningDepartmentId: string | null;
+  billingAnchorOn: string | null;
+  endedOn: string | null;
+  replacedFromAssignmentId: string | null;
+}
+
+/** Timeline of a K1 annual right starting at `rootAssignmentId`, used for advisory locks and post-transfer confirmations. */
+export interface K1AnnualHolderTimeline {
+  rootAssignmentId: string;
+  segments: K1AnnualHolderSegment[];
+}
+
+/** Closed non-replaced K1 annual seat that may still have an active paid 12-month cycle crossing `onDate` (`F9(c)`). */
+export interface K1AnnualPaidSeat extends GrantedSeatOfRequest {
+  personalCommitmentMonths: 12;
+  billingAnchorOn: string;
+}

@@ -5,7 +5,7 @@ import { CatalogApi } from '../../catalog/public/catalog.api';
 import { SubscriptionPeriodApi } from '../../catalog/public/subscription-period.api';
 import { AssignmentSeatMonthRepo } from '../assignment/assignment-seat-month.repo';
 import { SubscriptionRenewalRepo } from '../subscription-renewal/subscription-renewal.repo';
-import type { SeatInForce, SeatOfMonth } from './licensing-seat-month.types';
+import type { SeatInForce, SeatOfMonth, UnrequestedK1SeatInForce } from './licensing-seat-month.types';
 
 /**
  * The licensing facade for the cost of a month of the seats of the shared pool (`SM-1`, `QĐ-103k`): which seats of a `K2` plan were in force on
@@ -40,6 +40,27 @@ export class LicensingSeatMonthApi {
     const pools = await this.k2PlansTouching(day, addDays(day, 1), tx);
 
     return this.seats.seatsInForceOfPlans(pools, day, tx);
+  }
+
+  /** Active standalone K1 seats without a Request on `day` (`K-A2`), enriched with plan VND monthly reference prices. */
+  async getUnrequestedK1SeatsInForceOn(day: BusinessDate, tx?: DbTx): Promise<UnrequestedK1SeatInForce[]> {
+    const planIds = await this.seats.standalonePlanIdsOn(day, tx);
+    if (planIds.length === 0) return [];
+    const k1Targets = (await this.catalog.findPlanSeatTargets(planIds, tx)).filter(
+      (target) => target.provisioningType === 'K1',
+    );
+    if (k1Targets.length === 0) return [];
+    const priceByPlan = new Map(k1Targets.map((target) => [target.planId, target.monthlyUnitPriceMinor ?? null]));
+    const seats = await this.seats.unrequestedK1SeatsInForceOfPlans(
+      k1Targets.map((target) => target.planId),
+      day,
+      tx,
+    );
+
+    return seats.map((seat) => ({
+      ...seat,
+      referenceMonthlyPriceMinor: priceByPlan.get(seat.planId) ?? null,
+    }));
   }
 
   private async k2PlansTouching(

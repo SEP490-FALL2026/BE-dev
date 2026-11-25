@@ -87,4 +87,38 @@ export class SeatReleaseRepo {
 
     return new Map(rows.map((row) => toCoverageEntry(row, input.grant)));
   }
+
+  /** Confirmed budget invoice ids grouped by `requestId`, for K1 annual F8 transfer offsets. */
+  async confirmedInvoiceIdsByRequests(tx: DbTx, requestIds: readonly string[]): Promise<Map<string, string[]>> {
+    if (requestIds.length === 0) return new Map();
+    const rows = await tx.purchaseInvoice.findMany({
+      where: {
+        requestId: { in: [...new Set(requestIds)] },
+        state: 'CONFIRMED',
+        invoiceId: { not: null },
+      },
+      select: { requestId: true, invoiceId: true },
+      orderBy: [{ serviceMonth: 'asc' }, { decidedAt: 'asc' }, { id: 'asc' }],
+    });
+    const byRequest = new Map<string, string[]>();
+    for (const row of rows) {
+      if (row.requestId === null || row.invoiceId === null) continue;
+      const list = byRequest.get(row.requestId) ?? [];
+      list.push(row.invoiceId);
+      byRequest.set(row.requestId, list);
+    }
+
+    return byRequest;
+  }
+
+  /** Cost center ids of requests (`access_requests.cost_center_id`), keyed by request id. */
+  async requestCostCenters(tx: DbTx, requestIds: readonly string[]): Promise<Map<string, string | null>> {
+    if (requestIds.length === 0) return new Map();
+    const rows = await tx.accessRequest.findMany({
+      where: { id: { in: [...new Set(requestIds)] } },
+      select: { id: true, costCenterId: true },
+    });
+
+    return new Map(rows.map((row) => [row.id, row.costCenterId]));
+  }
 }

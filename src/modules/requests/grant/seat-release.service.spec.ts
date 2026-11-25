@@ -45,7 +45,12 @@ describe('SeatReleaseService (W3-07 monthly breakdown)', () => {
     };
     const licensing = { listRightChainsOf: jest.fn() };
 
-    const service = new SeatReleaseService(budgets as never, organizationReads as never, repo, licensing as never);
+    const service = new SeatReleaseService(
+      budgets as never,
+      organizationReads as never,
+      repo as never,
+      licensing as never,
+    );
 
     await service.afterGrant(
       TX,
@@ -119,7 +124,12 @@ describe('SeatReleaseService (W3-07 monthly breakdown)', () => {
     };
     const licensing = { listRightChainsOf: jest.fn() };
 
-    const service = new SeatReleaseService(budgets as never, organizationReads as never, repo, licensing as never);
+    const service = new SeatReleaseService(
+      budgets as never,
+      organizationReads as never,
+      repo as never,
+      licensing as never,
+    );
 
     await service.afterRevocation(
       TX,

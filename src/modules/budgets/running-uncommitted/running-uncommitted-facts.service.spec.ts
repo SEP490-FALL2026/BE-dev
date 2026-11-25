@@ -1,7 +1,7 @@
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { SubscriptionPeriodApi } from '../../catalog/public/subscription-period.api';
 import type { LicensingSeatMonthApi } from '../../licensing/public/licensing-seat-month.api';
-import type { SeatInForce } from '../../licensing/public/licensing-seat-month.types';
+import type { SeatInForce, UnrequestedK1SeatInForce } from '../../licensing/public/licensing-seat-month.types';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { SharedPoolLineRepo } from '../shared-pool-line/shared-pool-line.repo';
 import type { RunningUncommittedRepo } from './running-uncommitted.repo';
@@ -28,6 +28,9 @@ const inForceSeat = (over: Partial<SeatInForce> = {}): SeatInForce => ({
 function buildService() {
   const licensing = {
     getSeatsInForceOn: jest.fn<Promise<SeatInForce[]>, [string, DbTx?]>().mockResolvedValue([]),
+    getUnrequestedK1SeatsInForceOn: jest
+      .fn<Promise<UnrequestedK1SeatInForce[]>, [string, DbTx?]>()
+      .mockResolvedValue([]),
   };
   const periods = {
     getPurchaseFacts: jest.fn().mockResolvedValue([]),
@@ -202,5 +205,51 @@ describe('RunningUncommittedFactsService', () => {
     const result = await service.ofYear(2027);
 
     expect(result.size).toBe(0);
+  });
+
+  it('K-A2 (D-17): includes unrequested K1 seats (500k on 20/07 => 3.000.000, on 01/12 => 500.000) and exposes NO_PRICE flag in ofYearWithFlags without changing ofYear', async () => {
+    const { service, licensing, organizationReads } = buildService();
+    licensing.getUnrequestedK1SeatsInForceOn.mockResolvedValue([
+      {
+        assignmentId: 'k1-a',
+        planId: 'plan-k1',
+        source: 'BASELINE',
+        kind: 'PERSONAL',
+        employeeId: 'emp-1',
+        owningDepartmentId: null,
+        heldFrom: '2027-01-01',
+        heldUntil: null,
+        billingAnchorOn: '2027-01-01',
+        referenceMonthlyPriceMinor: 500_000n,
+      },
+      {
+        assignmentId: 'k1-np',
+        planId: 'plan-np',
+        source: 'HANDOVER',
+        kind: 'PERSONAL',
+        employeeId: 'emp-2',
+        owningDepartmentId: null,
+        heldFrom: '2027-01-01',
+        heldUntil: null,
+        billingAnchorOn: null,
+        referenceMonthlyPriceMinor: null,
+      },
+    ]);
+    organizationReads.getOwningUnits.mockResolvedValue(
+      new Map([
+        ['emp-1', { departmentId: 'd-tk', costCenter: { id: CC_TK, code: 'TK', name: 'TK', status: 'ACTIVE' } }],
+        ['emp-2', { departmentId: 'd-kt', costCenter: { id: CC_KT, code: 'KT', name: 'KT', status: 'ACTIVE' } }],
+      ]),
+    );
+
+    const julRes = await service.ofYearWithFlags(2027, '2027-07-20');
+    expect(julRes.totals.get(CC_TK)).toBe(3_000_000n);
+    expect(julRes.totals.get(CC_KT) ?? 0n).toBe(0n);
+    expect(julRes.flagsByCostCenter.get(CC_KT)).toEqual([
+      { code: 'NO_PRICE', planId: 'plan-np', assignmentId: 'k1-np' },
+    ]);
+
+    const decTotals = await service.ofYear(2027, '2027-12-01');
+    expect(decTotals.get(CC_TK)).toBe(500_000n);
   });
 });

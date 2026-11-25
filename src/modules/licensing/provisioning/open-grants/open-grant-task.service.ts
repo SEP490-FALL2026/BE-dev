@@ -6,6 +6,8 @@ import type {
   GrantCompletion,
   GrantExecution,
   GrantedSeatOfRequest,
+  K1AnnualHolderTimeline,
+  K1AnnualPaidSeat,
   OpenGrantTask,
   PoolTopUpPurchase,
   SeatRootsOfRequests,
@@ -80,5 +82,21 @@ export class OpenGrantTaskService {
   /** Where the grant of each person of these requests stands: their grant tasks that were not cancelled, the newest first. */
   grantExecutionsOf(requestIds: readonly string[], tx?: DbTx): Promise<GrantExecution[]> {
     return this.repo.grantExecutionsOf(requestIds, tx);
+  }
+
+  k1AnnualHolderTimeline(
+    requestId: string,
+    renewedAssignmentId: string | null,
+    tx?: DbTx,
+  ): Promise<K1AnnualHolderTimeline | null> {
+    return this.repo.k1AnnualHolderTimeline(requestId, renewedAssignmentId, tx);
+  }
+
+  k1AnnualRootsOfRequests(roots: SeatRootsOfRequests, tx?: DbTx): Promise<Map<string, string>> {
+    return this.repo.k1AnnualRootsOfRequests(roots, tx);
+  }
+
+  listK1AnnualPaidSeatsOn(roots: SeatRootsOfRequests, onDate: BusinessDate, tx?: DbTx): Promise<K1AnnualPaidSeat[]> {
+    return this.repo.listK1AnnualPaidSeatsOn(roots, onDate, tx);
   }
 }

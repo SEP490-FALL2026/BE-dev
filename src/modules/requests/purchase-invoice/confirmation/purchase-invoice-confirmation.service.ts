@@ -6,6 +6,7 @@ import { AuditApi } from '../../../audit/public/audit.api';
 import { BudgetsApi } from '../../../budgets/public/budgets.api';
 import { PurchaseInvoiceRecordRefusedError } from '../../../budgets/public/budgets.errors';
 import { NotificationsApi } from '../../../notifications/public/notifications.api';
+import type { PurchaseInvoiceRecordInput } from '../../../budgets/public/budgets.types';
 import { OperatingParametersApi } from '../../../operating-parameters/public/operating-parameters.api';
 import { firstOfMonth } from '../labels/purchase-invoice-labels.policy';
 import {
@@ -50,9 +51,11 @@ export class PurchaseInvoiceConfirmationService {
       const poolFacts = await this.plans.poolExpectationFactsOf(row, tx);
       const poolExpectation = await this.evaluatePoolExpectation(tx, row, poolFacts, now);
       const poolSubscriptionId = row.linkKind === 'REQUEST' && poolFacts.isK2 ? poolFacts.poolSubscriptionId : null;
+      const k1Annual = await this.plans.k1AnnualAllocationFactsOf(row, tx);
       const recorded = await this.record(tx, actor, row, now, {
         poolSubscriptionId,
         poolFigures: poolExpectation?.poolFigures ?? null,
+        k1Annual,
       });
       if (!(await this.invoices.markConfirmed(tx, id, actor.employeeId, now, recorded.invoiceId))) {
         throw new PurchaseInvoiceRefusedError('NOT_SUBMITTED');
@@ -130,6 +133,7 @@ export class PurchaseInvoiceConfirmationService {
     pool: {
       poolSubscriptionId: string | null;
       poolFigures: PoolInvoiceExpectationResult['poolFigures'] | null;
+      k1Annual: PurchaseInvoiceRecordInput['k1Annual'];
     },
   ) {
     const unallocated = await this.unallocatedOf(tx, row);
@@ -150,6 +154,7 @@ export class PurchaseInvoiceConfirmationService {
         chargedCostCenterId: pool.poolSubscriptionId === null ? row.chargedCostCenterId : null,
         unallocated,
         poolFigures: pool.poolFigures,
+        ...(pool.k1Annual ? { k1Annual: pool.k1Annual } : {}),
         now,
       });
     } catch (error) {

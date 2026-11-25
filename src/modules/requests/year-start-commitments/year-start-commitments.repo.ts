@@ -376,4 +376,27 @@ export class YearStartCommitmentsRepo {
 
     return began;
   }
+
+  /** Confirmed budget invoice ids grouped by `requestId`, for K1 annual 01/01 allocation application. */
+  async confirmedInvoiceIdsByRequests(tx: DbTx, requestIds: readonly string[]): Promise<Map<string, string[]>> {
+    if (requestIds.length === 0) return new Map();
+    const rows = await tx.purchaseInvoice.findMany({
+      where: {
+        requestId: { in: [...new Set(requestIds)] },
+        state: 'CONFIRMED',
+        invoiceId: { not: null },
+      },
+      select: { requestId: true, invoiceId: true },
+      orderBy: [{ serviceMonth: 'asc' }, { decidedAt: 'asc' }, { id: 'asc' }],
+    });
+    const byRequest = new Map<string, string[]>();
+    for (const row of rows) {
+      if (row.requestId === null || row.invoiceId === null) continue;
+      const list = byRequest.get(row.requestId) ?? [];
+      list.push(row.invoiceId);
+      byRequest.set(row.requestId, list);
+    }
+
+    return byRequest;
+  }
 }

@@ -212,6 +212,17 @@ export interface PurchaseInvoiceRecordInput {
   unallocated: { reason: 'K1_GRANT_FAILED'; departmentId: string } | null;
   /** Pool variance figures captured for a pooled-quota seat invoice; null or omitted for K1/K4. */
   poolFigures?: InvoicePoolFigures | null;
+  /** Per-month allocation plan for a K1 annual (12-month, qty 1) invoice; omitted for all other invoices. */
+  k1Annual?: {
+    /** Tier 0 advisory lock subject key: root assignment id, or `req:<requestId>` before an assignment exists. */
+    lockSubjectKey: string;
+    /** Optional per-month Cost Center & Request mapping when confirmed after one or more transfers. */
+    monthAllocations?: readonly {
+      month: BusinessDate;
+      costCenterId: string;
+      requestId: string | null;
+    }[];
+  } | null;
   now: Date;
 }
 
@@ -261,4 +272,27 @@ export interface OutOfProcessSpendRecorded {
   invoiceId: string;
   /** Where it was booked: as an expense of a Cost Center, or of no Cost Center yet. */
   booking: 'COST_CENTER' | 'UNALLOCATED';
+}
+
+export interface K1YearStartApplyInput {
+  year: number;
+  items: readonly {
+    requestId: string;
+    commitmentId: string;
+    costCenterId: string;
+    invoiceIds: readonly string[];
+  }[];
+}
+
+export interface K1TransferAllocationInput {
+  lockSubjectKey: string;
+  invoiceIds: readonly string[];
+  billingAnchorOn: BusinessDate;
+  endedOn: BusinessDate;
+  oldCostCenterId: string;
+  newCostCenterId: string;
+  oldRequestIds: readonly string[];
+  newRequestId: string | null;
+  reference: string;
+  now: Date;
 }

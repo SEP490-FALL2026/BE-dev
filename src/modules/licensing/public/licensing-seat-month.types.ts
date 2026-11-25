@@ -39,3 +39,17 @@ export interface SeatInForce {
   heldFrom: BusinessDate;
   heldUntil: BusinessDate | null;
 }
+
+/** Active K1 seat without a linked Request (`K-A2`), used to compute running uncommitted cost and `NO_PRICE` flags. */
+export interface UnrequestedK1SeatInForce {
+  assignmentId: string;
+  planId: string;
+  source: SeatInForceSource;
+  kind: 'PERSONAL' | 'SERVICE';
+  employeeId: string;
+  owningDepartmentId: string | null;
+  heldFrom: BusinessDate;
+  heldUntil: BusinessDate | null;
+  billingAnchorOn: BusinessDate | null;
+  referenceMonthlyPriceMinor: bigint | null;
+}

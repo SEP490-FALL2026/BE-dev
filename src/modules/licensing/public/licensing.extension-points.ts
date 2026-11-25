@@ -62,7 +62,13 @@ export interface GrantRequestGate {
    */
   reportRightReplaced(
     tx: DbTx,
-    input: { assignmentId: string; provisioningType: ProvisioningKind; endedOn: BusinessDate; now: Date },
+    input: {
+      assignmentId: string;
+      provisioningType: ProvisioningKind;
+      endedOn: BusinessDate;
+      now: Date;
+      newRequestId?: string;
+    },
   ): Promise<void>;
   /** Whether the request waits for the IT Admin to close the task of its grant as cancelled: nothing else is decided on it. */
   isWithdrawing(tx: DbTx, requestId: string, employeeId?: string): Promise<boolean>;

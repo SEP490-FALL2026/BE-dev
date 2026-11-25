@@ -101,7 +101,13 @@ export class AccessRequestGrantGate implements GrantRequestGate, OnModuleInit {
 
   reportRightReplaced(
     tx: DbTx,
-    input: { assignmentId: string; provisioningType: ProvisioningKind; endedOn: BusinessDate; now: Date },
+    input: {
+      assignmentId: string;
+      provisioningType: ProvisioningKind;
+      endedOn: BusinessDate;
+      now: Date;
+      newRequestId?: string;
+    },
   ): Promise<void> {
     return this.seats.afterRightReplaced(tx, input);
   }

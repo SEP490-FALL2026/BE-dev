@@ -23,6 +23,27 @@ export interface RunningUncommittedCommitment {
   costCenterId: string;
 }
 
+/** An active K1 seat without a Request (`K-A2`). */
+export interface RunningUncommittedK1Seat {
+  assignmentId: string;
+  planId: string;
+  costCenterId: string | null;
+  heldFrom: BusinessDate;
+  heldUntil: BusinessDate | null;
+  billingAnchorOn?: BusinessDate | null;
+}
+
+export interface RunningUncommittedFlag {
+  code: 'NO_PRICE';
+  planId: string;
+  assignmentId: string;
+}
+
+export interface RunningUncommittedResult {
+  totals: Map<string, bigint>;
+  flagsByCostCenter: Map<string, RunningUncommittedFlag[]>;
+}
+
 export interface RunningUncommittedInput {
   year: number;
   today: BusinessDate;
@@ -30,6 +51,8 @@ export interface RunningUncommittedInput {
   periodBySubscription: ReadonlyMap<string, RunningUncommittedPeriod>;
   commitmentByRequest: ReadonlyMap<string, RunningUncommittedCommitment>;
   runMonthsBySubscription: ReadonlyMap<string, ReadonlySet<number>>;
+  k1UnrequestedSeats?: readonly RunningUncommittedK1Seat[];
+  k1ReferencePriceByPlan?: ReadonlyMap<string, bigint | null>;
 }
 
 const EMPTY_MONTHS: ReadonlySet<number> = new Set();
@@ -93,19 +116,73 @@ function seatUncommittedCost(seat: RunningUncommittedSeat, input: RunningUncommi
 }
 
 /**
- * Computes running uncommitted K2 pool cost per Cost Center for `year` on `today`.
+ * Computes running uncommitted K2 pool and unrequested K1 cost per Cost Center for `year` on `today` with `NO_PRICE` flags.
  * Applies to the current fiscal year and next year (`Y+1`); past years and further future years return empty totals.
  */
-export function runningUncommittedByCostCenter(input: RunningUncommittedInput): Map<string, bigint> {
+export function runningUncommittedWithFlagsByCostCenter(input: RunningUncommittedInput): RunningUncommittedResult {
   const totals = new Map<string, bigint>();
+  const flagsByCostCenter = new Map<string, RunningUncommittedFlag[]>();
   const todayYear = Number(input.today.slice(0, 4));
-  if (input.year !== todayYear && input.year !== todayYear + 1) return totals;
+  if (input.year !== todayYear && input.year !== todayYear + 1) return { totals, flagsByCostCenter };
 
   for (const seat of input.seats) {
     if (seat.costCenterId === null) continue;
     const cost = seatUncommittedCost(seat, input);
     if (cost > 0n) totals.set(seat.costCenterId, (totals.get(seat.costCenterId) ?? 0n) + cost);
   }
+  accumulateK1Unrequested(input, totals, flagsByCostCenter);
 
-  return totals;
+  return { totals, flagsByCostCenter };
+}
+
+/**
+ * Computes running uncommitted cost per Cost Center for `year` on `today`.
+ */
+export function runningUncommittedByCostCenter(input: RunningUncommittedInput): Map<string, bigint> {
+  return runningUncommittedWithFlagsByCostCenter(input).totals;
+}
+
+function k1MonthsLeftInYear(
+  seat: RunningUncommittedK1Seat,
+  today: BusinessDate,
+  minMonthDay: BusinessDate,
+  yearEnd: BusinessDate,
+): number {
+  if (seat.heldFrom > today || (seat.heldUntil !== null && today >= seat.heldUntil)) return 0;
+  const effectiveStart = maxDate(seat.heldFrom, minMonthDay);
+  if (effectiveStart > yearEnd) return 0;
+  const lastHeldDay = seat.heldUntil === null ? yearEnd : addDays(seat.heldUntil, -1);
+  if (lastHeldDay < effectiveStart) return 0;
+  const clampedEnd = lastHeldDay > yearEnd ? yearEnd : lastHeldDay;
+  const months = Number(clampedEnd.slice(5, 7)) - Number(effectiveStart.slice(5, 7)) + 1;
+
+  return months > 0 ? months : 0;
+}
+
+function accumulateK1Unrequested(
+  input: RunningUncommittedInput,
+  totals: Map<string, bigint>,
+  flagsByCostCenter: Map<string, RunningUncommittedFlag[]>,
+): void {
+  const priceMap = input.k1ReferencePriceByPlan ?? new Map<string, bigint | null>();
+  const todayYear = Number(input.today.slice(0, 4));
+  const yearStart: BusinessDate = `${input.year}-01-01`;
+  const yearEnd: BusinessDate = `${input.year}-12-31`;
+  const minMonthDay = input.year === todayYear ? maxDate(yearStart, `${input.today.slice(0, 7)}-01`) : yearStart;
+
+  for (const seat of input.k1UnrequestedSeats ?? []) {
+    if (seat.costCenterId === null) continue;
+    const months = k1MonthsLeftInYear(seat, input.today, minMonthDay, yearEnd);
+    if (months === 0) continue;
+
+    const refPrice = priceMap.get(seat.planId) ?? null;
+    if (refPrice === null || refPrice <= 0n) {
+      const list = flagsByCostCenter.get(seat.costCenterId) ?? [];
+      list.push({ code: 'NO_PRICE', planId: seat.planId, assignmentId: seat.assignmentId });
+      flagsByCostCenter.set(seat.costCenterId, list);
+      continue;
+    }
+
+    totals.set(seat.costCenterId, (totals.get(seat.costCenterId) ?? 0n) + refPrice * BigInt(months));
+  }
 }

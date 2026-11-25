@@ -26,6 +26,10 @@ import { matchPurchaseInvoice, pooledInvoiceCeilingMinor, type OriginalPrice } f
 import { PurchaseInvoiceRepo, type RequestPurchaseFacts } from './purchase-invoice.repo';
 import type { PurchaseInvoiceFormInput } from './purchase-invoice.dto';
 import type { PurchaseInvoiceLink, PurchaseInvoiceMoney, PurchaseInvoicePlan } from './purchase-invoice.types';
+import {
+  collectSegmentDepartments,
+  resolveK1AnnualMonthAllocations,
+} from './confirmation/k1-annual-confirmation.policy';
 
 /**
  * The states of a request whose purchase has been approved to be spent (the spend decision is behind it): it waits for the IT Admin, who buys
@@ -530,5 +534,58 @@ export class PurchaseInvoicePlanService {
     );
 
     return found ? { id: found.id, remainingMinor: found.remainingMinor } : null;
+  }
+
+  /** Builds K1 annual 12-month allocation inputs when confirming a K1 annual (qty 1) request invoice, or null otherwise. */
+  async k1AnnualAllocationFactsOf(
+    row: {
+      linkKind: 'REQUEST' | 'SUBSCRIPTION' | 'LICENSE_LOT';
+      requestId: string | null;
+      unallocatedReason: string | null;
+      quantity: number;
+      serviceMonth: Date;
+      chargedCostCenterId: string | null;
+    },
+    tx?: DbTx,
+  ) {
+    const eligible = await this.eligibleK1AnnualRequest(row, tx);
+    if (!eligible) return null;
+
+    const timeline = await this.grants.getK1AnnualHolderTimeline(eligible.requestId, eligible.renewedAssignmentId, tx);
+    const lockSubjectKey = timeline?.rootAssignmentId ?? `req:${eligible.requestId}`;
+    const deptIds = timeline ? collectSegmentDepartments(timeline.segments) : [];
+    const costCenterByDepartment =
+      deptIds.length > 0 ? await this.organizationReads.getUnitCostCenterIds(deptIds, tx) : new Map<string, string>();
+    const monthAllocations = timeline
+      ? resolveK1AnnualMonthAllocations({
+          serviceMonth: row.serviceMonth.toISOString().slice(0, 10),
+          segments: timeline.segments,
+          costCenterByDepartment,
+          fallbackCostCenterId: row.chargedCostCenterId,
+          primaryRequestId: eligible.requestId,
+        })
+      : undefined;
+
+    return { lockSubjectKey, ...(monthAllocations ? { monthAllocations } : {}) };
+  }
+
+  private async eligibleK1AnnualRequest(
+    row: { linkKind: string; requestId: string | null; unallocatedReason: string | null; quantity: number },
+    tx?: DbTx,
+  ): Promise<{ requestId: string; renewedAssignmentId: string | null } | null> {
+    if (
+      row.linkKind !== 'REQUEST' ||
+      row.requestId === null ||
+      row.unallocatedReason === 'K1_GRANT_FAILED' ||
+      row.quantity !== 1
+    ) {
+      return null;
+    }
+    const request = await this.invoices.requestFacts(row.requestId, tx);
+    if (!request?.planId) return null;
+    const [target] = await this.catalog.findPlanSeatTargets([request.planId], tx);
+    if (target?.provisioningType !== 'K1' || target.referenceCommitmentMonths !== 12) return null;
+
+    return { requestId: row.requestId, renewedAssignmentId: request.renewedAssignmentId };
   }
 }

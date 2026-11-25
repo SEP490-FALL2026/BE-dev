@@ -91,6 +91,7 @@ function build(
     matchResult: row?.matchResult === 'PRICE_QUANTITY_EXCEPTION' ? 'PRICE_QUANTITY_EXCEPTION' : 'MATCHED',
   });
   const openDiscrepancy = jest.fn().mockResolvedValue('case-1');
+  const k1AnnualAllocationFactsOf = jest.fn().mockResolvedValue(null);
   const poolExpectationFactsOf = jest.fn().mockResolvedValue(
     opts.poolFacts ?? {
       isK2: true,
@@ -121,11 +122,23 @@ function build(
     { notifyInApp: jest.fn().mockResolvedValue(true) } as unknown as NotificationsApi,
     { record: jest.fn().mockResolvedValue(undefined) } as unknown as AuditApi,
     settlement,
-    { poolExpectationFactsOf, poolSubscriptionOfRequest: jest.fn() } as unknown as PurchaseInvoicePlanService,
+    {
+      poolExpectationFactsOf,
+      poolSubscriptionOfRequest: jest.fn(),
+      k1AnnualAllocationFactsOf,
+    } as unknown as PurchaseInvoicePlanService,
     { getValue } as unknown as OperatingParametersApi,
   );
 
-  return { service, recordPurchaseInvoice, openDiscrepancy, recordRealisedSaving, getValue, poolExpectationFactsOf };
+  return {
+    service,
+    recordPurchaseInvoice,
+    openDiscrepancy,
+    recordRealisedSaving,
+    getValue,
+    poolExpectationFactsOf,
+    k1AnnualAllocationFactsOf,
+  };
 }
 
 describe('PurchaseInvoiceConfirmationService (W3-05)', () => {
@@ -348,5 +361,31 @@ describe('PurchaseInvoiceConfirmationService (W3-05)', () => {
     const adj = build({ row: makeRow({ label: 'NEW_PURCHASE', netMinor: 66_000_000n }) });
     await adj.service.confirm(ACTOR, 'pi-1');
     expect(adj.recordRealisedSaving).not.toHaveBeenCalled();
+  });
+
+  it('W3-23: forwards k1Annual allocation plan to budgets.recordPurchaseInvoice when confirming a K1 annual invoice', async () => {
+    const row = makeRow({
+      linkKind: 'REQUEST',
+      requestId: 'req-k1',
+      subscriptionId: null,
+      quantity: 1,
+      serviceMonth: new Date('2026-11-01T00:00:00.000Z'),
+      chargedCostCenterId: 'cc-a',
+      netMinor: 5_400_000n,
+      nonDeductibleTaxMinor: 540_000n,
+    });
+    const built = build({ row, poolFacts: { isK2: false } });
+    built.k1AnnualAllocationFactsOf.mockResolvedValue({ lockSubjectKey: 'asg-k1' });
+
+    await built.service.confirm(ACTOR, 'pi-1');
+
+    expect(built.k1AnnualAllocationFactsOf).toHaveBeenCalledWith(row, TX);
+    expect(built.recordPurchaseInvoice).toHaveBeenCalledWith(
+      TX,
+      ACTOR,
+      expect.objectContaining({
+        k1Annual: { lockSubjectKey: 'asg-k1' },
+      }),
+    );
   });
 });

@@ -6,6 +6,8 @@ import type {
   GrantCompletion,
   GrantExecution,
   GrantedSeatOfRequest,
+  K1AnnualHolderTimeline,
+  K1AnnualPaidSeat,
   OpenGrantTask,
   PoolTopUpPurchase,
   SeatRootsOfRequests,
@@ -65,5 +67,24 @@ export class LicensingOpenGrantsApi {
    */
   listGrantExecutionsOfRequests(requestIds: readonly string[], tx?: DbTx): Promise<GrantExecution[]> {
     return this.openGrants.grantExecutionsOf(requestIds, tx);
+  }
+
+  /** Root assignment & replacement segments along the lifetime of a K1 annual request. */
+  getK1AnnualHolderTimeline(
+    requestId: string,
+    renewedAssignmentId: string | null,
+    tx?: DbTx,
+  ): Promise<K1AnnualHolderTimeline | null> {
+    return this.openGrants.k1AnnualHolderTimeline(requestId, renewedAssignmentId, tx);
+  }
+
+  /** Maps request ids to their root assignment id for Tier 0 K1 allocation locking. */
+  listK1AnnualRootsOfRequests(roots: SeatRootsOfRequests, tx?: DbTx): Promise<Map<string, string>> {
+    return this.openGrants.k1AnnualRootsOfRequests(roots, tx);
+  }
+
+  /** Closed (non-replaced) 12-month K1 seats whose `validUntil <= onDate` (`F9(c)`). */
+  listK1AnnualPaidSeatsOn(roots: SeatRootsOfRequests, onDate: BusinessDate, tx?: DbTx): Promise<K1AnnualPaidSeat[]> {
+    return this.openGrants.listK1AnnualPaidSeatsOn(roots, onDate, tx);
   }
 }

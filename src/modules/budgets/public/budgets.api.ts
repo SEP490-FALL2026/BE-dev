@@ -5,6 +5,8 @@ import { InvoiceRepo } from '../budget/invoice.repo';
 import { CommitmentService } from '../commitment/commitment.service';
 import { OutOfProcessSpendRecorderService } from '../invoice/out-of-process-spend-recorder.service';
 import { PurchaseInvoiceRecorderService } from '../invoice/purchase-invoice-recorder.service';
+import { InvoiceAllocationTransferService } from '../invoice/invoice-allocation-transfer.service';
+import { K1YearStartApplicationService } from '../invoice/k1-year-start-application.service';
 import { RunningUncommittedFactsService } from '../running-uncommitted/running-uncommitted-facts.service';
 import type {
   CommittedAmount,
@@ -12,6 +14,8 @@ import type {
   CommitmentReleaseInput,
   HeldAmount,
   HeldCommitment,
+  K1TransferAllocationInput,
+  K1YearStartApplyInput,
   OutOfProcessSpendInput,
   OutOfProcessSpendRecorded,
   PurchaseInvoiceRecorded,
@@ -40,6 +44,8 @@ export class BudgetsApi {
     private readonly outOfProcessSpends: OutOfProcessSpendRecorderService,
     private readonly invoices: InvoiceRepo,
     private readonly runningUncommitted: RunningUncommittedFactsService,
+    private readonly k1YearStart: K1YearStartApplicationService,
+    private readonly k1Transfer: InvoiceAllocationTransferService,
   ) {}
 
   /** The current budget of each of the years; a year without one is absent from the map, which is not a budget of nothing. */
@@ -172,5 +178,20 @@ export class BudgetsApi {
             }
           : null,
     };
+  }
+
+  /** Acquires Tier 0 K1 allocation advisory locks (`k1-allocation:<key>:<year>`) ascending before commitment reads. */
+  lockK1AllocationYears(tx: DbTx, subjectKeys: readonly string[], years: readonly number[]): Promise<void> {
+    return this.k1YearStart.lockK1AllocationYears(tx, subjectKeys, years);
+  }
+
+  /** Applies existing K1 annual `invoice_allocations` to newly created 01/01 year-start commitments in the same tx. */
+  applyK1YearStartAllocations(tx: DbTx, input: K1YearStartApplyInput): Promise<void> {
+    return this.k1YearStart.applyYearStart(tx, input);
+  }
+
+  /** Transfers remaining K1 annual allocation months on replacement (`F8`) with `TRANSFER_OUT`/`TRANSFER_IN` and `D-16` guard. */
+  transferK1AnnualAllocations(tx: DbTx, input: K1TransferAllocationInput): Promise<{ transferredMinor: bigint }> {
+    return this.k1Transfer.transfer(tx, input);
   }
 }

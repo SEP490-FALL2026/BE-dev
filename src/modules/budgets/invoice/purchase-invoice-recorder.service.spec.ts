@@ -7,6 +7,8 @@ import type { InvoiceRecord, InvoiceRepo } from '../budget/invoice.repo';
 import { PurchaseInvoiceRecordRefusedError } from '../public/budgets.errors';
 import type { PurchaseInvoiceRecordInput } from '../public/budgets.types';
 import type { ThresholdAlertService } from '../threshold/threshold-alert.service';
+import type { InvoiceAllocationRepo } from './invoice-allocation.repo';
+import type { InvoiceYearApplicationRepo } from './invoice-year-application.repo';
 import { PurchaseInvoiceRecorderService } from './purchase-invoice-recorder.service';
 
 const ACTOR = { employeeId: 'finance-1', appUserId: 'u-1', roles: ['FINANCE'] } as unknown as AuthenticatedPrincipal;
@@ -47,7 +49,7 @@ const input = (over: Partial<PurchaseInvoiceRecordInput> = {}): PurchaseInvoiceR
 
 function build(opts: { commitments?: ReturnType<typeof commitment>[]; exists?: boolean } = {}) {
   const calls: string[] = [];
-  const lockOfRequest = jest.fn(() => {
+  const lockOfRequest = jest.fn<Promise<ReturnType<typeof commitment>[]>, [unknown, string]>(() => {
     calls.push('lock');
 
     return Promise.resolve(opts.commitments ?? [commitment()]);
@@ -74,6 +76,21 @@ function build(opts: { commitments?: ReturnType<typeof commitment>[]; exists?: b
   });
   const watch = jest.fn().mockResolvedValue({ pairs: [], usedBefore: new Map() });
   const settle = jest.fn().mockResolvedValue(0);
+  const lockK1AllocationYears = jest.fn(() => {
+    calls.push('k1Lock');
+
+    return Promise.resolve();
+  });
+  const allocInsertMany = jest.fn((_tx: unknown, lines: readonly Record<string, unknown>[]) => {
+    calls.push('allocInsertMany');
+
+    return Promise.resolve(lines.map((line, i) => ({ id: `alloc-${i + 1}`, ...line })));
+  });
+  const appInsert = jest.fn((_tx: unknown, row: Record<string, unknown>) => {
+    calls.push('appInsert');
+
+    return Promise.resolve({ id: 'app-1', ...row });
+  });
   const service = new PurchaseInvoiceRecorderService(
     { lockOfRequest, applyInvoice } as unknown as CommitmentRepo,
     {
@@ -83,9 +100,24 @@ function build(opts: { commitments?: ReturnType<typeof commitment>[]; exists?: b
     { lock },
     { record } as unknown as AuditApi,
     { watch, settle } as unknown as ThresholdAlertService,
+    { lockK1AllocationYears, insertMany: allocInsertMany } as unknown as InvoiceAllocationRepo,
+    { insert: appInsert } as unknown as InvoiceYearApplicationRepo,
   );
 
-  return { service, calls, lockOfRequest, applyInvoice, insert, lock, record, watch, settle };
+  return {
+    service,
+    calls,
+    lockOfRequest,
+    applyInvoice,
+    insert,
+    lock,
+    record,
+    watch,
+    settle,
+    lockK1AllocationYears,
+    allocInsertMany,
+    appInsert,
+  };
 }
 
 describe('PurchaseInvoiceRecorderService.record (PI-1.5, PI-1.7)', () => {

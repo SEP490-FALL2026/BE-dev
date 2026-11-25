@@ -130,7 +130,13 @@ export class SeatReleaseService {
    */
   async afterRightReplaced(
     tx: DbTx,
-    input: { assignmentId: string; provisioningType: ProvisioningKind; endedOn: BusinessDate; now: Date },
+    input: {
+      assignmentId: string;
+      provisioningType: ProvisioningKind;
+      endedOn: BusinessDate;
+      now: Date;
+      newRequestId?: string;
+    },
   ): Promise<void> {
     const endsOn = transferReleaseEndsOn(input.provisioningType, input.endedOn);
     if (endsOn === null) return;
@@ -141,6 +147,15 @@ export class SeatReleaseService {
       assignmentIds: chain.chainAssignmentIds,
       grant: { requestId: chain.grantRequestId, startDate: chain.grantedStartDate, endDate: chain.grantedEndDate },
     });
+    if (
+      input.provisioningType === 'K1' &&
+      chain.personalCommitmentMonths === 12 &&
+      chain.billingAnchorOn &&
+      input.newRequestId
+    ) {
+      const transferred = await this.transferK1AnnualIfInvoiced(tx, chain, coverages, input);
+      if (transferred) return;
+    }
     await this.give(tx, coverages, input.now, {
       reason: 'TRANSFER_EFFECTIVE',
       reference: transferReleaseReference(REGRANT_REFERENCE, input.assignmentId),
@@ -158,6 +173,58 @@ export class SeatReleaseService {
         return revocationBreakdown({ commitment, coverage, endsOn, currentYear });
       },
     });
+  }
+
+  private async transferK1AnnualIfInvoiced(
+    tx: DbTx,
+    chain: Awaited<ReturnType<LicensingApi['listRightChainsOf']>>[number],
+    coverages: ReadonlyMap<string, SeatCoverage>,
+    input: { assignmentId: string; endedOn: BusinessDate; now: Date; newRequestId?: string },
+  ): Promise<boolean> {
+    if (!input.newRequestId || !chain.billingAnchorOn) return false;
+    const oldRequestIds = [...new Set([...coverages.keys(), ...(chain.grantRequestId ? [chain.grantRequestId] : [])])];
+    if (oldRequestIds.length === 0) return false;
+
+    const confirmedMap = await this.repo.confirmedInvoiceIdsByRequests(tx, oldRequestIds);
+    const invoiceIds = oldRequestIds.flatMap((id) => confirmedMap.get(id) ?? []);
+    if (invoiceIds.length === 0) return false;
+
+    const ccPair = await this.resolveTransferCostCenters(
+      tx,
+      chain.grantRequestId ?? oldRequestIds[0],
+      input.newRequestId,
+    );
+    if (!ccPair) return false;
+
+    await this.budgets.transferK1AnnualAllocations(tx, {
+      lockSubjectKey: chain.chainAssignmentIds[chain.chainAssignmentIds.length - 1] ?? input.assignmentId,
+      invoiceIds,
+      billingAnchorOn: chain.billingAnchorOn,
+      endedOn: input.endedOn,
+      oldCostCenterId: ccPair.oldCostCenterId,
+      newCostCenterId: ccPair.newCostCenterId,
+      oldRequestIds,
+      newRequestId: input.newRequestId,
+      reference: transferReleaseReference(REGRANT_REFERENCE, input.assignmentId),
+      now: input.now,
+    });
+
+    return true;
+  }
+
+  private async resolveTransferCostCenters(
+    tx: DbTx,
+    oldRequestId: string,
+    newRequestId: string,
+  ): Promise<{ oldCostCenterId: string; newCostCenterId: string } | null> {
+    const ccMap = await this.repo.requestCostCenters(tx, [oldRequestId, newRequestId]);
+    const oldCc = ccMap.get(oldRequestId) ?? null;
+    const newCc = ccMap.get(newRequestId) ?? null;
+    if (!oldCc || !newCc || oldCc === newCc) {
+      return null;
+    }
+
+    return { oldCostCenterId: oldCc, newCostCenterId: newCc };
   }
 
   /** The grant of `requestId` was completed: a K2 right granted after its commitment began gives back the days before it. */
