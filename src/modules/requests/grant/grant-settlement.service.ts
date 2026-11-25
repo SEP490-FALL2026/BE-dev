@@ -40,7 +40,7 @@ export class GrantSettlementService {
       beneficiaryCount: Math.max(1, request.beneficiaryEmployeeIds.length),
     });
     if (!amount) return;
-    await this.licensing.recordAvoidedCost(tx, facts.taskId, amount);
+    await this.licensing.recordAvoidedCost(tx, facts.taskId, amount, facts.grantedOn);
   }
 
   private async commitmentSeatCountOf(

@@ -313,6 +313,15 @@ describe('PurchaseInvoiceRecorderService.record (PI-1.5, PI-1.7)', () => {
       expect(insert).not.toHaveBeenCalled();
     });
 
+    it('FIX-B1 F9 (A M-6): throws NO_PLACE before DUPLICATE_NUMBER when both apply', async () => {
+      const { service, insert } = build({ commitments: [], exists: true });
+
+      const err = await service.record(TX, ACTOR, input({ chargedCostCenterId: null })).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(PurchaseInvoiceRecordRefusedError);
+      expect((err as PurchaseInvoiceRecordRefusedError).reason).toBe('NO_PLACE');
+      expect(insert).not.toHaveBeenCalled();
+    });
+
     it('refuses a number the vendor used already', async () => {
       const { service, insert, applyInvoice } = build({ exists: true });
 

@@ -295,8 +295,13 @@ export class LicensingApi {
   /**
    * Records the avoided cost for a grant task completed from the shared pool (`W3-09`, `B1-R8`, idempotent per task).
    */
-  recordAvoidedCost(tx: DbTx, taskId: string, amount: { amountMinor: bigint; currency: string }): Promise<void> {
-    return this.sharedPool.recordAvoidedCost(tx, taskId, amount);
+  recordAvoidedCost(
+    tx: DbTx,
+    taskId: string,
+    amount: { amountMinor: bigint; currency: string },
+    completedOn: BusinessDate,
+  ): Promise<void> {
+    return this.sharedPool.recordAvoidedCost(tx, taskId, amount, completedOn);
   }
 
   /**

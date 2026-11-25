@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/business-date';
+import { toDateColumn, type BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AvoidedCost } from './shared-pool.policy';
 
@@ -7,7 +7,12 @@ import type { AvoidedCost } from './shared-pool.policy';
 @Injectable()
 export class SharedPoolAvoidedCostRepo {
   /** Records the pre-computed avoided cost of a pool grant task (`W3-09`, idempotent per task). */
-  async recordForTask(tx: DbTx, taskId: string, amount: { amountMinor: bigint; currency: string }): Promise<void> {
+  async recordForTask(
+    tx: DbTx,
+    taskId: string,
+    amount: { amountMinor: bigint; currency: string },
+    completedOn: BusinessDate,
+  ): Promise<void> {
     const task = await tx.provisioningTask.findUnique({
       where: { id: taskId },
       select: {
@@ -18,7 +23,6 @@ export class SharedPoolAvoidedCostRepo {
         assignment: {
           select: {
             planId: true,
-            validFrom: true,
             plan: { select: { provisioningType: true } },
           },
         },
@@ -33,7 +37,7 @@ export class SharedPoolAvoidedCostRepo {
       assignmentId: task.assignmentId,
       requestId: task.requestId,
       planId: task.assignment.planId,
-      recordedOn: fromDateColumn(task.assignment.validFrom),
+      recordedOn: completedOn,
       cost: {
         provisioningType: kind,
         months: null,

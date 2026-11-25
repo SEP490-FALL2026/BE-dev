@@ -198,7 +198,12 @@ export class SharedPoolService {
   /**
    * Records the pre-computed cost avoided when a pool grant task completes (`W3-09`, `B1-R8`), once per task.
    */
-  recordAvoidedCost(tx: DbTx, taskId: string, amount: { amountMinor: bigint; currency: string }): Promise<void> {
-    return this.avoidedCosts.recordForTask(tx, taskId, amount);
+  recordAvoidedCost(
+    tx: DbTx,
+    taskId: string,
+    amount: { amountMinor: bigint; currency: string },
+    completedOn: BusinessDate,
+  ): Promise<void> {
+    return this.avoidedCosts.recordForTask(tx, taskId, amount, completedOn);
   }
 }

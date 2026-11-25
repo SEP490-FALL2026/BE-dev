@@ -120,7 +120,12 @@ describe('AccessRequestGrantGate avoided cost on pool grant (W3-09, B1-R8)', () 
     );
 
     expect(recordAvoidedCost).toHaveBeenCalledTimes(1);
-    expect(recordAvoidedCost).toHaveBeenCalledWith(TX, 'task-1', { amountMinor: 5_000_000n, currency: 'VND' });
+    expect(recordAvoidedCost).toHaveBeenCalledWith(
+      TX,
+      'task-1',
+      { amountMinor: 5_000_000n, currency: 'VND' },
+      '2026-05-20',
+    );
   });
 
   it('FIX-B1 F6 (B-I4): picks commitment whose year matches grant date (approved 12/2026, granted 01/2027 -> picks 2027)', async () => {
@@ -141,7 +146,12 @@ describe('AccessRequestGrantGate avoided cost on pool grant (W3-09, B1-R8)', () 
     );
 
     expect(recordAvoidedCost).toHaveBeenCalledTimes(1);
-    expect(recordAvoidedCost).toHaveBeenCalledWith(TX, 'task-1', { amountMinor: 6_000_000n, currency: 'VND' });
+    expect(recordAvoidedCost).toHaveBeenCalledWith(
+      TX,
+      'task-1',
+      { amountMinor: 6_000_000n, currency: 'VND' },
+      '2027-01-10',
+    );
   });
 
   it('divides group K2 year commitment across committed seats via lineAmounts', async () => {
@@ -159,7 +169,12 @@ describe('AccessRequestGrantGate avoided cost on pool grant (W3-09, B1-R8)', () 
     await gate.reportOutcome(TX, 'req-1', 'COMPLETED', 'e1', factsOf());
 
     expect(recordAvoidedCost).toHaveBeenCalledTimes(1);
-    expect(recordAvoidedCost).toHaveBeenCalledWith(TX, 'task-1', { amountMinor: 5_000_000n, currency: 'VND' });
+    expect(recordAvoidedCost).toHaveBeenCalledWith(
+      TX,
+      'task-1',
+      { amountMinor: 5_000_000n, currency: 'VND' },
+      '2026-03-10',
+    );
   });
 
   it('releases K4 commitment AND records avoided cost from request.pricing.amount when granted from pool', async () => {
@@ -179,7 +194,12 @@ describe('AccessRequestGrantGate avoided cost on pool grant (W3-09, B1-R8)', () 
       TX,
       expect.objectContaining({ requestId: 'req-1', reason: 'GRANTED_FROM_POOL' }),
     );
-    expect(recordAvoidedCost).toHaveBeenCalledWith(TX, 'task-1', { amountMinor: 2_000_000n, currency: 'VND' });
+    expect(recordAvoidedCost).toHaveBeenCalledWith(
+      TX,
+      'task-1',
+      { amountMinor: 2_000_000n, currency: 'VND' },
+      '2026-03-10',
+    );
   });
 
   it('does not record avoided cost when fromPool is false or grant failed', async () => {

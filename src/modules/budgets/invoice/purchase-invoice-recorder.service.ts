@@ -36,7 +36,7 @@ export class PurchaseInvoiceRecorderService {
     actor: AuthenticatedPrincipal,
     input: PurchaseInvoiceRecordInput,
   ): Promise<PurchaseInvoiceRecorded> {
-    await this.assertValidInvoice(tx, input);
+    this.assertPositiveAmounts(input);
     const serviceYear = Number(input.serviceMonth.slice(0, 4));
     const rows =
       input.requestId !== null && input.subscriptionId === null && input.unallocated === null
@@ -50,6 +50,9 @@ export class PurchaseInvoiceRecorderService {
       unallocated: input.unallocated !== null,
     });
     if (booking.kind === 'UNPLACED') throw new PurchaseInvoiceRecordRefusedError('NO_PLACE');
+    if (await this.invoices.exists(tx, input.organizationId, input.vendorId, input.number)) {
+      throw new PurchaseInvoiceRecordRefusedError('DUPLICATE_NUMBER');
+    }
 
     const watch = await this.watchUse(tx, rows, booking, serviceYear);
     const placed = await this.place(tx, input, rows, booking, serviceYear);
@@ -84,12 +87,9 @@ export class PurchaseInvoiceRecorderService {
     return { invoiceId: invoice.id, booking: booking.kind, subscriptionId, actualCostMinor, ...placed };
   }
 
-  private async assertValidInvoice(tx: DbTx, input: PurchaseInvoiceRecordInput): Promise<void> {
+  private assertPositiveAmounts(input: PurchaseInvoiceRecordInput): void {
     if (input.netMinor <= 0n || input.deductibleTaxMinor < 0n || input.nonDeductibleTaxMinor < 0n) {
       throw new PurchaseInvoiceRecordRefusedError('AMOUNT_NOT_POSITIVE');
-    }
-    if (await this.invoices.exists(tx, input.organizationId, input.vendorId, input.number)) {
-      throw new PurchaseInvoiceRecordRefusedError('DUPLICATE_NUMBER');
     }
   }
 
