@@ -7,6 +7,7 @@ import type {
   GrantExecution,
   GrantedSeatOfRequest,
   OpenGrantTask,
+  PoolTopUpPurchase,
   SeatRootsOfRequests,
 } from './licensing-open-grants.types';
 
@@ -50,6 +51,11 @@ export class LicensingOpenGrantsApi {
    */
   listGrantCompletionsOfRequests(requestIds: readonly string[], tx?: DbTx): Promise<Map<string, GrantCompletion>> {
     return this.openGrants.grantCompletionsOf(requestIds, tx);
+  }
+
+  /** Completed `POOL_TOP_UP` grant tasks of `requestId`, for pooled-quota top-up invoice expectation. */
+  listCompletedPoolTopUpPurchasesOfRequest(requestId: string, tx?: DbTx): Promise<PoolTopUpPurchase[]> {
+    return this.openGrants.completedPoolTopUpPurchasesOf(requestId, tx);
   }
 
   /**

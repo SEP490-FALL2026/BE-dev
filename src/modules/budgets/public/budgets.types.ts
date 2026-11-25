@@ -207,7 +207,23 @@ export interface PurchaseInvoiceRecordInput {
    * allocated, shown with the department of the user, and no expense of any Cost Center; no commitment is taken down by it.
    */
   unallocated: { reason: 'K1_GRANT_FAILED'; departmentId: string } | null;
+  /** Pool variance figures captured for a pooled-quota seat invoice; null or omitted for K1/K4. */
+  poolFigures?: InvoicePoolFigures | null;
   now: Date;
+}
+
+/** Pool variance figures stored on an invoice row (`invoices.pool_*`). */
+export interface InvoicePoolFigures {
+  expectedMinor: bigint | null;
+  varianceMinor: bigint;
+  varianceMonth: BusinessDate;
+  inReview: boolean;
+}
+
+/** Recorded invoice metadata for a purchase invoice as read back by the requests module. */
+export interface RecordedPurchaseInvoiceInfo {
+  subscriptionId: string | null;
+  poolFigures: InvoicePoolFigures | null;
 }
 
 export interface PurchaseInvoiceRecorded {

@@ -16,6 +16,10 @@ import {
   labelOfPurchaseInvoice,
   expenseYearOf,
 } from './labels/purchase-invoice-labels.policy';
+import {
+  expectedPoolAmountOf,
+  type PoolInvoiceExpectationSource,
+} from './pool-expectation/purchase-invoice-pool-expectation.policy';
 import { bearsByHolder, chargedCostCenterOf, holderDayOf } from './purchase-invoice-charge.policy';
 import { PurchaseInvoiceRefusedError } from './purchase-invoice.errors';
 import { matchPurchaseInvoice, pooledInvoiceCeilingMinor, type OriginalPrice } from './purchase-invoice-match.policy';
@@ -86,8 +90,20 @@ interface LinkFacts {
   poolSubscriptionId: string | null;
   /** The price and the renewal day of the subscription the invoice is a line of (the one it names, or the pool of a `K2` request); null for a request of another kind. */
   seatPricing: SeatPricing | null;
+  /** Pool expectation inputs for a K2 invoice (subscription period or pool top-up); null for K1/K4. */
+  poolSource: PoolInvoiceExpectationSource | null;
   renewedAssignmentId: string | null;
 }
+
+/** Facts needed by confirmation to evaluate expected pool amount and variance month in the organization time zone. */
+export type PoolExpectationFacts =
+  | {
+      isK2: true;
+      poolSubscriptionId: string | null;
+      timeZone: string;
+      source: PoolInvoiceExpectationSource;
+    }
+  | { isK2: false };
 
 /**
  * Reads a purchase invoice against the request or subscription it names (`PI-1`): who may name it (the IT Admin works the departments they are in
@@ -163,6 +179,7 @@ export class PurchaseInvoicePlanService {
           : null,
       poolSubscriptionId: pool.id,
       seatPricing: pool.pricing,
+      poolSource: pool.poolSource,
       renewedAssignmentId: request.renewedAssignmentId,
     };
   }
@@ -172,12 +189,23 @@ export class PurchaseInvoicePlanService {
     provisioningType: string | undefined,
     planId: string,
     tx?: DbTx,
-  ): Promise<{ id: string | null; pricing: SeatPricing | null }> {
-    if (provisioningType !== 'K2') return { id: null, pricing: null };
+  ): Promise<{ id: string | null; pricing: SeatPricing | null; poolSource: PoolInvoiceExpectationSource | null }> {
+    if (provisioningType !== 'K2') return { id: null, pricing: null, poolSource: null };
     const id = await this.poolSubscriptionOfPlan(planId, tx);
     const [facts] = await this.periods.getPurchaseFacts([id], tx);
 
-    return { id, pricing: facts ? pricingOf(facts) : null };
+    return {
+      id,
+      pricing: facts ? pricingOf(facts) : null,
+      poolSource: {
+        kind: 'REQUEST_TOP_UP',
+        billingCycle: facts?.billingCycle ?? null,
+        monthlyPriceMinor: facts?.monthlyPriceMinor ?? null,
+        renewalDate: facts?.renewalDate ?? null,
+        endDate: facts?.endDate ?? null,
+        purchaseDates: null,
+      },
+    };
   }
 
   /**
@@ -232,8 +260,97 @@ export class PurchaseInvoicePlanService {
       holderBound: false,
       poolSubscriptionId: null,
       seatPricing: pricingOf(period),
+      poolSource:
+        period.provisioningType === 'K2'
+          ? {
+              kind: 'SUBSCRIPTION',
+              billingCycle: period.billingCycle,
+              purchasedQuantity: period.purchasedQuantity,
+              monthlyPriceMinor: period.monthlyPriceMinor,
+            }
+          : null,
       renewedAssignmentId: null,
     };
+  }
+
+  /** Reads K2 pool expectation inputs for a submitted invoice being confirmed. */
+  async poolExpectationFactsOf(
+    link: { linkKind: 'REQUEST' | 'SUBSCRIPTION'; requestId: string | null; subscriptionId: string | null },
+    tx?: DbTx,
+  ): Promise<PoolExpectationFacts> {
+    if (link.linkKind === 'SUBSCRIPTION') {
+      return link.subscriptionId === null ? { isK2: false } : this.subscriptionPoolExpectation(link.subscriptionId, tx);
+    }
+
+    return link.requestId === null ? { isK2: false } : this.requestPoolExpectation(link.requestId, tx);
+  }
+
+  private async subscriptionPoolExpectation(subscriptionId: string, tx?: DbTx): Promise<PoolExpectationFacts> {
+    const [period] = await this.periods.getPurchaseFacts([subscriptionId], tx);
+    if (!period || period.provisioningType !== 'K2') return { isK2: false };
+    const timeZone = ((await this.organizationReads.getOrganization(tx)) as { timeZone: string }).timeZone;
+
+    return {
+      isK2: true,
+      poolSubscriptionId: subscriptionId,
+      timeZone,
+      source: {
+        kind: 'SUBSCRIPTION',
+        billingCycle: period.billingCycle,
+        purchasedQuantity: period.purchasedQuantity,
+        monthlyPriceMinor: period.monthlyPriceMinor,
+      },
+    };
+  }
+
+  private async requestPoolExpectation(requestId: string, tx?: DbTx): Promise<PoolExpectationFacts> {
+    const request = await this.invoices.requestFacts(requestId, tx);
+    if (!request || request.planId === null) return { isK2: false };
+    const [target] = await this.catalog.findPlanSeatTargets([request.planId], tx);
+    if (target?.provisioningType !== 'K2') return { isK2: false };
+    const poolSubscriptionId = await this.poolSubscriptionOfPlan(request.planId, tx);
+    const [period] = await this.periods.getPurchaseFacts([poolSubscriptionId], tx);
+    const timeZone = ((await this.organizationReads.getOrganization(tx)) as { timeZone: string }).timeZone;
+    const purchaseDates = await this.topUpPurchaseDatesOf(requestId, timeZone, tx);
+
+    return {
+      isK2: true,
+      poolSubscriptionId,
+      timeZone,
+      source: this.topUpSource(period, purchaseDates),
+    };
+  }
+
+  private topUpSource(
+    period: Awaited<ReturnType<SubscriptionPeriodApi['getPurchaseFacts']>>[number] | undefined,
+    purchaseDates: BusinessDate[] | null,
+  ): Extract<PoolExpectationFacts, { isK2: true }>['source'] {
+    if (!period) {
+      return {
+        kind: 'REQUEST_TOP_UP',
+        billingCycle: null,
+        monthlyPriceMinor: null,
+        renewalDate: null,
+        endDate: null,
+        purchaseDates,
+      };
+    }
+
+    return {
+      kind: 'REQUEST_TOP_UP',
+      billingCycle: period.billingCycle,
+      monthlyPriceMinor: period.monthlyPriceMinor,
+      renewalDate: period.renewalDate,
+      endDate: period.endDate,
+      purchaseDates,
+    };
+  }
+
+  private async topUpPurchaseDatesOf(requestId: string, timeZone: string, tx?: DbTx): Promise<BusinessDate[] | null> {
+    const tasks = await this.grants.listCompletedPoolTopUpPurchasesOfRequest(requestId, tx);
+    if (tasks.length === 0 || tasks.some((task) => task.purchasedAt === null)) return null;
+
+    return tasks.map((task) => businessDateAt(task.purchasedAt as Date, timeZone));
   }
 
   /** The month the right began: the month of the grant, and for a request not granted yet the month of its first invoice. */
@@ -309,6 +426,7 @@ export class PurchaseInvoicePlanService {
     const placed = pooled || unallocated !== null;
     const chargedCostCenterId = placed ? null : await this.chargedCostCenterOf(facts, serviceMonth, tx);
     const commitment = placed ? null : await this.commitmentOf(facts, chargedCostCenterId, serviceMonth, tx);
+    const noExpectedAmount = await this.isPoolExpectedMissing(facts, tx);
 
     return {
       organizationId: facts.organizationId,
@@ -324,8 +442,21 @@ export class PurchaseInvoicePlanService {
       flags: flagsOfPurchaseInvoice({
         outsideTerm: period.outsideTerm,
         overApproved: this.overApproved(facts, serviceMonth, money, commitment),
+        noExpectedAmount,
       }),
     };
+  }
+
+  private async isPoolExpectedMissing(facts: LinkFacts, tx?: DbTx): Promise<boolean> {
+    if (facts.poolSource === null) return false;
+    if (facts.poolSource.kind === 'SUBSCRIPTION') {
+      return expectedPoolAmountOf(facts.poolSource) === null;
+    }
+    if (facts.requestId === null) return true;
+    const timeZone = ((await this.organizationReads.getOrganization(tx)) as { timeZone: string }).timeZone;
+    const purchaseDates = await this.topUpPurchaseDatesOf(facts.requestId, timeZone, tx);
+
+    return expectedPoolAmountOf({ ...facts.poolSource, purchaseDates }) === null;
   }
 
   /**

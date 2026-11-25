@@ -5,13 +5,13 @@ import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 
 /** The most files that come with one purchase invoice (`D9`). */
 export const PURCHASE_INVOICE_DOCUMENTS_MAX = 20;
-/** The most marks laid on one invoice: over what was approved, outside the term. */
-export const PURCHASE_INVOICE_FLAGS_MAX = 2;
+/** The most marks laid on one invoice: over what was approved, outside the term, or missing expected pool amount. */
+export const PURCHASE_INVOICE_FLAGS_MAX = 3;
 
 const label = z.enum(['NEW_PURCHASE', 'PERIOD', 'RENEWAL']);
 const state = z.enum(['SUBMITTED', 'CONFIRMED', 'RETURNED']);
 const matchResult = z.enum(['MATCHED', 'PRICE_QUANTITY_EXCEPTION']);
-const flag = z.enum(['OVER_APPROVED', 'OUTSIDE_TERM']);
+const flag = z.enum(['OVER_APPROVED', 'OUTSIDE_TERM', 'NO_EXPECTED_AMOUNT']);
 const paymentSource = z.enum(['COMPANY_CARD', 'IT_ADVANCE']);
 
 /** An amount in dong, as typed: what the card took out of the company, fees and exchange loss included. */
@@ -146,6 +146,13 @@ const detailSchema = summarySchema.extend({
   resubmissionOfId: z.uuid().nullable(),
   resubmittedAsId: z.uuid().nullable(),
   invoiceId: z.uuid().nullable().meta({ description: 'The invoice written when Finance signed; null before.' }),
+  poolExpected: moneyView.nullable().meta({
+    description: 'The expected amount in dong for a pooled-quota seat invoice; null when absent or not applicable.',
+  }),
+  poolVariance: moneyView.nullable().meta({
+    description:
+      'Actual cost minus expected amount in dong for a pooled-quota seat invoice; equals actual cost when expected is null, and null before confirmation or when not applicable.',
+  }),
   documents: z
     .array(
       z.strictObject({ documentId: z.uuid(), position: z.number().int().min(1).max(PURCHASE_INVOICE_DOCUMENTS_MAX) }),

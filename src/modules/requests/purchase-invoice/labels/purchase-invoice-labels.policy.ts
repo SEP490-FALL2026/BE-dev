@@ -9,7 +9,7 @@ import type { BusinessDate } from '../../../../core/business-date';
 export type PurchaseInvoiceLabel = 'NEW_PURCHASE' | 'PERIOD' | 'RENEWAL';
 
 /** Marks that are laid on an invoice and never refuse it. */
-export type PurchaseInvoiceFlag = 'OVER_APPROVED' | 'OUTSIDE_TERM';
+export type PurchaseInvoiceFlag = 'OVER_APPROVED' | 'OUTSIDE_TERM' | 'NO_EXPECTED_AMOUNT';
 
 export interface PurchaseInvoiceLabelInput {
   link: 'REQUEST' | 'SUBSCRIPTION';
@@ -70,10 +70,15 @@ export function labelOfPurchaseInvoice(input: PurchaseInvoiceLabelInput): Purcha
 }
 
 /** The marks of an invoice, in a fixed order. */
-export function flagsOfPurchaseInvoice(input: { outsideTerm: boolean; overApproved: boolean }): PurchaseInvoiceFlag[] {
+export function flagsOfPurchaseInvoice(input: {
+  outsideTerm: boolean;
+  overApproved: boolean;
+  noExpectedAmount?: boolean;
+}): PurchaseInvoiceFlag[] {
   const flags: PurchaseInvoiceFlag[] = [];
   if (input.overApproved) flags.push('OVER_APPROVED');
   if (input.outsideTerm) flags.push('OUTSIDE_TERM');
+  if (input.noExpectedAmount) flags.push('NO_EXPECTED_AMOUNT');
 
   return flags;
 }

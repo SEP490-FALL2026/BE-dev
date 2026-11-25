@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { BudgetFactsRepo } from '../budget/budget-facts.repo';
+import { InvoiceRepo } from '../budget/invoice.repo';
 import { CommitmentService } from '../commitment/commitment.service';
 import { OutOfProcessSpendRecorderService } from '../invoice/out-of-process-spend-recorder.service';
 import { PurchaseInvoiceRecorderService } from '../invoice/purchase-invoice-recorder.service';
@@ -14,6 +15,7 @@ import type {
   OutOfProcessSpendRecorded,
   PurchaseInvoiceRecorded,
   PurchaseInvoiceRecordInput,
+  RecordedPurchaseInvoiceInfo,
   ReleasedCommitment,
   RequestCommitment,
   SeatCommitment,
@@ -35,6 +37,7 @@ export class BudgetsApi {
     private readonly commitments: CommitmentService,
     private readonly purchaseInvoices: PurchaseInvoiceRecorderService,
     private readonly outOfProcessSpends: OutOfProcessSpendRecorderService,
+    private readonly invoices: InvoiceRepo,
   ) {}
 
   /** The current budget of each of the years; a year without one is absent from the map, which is not a budget of nothing. */
@@ -133,5 +136,32 @@ export class BudgetsApi {
     input: OutOfProcessSpendInput,
   ): Promise<OutOfProcessSpendRecorded> {
     return this.outOfProcessSpends.record(tx, actor, input);
+  }
+
+  /**
+   * Marks the pool variance of `purchaseInvoiceId` as resolved once its discrepancy case closes, keeping `invoices` append-only.
+   * Returns true when a `pool_variance_in_review` invoice was resolved, false otherwise.
+   */
+  async markPoolVarianceResolved(tx: DbTx, purchaseInvoiceId: string, resolvedAt?: Date): Promise<boolean> {
+    return (await this.invoices.markPoolVarianceResolved(tx, purchaseInvoiceId, resolvedAt)) !== null;
+  }
+
+  /** Reads the recorded subscription id and pool variance figures (with current in-review status) of `purchaseInvoiceId`. */
+  async purchaseInvoiceInfo(purchaseInvoiceId: string, tx?: DbTx): Promise<RecordedPurchaseInvoiceInfo | null> {
+    const row = await this.invoices.findByPurchaseInvoiceId(purchaseInvoiceId, tx);
+    if (!row) return null;
+
+    return {
+      subscriptionId: row.subscriptionId,
+      poolFigures:
+        row.poolVarianceMinor !== null && row.poolVarianceMonth !== null
+          ? {
+              expectedMinor: row.poolExpectedMinor,
+              varianceMinor: row.poolVarianceMinor,
+              varianceMonth: row.poolVarianceMonth,
+              inReview: row.poolVarianceInReview,
+            }
+          : null,
+    };
   }
 }

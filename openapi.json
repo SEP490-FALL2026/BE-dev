@@ -58435,7 +58435,10 @@
             "name": "outcome",
             "required": false,
             "in": "query",
-            "schema": { "type": "string", "enum": ["EXPLAINED", "OUT_OF_PROCESS_SUSPECTED"] }
+            "schema": {
+              "type": "string",
+              "enum": ["EXPLAINED", "OUT_OF_PROCESS_SUSPECTED", "EXCHANGE_RATE_LINE_PRICE_UPDATED"]
+            }
           },
           {
             "name": "page",
@@ -129742,9 +129745,9 @@
               },
               "matchResult": { "type": "string", "enum": ["MATCHED", "PRICE_QUANTITY_EXCEPTION"] },
               "flags": {
-                "maxItems": 2,
+                "maxItems": 3,
                 "type": "array",
-                "items": { "type": "string", "enum": ["OVER_APPROVED", "OUTSIDE_TERM"] }
+                "items": { "type": "string", "enum": ["OVER_APPROVED", "OUTSIDE_TERM", "NO_EXPECTED_AMOUNT"] }
               },
               "chargedCostCenter": {
                 "type": "object",
@@ -129909,9 +129912,9 @@
               },
               "matchResult": { "type": "string", "enum": ["MATCHED", "PRICE_QUANTITY_EXCEPTION"] },
               "flags": {
-                "maxItems": 2,
+                "maxItems": 3,
                 "type": "array",
-                "items": { "type": "string", "enum": ["OVER_APPROVED", "OUTSIDE_TERM"] }
+                "items": { "type": "string", "enum": ["OVER_APPROVED", "OUTSIDE_TERM", "NO_EXPECTED_AMOUNT"] }
               },
               "id": { "type": "string", "format": "uuid" },
               "state": { "type": "string", "enum": ["SUBMITTED", "CONFIRMED", "RETURNED"] },
@@ -129978,6 +129981,22 @@
                 "description": "The invoice written when Finance signed; null before.",
                 "nullable": true
               },
+              "poolExpected": {
+                "type": "object",
+                "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                "required": ["amount", "currency"],
+                "additionalProperties": false,
+                "description": "The expected amount in dong for a pooled-quota seat invoice; null when absent or not applicable.",
+                "nullable": true
+              },
+              "poolVariance": {
+                "type": "object",
+                "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                "required": ["amount", "currency"],
+                "additionalProperties": false,
+                "description": "Actual cost minus expected amount in dong for a pooled-quota seat invoice; equals actual cost when expected is null, and null before confirmation or when not applicable.",
+                "nullable": true
+              },
               "documents": {
                 "maxItems": 20,
                 "type": "array",
@@ -130023,6 +130042,8 @@
               "resubmissionOfId",
               "resubmittedAsId",
               "invoiceId",
+              "poolExpected",
+              "poolVariance",
               "documents"
             ],
             "additionalProperties": false,
@@ -130138,9 +130159,9 @@
                     },
                     "matchResult": { "type": "string", "enum": ["MATCHED", "PRICE_QUANTITY_EXCEPTION"] },
                     "flags": {
-                      "maxItems": 2,
+                      "maxItems": 3,
                       "type": "array",
-                      "items": { "type": "string", "enum": ["OVER_APPROVED", "OUTSIDE_TERM"] }
+                      "items": { "type": "string", "enum": ["OVER_APPROVED", "OUTSIDE_TERM", "NO_EXPECTED_AMOUNT"] }
                     },
                     "id": { "type": "string", "format": "uuid" },
                     "state": { "type": "string", "enum": ["SUBMITTED", "CONFIRMED", "RETURNED"] },
@@ -130354,14 +130375,14 @@
                     "id": { "type": "string", "format": "uuid" },
                     "state": { "type": "string", "enum": ["OPEN", "CLOSED"] },
                     "mismatches": {
-                      "maxItems": 2,
+                      "maxItems": 3,
                       "type": "array",
-                      "items": { "type": "string", "enum": ["QUANTITY", "UNIT_PRICE"] }
+                      "items": { "type": "string", "enum": ["QUANTITY", "UNIT_PRICE", "EXPECTED_AMOUNT"] }
                     },
                     "openedAt": { "type": "string", "format": "date-time" },
                     "outcome": {
                       "type": "string",
-                      "enum": ["EXPLAINED", "OUT_OF_PROCESS_SUSPECTED", null],
+                      "enum": ["EXPLAINED", "OUT_OF_PROCESS_SUSPECTED", "EXCHANGE_RATE_LINE_PRICE_UPDATED", null],
                       "nullable": true
                     },
                     "purchaseInvoice": {
@@ -130484,14 +130505,14 @@
               "id": { "type": "string", "format": "uuid" },
               "state": { "type": "string", "enum": ["OPEN", "CLOSED"] },
               "mismatches": {
-                "maxItems": 2,
+                "maxItems": 3,
                 "type": "array",
-                "items": { "type": "string", "enum": ["QUANTITY", "UNIT_PRICE"] }
+                "items": { "type": "string", "enum": ["QUANTITY", "UNIT_PRICE", "EXPECTED_AMOUNT"] }
               },
               "openedAt": { "type": "string", "format": "date-time" },
               "outcome": {
                 "type": "string",
-                "enum": ["EXPLAINED", "OUT_OF_PROCESS_SUSPECTED", null],
+                "enum": ["EXPLAINED", "OUT_OF_PROCESS_SUSPECTED", "EXCHANGE_RATE_LINE_PRICE_UPDATED", null],
                 "nullable": true
               },
               "purchaseInvoice": {
@@ -130567,7 +130588,10 @@
               "closure": {
                 "type": "object",
                 "properties": {
-                  "outcome": { "type": "string", "enum": ["EXPLAINED", "OUT_OF_PROCESS_SUSPECTED"] },
+                  "outcome": {
+                    "type": "string",
+                    "enum": ["EXPLAINED", "OUT_OF_PROCESS_SUSPECTED", "EXCHANGE_RATE_LINE_PRICE_UPDATED"]
+                  },
                   "reason": { "type": "string" },
                   "differenceAmount": {
                     "type": "object",
@@ -130612,8 +130636,8 @@
         "properties": {
           "outcome": {
             "type": "string",
-            "enum": ["EXPLAINED", "OUT_OF_PROCESS_SUSPECTED"],
-            "description": "EXPLAINED when the difference has a reason; OUT_OF_PROCESS_SUSPECTED when someone may have paid for the software outside the process (it needs a difference above nothing, and is sent on to the review of the accounts at the vendor)."
+            "enum": ["EXPLAINED", "OUT_OF_PROCESS_SUSPECTED", "EXCHANGE_RATE_LINE_PRICE_UPDATED"],
+            "description": "EXPLAINED when the difference has a reason; OUT_OF_PROCESS_SUSPECTED when someone may have paid for the software outside the process (it needs a difference above nothing, and is sent on to the review of the accounts at the vendor); EXCHANGE_RATE_LINE_PRICE_UPDATED when exchange rate or card fee differences require the responsible IT Admin to review the subscription monthly price."
           },
           "reason": {
             "type": "string",

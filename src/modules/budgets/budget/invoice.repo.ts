@@ -57,6 +57,7 @@ export interface InvoiceRecord {
   recordedAt: Date;
   serviceMonth: BusinessDate | null;
   purchaseInvoiceId: string | null;
+  subscriptionId: string | null;
   poolExpectedMinor: bigint | null;
   poolVarianceMinor: bigint | null;
   poolVarianceMonth: BusinessDate | null;
@@ -86,6 +87,7 @@ const toRecord = (row: Prisma.InvoiceGetPayload<object>, resolved = false): Invo
   recordedAt: row.recordedAt,
   serviceMonth: row.serviceMonth ? fromDateColumn(row.serviceMonth) : null,
   purchaseInvoiceId: row.purchaseInvoiceId,
+  subscriptionId: row.subscriptionId,
   poolExpectedMinor: row.poolExpectedMinor,
   poolVarianceMinor: row.poolVarianceMinor,
   poolVarianceMonth: row.poolVarianceMonth ? fromDateColumn(row.poolVarianceMonth) : null,

@@ -2,9 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
+import { BudgetsApi } from '../../budgets/public/budgets.api';
 import { FinanceApi } from '../../finance/public/finance.api';
 import { InvoiceDiscrepancyReferralListeners } from '../public/requests.extension-points';
 import { closureRefusal, isReferred } from './invoice-discrepancy-closure.policy';
+import { InvoiceDiscrepancyNotifierService } from './invoice-discrepancy-notifier.service';
 import { InvoiceDiscrepancyRefusedError } from './invoice-discrepancy.errors';
 import { InvoiceDiscrepancyRepo, type InvoiceDiscrepancyRow } from './invoice-discrepancy.repo';
 import type { InvoiceDiscrepancyMismatch, InvoiceDiscrepancyOutcome } from './invoice-discrepancy.types';
@@ -13,7 +15,8 @@ import type { InvoiceDiscrepancyMismatch, InvoiceDiscrepancyOutcome } from './in
  * Finance closes the case of an invoice that differs, once, with the reason and the difference it works out (`RC-1`, `QĐ-111y`, `R-29`). The case
  * is locked first, so two closings of it queue and the second finds it closed. An explanation ends it. A suspicion that someone paid for the software
  * outside the process is told, in the same transaction, to the contexts that take it up (`SBF-08`): the case is never closed without that
- * entry, and if the entry is refused the closing is undone. The money of the invoice is in the expense already; closing writes none.
+ * entry, and if the entry is refused the closing is undone. Closing also resolves any `pool_variance_in_review` mark on the invoice, and when
+ * closed due to exchange-rate/card-fee differences prompts the responsible IT Admin to review the subscription monthly price.
  */
 @Injectable()
 export class InvoiceDiscrepancyClosureService {
@@ -23,6 +26,8 @@ export class InvoiceDiscrepancyClosureService {
     private readonly finance: FinanceApi,
     private readonly audit: AuditApi,
     private readonly referrals: InvoiceDiscrepancyReferralListeners,
+    private readonly budgets: BudgetsApi,
+    private readonly notifier: InvoiceDiscrepancyNotifierService,
   ) {}
 
   /** Throws InvoiceDiscrepancyRefusedError (NOT_FOUND, ALREADY_CLOSED, DIFFERENCE_INVALID) and the money errors of `core/money`. */
@@ -51,6 +56,7 @@ export class InvoiceDiscrepancyClosureService {
         differenceMinor: difference,
       };
       if (!(await this.cases.markClosed(tx, id, closing))) throw new InvoiceDiscrepancyRefusedError('ALREADY_CLOSED');
+      await this.budgets.markPoolVarianceResolved(tx, row.purchaseInvoiceId, now);
       await this.audit.record(tx, {
         organizationId: row.organizationId,
         actorKind: 'USER',
@@ -64,6 +70,20 @@ export class InvoiceDiscrepancyClosureService {
         correlationId: actor.sessionId,
       });
       if (isReferred(input.outcome)) await this.referrals.emit(tx, referralOf(row, closing));
+      if (input.outcome === 'EXCHANGE_RATE_LINE_PRICE_UPDATED') {
+        const subscriptionId =
+          row.purchaseInvoice.subscriptionId ??
+          (await this.budgets.purchaseInvoiceInfo(row.purchaseInvoiceId, tx))?.subscriptionId ??
+          null;
+        if (subscriptionId !== null) {
+          await this.notifier.notifyPriceReview(tx, {
+            organizationId: row.organizationId,
+            subscriptionId,
+            purchaseInvoiceId: row.purchaseInvoiceId,
+            actorEmployeeId: actor.employeeId,
+          });
+        }
+      }
 
       return (await this.cases.find(id, tx)) as InvoiceDiscrepancyRow;
     });

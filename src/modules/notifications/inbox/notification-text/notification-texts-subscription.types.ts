@@ -208,4 +208,15 @@ export const SUBSCRIPTION_TEXTS = {
       message: 'The idle seat cost of {subscriptionId:name} in {month} is {ratioPercent} %, exceeding 10 %.',
     },
   },
+  SUBSCRIPTION_PRICE_REVIEW: {
+    vi: {
+      title: 'Cần cập nhật giá tháng thuê bao',
+      message: 'Hóa đơn của {subscriptionId:name} lệch do tỷ giá hoặc phí thẻ; hãy cập nhật giá tháng.',
+    },
+    en: {
+      title: 'Subscription monthly price review needed',
+      message:
+        'An invoice for {subscriptionId:name} differed due to exchange rate or card fees; please update the monthly price.',
+    },
+  },
 } satisfies Partial<Record<InAppNotificationCode, NotificationTexts>>;

@@ -75,3 +75,9 @@ export interface GrantExecution {
   claimedByAppUserId: string | null;
   createdAt: Date;
 }
+
+/** A completed grant task that topped up a shared pool when fulfilling a request (`POOL_TOP_UP`). */
+export interface PoolTopUpPurchase {
+  taskId: string;
+  purchasedAt: Date | null;
+}

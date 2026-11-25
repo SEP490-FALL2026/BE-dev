@@ -46,10 +46,19 @@ export function toDetail(
     documents: { documentId: string; position: number }[];
     resubmittedAsId: string | null;
     originalMinorUnits: number;
+    poolFigures?: { expectedMinor: bigint | null; varianceMinor: bigint } | null;
   },
 ): PurchaseInvoiceDetailWire {
+  const summary = toSummary(row);
+  const poolFigures = extra.poolFigures ?? null;
+  const flags =
+    poolFigures !== null && poolFigures.expectedMinor === null && !summary.flags.includes('NO_EXPECTED_AMOUNT')
+      ? ([...summary.flags, 'NO_EXPECTED_AMOUNT'] as PurchaseInvoiceFlag[])
+      : summary.flags;
+
   return {
-    ...toSummary(row),
+    ...summary,
+    flags,
     provisioningTaskId: row.provisioningTaskId,
     unitPriceOriginal: {
       amount: formatAmount(row.unitPriceOriginalMinor, extra.originalMinorUnits),
@@ -63,6 +72,8 @@ export function toDetail(
     resubmissionOfId: row.resubmissionOfId,
     resubmittedAsId: extra.resubmittedAsId,
     invoiceId: row.invoiceId,
+    poolExpected: poolFigures?.expectedMinor != null ? dongView(poolFigures.expectedMinor) : null,
+    poolVariance: poolFigures !== null ? dongView(poolFigures.varianceMinor) : null,
     documents: extra.documents,
   };
 }

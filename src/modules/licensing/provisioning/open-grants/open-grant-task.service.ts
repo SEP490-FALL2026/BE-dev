@@ -7,6 +7,7 @@ import type {
   GrantExecution,
   GrantedSeatOfRequest,
   OpenGrantTask,
+  PoolTopUpPurchase,
   SeatRootsOfRequests,
 } from '../../public/licensing-open-grants.types';
 import { OpenGrantTaskRepo } from './open-grant-task.repo';
@@ -69,6 +70,11 @@ export class OpenGrantTaskService {
 
   grantCompletionsOf(requestIds: readonly string[], tx?: DbTx): Promise<Map<string, GrantCompletion>> {
     return this.repo.grantCompletionsOf(requestIds, tx);
+  }
+
+  /** Completed `POOL_TOP_UP` grant tasks for a request, used to compute pooled top-up invoice expectation. */
+  completedPoolTopUpPurchasesOf(requestId: string, tx?: DbTx): Promise<PoolTopUpPurchase[]> {
+    return this.repo.completedPoolTopUpPurchasesOf(requestId, tx);
   }
 
   /** Where the grant of each person of these requests stands: their grant tasks that were not cancelled, the newest first. */

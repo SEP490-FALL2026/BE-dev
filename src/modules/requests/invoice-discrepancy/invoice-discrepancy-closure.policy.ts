@@ -5,7 +5,8 @@
  * the invoice cost beyond what was approved or bought, and an invoice for less is explained, not suspected.
  */
 
-export type InvoiceDiscrepancyOutcomeKind = 'EXPLAINED' | 'OUT_OF_PROCESS_SUSPECTED';
+export type InvoiceDiscrepancyOutcomeKind =
+  'EXPLAINED' | 'OUT_OF_PROCESS_SUSPECTED' | 'EXCHANGE_RATE_LINE_PRICE_UPDATED';
 
 export type InvoiceDiscrepancyClosureRefusal = 'DIFFERENCE_INVALID';
 

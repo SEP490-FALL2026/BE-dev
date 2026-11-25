@@ -268,7 +268,25 @@ describe('PurchaseInvoiceRecorderService.record (PI-1.5, PI-1.7)', () => {
 
       expect(recorded).toMatchObject({ booking: 'SUBSCRIPTION', subscriptionId: 's-1', commitmentId: null });
       expect(lockOfRequest).not.toHaveBeenCalled();
-      expect(insert.mock.calls[0][1]).toMatchObject({ subscriptionId: 's-1', costCenterId: null });
+      expect(insert.mock.calls[0][1]).toMatchObject({ subscriptionId: 's-1', costCenterId: null, poolFigures: null });
+    });
+
+    it('forwards poolFigures when provided for a pooled-quota invoice', async () => {
+      const { service, insert } = build();
+      const poolFigures = {
+        expectedMinor: 66_000_000n,
+        varianceMinor: 3_500_000n,
+        varianceMonth: '2027-07-01',
+        inReview: true,
+      };
+
+      await service.record(
+        TX,
+        ACTOR,
+        input({ requestId: null, subscriptionId: 's-1', chargedCostCenterId: null, poolFigures }),
+      );
+
+      expect(insert.mock.calls[0][1]).toMatchObject({ subscriptionId: 's-1', poolFigures });
     });
   });
 

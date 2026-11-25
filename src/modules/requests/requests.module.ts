@@ -206,6 +206,7 @@ import { MyRequestsService } from './my-requests/my-requests.service';
 import { InvoiceDiscrepanciesController } from './invoice-discrepancy-queue/invoice-discrepancies.controller';
 import { InvoiceDiscrepancyQueryService } from './invoice-discrepancy-queue/invoice-discrepancy-query.service';
 import { InvoiceDiscrepancyClosureService } from './invoice-discrepancy/invoice-discrepancy-closure.service';
+import { InvoiceDiscrepancyNotifierService } from './invoice-discrepancy/invoice-discrepancy-notifier.service';
 import { InvoiceDiscrepancyOpeningService } from './invoice-discrepancy/invoice-discrepancy-opening.service';
 import { InvoiceDiscrepancyRepo } from './invoice-discrepancy/invoice-discrepancy.repo';
 import { PurchaseInvoicePlanService } from './purchase-invoice/purchase-invoice-plan.service';
@@ -403,6 +404,7 @@ import { PurchaseInvoicesController } from './purchase-invoice/purchase-invoices
     PurchaseInvoiceConfirmationService,
     // The case of an invoice that differs (`SBF-11a`): opened when Finance signs, read and closed here, and the extension point a suspicion is sent on through.
     InvoiceDiscrepancyRepo,
+    InvoiceDiscrepancyNotifierService,
     InvoiceDiscrepancyOpeningService,
     InvoiceDiscrepancyClosureService,
     InvoiceDiscrepancyQueryService,

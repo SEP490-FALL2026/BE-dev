@@ -7,6 +7,7 @@ import {
   type GrantCompletion,
   type GrantExecution,
   type GrantedSeatOfRequest,
+  type PoolTopUpPurchase,
   type SeatRootsOfRequests,
 } from '../../public/licensing-open-grants.types';
 
@@ -66,6 +67,22 @@ export class OpenGrantTaskRepo {
           : [[row.requestId, { completedByAppUserId: row.completedByAppUserId, completedAt: row.completedAt }]],
       ),
     );
+  }
+
+  /** Completed `POOL_TOP_UP` grant tasks for `requestId`, ordered deterministically. */
+  async completedPoolTopUpPurchasesOf(requestId: string, tx?: DbTx): Promise<PoolTopUpPurchase[]> {
+    const rows = await (tx ?? this.prisma).provisioningTask.findMany({
+      where: {
+        kind: 'GRANT',
+        status: 'COMPLETED',
+        requestId,
+        purchaseKind: 'POOL_TOP_UP',
+      },
+      select: { id: true, purchasedAt: true },
+      orderBy: [{ purchasedAt: 'asc' }, { id: 'asc' }],
+    });
+
+    return rows.map((row) => ({ taskId: row.id, purchasedAt: row.purchasedAt }));
   }
 
   /**
