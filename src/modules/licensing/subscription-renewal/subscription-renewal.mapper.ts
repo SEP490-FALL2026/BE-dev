@@ -1,4 +1,6 @@
+import { DONG, formatAmount } from '../../../core/money/money';
 import type { PeriodAdjustment, RenewalPeriodFacts } from '../../catalog/public/subscription-period.types';
+import type { SubscriptionKpi4Summary } from './kpi/subscription-renewal-kpi.types';
 import { cancelProblem, suggestedChoiceOf, type SeatsNeededCounts } from './seats-needed/renewal-seats-needed.policy';
 import type {
   DeadlineEventWire,
@@ -186,5 +188,66 @@ export function toAdjustmentWire(
     lines: lineInfo?.lines ?? [],
     minimumSeatsTotal: period.minimumSeatsTotal ?? null,
     shortfall: lineInfo?.shortfall ?? 0,
+  };
+}
+
+const toVndMoney = (amountMinor: bigint) => ({
+  amount: formatAmount(amountMinor, 0),
+  currency: DONG,
+});
+
+/** Maps missed-adjustment seat-months into keyed records without nested arrays. */
+export function toMissedAdjustmentKpiWire(summary: SubscriptionKpi4Summary) {
+  const linesById: Record<
+    string,
+    {
+      planId: string;
+      missedSeats: number;
+      seatMonths: number;
+      amount: { amount: string; currency: string };
+      monthsByMonth: Record<
+        string,
+        {
+          missedIdleSeatDays: number;
+          daysInMonth: number;
+          seatMonths: number;
+          amount: { amount: string; currency: string };
+        }
+      >;
+    }
+  > = {};
+
+  for (const line of summary.lines) {
+    const monthsByMonth: Record<
+      string,
+      {
+        missedIdleSeatDays: number;
+        daysInMonth: number;
+        seatMonths: number;
+        amount: { amount: string; currency: string };
+      }
+    > = {};
+    for (const month of line.months) {
+      monthsByMonth[month.month] = {
+        missedIdleSeatDays: month.missedIdleSeatDays,
+        daysInMonth: month.daysInMonth,
+        seatMonths: month.seatMonths,
+        amount: toVndMoney(month.amountMinor),
+      };
+    }
+    linesById[line.subscriptionLineId] = {
+      planId: line.planId,
+      missedSeats: line.missedSeats,
+      seatMonths: line.seatMonths,
+      amount: toVndMoney(line.amountMinor),
+      monthsByMonth,
+    };
+  }
+
+  return {
+    subscriptionId: summary.subscriptionId,
+    totalSeatMonths: summary.totalSeatMonths,
+    totalAmount: toVndMoney(summary.totalAmountMinor),
+    linesById,
   };
 }

@@ -265,6 +265,10 @@ export const ROUTE_ERROR_CODES_LICENSING: Readonly<
   subscriptionRenewalList: {
     '403': ['SUBSCRIPTION_RENEWAL.READ_FORBIDDEN'],
   },
+  subscriptionRenewalMissedAdjustmentKpiGet: {
+    '403': ['SUBSCRIPTION_RENEWAL.READ_FORBIDDEN'],
+    '404': ['SUBSCRIPTION_RENEWAL.NOT_FOUND'],
+  },
   subscriptionRenewalPropose: {
     '403': ['SUBSCRIPTION_RENEWAL.NOT_RESPONSIBLE'],
     '404': ['SUBSCRIPTION_RENEWAL.NOT_FOUND'],

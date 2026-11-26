@@ -418,3 +418,47 @@ export class SubscriptionRenewalSeatRankingResponseDto extends createZodDto(
 export class SubscriptionDeadlineEventPageResponseDto extends createZodDto(
   successEnvelopeSchema(z.strictObject({ items: z.array(deadlineEventSchema), pagination })),
 ) {}
+
+const monthStart = businessDate.refine((value) => value.endsWith('-01'), {
+  message: 'Must be the first day of a calendar month (YYYY-MM-01)',
+});
+
+const kpiMonthSchema = z.strictObject({
+  missedIdleSeatDays: z.number().int().nonnegative(),
+  daysInMonth: z.number().int().positive(),
+  seatMonths: z.number().nonnegative(),
+  amount: money,
+});
+
+const kpiLineSchema = z.strictObject({
+  planId: z.uuid(),
+  missedSeats: z.number().int().nonnegative(),
+  seatMonths: z.number().nonnegative(),
+  amount: money,
+  monthsByMonth: z.record(z.string(), kpiMonthSchema),
+});
+
+export class SubscriptionRenewalMissedAdjustmentKpiQueryDto extends createZodDto(
+  z.strictObject({
+    months: z.preprocess((value: unknown): unknown => {
+      if (Array.isArray(value)) {
+        return value.flatMap((v: unknown): unknown[] => (typeof v === 'string' ? v.split(',') : [v]));
+      }
+      if (typeof value === 'string') return value.split(',').filter((v) => v.length > 0);
+      return value;
+    }, z.array(monthStart).min(1).max(24)),
+  }),
+) {}
+
+export class SubscriptionRenewalMissedAdjustmentKpiResponseDto extends createZodDto(
+  successEnvelopeSchema(
+    z.strictObject({
+      kpi: z.strictObject({
+        subscriptionId: z.uuid(),
+        totalSeatMonths: z.number().nonnegative(),
+        totalAmount: money,
+        linesById: z.record(z.uuid(), kpiLineSchema),
+      }),
+    }),
+  ),
+) {}

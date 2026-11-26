@@ -87,7 +87,7 @@ export class SubscriptionLineSeatsController {
   @RequireRoles('IT_ADMIN')
   @ApiOperation({
     operationId: 'subscriptionLineSeatReduction',
-    summary: 'Record a mid-term seat reduction against a prior seat purchase on a subscription line',
+    summary: 'Record a mid-term seat reduction on a subscription line',
   })
   @ApiSuccessResponse(SeatCorrectionResponseDto, {
     status: HttpStatus.CREATED,

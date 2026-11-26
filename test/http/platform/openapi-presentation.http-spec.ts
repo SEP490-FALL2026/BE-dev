@@ -285,7 +285,8 @@ describe('API inventory (e2e): openapi presentation and wire messages', () => {
       // 453 with redesign wave 2 routes (department IT substitutes, unplaced-work designations, device lifecycle, return tasks, activations, initial records, device software reads).
       // 459 with the six workspace routes of redesign wave 3.
       // 465 with the six routes of the lots of licenses.
-      expect(operations).toHaveLength(465);
+      // 471 with the six routes of subscription-lines (W3 multi-line & seat ledger); 472 with F-16 missed-adjustment KPI.
+      expect(operations).toHaveLength(472);
       expect(missing).toEqual([]);
     });
 

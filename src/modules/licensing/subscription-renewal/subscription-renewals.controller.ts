@@ -20,6 +20,8 @@ import {
   SubscriptionRenewalAdjustmentQueryDto,
   SubscriptionRenewalAdjustmentResponseDto,
   SubscriptionRenewalListQueryDto,
+  SubscriptionRenewalMissedAdjustmentKpiQueryDto,
+  SubscriptionRenewalMissedAdjustmentKpiResponseDto,
   SubscriptionRenewalProposeBodyDto,
   SubscriptionRenewalOutcomeBodyDto,
   SubscriptionRenewalIdParamDto,
@@ -28,6 +30,7 @@ import {
   SubscriptionRenewalSeatRankingQueryDto,
   SubscriptionRenewalSeatRankingResponseDto,
 } from './subscription-renewal.dto';
+import { toMissedAdjustmentKpiWire } from './subscription-renewal.mapper';
 import { RENEWAL_ERROR_EXAMPLES as EXAMPLES, toRenewalApiException } from './subscription-renewal.http-errors';
 import { RenewalViewService } from './subscription-renewal-view.service';
 
@@ -312,6 +315,39 @@ export class SubscriptionRenewalsController {
   async deadlineEvents(@Query() query: SubscriptionDeadlineEventListQueryDto) {
     try {
       return await this.views.deadlineEvents(query);
+    } catch (error) {
+      throw toRenewalApiException(error);
+    }
+  }
+
+  @Get('subscriptions/:id/renewals/missed-adjustment-kpi')
+  @AuthenticatedOnly()
+  @ApiOperation({
+    operationId: 'subscriptionRenewalMissedAdjustmentKpiGet',
+    summary: 'Read missed adjustment seat-months and cost for a subscription',
+  })
+  @ApiSuccessResponse(SubscriptionRenewalMissedAdjustmentKpiResponseDto, {
+    message: 'SUBSCRIPTION_RENEWAL.KPI4_RETRIEVED',
+    description:
+      'Summary of unused seats kept past the adjustment point across requested calendar months, with per-line and per-month seat-month and cost breakdowns in dong. Read by the IT Admin and Finance.',
+  })
+  @ApiErrorResponses(
+    ...AUTH_ERRORS,
+    READERS_ONLY,
+    {
+      status: HttpStatus.NOT_FOUND,
+      description: 'The subscription does not exist (SUBSCRIPTION_RENEWAL.NOT_FOUND).',
+      examples: [EXAMPLES.NOT_FOUND],
+    },
+    INVALID,
+  )
+  async missedAdjustmentKpi(
+    @CurrentPrincipal() actor: AuthenticatedPrincipal,
+    @Param() params: SubscriptionRenewalIdParamDto,
+    @Query() query: SubscriptionRenewalMissedAdjustmentKpiQueryDto,
+  ) {
+    try {
+      return { kpi: toMissedAdjustmentKpiWire(await this.views.missedAdjustmentKpiOf(actor, params.id, query.months)) };
     } catch (error) {
       throw toRenewalApiException(error);
     }

@@ -348,6 +348,7 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   subscriptionRenewalAdjustmentGet: 'SUBSCRIPTION_RENEWAL.ADJUSTMENT_FOUND',
   subscriptionRenewalGet: 'SUBSCRIPTION_RENEWAL.FOUND',
   subscriptionRenewalList: 'SUBSCRIPTION_RENEWAL.LISTED',
+  subscriptionRenewalMissedAdjustmentKpiGet: 'SUBSCRIPTION_RENEWAL.KPI4_RETRIEVED',
   subscriptionRenewalPropose: 'SUBSCRIPTION_RENEWAL.OUTCOME_RECORDED',
   subscriptionRenewalRecordOutcome: 'SUBSCRIPTION_RENEWAL.OUTCOME_RECORDED',
   subscriptionRenewalSeatRanking: 'SUBSCRIPTION_RENEWAL.SEATS_RANKED',

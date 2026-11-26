@@ -26,4 +26,5 @@ export const API_COVERAGE_WAVE3_TECH: readonly string[] = [
   // W3-19: vendor seat corrections and mid-term seat reductions on a subscription line.
   'POST /api/v1/subscription-lines/{id}/seat-corrections',
   'POST /api/v1/subscription-lines/{id}/seat-reductions',
+  'GET /api/v1/subscriptions/{id}/renewals/missed-adjustment-kpi',
 ];
