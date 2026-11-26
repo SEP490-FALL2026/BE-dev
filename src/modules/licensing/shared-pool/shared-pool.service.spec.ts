@@ -236,14 +236,7 @@ describe('SharedPoolService (ledger seats & chooseLine)', () => {
       }),
     } as unknown as GrantRequestGateHook;
 
-    const service = new SharedPoolService(
-      {} as unknown as CatalogApi,
-      {} as unknown as SharedPoolCapacityRepo,
-      {} as unknown as SharedPoolAvoidedCostRepo,
-      {} as unknown as SeatLedgerApi,
-      lotStock,
-      gate,
-    );
+    const service = k4PoolService(lotStock, gate);
 
     await expect(
       service.chooseLine(tx, {
@@ -254,6 +247,16 @@ describe('SharedPoolService (ledger seats & chooseLine)', () => {
       }),
     ).rejects.toBeInstanceOf(LicenseLotReservedForRequestError);
   });
+
+  const k4PoolService = (lotStock: LicenseLotStockApi, gate: GrantRequestGateHook) =>
+    new SharedPoolService(
+      {} as unknown as CatalogApi,
+      {} as unknown as SharedPoolCapacityRepo,
+      {} as unknown as SharedPoolAvoidedCostRepo,
+      {} as unknown as SeatLedgerApi,
+      lotStock,
+      gate,
+    );
 
   it('F-17: K4 chooseLine takes purchase path (returns null) on RESERVED_FOR_REQUEST when allowPurchase is true', async () => {
     const lotStock = {
@@ -287,14 +290,7 @@ describe('SharedPoolService (ledger seats & chooseLine)', () => {
       }),
     } as unknown as GrantRequestGateHook;
 
-    const service = new SharedPoolService(
-      {} as unknown as CatalogApi,
-      {} as unknown as SharedPoolCapacityRepo,
-      {} as unknown as SharedPoolAvoidedCostRepo,
-      {} as unknown as SeatLedgerApi,
-      lotStock,
-      gate,
-    );
+    const service = k4PoolService(lotStock, gate);
 
     await expect(
       service.chooseLine(tx, {
@@ -307,48 +303,54 @@ describe('SharedPoolService (ledger seats & chooseLine)', () => {
     ).resolves.toBeNull();
   });
 
-  it('F-17: assertK4LotGrantable throws LicenseLotReservedForRequestError when named REQUEST lot has excessGrantable <= 0', async () => {
-    const lotStock = {
-      accountLotCandidates: jest.fn().mockResolvedValue([
-        {
-          id: 'lot-duc',
-          purchasedOn: '2027-04-01',
-          licenseCount: 2,
-          unitPriceMinor: 12_000_000n,
-          purpose: 'REQUEST',
-          requestId: 'req-duc',
-          legacySubscriptionId: null,
-          free: 2,
-          keysInStore: 2,
-          openTasksWithoutKey: 1,
-          beneficiaries: 2,
-          chargedExcess: 0,
-          grantable: 1,
-          excessGrantable: 0,
-        },
+  it('F-17: assertK4LotGrantable throws LicenseLotReservedForRequestError when named REQUEST lot has excessGrantable <= 0 and loads all REQUEST lot reservations', async () => {
+    const lot = (id: string, requestId: string, licenseCount: number, purchasedOn: string) => ({
+      id,
+      purchasedOn,
+      licenseCount,
+      unitPriceMinor: 12_000_000n,
+      purpose: 'REQUEST' as const,
+      requestId,
+      legacySubscriptionId: null,
+      free: licenseCount,
+      keysInStore: licenseCount,
+      openTasksWithoutKey: 1,
+      beneficiaries: 2,
+      chargedExcess: 0,
+      grantable: licenseCount - 1,
+      excessGrantable: 0,
+    });
+    const reservedForRequestLots = jest.fn().mockResolvedValue(
+      new Map([
+        ['lot-older', { beneficiaries: 2, chargedExcess: 0 }],
+        ['lot-duc', { beneficiaries: 2, chargedExcess: 0 }],
       ]),
+    );
+    const lotStock = {
+      accountLotCandidates: jest
+        .fn()
+        .mockResolvedValue([
+          lot('lot-older', 'req-older', 3, '2027-03-01'),
+          lot('lot-duc', 'req-duc', 2, '2027-04-01'),
+        ]),
     } as unknown as LicenseLotStockApi;
     const gate = {
       isBound: () => true,
-      get: () => ({
-        reservedForRequestLots: jest
-          .fn()
-          .mockResolvedValue(new Map([['lot-duc', { beneficiaries: 2, chargedExcess: 0 }]])),
-      }),
+      get: () => ({ reservedForRequestLots }),
     } as unknown as GrantRequestGateHook;
 
-    const service = new SharedPoolService(
-      {} as unknown as CatalogApi,
-      {} as unknown as SharedPoolCapacityRepo,
-      {} as unknown as SharedPoolAvoidedCostRepo,
-      {} as unknown as SeatLedgerApi,
-      lotStock,
-      gate,
-    );
+    const service = k4PoolService(lotStock, gate);
 
     await expect(
       service.assertK4LotGrantable(tx, { planId: 'plan-cad', lotId: 'lot-duc', requestId: 'req-minh' }),
     ).rejects.toBeInstanceOf(LicenseLotReservedForRequestError);
+    expect(reservedForRequestLots).toHaveBeenCalledWith(
+      [
+        { lotId: 'lot-older', requestId: 'req-older' },
+        { lotId: 'lot-duc', requestId: 'req-duc' },
+      ],
+      tx,
+    );
   });
 
   it('G-4: lotReservationsOf fails loudly when GrantRequestGateHook is unbound', async () => {

@@ -305,7 +305,7 @@ export class SharedPoolService {
     const raw = await this.lotStock.accountLotCandidates(input.planId, undefined, tx);
     const match = raw.find((l) => l.id === input.lotId || l.legacySubscriptionId === input.lotId);
     if (!match || match.purpose !== 'REQUEST' || match.requestId === (input.requestId ?? null)) return;
-    const reservations = await this.lotReservationsOf([match], tx);
+    const reservations = await this.lotReservationsOf(raw, tx);
     const candidates =
       reservations.size > 0 ? await this.lotStock.accountLotCandidates(input.planId, { reservations }, tx) : raw;
     const checked = candidates.find((l) => l.id === match.id);
