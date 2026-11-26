@@ -38,22 +38,31 @@ export function assertLineCorrectable(input: {
  * Classifies a `VENDOR_RECORD` correction:
  * - `delta > 0` without `basis` on `FIXED` -> `outOfProcess = true`, notify Finance + R1
  * - `delta > 0` on `MEMBERS` -> reconciliation without `outOfProcess`
- * - `delta < 0` -> `REDUCE`, notify Finance
+ * - `delta < 0` on 12-month commitment without `allowsMidTermReduction` -> `REDUCE`, `outOfProcess = true`, notify Finance
+ * - other `delta < 0` -> `REDUCE`, notify Finance
  */
-export function judgeVendorCorrection(input: { delta: number; seatCounting: 'FIXED' | 'MEMBERS'; hasBasis: boolean }): {
+export function judgeVendorCorrection(input: {
+  delta: number;
+  seatCounting: 'FIXED' | 'MEMBERS';
+  hasBasis: boolean;
+  commitmentTermMonths?: number | null;
+  allowsMidTermReduction?: boolean;
+}): {
   reason: 'TOP_UP' | 'REDUCE';
   outOfProcess: boolean;
   notifyFinance: boolean;
   notifyR1: boolean;
 } {
-  const outOfProcess = input.delta > 0 && !input.hasBasis && input.seatCounting !== 'MEMBERS';
+  const positiveOutOfProcess = input.delta > 0 && !input.hasBasis && input.seatCounting !== 'MEMBERS';
+  const negativeOutOfProcess = input.delta < 0 && input.commitmentTermMonths === 12 && !input.allowsMidTermReduction;
+  const outOfProcess = positiveOutOfProcess || negativeOutOfProcess;
   const reason = input.delta > 0 ? 'TOP_UP' : 'REDUCE';
 
   return {
     reason,
     outOfProcess,
     notifyFinance: outOfProcess || input.delta < 0,
-    notifyR1: outOfProcess,
+    notifyR1: positiveOutOfProcess,
   };
 }
 

@@ -32,6 +32,7 @@ function build(
   over: {
     responsible?: string | null;
     seatCounting?: 'FIXED' | 'MEMBERS';
+    commitmentTermMonths?: number | null;
     allowsMidTermReduction?: boolean;
     refunded?: {
       id: string;
@@ -73,6 +74,7 @@ function build(
           kind: 'TERM' as const,
           status: 'ACTIVE' as const,
           seatCounting: over.seatCounting ?? ('FIXED' as const),
+          commitmentTermMonths: over.commitmentTermMonths === undefined ? 12 : over.commitmentTermMonths,
           allowsMidTermReduction: over.allowsMidTermReduction ?? false,
           billingCycle: 'ANNUAL' as const,
           invoicedLater: false,
@@ -281,5 +283,32 @@ describe('SubscriptionLineCorrectionService (W3-19)', () => {
     });
     expect(reduced.delta).toBe(-2);
     expect(reduced.refundedSeatChangeId).toBe('chg-buy');
+  });
+
+  it('F-14: delta -1 on 12-month commitment without allowsMidTermReduction marks outOfProcess=true, while allowsMidTermReduction=true marks false', async () => {
+    const blocked = build({ commitmentTermMonths: 12, allowsMidTermReduction: false });
+    const res1 = await blocked.service.recordCorrection(actor, 'line-1', {
+      delta: -1,
+      effectiveOn: '2027-03-06',
+      note: 'Vendor reduced without mid-term clause',
+      expectedUpdatedAt: TS,
+    });
+    expect(res1.outOfProcess).toBe(true);
+    expect(blocked.notifyInApp).toHaveBeenCalledWith(
+      blocked.tx,
+      expect.objectContaining({
+        recipientEmployeeId: 'fin-1',
+        params: expect.objectContaining({ outOfProcess: true, delta: -1 }) as unknown,
+      }),
+    );
+
+    const allowed = build({ commitmentTermMonths: 12, allowsMidTermReduction: true });
+    const res2 = await allowed.service.recordCorrection(actor, 'line-1', {
+      delta: -1,
+      effectiveOn: '2027-03-06',
+      note: 'Allowed mid-term reduction',
+      expectedUpdatedAt: TS,
+    });
+    expect(res2.outOfProcess).toBe(false);
   });
 });

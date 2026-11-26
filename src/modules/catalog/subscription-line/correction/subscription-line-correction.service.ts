@@ -100,6 +100,8 @@ export class SubscriptionLineCorrectionService {
         delta: input.delta,
         seatCounting: context.period.seatCounting === 'MEMBERS' ? 'MEMBERS' : 'FIXED',
         hasBasis: input.basis !== undefined,
+        commitmentTermMonths: context.period.commitmentTermMonths,
+        allowsMidTermReduction: context.period.allowsMidTermReduction,
       });
 
       const { change } = await this.seatLedger.recordVendor(tx, lockedLine, {

@@ -151,4 +151,62 @@ describe('subscription quantity change rules (real PostgreSQL)', () => {
 
     expect(h.codeOf(stale)).toBe('SUBSCRIPTION_LINE.STALE');
   });
+
+  it('F-14: seat-corrections delta -1 sets outOfProcess=true on 12-month without allowsMidTermReduction and false when allowed', async () => {
+    const blockedSub = await h.subscription(6, 'K2');
+    await h.ctx.sql.query(
+      `UPDATE subscriptions
+          SET responsible_it_admin_employee_id = $2,
+              commitment_term_months = 12,
+              allows_mid_term_reduction = false
+        WHERE id = $1`,
+      [blockedSub, h.it1.employeeId],
+    );
+    const blockedLine = (
+      await h.ctx.sql.query<{ id: string; updated_at: Date; today: string }>(
+        `SELECT id, updated_at, (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date::text AS today
+           FROM subscription_lines WHERE subscription_id = $1`,
+        [blockedSub],
+      )
+    ).rows[0];
+    const res1 = await request(h.server())
+      .post(`/api/v1/subscription-lines/${blockedLine.id}/seat-corrections`)
+      .set(h.as(h.it1))
+      .send({
+        delta: -1,
+        effectiveOn: blockedLine.today,
+        note: 'Vendor reduced without clause',
+        expectedUpdatedAt: blockedLine.updated_at.toISOString(),
+      })
+      .expect(201);
+    expect(h.dataOf<{ outOfProcess: boolean }>(res1).outOfProcess).toBe(true);
+
+    const allowedSub = await h.subscription(6, 'K2');
+    await h.ctx.sql.query(
+      `UPDATE subscriptions
+          SET responsible_it_admin_employee_id = $2,
+              commitment_term_months = 12,
+              allows_mid_term_reduction = true
+        WHERE id = $1`,
+      [allowedSub, h.it1.employeeId],
+    );
+    const allowedLine = (
+      await h.ctx.sql.query<{ id: string; updated_at: Date; today: string }>(
+        `SELECT id, updated_at, (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date::text AS today
+           FROM subscription_lines WHERE subscription_id = $1`,
+        [allowedSub],
+      )
+    ).rows[0];
+    const res2 = await request(h.server())
+      .post(`/api/v1/subscription-lines/${allowedLine.id}/seat-corrections`)
+      .set(h.as(h.it1))
+      .send({
+        delta: -1,
+        effectiveOn: allowedLine.today,
+        note: 'Allowed mid-term reduction',
+        expectedUpdatedAt: allowedLine.updated_at.toISOString(),
+      })
+      .expect(201);
+    expect(h.dataOf<{ outOfProcess: boolean }>(res2).outOfProcess).toBe(false);
+  });
 });

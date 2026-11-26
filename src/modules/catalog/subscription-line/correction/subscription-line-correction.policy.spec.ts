@@ -99,14 +99,34 @@ describe('subscription-line-correction.policy (W3-19)', () => {
         expected: { reason: 'TOP_UP', outOfProcess: false, notifyFinance: false, notifyR1: false },
       },
       {
-        name: 'delta < 0 -> REDUCE, notify Finance only',
+        name: 'delta < 0 without commitmentTermMonths -> REDUCE, not outOfProcess, notify Finance only',
         delta: -2,
         seatCounting: 'FIXED' as const,
         hasBasis: false,
         expected: { reason: 'REDUCE', outOfProcess: false, notifyFinance: true, notifyR1: false },
       },
-    ])('$name', ({ delta, seatCounting, hasBasis, expected }) => {
-      expect(judgeVendorCorrection({ delta, seatCounting, hasBasis })).toEqual(expected);
+      {
+        name: 'F-14: delta < 0 on 12-month without allowsMidTermReduction -> outOfProcess, notify Finance',
+        delta: -1,
+        seatCounting: 'FIXED' as const,
+        hasBasis: false,
+        commitmentTermMonths: 12,
+        allowsMidTermReduction: false,
+        expected: { reason: 'REDUCE', outOfProcess: true, notifyFinance: true, notifyR1: false },
+      },
+      {
+        name: 'F-14: delta < 0 on 12-month with allowsMidTermReduction=true -> not outOfProcess',
+        delta: -1,
+        seatCounting: 'FIXED' as const,
+        hasBasis: false,
+        commitmentTermMonths: 12,
+        allowsMidTermReduction: true,
+        expected: { reason: 'REDUCE', outOfProcess: false, notifyFinance: true, notifyR1: false },
+      },
+    ])('$name', ({ delta, seatCounting, hasBasis, commitmentTermMonths, allowsMidTermReduction, expected }) => {
+      expect(
+        judgeVendorCorrection({ delta, seatCounting, hasBasis, commitmentTermMonths, allowsMidTermReduction }),
+      ).toEqual(expected);
     });
 
     it('deduplicates Finance + R1 recipients and excludes actor', () => {
