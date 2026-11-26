@@ -226,13 +226,16 @@ export class PurchaseInvoicePlanService {
     subscriptionLineIds: readonly string[],
     tx?: DbTx,
   ): Promise<LinkFacts> {
+    if (tx !== undefined && seatPurchaseId === null) {
+      await this.pool.lockPeriod(tx, subscriptionId);
+    }
     const [period] = await this.pool.getPurchaseFacts([subscriptionId], tx);
     if (!period) throw new PurchaseInvoiceRefusedError('LINK_NOT_FOUND');
 
     const vendorId = await this.catalog.getPlanVendorId(period.planId, tx);
     if (vendorId === null) throw new PurchaseInvoiceRefusedError('NO_VENDOR');
     const purchase = await this.validateSeatPurchaseLink(subscriptionId, seatPurchaseId, tx);
-    if (seatPurchaseId === null && subscriptionLineIds.length > 0) {
+    if (seatPurchaseId === null) {
       await this.validateLineSelection(subscriptionId, serviceMonth, subscriptionLineIds, tx);
     }
     const organization = await this.organizationReads.getOrganization(tx);
@@ -290,12 +293,19 @@ export class PurchaseInvoicePlanService {
     subscriptionLineIds: readonly string[],
     tx?: DbTx,
   ): Promise<void> {
+    const invoiced = await this.invoices.invoicedLinesForMonth(subscriptionId, serviceMonth, tx);
+    if (subscriptionLineIds.length === 0) {
+      if (invoiced.lineIds.size > 0) {
+        throw new PurchaseInvoiceRefusedError('LINE_ALREADY_INVOICED', undefined, { lineIds: [...invoiced.lineIds] });
+      }
+
+      return;
+    }
     const lines = (await this.pool.linesOfSubscription(subscriptionId, tx)).filter((l) => l.closedReason !== 'REMOVED');
     const validIds = new Set(lines.map((l) => l.id));
     if (subscriptionLineIds.some((id) => !validIds.has(id))) {
       throw new PurchaseInvoiceRefusedError('INVALID_LINE_SELECTION');
     }
-    const invoiced = await this.invoices.invoicedLinesForMonth(subscriptionId, serviceMonth, tx);
     if (invoiced.wholePeriodInvoiced) {
       throw new PurchaseInvoiceRefusedError('LINE_ALREADY_INVOICED', undefined, { lineIds: subscriptionLineIds });
     }

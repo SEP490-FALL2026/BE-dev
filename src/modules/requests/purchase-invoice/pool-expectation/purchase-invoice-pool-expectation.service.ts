@@ -60,6 +60,11 @@ export class PurchaseInvoicePoolService {
     return this.seatLedger.linesOfSubscription(subscriptionId, tx);
   }
 
+  /** Locks the subscription period `FOR UPDATE` (Tier 6) before checking or inserting period invoices (`F-9`). */
+  lockPeriod(tx: DbTx, subscriptionId: string) {
+    return this.periods.lockPeriod(tx, subscriptionId);
+  }
+
   async topUpPurchaseDatesOf(requestId: string, timeZone: string, tx?: DbTx): Promise<BusinessDate[] | null> {
     const tasks = await this.grants.listCompletedPoolTopUpPurchasesOfRequest(requestId, tx);
     if (tasks.length === 0 || tasks.some((task) => task.purchasedAt === null)) return null;

@@ -104,6 +104,7 @@ describe('PurchaseInvoicePlanService acting scope (S2-2)', () => {
         getSubscriptionOriginalPrice: jest.fn().mockResolvedValue(null),
       } as never,
       {
+        lockPeriod: jest.fn().mockResolvedValue(null),
         getPurchaseFacts: jest.fn().mockResolvedValue([
           {
             subscriptionId: 'sub-1',
@@ -154,6 +155,151 @@ describe('PurchaseInvoicePlanService acting scope (S2-2)', () => {
 
     expect(caught).toBeInstanceOf(PurchaseInvoiceRefusedError);
     expect((caught as PurchaseInvoiceRefusedError).reason).toBe('LINE_ALREADY_INVOICED');
+  });
+
+  it('F-9: locks subscription period before checking invoicedLinesForMonth in tx and rejects whole-period invoice when any line is already invoiced (details.lineIds)', async () => {
+    const order: string[] = [];
+    const lockPeriod = jest.fn(() => {
+      order.push('lockPeriod');
+      return Promise.resolve(null);
+    });
+    const invoicedLinesForMonth = jest.fn(() => {
+      order.push('invoicedLinesForMonth');
+      return Promise.resolve({ wholePeriodInvoiced: false, lineIds: new Set(['line-standard']) });
+    });
+    const service = new PurchaseInvoicePlanService(
+      { invoicedLinesForMonth } as never,
+      {
+        getPlanVendorId: jest.fn().mockResolvedValue('vendor-1'),
+        getSubscriptionOriginalPrice: jest.fn().mockResolvedValue(null),
+      } as never,
+      {
+        lockPeriod,
+        getPurchaseFacts: jest.fn().mockResolvedValue([
+          {
+            subscriptionId: 'sub-1',
+            planId: 'plan-1',
+            provisioningType: 'K2',
+            billingCycle: 'ANNUAL',
+            purchasedQuantity: 10,
+            monthlyPriceMinor: 500_000n,
+            cycleMonths: 12,
+            startDate: '2026-07-01',
+            endDate: '2027-06-30',
+            renewalDate: '2027-07-01',
+            invoicedLater: false,
+          },
+        ]),
+        linesOfSubscription: jest.fn().mockResolvedValue([
+          { id: 'line-standard', subscriptionId: 'sub-1', monthlyUnitPriceMinor: 500_000n, closedReason: null },
+          { id: 'line-premium', subscriptionId: 'sub-1', monthlyUnitPriceMinor: 800_000n, closedReason: null },
+        ]),
+      } as never,
+      {} as never,
+      {} as never,
+      {
+        getItAdminActingScope: jest.fn().mockResolvedValue([]),
+        getOrganization: jest.fn().mockResolvedValue({ id: 'org-1', timeZone: 'Asia/Ho_Chi_Minh' }),
+      } as never,
+      { findUsableItAdminEmployeeIds: jest.fn().mockResolvedValue(new Set()) } as never,
+      {} as never,
+    );
+
+    let caught: unknown;
+    try {
+      await service.plan(
+        actor,
+        {
+          link: { subscriptionId: 'sub-1' },
+          servicePeriodMonth: '2026-11',
+          netAmount: { amount: '1300000' },
+          unitPriceOriginal: { amount: '1300000', currency: 'VND' },
+          quantity: 10,
+        } as never,
+        tx,
+      );
+    } catch (e) {
+      caught = e;
+    }
+
+    expect(lockPeriod).toHaveBeenCalledWith(tx, 'sub-1');
+    expect(order).toEqual(['lockPeriod', 'invoicedLinesForMonth']);
+    expect(caught).toBeInstanceOf(PurchaseInvoiceRefusedError);
+    expect((caught as PurchaseInvoiceRefusedError).reason).toBe('LINE_ALREADY_INVOICED');
+    expect((caught as PurchaseInvoiceRefusedError).lineIds).toEqual(['line-standard']);
+  });
+
+  it('F-9: skips lockPeriod on read-only preview (no tx) and allows whole-period preview when wholePeriodInvoiced has no split lines', async () => {
+    const lockPeriod = jest.fn();
+    const service = new PurchaseInvoicePlanService(
+      {
+        invoicedLinesForMonth: jest.fn().mockResolvedValue({ wholePeriodInvoiced: true, lineIds: new Set() }),
+        earlierOf: jest.fn().mockResolvedValue({ count: 1, earliestServiceMonth: '2026-10-01' }),
+      } as never,
+      {
+        getPlanVendorId: jest.fn().mockResolvedValue('vendor-1'),
+        getSubscriptionOriginalPrice: jest.fn().mockResolvedValue(null),
+      } as never,
+      {
+        lockPeriod,
+        getPurchaseFacts: jest.fn().mockResolvedValue([
+          {
+            subscriptionId: 'sub-1',
+            planId: 'plan-1',
+            provisioningType: 'K2',
+            billingCycle: 'ANNUAL',
+            purchasedQuantity: 10,
+            monthlyPriceMinor: 500_000n,
+            cycleMonths: 12,
+            startDate: '2026-07-01',
+            endDate: '2027-06-30',
+            renewalDate: '2027-07-01',
+            invoicedLater: false,
+          },
+        ]),
+        linesOfSubscription: jest
+          .fn()
+          .mockResolvedValue([
+            { id: 'line-std', subscriptionId: 'sub-1', monthlyUnitPriceMinor: 500_000n, closedReason: null },
+          ]),
+        subscriptionSource: jest.fn().mockResolvedValue({
+          kind: 'LINES',
+          seatsByDay: new Map(),
+          totalSeats: 10,
+          monthlyPriceMinor: 500_000n,
+          expectedNetMinor: 5_000_000n,
+        }),
+        isPoolExpectedMissing: jest.fn().mockResolvedValue(false),
+      } as never,
+      {} as never,
+      {} as never,
+      {
+        getItAdminActingScope: jest.fn().mockResolvedValue([]),
+        getOrganization: jest.fn().mockResolvedValue({ id: 'org-1', timeZone: 'Asia/Ho_Chi_Minh' }),
+      } as never,
+      { findUsableItAdminEmployeeIds: jest.fn().mockResolvedValue(new Set()) } as never,
+      {
+        parseMoney: jest.fn((m: { amount: string; currency: string }) =>
+          Promise.resolve({ amountMinor: BigInt(m.amount), currency: m.currency }),
+        ),
+      } as never,
+    );
+
+    const planned = await service.plan(actor, {
+      link: { subscriptionId: 'sub-1' },
+      servicePeriodMonth: '2026-11',
+      netAmount: { amount: '5000000' },
+      unitPriceOriginal: { amount: '500000', currency: 'VND' },
+      quantity: 10,
+    } as never);
+
+    expect(lockPeriod).not.toHaveBeenCalled();
+    expect(planned.link).toEqual({
+      kind: 'SUBSCRIPTION',
+      subscriptionId: 'sub-1',
+      seatPurchaseId: null,
+      subscriptionLineIds: [],
+    });
   });
 
   it('rejects LICENSE_LOT link with LOT_ALREADY_INVOICED when invoiceActualMinor is already set (F14a)', async () => {
