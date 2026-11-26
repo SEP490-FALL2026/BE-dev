@@ -281,6 +281,16 @@ export class WorkspaceRepo {
     return new Map(ids.map((id) => [id, byId.get(id) ?? 0]));
   }
 
+  /** The id of the workspace this subscription is held in, or null when it has none or does not exist. */
+  async idOfSubscription(subscriptionId: string, tx?: DbTx): Promise<string | null> {
+    const row = await (tx ?? this.prisma).subscription.findUnique({
+      where: { id: subscriptionId },
+      select: { workspaceId: true },
+    });
+
+    return row?.workspaceId ?? null;
+  }
+
   /** Display names keyed by id for these workspaces (absent ids are omitted). */
   async namesOf(ids: readonly string[], tx?: DbTx): Promise<Map<string, string>> {
     if (ids.length === 0) return new Map();

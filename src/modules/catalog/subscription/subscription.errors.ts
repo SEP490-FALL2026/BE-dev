@@ -302,3 +302,10 @@ export class SubscriptionLinesXorPlanError extends Error {
     this.name = 'SubscriptionLinesXorPlanError';
   }
 }
+
+export class SubscriptionWorkspaceNotFoundError extends Error {
+  constructor() {
+    super('The workspace does not exist.');
+    this.name = 'SubscriptionWorkspaceNotFoundError';
+  }
+}

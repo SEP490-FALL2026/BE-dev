@@ -15,6 +15,11 @@ export class WorkspaceApi {
     private readonly views: WorkspaceViewService,
   ) {}
 
+  /** The workspace id a subscription is held in; null when the subscription does not exist or has no workspace. */
+  workspaceOfSubscription(subscriptionId: string, tx?: DbTx): Promise<string | null> {
+    return this.repo.idOfSubscription(subscriptionId, tx);
+  }
+
   /** The administrators of each of these workspaces, in one read; a workspace that does not exist is absent. */
   async adminsOf(workspaceIds: readonly string[], tx?: DbTx): Promise<Map<string, WorkspaceAdminView[]>> {
     const records = await this.repo.findMany(workspaceIds, tx);

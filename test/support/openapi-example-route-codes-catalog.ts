@@ -188,7 +188,9 @@ export const ROUTE_ERROR_CODES_CATALOG: Readonly<Record<string, Partial<Record<R
       ],
     },
     planWorkspaceProfileSet: {
+      '403': ['WORKSPACE.NOT_RESPONSIBLE'],
       '404': ['PLAN.NOT_FOUND'],
+      '409': ['PLAN.WORKSPACE_AMBIGUOUS', 'WORKSPACE.STALE'],
       '422': [
         'PLAN.PRIMARY_OWNER_NOT_LISTED',
         'PLAN.VENDOR_ADMINS_INVALID',
@@ -197,6 +199,7 @@ export const ROUTE_ERROR_CODES_CATALOG: Readonly<Record<string, Partial<Record<R
         'PLAN.WORKSPACE_PERSON_INVALID',
         'PLAN.WORKSPACE_PROFILE_NOT_APPLICABLE',
         'PLAN.WORKSPACE_TEXT_INVALID',
+        'PLAN.WORKSPACE_VENDOR_REQUIRED',
       ],
     },
     requestableApplicationGet: {
@@ -227,7 +230,6 @@ export const ROUTE_ERROR_CODES_CATALOG: Readonly<Record<string, Partial<Record<R
       ],
     },
     subscriptionCreate: {
-      '404': ['WORKSPACE.NOT_FOUND'],
       '409': ['SUBSCRIPTION.DUPLICATE_PLAN'],
       '422': [
         'CURRENCY_NOT_SUPPORTED',
@@ -255,6 +257,7 @@ export const ROUTE_ERROR_CODES_CATALOG: Readonly<Record<string, Partial<Record<R
         'SUBSCRIPTION.RESPONSIBLE_NOT_IT_ADMIN',
         'SUBSCRIPTION.RESPONSIBLE_REQUIRED',
         'SUBSCRIPTION.VENDOR_ADMINS_REQUIRED',
+        'SUBSCRIPTION.WORKSPACE_NOT_FOUND',
         'SUBSCRIPTION.WORKSPACE_REQUIRED',
         'SUBSCRIPTION.WORKSPACE_VENDOR_MISMATCH',
         'SUBSCRIPTION_LINE.PLAN_NOT_K2',
@@ -264,7 +267,7 @@ export const ROUTE_ERROR_CODES_CATALOG: Readonly<Record<string, Partial<Record<R
       '404': ['SUBSCRIPTION.NOT_FOUND'],
     },
     subscriptionUpdate: {
-      '404': ['SUBSCRIPTION.NOT_FOUND', 'WORKSPACE.NOT_FOUND'],
+      '404': ['SUBSCRIPTION.NOT_FOUND'],
       '409': [
         'SUBSCRIPTION.MID_TERM_REDUCTION_NOT_ALLOWED',
         'SUBSCRIPTION.PRIMARY_CONFLICT',
@@ -298,6 +301,7 @@ export const ROUTE_ERROR_CODES_CATALOG: Readonly<Record<string, Partial<Record<R
         'SUBSCRIPTION.UPDATE_EMPTY',
         'SUBSCRIPTION.VENDOR_ADMINS_REQUIRED',
         'SUBSCRIPTION.VERSION_REQUIRED',
+        'SUBSCRIPTION.WORKSPACE_NOT_FOUND',
         'SUBSCRIPTION.WORKSPACE_REQUIRED',
         'SUBSCRIPTION.WORKSPACE_VENDOR_MISMATCH',
       ],

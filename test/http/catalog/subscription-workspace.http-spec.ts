@@ -8,6 +8,7 @@ import {
   SubscriptionMembersPaymentDayRequiredError,
   SubscriptionSeatCountingFixedError,
   SubscriptionVendorAdminsRequiredError,
+  SubscriptionWorkspaceNotFoundError,
 } from '../../../src/modules/catalog/subscription/subscription.errors';
 import { SubscriptionService } from '../../../src/modules/catalog/subscription/subscription.service';
 import {
@@ -152,9 +153,20 @@ describe('W3-11, W3-12, W3-14 workspace & seat-counting subscription HTTP contra
       409,
       'SUBSCRIPTION.DUPLICATE_PLAN',
     ],
-    ['WorkspaceVendorMismatchError', () => new WorkspaceVendorMismatchError(), 422, 'WORKSPACE.VENDOR_MISMATCH'],
-    ['WorkspaceRequiredError', () => new WorkspaceRequiredError([WS_ID]), 422, 'WORKSPACE.REQUIRED'],
-    ['WorkspaceNotFoundError', () => new WorkspaceNotFoundError(), 404, 'WORKSPACE.NOT_FOUND'],
+    [
+      'WorkspaceVendorMismatchError',
+      () => new WorkspaceVendorMismatchError(),
+      422,
+      'SUBSCRIPTION.WORKSPACE_VENDOR_MISMATCH',
+    ],
+    ['WorkspaceRequiredError', () => new WorkspaceRequiredError([WS_ID]), 422, 'SUBSCRIPTION.WORKSPACE_REQUIRED'],
+    ['WorkspaceNotFoundError', () => new WorkspaceNotFoundError(), 422, 'SUBSCRIPTION.WORKSPACE_NOT_FOUND'],
+    [
+      'SubscriptionWorkspaceNotFoundError',
+      () => new SubscriptionWorkspaceNotFoundError(),
+      422,
+      'SUBSCRIPTION.WORKSPACE_NOT_FOUND',
+    ],
   ] as const)('POST /subscriptions maps %s to HTTP %i %s', async (_label, buildError, status, code) => {
     declare.mockRejectedValueOnce(buildError());
 
@@ -201,5 +213,17 @@ describe('W3-11, W3-12, W3-14 workspace & seat-counting subscription HTTP contra
       .expect(409);
 
     expect(bodyOf(response).error.code).toBe('SUBSCRIPTION.DUPLICATE_PLAN');
+  });
+
+  it('PATCH /subscriptions/:id maps WorkspaceNotFoundError to 422 SUBSCRIPTION.WORKSPACE_NOT_FOUND', async () => {
+    update.mockRejectedValueOnce(new WorkspaceNotFoundError());
+
+    const response = await request(app.getHttpServer())
+      .patch(`/api/v1/subscriptions/${SUB_ID}`)
+      .set('Authorization', bearer(principal(['IT_ADMIN'])))
+      .send({ workspaceId: WS_ID })
+      .expect(422);
+
+    expect(bodyOf(response).error.code).toBe('SUBSCRIPTION.WORKSPACE_NOT_FOUND');
   });
 });

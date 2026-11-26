@@ -200,21 +200,38 @@ export class PlansController {
     description:
       'The workspace profile replaces the previous one as a whole; it names the owners, the admins and the emergency account, the email of the company account that owns the plan at the vendor (optional) and a free note, and takes no password. Only a plan that needs admins at the vendor has one: a K2 plan, or a K4 plan with an admin console. The owners and admins are at least two different IT Admins who work now.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, NOT_FOUND, {
-    status: HttpStatus.UNPROCESSABLE_ENTITY,
-    description:
-      'The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.WORKSPACE_PROFILE_NOT_APPLICABLE, WORKSPACE_PERSON_INVALID, PRIMARY_OWNER_NOT_LISTED, WORKSPACE_MEMBER_DUPLICATE, WORKSPACE_LIMIT_EXCEEDED (details.role is OWNER when there are more owners than ownerLimit, ADMIN when more admins than adminLimit), WORKSPACE_TEXT_INVALID or VENDOR_ADMINS_INVALID (fewer than two different IT Admins).',
-    examples: [
-      VALIDATION_EXAMPLE,
-      EXAMPLES.WORKSPACE_PROFILE_NOT_APPLICABLE,
-      EXAMPLES.WORKSPACE_PERSON_INVALID,
-      EXAMPLES.PRIMARY_OWNER_NOT_LISTED,
-      EXAMPLES.WORKSPACE_MEMBER_DUPLICATE,
-      EXAMPLES.WORKSPACE_LIMIT_EXCEEDED,
-      EXAMPLES.WORKSPACE_TEXT_INVALID,
-      EXAMPLES.VENDOR_ADMINS_INVALID,
-    ],
-  })
+  @ApiErrorResponses(
+    ...AUTH_ERRORS,
+    {
+      status: HttpStatus.FORBIDDEN,
+      description:
+        'Only an IT Admin records the workspace profile, and only the one who answers for the workspace (WORKSPACE.NOT_RESPONSIBLE).',
+      examples: [FORBIDDEN_EXAMPLE, EXAMPLES.WORKSPACE_NOT_RESPONSIBLE],
+    },
+    NOT_FOUND,
+    {
+      status: HttpStatus.CONFLICT,
+      description:
+        'The vendor holds several workspaces (PLAN.WORKSPACE_AMBIGUOUS, details.workspaceIds) or the workspace changed since it was read (WORKSPACE.STALE).',
+      examples: [EXAMPLES.WORKSPACE_AMBIGUOUS, EXAMPLES.WORKSPACE_STALE],
+    },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description:
+        'The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.WORKSPACE_PROFILE_NOT_APPLICABLE, WORKSPACE_VENDOR_REQUIRED, WORKSPACE_PERSON_INVALID, PRIMARY_OWNER_NOT_LISTED, WORKSPACE_MEMBER_DUPLICATE, WORKSPACE_LIMIT_EXCEEDED (details.role is OWNER when there are more owners than ownerLimit, ADMIN when more admins than adminLimit), WORKSPACE_TEXT_INVALID or VENDOR_ADMINS_INVALID (fewer than two different IT Admins).',
+      examples: [
+        VALIDATION_EXAMPLE,
+        EXAMPLES.WORKSPACE_PROFILE_NOT_APPLICABLE,
+        EXAMPLES.WORKSPACE_VENDOR_REQUIRED,
+        EXAMPLES.WORKSPACE_PERSON_INVALID,
+        EXAMPLES.PRIMARY_OWNER_NOT_LISTED,
+        EXAMPLES.WORKSPACE_MEMBER_DUPLICATE,
+        EXAMPLES.WORKSPACE_LIMIT_EXCEEDED,
+        EXAMPLES.WORKSPACE_TEXT_INVALID,
+        EXAMPLES.VENDOR_ADMINS_INVALID,
+      ],
+    },
+  )
   async setWorkspaceProfile(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: PlanIdParamDto,

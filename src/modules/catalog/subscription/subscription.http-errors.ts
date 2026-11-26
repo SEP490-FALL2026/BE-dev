@@ -58,6 +58,7 @@ import {
   SubscriptionQuantityBelowOccupiedError,
   SubscriptionStillDraftError,
   SubscriptionUpdateEmptyError,
+  SubscriptionWorkspaceNotFoundError,
 } from './subscription.errors';
 
 const refuse = (status: HttpStatus, code: string, message: string, details?: Record<string, unknown>): ApiException =>
@@ -75,8 +76,8 @@ export function toSubscriptionApiException(error: unknown): unknown {
   if (error instanceof WorkspaceVendorMismatchError) {
     return refuse(UNPROCESSABLE, 'SUBSCRIPTION.WORKSPACE_VENDOR_MISMATCH', error.message);
   }
-  if (error instanceof WorkspaceNotFoundError)
-    return refuse(HttpStatus.NOT_FOUND, 'WORKSPACE.NOT_FOUND', error.message);
+  if (error instanceof WorkspaceNotFoundError || error instanceof SubscriptionWorkspaceNotFoundError)
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.WORKSPACE_NOT_FOUND', new SubscriptionWorkspaceNotFoundError().message);
   if (error instanceof SubscriptionMembersMonthlyOnlyError) {
     return refuse(UNPROCESSABLE, 'SUBSCRIPTION.MEMBERS_MONTHLY_ONLY', error.message);
   }
@@ -263,7 +264,7 @@ export const SUBSCRIPTION_ERROR_EXAMPLES = {
   DUPLICATE_PLAN: example(new SubscriptionDuplicatePlanError(['<subscription-id>'])),
   WORKSPACE_REQUIRED: example(new WorkspaceRequiredError(['<workspace-id>', '<other-workspace-id>'])),
   WORKSPACE_VENDOR_MISMATCH: example(new WorkspaceVendorMismatchError()),
-  WORKSPACE_NOT_FOUND: example(new WorkspaceNotFoundError()),
+  WORKSPACE_NOT_FOUND: example(new SubscriptionWorkspaceNotFoundError()),
   MEMBERS_MONTHLY_ONLY: example(new SubscriptionMembersMonthlyOnlyError()),
   MEMBERS_PAYMENT_DAY_REQUIRED: example(new SubscriptionMembersPaymentDayRequiredError()),
   SEAT_COUNTING_FIXED: example(new SubscriptionSeatCountingFixedError()),

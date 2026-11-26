@@ -36,4 +36,21 @@ describe('WorkspaceRepo', () => {
       expect(values).toContain('2026-12-09');
     });
   });
+
+  describe('idOfSubscription', () => {
+    it('returns the workspaceId of the subscription or null when absent', async () => {
+      const findUnique = jest
+        .fn()
+        .mockResolvedValueOnce({ workspaceId: 'ws-1' })
+        .mockResolvedValueOnce({ workspaceId: null })
+        .mockResolvedValueOnce(null);
+      const tx = { subscription: { findUnique } } as unknown as DbTx;
+      const repo = new WorkspaceRepo({} as PrismaService);
+
+      await expect(repo.idOfSubscription('sub-1', tx)).resolves.toBe('ws-1');
+      await expect(repo.idOfSubscription('sub-2', tx)).resolves.toBeNull();
+      await expect(repo.idOfSubscription('sub-9', tx)).resolves.toBeNull();
+      expect(findUnique).toHaveBeenCalledWith({ where: { id: 'sub-1' }, select: { workspaceId: true } });
+    });
+  });
 });

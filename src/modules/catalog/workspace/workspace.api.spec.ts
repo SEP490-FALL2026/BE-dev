@@ -9,11 +9,12 @@ describe('WorkspaceApi', () => {
   const workspace = (id: string, overrides: Partial<WorkspaceRecord> = {}) =>
     ({ id, admins: [khoa, nam], responsibleItAdminEmployeeId: 'khoa', ...overrides }) as unknown as WorkspaceRecord;
 
-  function setup(records: WorkspaceRecord[]) {
+  function setup(records: WorkspaceRecord[], subscriptionWorkspaces: Record<string, string | null> = {}) {
     const repo = {
       findMany: jest.fn().mockResolvedValue(records),
       find: jest.fn((id: string) => Promise.resolve(records.find((record) => record.id === id) ?? null)),
       findOfVendor: jest.fn().mockResolvedValue(records),
+      idOfSubscription: jest.fn((subId: string) => Promise.resolve(subscriptionWorkspaces[subId] ?? null)),
     } as unknown as WorkspaceRepo;
     const views = { workingAdminCount: jest.fn().mockResolvedValue(1) } as unknown as WorkspaceViewService;
 
@@ -47,5 +48,13 @@ describe('WorkspaceApi', () => {
     { records: [workspace('ws-1'), workspace('ws-2')], expected: { kind: 'MANY', workspaceIds: ['ws-1', 'ws-2'] } },
   ])('offers a vendor with $records.length workspaces as $expected', async ({ records, expected }) => {
     await expect(setup(records).defaultWorkspaceOfVendor('v-1')).resolves.toEqual(expected);
+  });
+
+  it('returns the workspace id of a subscription or null when absent', async () => {
+    const api = setup([], { 'sub-1': 'ws-1', 'sub-2': null });
+
+    await expect(api.workspaceOfSubscription('sub-1')).resolves.toBe('ws-1');
+    await expect(api.workspaceOfSubscription('sub-2')).resolves.toBeNull();
+    await expect(api.workspaceOfSubscription('sub-9')).resolves.toBeNull();
   });
 });
