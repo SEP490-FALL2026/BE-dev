@@ -8,6 +8,7 @@ import { PlanApplicationRetiredError, PlanNotFoundError } from '../plan/plan.err
 import { WorkspaceNotFoundError, WorkspaceVendorMismatchError } from '../workspace/workspace.errors';
 import {
   SubscriptionLineClosedError,
+  SubscriptionLinesLimitError,
   SubscriptionLineLiveTakenError,
   SubscriptionLineNotFoundError,
   SubscriptionLineNotResponsibleError,
@@ -64,6 +65,9 @@ export function toSubscriptionLineApiException(error: unknown): unknown {
   if (error instanceof SubscriptionLinePlanTakenError) {
     return refuse(HttpStatus.CONFLICT, 'SUBSCRIPTION.DUPLICATE_PLAN', error.message);
   }
+  if (error instanceof SubscriptionLinesLimitError) {
+    return refuse(HttpStatus.CONFLICT, 'SUBSCRIPTION.LINES_LIMIT', error.message, { limit: error.limit });
+  }
   if (error instanceof SubscriptionLineQuantityViaPurchaseError) {
     return refuse(UNPROCESSABLE, 'SUBSCRIPTION_LINE.QUANTITY_VIA_PURCHASE', error.message);
   }
@@ -104,6 +108,7 @@ export const SUBSCRIPTION_LINE_ERROR_EXAMPLES = {
   PERIOD_STALE: example(new SubscriptionLinePeriodStaleError(new Date('2026-01-01T00:00:00.000Z'))),
   CLOSED: example(new SubscriptionLineClosedError()),
   DUPLICATE_PLAN: example(new SubscriptionLineLiveTakenError()),
+  LINES_LIMIT: example(new SubscriptionLinesLimitError()),
   QUANTITY_VIA_PURCHASE: example(new SubscriptionLineQuantityViaPurchaseError()),
   NOT_TERM: example(new SubscriptionLinePeriodNotTermError()),
   PLAN_NOT_K2: example(new SubscriptionLinePlanNotK2Error()),

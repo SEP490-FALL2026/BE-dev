@@ -20,6 +20,7 @@ import {
   SubscriptionLinePlanNotK2Error,
   SubscriptionLinePlanTakenError,
   SubscriptionLinePriceNotVndError,
+  SubscriptionLinesLimitError,
 } from '../subscription-line/subscription-line.errors';
 import {
   SubscriptionApplicationRetiredError,
@@ -113,6 +114,9 @@ export function toSubscriptionApiException(error: unknown): unknown {
   }
   if (error instanceof SubscriptionLinePlanTakenError) {
     return refuse(HttpStatus.CONFLICT, 'SUBSCRIPTION.DUPLICATE_PLAN', error.message);
+  }
+  if (error instanceof SubscriptionLinesLimitError) {
+    return refuse(HttpStatus.CONFLICT, 'SUBSCRIPTION.LINES_LIMIT', error.message, { limit: error.limit });
   }
   if (error instanceof ApiException) return error;
 
@@ -273,6 +277,7 @@ export const SUBSCRIPTION_ERROR_EXAMPLES = {
   K1_HAS_NO_SUBSCRIPTION: example(new SubscriptionK1HasNoSubscriptionError()),
   PERPETUAL_IS_LICENSE_LOT: example(new SubscriptionPerpetualIsLicenseLotError()),
   LINES_XOR_PLAN: example(new SubscriptionLinesXorPlanError()),
+  LINES_LIMIT: example(new SubscriptionLinesLimitError()),
   LINE_PLAN_NOT_K2: example(new SubscriptionLinePlanNotK2Error()),
   MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(2, 'unitPrice')),
   MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError('unitPrice')),

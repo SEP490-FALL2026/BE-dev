@@ -52,7 +52,9 @@ const declareSubscriptionLineSchema = z.strictObject({
 
 export const declareSubscriptionBodySchema = z.strictObject({
   planId: z.uuid().optional(),
-  lines: z.array(declareSubscriptionLineSchema).min(1).max(SUBSCRIPTION_LINES_MAX).optional(),
+  lines: z.array(declareSubscriptionLineSchema).min(1).optional().meta({
+    description: 'The K2 plans in this period (at most 20 lines; more is refused with SUBSCRIPTION.LINES_LIMIT).',
+  }),
   kind,
   purchasedQuantity: quantity.optional(),
   unitPrice: unitPrice.optional(),

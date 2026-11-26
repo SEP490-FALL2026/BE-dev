@@ -230,7 +230,7 @@ export const ROUTE_ERROR_CODES_CATALOG: Readonly<Record<string, Partial<Record<R
       ],
     },
     subscriptionCreate: {
-      '409': ['SUBSCRIPTION.DUPLICATE_PLAN'],
+      '409': ['SUBSCRIPTION.DUPLICATE_PLAN', 'SUBSCRIPTION.LINES_LIMIT'],
       '422': [
         'CURRENCY_NOT_SUPPORTED',
         'MONEY_OUT_OF_RANGE',

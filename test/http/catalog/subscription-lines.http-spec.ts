@@ -4,6 +4,7 @@ import type { App } from 'supertest/types';
 import { SeatChangeQueryService } from '../../../src/modules/catalog/subscription-line/seat-change-query.service';
 import {
   SubscriptionLineClosedError,
+  SubscriptionLinesLimitError,
   SubscriptionLineLiveTakenError,
   SubscriptionLineNotFoundError,
   SubscriptionLineNotResponsibleError,
@@ -219,6 +220,17 @@ describe('Subscription lines HTTP routes (W3-15)', () => {
         .send(validBody)
         .expect(422);
       expect(bodyOf(vendorRes).error.code).toBe('WORKSPACE_VENDOR_MISMATCH');
+    });
+
+    it('LINES_LIMIT: returns 409 SUBSCRIPTION.LINES_LIMIT when adding beyond 20 lines', async () => {
+      lineSvc.addLine.mockRejectedValueOnce(new SubscriptionLinesLimitError());
+
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/subscriptions/${SUB_ID}/lines`)
+        .set('Authorization', itAuth)
+        .send(validBody)
+        .expect(409);
+      expect(bodyOf(res).error.code).toBe('SUBSCRIPTION.LINES_LIMIT');
     });
   });
 
@@ -455,6 +467,28 @@ describe('Subscription lines HTTP routes (W3-15)', () => {
         .expect(201);
       const createdData = dataOf<{ lines: Array<{ seatsToday: number }> }>(created);
       expect(createdData.lines.map((item) => item.seatsToday)).toEqual([10, 2]);
+    });
+
+    it('LINES_LIMIT: POST /subscriptions with 21 lines reaches service and maps 409 SUBSCRIPTION.LINES_LIMIT', async () => {
+      subSvc.declare.mockRejectedValueOnce(new SubscriptionLinesLimitError());
+
+      const twentyOne = Array.from({ length: 21 }, (_, idx) => ({
+        planId: `33333333-3333-4333-8333-${String(idx).padStart(12, '0')}`,
+        monthlyUnitPrice: { amount: '500000', currency: 'VND' },
+        quantity: 1,
+      }));
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/subscriptions')
+        .set('Authorization', itAuth)
+        .send({
+          kind: 'TERM',
+          billingCycle: 'MONTHLY',
+          commitmentTermMonths: 1,
+          startDate: '2026-11-01',
+          lines: twentyOne,
+        })
+        .expect(409);
+      expect(bodyOf(res).error.code).toBe('SUBSCRIPTION.LINES_LIMIT');
     });
   });
 });

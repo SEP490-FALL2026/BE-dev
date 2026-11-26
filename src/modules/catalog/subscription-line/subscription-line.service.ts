@@ -12,7 +12,9 @@ import { WorkspaceNotFoundError } from '../workspace/workspace.errors';
 import { WorkspaceForSubscriptionService } from '../workspace/workspace-for-subscription.service';
 import { SeatLedgerService } from './ledger/seat-ledger.service';
 import {
+  SUBSCRIPTION_LINES_MAX,
   SubscriptionLineClosedError,
+  SubscriptionLinesLimitError,
   SubscriptionLineLiveTakenError,
   SubscriptionLineNotFoundError,
   SubscriptionLineNotResponsibleError,
@@ -121,6 +123,10 @@ export class SubscriptionLineService {
     workspaceRef: { get: () => string | null; set: (next: string | null) => void },
   ) {
     const { period, workspaceId } = await this.lockPeriodForAdd(tx, actor, subscriptionId, input, workspaceRef);
+    const existingLines = (await this.lines.ofSubscriptions([subscriptionId], tx)).get(subscriptionId) ?? [];
+    if (existingLines.length >= SUBSCRIPTION_LINES_MAX) {
+      throw new SubscriptionLinesLimitError(SUBSCRIPTION_LINES_MAX);
+    }
     const plan = await this.assertAddablePlanAndBaseline(tx, period.organizationId, workspaceId, input);
 
     const line = await this.lines.insert(tx, {

@@ -5,7 +5,11 @@ import type { AuthenticatedPrincipal } from '../../../../infrastructure/security
 import { AuditApi } from '../../../audit/public/audit.api';
 import { catalogAuditEvent } from '../../catalog-audit-event.mapper';
 import { PlanFactsService, type LockedPlan } from '../../plan/plan-facts.service';
-import { SubscriptionLinePlanNotK2Error } from '../../subscription-line/subscription-line.errors';
+import {
+  SUBSCRIPTION_LINES_MAX,
+  SubscriptionLinePlanNotK2Error,
+  SubscriptionLinesLimitError,
+} from '../../subscription-line/subscription-line.errors';
 import {
   SubscriptionPeriodLinesService,
   type CreatePeriodLineInput,
@@ -81,6 +85,7 @@ export class SubscriptionMultiLineService {
     rawLines: readonly DeclareSubscriptionLineInput[],
   ): Promise<SubscriptionRecord> {
     if (input.kind !== 'TERM') throw new SubscriptionPerpetualHasNoTermError(['lines']);
+    if (rawLines.length > SUBSCRIPTION_LINES_MAX) throw new SubscriptionLinesLimitError(SUBSCRIPTION_LINES_MAX);
     const planIds = rawLines.map((line) => line.planId);
     if (new Set(planIds).size !== planIds.length) throw new SubscriptionDuplicatePlanError([]);
 

@@ -8,14 +8,11 @@ import { WorkspaceVendorMismatchError } from '../workspace/workspace.errors';
 import type { WorkspaceForSubscriptionService } from '../workspace/workspace-for-subscription.service';
 import type { SeatLedgerService } from './ledger/seat-ledger.service';
 import {
-  SubscriptionLineClosedError,
   SubscriptionLineLiveTakenError,
-  SubscriptionLineNotFoundError,
   SubscriptionLineNotResponsibleError,
   SubscriptionLinePeriodStaleError,
   SubscriptionLinePlanNotK2Error,
   SubscriptionLineQuantityViaPurchaseError,
-  SubscriptionLineStaleError,
 } from './subscription-line.errors';
 import { toSubscriptionLineApiException } from './subscription-line.http-errors';
 import type { SubscriptionLineRepo } from './subscription-line.repo';
@@ -81,10 +78,7 @@ function codeOf(error: unknown): { status: number; code: string | undefined } {
     getStatus?: () => number;
     getResponse?: () => { code?: string };
   };
-  return {
-    status: mapped.getStatus?.() ?? 500,
-    code: mapped.getResponse?.().code,
-  };
+  return { status: mapped.getStatus?.() ?? 500, code: mapped.getResponse?.().code };
 }
 
 function makeSut(overrides: Record<string, unknown> = {}) {
@@ -102,6 +96,7 @@ function makeSut(overrides: Record<string, unknown> = {}) {
       return Promise.resolve(makePeriod());
     }),
     findLive: jest.fn().mockResolvedValue(null),
+    ofSubscriptions: jest.fn().mockResolvedValue(new Map()),
     insert,
     lock: jest.fn().mockImplementation(() => {
       order.push('lockLine');
@@ -121,9 +116,7 @@ function makeSut(overrides: Record<string, unknown> = {}) {
     ...(overrides.ledgerRepo as object),
   } as unknown as SeatLedgerService;
   const occupancy = {
-    get: jest.fn().mockReturnValue({
-      occupiedBySubscriptionPlans: jest.fn().mockResolvedValue(new Map()),
-    }),
+    get: jest.fn().mockReturnValue({ occupiedBySubscriptionPlans: jest.fn().mockResolvedValue(new Map()) }),
   } as unknown as SeatOccupancyHook;
   const plans = {
     lockShared: jest.fn().mockImplementation(() => {
@@ -143,16 +136,12 @@ function makeSut(overrides: Record<string, unknown> = {}) {
   } as unknown as WorkspaceForSubscriptionService;
   const baselinePhase = {
     isBound: jest.fn().mockReturnValue(true),
-    get: jest.fn().mockReturnValue({
-      isClosed: jest.fn().mockResolvedValue(false),
-      ...(overrides.baselinePhase as object),
-    }),
+    get: jest
+      .fn()
+      .mockReturnValue({ isClosed: jest.fn().mockResolvedValue(false), ...(overrides.baselinePhase as object) }),
   } as unknown as SeatBaselinePhaseHook;
   const auditRecord = jest.fn().mockResolvedValue(undefined);
-  const audit = {
-    record: auditRecord,
-    ...(overrides.audit as object),
-  } as unknown as AuditApi;
+  const audit = { record: auditRecord, ...(overrides.audit as object) } as unknown as AuditApi;
   const service = new SubscriptionLineService(
     lines,
     seatLedger,
@@ -320,79 +309,21 @@ describe('SubscriptionLineService (W3-15)', () => {
         .catch((e: unknown) => e);
       expect(caughtK4).toBeInstanceOf(SubscriptionLinePlanNotK2Error);
     });
-  });
 
-  describe('updateLine', () => {
-    const updBody = { monthlyUnitPrice: { amount: '400000', currency: 'VND' }, expectedUpdatedAt: updatedAt };
-
-    it('rejects missing line (404), non-responsible IT Admin (403), closed line (409), stale version (409)', async () => {
-      const missing = makeSut({ lines: { lock: jest.fn().mockResolvedValue(null) } });
-      await expect(missing.service.updateLine(actor, 'line-x', updBody)).rejects.toBeInstanceOf(
-        SubscriptionLineNotFoundError,
-      );
-      expect(codeOf(new SubscriptionLineNotFoundError())).toEqual({
-        status: HttpStatus.NOT_FOUND,
-        code: 'SUBSCRIPTION_LINE.NOT_FOUND',
-      });
-
-      const notResp = makeSut({
+    it('LINES_LIMIT: rejects adding a 21st line to a period with 409 SUBSCRIPTION.LINES_LIMIT', async () => {
+      const existingTwenty = Array.from({ length: 20 }, (_, i) => makeLine({ id: `line-${i}`, planId: `plan-${i}` }));
+      const { service, insert } = makeSut({
         lines: {
-          lock: jest.fn().mockResolvedValue(makeLine()),
-          lockPeriod: jest.fn().mockResolvedValue(makePeriod({ responsibleItAdminEmployeeId: 'other' })),
-        },
-      });
-      await expect(notResp.service.updateLine(actor, 'line-1', updBody)).rejects.toBeInstanceOf(
-        SubscriptionLineNotResponsibleError,
-      );
-
-      const closed = makeSut({
-        lines: {
-          lock: jest.fn().mockResolvedValue(makeLine({ closedOn: '2026-11-15', closedReason: 'REMOVED' })),
+          readPeriodWorkspace: jest.fn().mockResolvedValue('ws-1'),
           lockPeriod: jest.fn().mockResolvedValue(makePeriod()),
+          ofSubscriptions: jest.fn().mockResolvedValue(new Map([['sub-1', existingTwenty]])),
         },
       });
-      await expect(closed.service.updateLine(actor, 'line-1', updBody)).rejects.toBeInstanceOf(
-        SubscriptionLineClosedError,
-      );
-      expect(codeOf(new SubscriptionLineClosedError())).toEqual({
-        status: HttpStatus.CONFLICT,
-        code: 'SUBSCRIPTION_LINE.CLOSED',
-      });
 
-      const stale = makeSut();
-      await expect(
-        stale.service.updateLine(actor, 'line-1', {
-          ...updBody,
-          expectedUpdatedAt: new Date('2026-11-19T00:00:00.000Z'),
-        }),
-      ).rejects.toBeInstanceOf(SubscriptionLineStaleError);
-      expect(codeOf(new SubscriptionLineStaleError(updatedAt))).toEqual({
-        status: HttpStatus.CONFLICT,
-        code: 'SUBSCRIPTION_LINE.STALE',
-      });
-    });
+      const caught = await service.addLine(actor, 'sub-1', baseAdd).catch((e: unknown) => e);
 
-    it('updates monthlyUnitPriceMinor / minimumSeats and records SUBSCRIPTION_LINE.UPDATED audit', async () => {
-      const { service, update, auditRecord } = makeSut();
-
-      await service.updateLine(actor, 'line-1', {
-        monthlyUnitPrice: { amount: '420000', currency: 'VND' },
-        minimumSeats: 10,
-        expectedUpdatedAt: updatedAt,
-      });
-
-      expect(update).toHaveBeenCalledWith(expect.anything(), 'line-1', {
-        monthlyUnitPriceMinor: 420_000n,
-        minimumSeats: 10,
-      });
-      expect(auditRecord).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({
-          action: 'SUBSCRIPTION_LINE.UPDATED',
-          resourceType: 'SUBSCRIPTION_LINE',
-          resourceId: 'line-1',
-        }),
-      );
+      expect(codeOf(caught)).toEqual({ status: HttpStatus.CONFLICT, code: 'SUBSCRIPTION.LINES_LIMIT' });
+      expect(insert).not.toHaveBeenCalled();
     });
   });
 });

@@ -43,8 +43,8 @@ const ADD_LINE_RESPONSES = [
   {
     status: HttpStatus.CONFLICT,
     description:
-      'Period changed concurrently (SUBSCRIPTION.STALE) or live line already exists (SUBSCRIPTION.DUPLICATE_PLAN).',
-    examples: [EXAMPLES.PERIOD_STALE, EXAMPLES.DUPLICATE_PLAN],
+      'Period changed concurrently (SUBSCRIPTION.STALE), live line already exists (SUBSCRIPTION.DUPLICATE_PLAN), or period already has 20 lines (SUBSCRIPTION.LINES_LIMIT).',
+    examples: [EXAMPLES.PERIOD_STALE, EXAMPLES.DUPLICATE_PLAN, EXAMPLES.LINES_LIMIT],
   },
   {
     status: HttpStatus.UNPROCESSABLE_ENTITY,

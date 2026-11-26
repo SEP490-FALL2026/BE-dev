@@ -28110,7 +28110,7 @@
             }
           },
           "409": {
-            "description": "The plan is a K2 or K4 plan and another live subscription (a draft, or active and not continued by a later period, not ended) already exists in the same workspace: add seats to that one, renew it, or choose a different workspace instead (SUBSCRIPTION.DUPLICATE_PLAN, details.subscriptionIds, nothing is written).",
+            "description": "The plan is a K2 or K4 plan and another live subscription (a draft, or active and not continued by a later period, not ended) already exists in the same workspace: add seats to that one, renew it, or choose a different workspace instead (SUBSCRIPTION.DUPLICATE_PLAN, details.subscriptionIds, nothing is written). A period cannot hold more than 20 lines (SUBSCRIPTION.LINES_LIMIT).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -28123,6 +28123,18 @@
                         "code": "SUBSCRIPTION.DUPLICATE_PLAN",
                         "message": "The plan already has a live subscription: add seats to it or renew it instead of declaring another.",
                         "details": { "subscriptionIds": ["<subscription-id>"] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.LINES_LIMIT": {
+                    "summary": "A subscription period can have at most 20 lines.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.LINES_LIMIT",
+                        "message": "A subscription period can have at most 20 lines.",
+                        "details": { "limit": 20 },
                         "requestId": "req_example"
                       }
                     }
@@ -29806,7 +29818,7 @@
             }
           },
           "409": {
-            "description": "Period changed concurrently (SUBSCRIPTION.STALE) or live line already exists (SUBSCRIPTION.DUPLICATE_PLAN).",
+            "description": "Period changed concurrently (SUBSCRIPTION.STALE), live line already exists (SUBSCRIPTION.DUPLICATE_PLAN), or period already has 20 lines (SUBSCRIPTION.LINES_LIMIT).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -29830,6 +29842,18 @@
                       "error": {
                         "code": "SUBSCRIPTION.DUPLICATE_PLAN",
                         "message": "The workspace already has a live line of this plan: add the seats to that subscription.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.LINES_LIMIT": {
+                    "summary": "A subscription period can have at most 20 lines.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.LINES_LIMIT",
+                        "message": "A subscription period can have at most 20 lines.",
+                        "details": { "limit": 20 },
                         "requestId": "req_example"
                       }
                     }
@@ -122678,8 +122702,8 @@
         "properties": {
           "planId": { "type": "string", "format": "uuid" },
           "lines": {
+            "description": "The K2 plans in this period (at most 20 lines; more is refused with SUBSCRIPTION.LINES_LIMIT).",
             "minItems": 1,
-            "maxItems": 20,
             "type": "array",
             "items": {
               "type": "object",

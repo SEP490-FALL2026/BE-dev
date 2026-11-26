@@ -112,4 +112,41 @@ describe('SubscriptionMultiLineService (F-3)', () => {
     expect(insert).not.toHaveBeenCalled();
     expect(createForPeriod).not.toHaveBeenCalled();
   });
+
+  it('LINES_LIMIT: refuses declaring more than 20 lines with 409 SUBSCRIPTION.LINES_LIMIT', async () => {
+    const tx = {} as DbTx;
+    const runner = { run: (work: (t: DbTx) => unknown) => Promise.resolve(work(tx)) } as unknown as TransactionRunner;
+    const insert = jest.fn();
+    const multiLine = new SubscriptionMultiLineService(
+      { insert } as unknown as SubscriptionRepo,
+      {} as PlanFactsService,
+      { read: jest.fn(), readOriginal: jest.fn(), priceToday: jest.fn() } as unknown as SubscriptionPricingService,
+      { requireOrganizationId: jest.fn() } as unknown as SubscriptionPeriodLinesService,
+      {} as SubscriptionPoolService,
+      { record: jest.fn() } as unknown as AuditApi,
+      runner,
+    );
+
+    const twentyOne = Array.from({ length: 21 }, (_, idx) => ({
+      planId: `plan-${idx}`,
+      monthlyUnitPrice: { amount: '500000', currency: 'VND' },
+      quantity: 1,
+    }));
+
+    const err = await multiLine
+      .declare(
+        actor,
+        { kind: 'TERM', billingCycle: 'MONTHLY', commitmentTermMonths: 1, startDate: '2026-11-01', lines: twentyOne },
+        twentyOne,
+      )
+      .catch((e: unknown) => e);
+
+    const httpErr = toSubscriptionApiException(err) as {
+      getStatus: () => number;
+      getResponse: () => { code: string };
+    };
+    expect(httpErr.getStatus()).toBe(HttpStatus.CONFLICT);
+    expect(httpErr.getResponse().code).toBe('SUBSCRIPTION.LINES_LIMIT');
+    expect(insert).not.toHaveBeenCalled();
+  });
 });

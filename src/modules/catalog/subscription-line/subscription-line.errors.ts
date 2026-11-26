@@ -142,3 +142,13 @@ export class SeatLedgerEffectiveInClosedMonthError extends Error {
     this.name = 'SeatLedgerEffectiveInClosedMonthError';
   }
 }
+
+export const SUBSCRIPTION_LINES_MAX = 20;
+
+/** A subscription period holds at most SUBSCRIPTION_LINES_MAX plan lines. */
+export class SubscriptionLinesLimitError extends Error {
+  constructor(readonly limit: number = SUBSCRIPTION_LINES_MAX) {
+    super(`A subscription period can have at most ${limit} lines.`);
+    this.name = 'SubscriptionLinesLimitError';
+  }
+}

@@ -234,7 +234,12 @@ export class SubscriptionsController {
         SUBSCRIPTION_ERROR_EXAMPLES.LINE_PLAN_NOT_K2,
       ],
     },
-    DUPLICATE_PLAN_CONFLICT,
+    {
+      ...DUPLICATE_PLAN_CONFLICT,
+      description:
+        DUPLICATE_PLAN_CONFLICT.description + ' A period cannot hold more than 20 lines (SUBSCRIPTION.LINES_LIMIT).',
+      examples: [...DUPLICATE_PLAN_CONFLICT.examples, SUBSCRIPTION_ERROR_EXAMPLES.LINES_LIMIT],
+    },
   )
   async declare(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: DeclareSubscriptionBodyDto) {
     try {
