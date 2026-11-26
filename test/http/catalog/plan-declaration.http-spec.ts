@@ -5,9 +5,13 @@ import { PlanWorkspaceService } from '../../../src/modules/catalog/plan/plan-wor
 import {
   PlanNotFoundError,
   PlanWorkspaceAmbiguousError,
+  PlanWorkspacePersonInvalidError,
   PlanWorkspaceVendorRequiredError,
 } from '../../../src/modules/catalog/plan/plan.errors';
-import { WorkspaceNotResponsibleError } from '../../../src/modules/catalog/workspace/workspace.errors';
+import {
+  WorkspaceNotResponsibleError,
+  WorkspaceStaleError,
+} from '../../../src/modules/catalog/workspace/workspace.errors';
 import { bodyOf } from '../../support/api-body';
 import { bearer, createHttpContractApp, principal } from '../../support/http-contract-app';
 
@@ -220,10 +224,22 @@ describe('plan routes (e2e, no database)', () => {
     it.each([
       ['409 PLAN.WORKSPACE_AMBIGUOUS', () => new PlanWorkspaceAmbiguousError([ID]), 409, 'PLAN.WORKSPACE_AMBIGUOUS'],
       [
+        '409 WORKSPACE.STALE',
+        () => new WorkspaceStaleError(new Date('2026-12-01T00:00:00.000Z')),
+        409,
+        'WORKSPACE.STALE',
+      ],
+      [
         '422 PLAN.WORKSPACE_VENDOR_REQUIRED',
         () => new PlanWorkspaceVendorRequiredError(),
         422,
         'PLAN.WORKSPACE_VENDOR_REQUIRED',
+      ],
+      [
+        '422 PLAN.WORKSPACE_PERSON_INVALID',
+        () => new PlanWorkspacePersonInvalidError(ID),
+        422,
+        'PLAN.WORKSPACE_PERSON_INVALID',
       ],
       ['403 WORKSPACE.NOT_RESPONSIBLE', () => new WorkspaceNotResponsibleError(), 403, 'WORKSPACE.NOT_RESPONSIBLE'],
       ['404 PLAN.NOT_FOUND', () => new PlanNotFoundError(), 404, 'PLAN.NOT_FOUND'],

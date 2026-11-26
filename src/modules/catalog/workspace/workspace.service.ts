@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
+import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { AuditValue } from '../../audit/public/audit.types';
 import { AuditApi } from '../../audit/public/audit.api';
@@ -155,42 +155,66 @@ export class WorkspaceService {
   async update(actor: AuthenticatedPrincipal, id: string, input: WorkspaceChangeInput) {
     const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('The workspaces were used before installation');
-    const changes = this.cleaned(input);
 
-    await this.runner.run(async (tx) => {
-      if (changes.emergencyAccount) await this.views.requireItAdmin(tx, changes.emergencyAccount.holderEmployeeId);
-      const current = await this.repo.lock(tx, id);
-      if (!current) throw new WorkspaceNotFoundError();
-      assertResponsible(actor.employeeId, current.responsibleItAdminEmployeeId);
-      if (current.updatedAt.getTime() !== input.expectedUpdatedAt.getTime())
-        throw new WorkspaceStaleError(current.updatedAt);
-      assertWithinLimits(
-        current.admins,
-        changes.ownerLimit === undefined ? current.ownerLimit : changes.ownerLimit,
-        changes.adminLimit === undefined ? current.adminLimit : changes.adminLimit,
-      );
-
-      await this.repo.update(tx, id, {
-        ...changes,
-        ...(changes.name === undefined ? {} : { normalizedName: searchKey(changes.name) }),
-      });
-      const after = await this.repo.find(id, tx);
-      if (!after) throw new WorkspaceNotFoundError();
-      await this.audit.record(
-        tx,
-        catalogAuditEvent(
-          actor,
-          organization.id,
-          'WORKSPACE.UPDATED',
-          'Workspace',
-          id,
-          profileOf(current),
-          profileOf(after),
-        ),
-      );
-    });
+    await this.runner.run((tx) => this.updateInTx(tx, actor, organization.id, id, input));
 
     return this.get(id);
+  }
+
+  /** Locks distinct employee ids `FOR SHARE` in ascending order (tier 1) before a workspace lock (tier 5b). */
+  async requireItAdmins(tx: DbTx, employeeIds: readonly string[]): Promise<void> {
+    for (const employeeId of [...new Set(employeeIds)].sort()) {
+      await this.views.requireItAdmin(tx, employeeId);
+    }
+  }
+
+  /**
+   * Updates the profile inside a caller-managed transaction. When `options.employeeChecked` is true, the caller has already locked the
+   * emergency holder `FOR SHARE` at tier 1 before locking the workspace at tier 5b.
+   */
+  async updateInTx(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    organizationId: string,
+    id: string,
+    input: WorkspaceChangeInput,
+    options: { current?: WorkspaceRecord; employeeChecked?: boolean } = {},
+  ): Promise<WorkspaceRecord> {
+    const changes = this.cleaned(input);
+    if (!options.employeeChecked && changes.emergencyAccount) {
+      await this.views.requireItAdmin(tx, changes.emergencyAccount.holderEmployeeId);
+    }
+    const current = options.current ?? (await this.repo.lock(tx, id));
+    if (!current) throw new WorkspaceNotFoundError();
+    assertResponsible(actor.employeeId, current.responsibleItAdminEmployeeId);
+    if (current.updatedAt.getTime() !== input.expectedUpdatedAt.getTime())
+      throw new WorkspaceStaleError(current.updatedAt);
+    assertWithinLimits(
+      current.admins,
+      changes.ownerLimit === undefined ? current.ownerLimit : changes.ownerLimit,
+      changes.adminLimit === undefined ? current.adminLimit : changes.adminLimit,
+    );
+
+    await this.repo.update(tx, id, {
+      ...changes,
+      ...(changes.name === undefined ? {} : { normalizedName: searchKey(changes.name) }),
+    });
+    const after = await this.repo.find(id, tx);
+    if (!after) throw new WorkspaceNotFoundError();
+    await this.audit.record(
+      tx,
+      catalogAuditEvent(
+        actor,
+        organizationId,
+        'WORKSPACE.UPDATED',
+        'Workspace',
+        id,
+        profileOf(current),
+        profileOf(after),
+      ),
+    );
+
+    return after;
   }
 
   /** The texts of a change cleaned; a field the change does not name is absent. */

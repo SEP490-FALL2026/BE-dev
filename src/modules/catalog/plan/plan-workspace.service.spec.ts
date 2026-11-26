@@ -8,6 +8,7 @@ import {
   WorkspaceNotResponsibleError,
   WorkspacePrimaryOwnerNotAdminError,
   WorkspaceRequiredError,
+  WorkspaceStaleError,
   WorkspaceTextInvalidError,
 } from '../workspace/workspace.errors';
 import type { WorkspaceRepo } from '../workspace/workspace.repo';
@@ -31,7 +32,6 @@ import type { WorkspaceProfileRecord } from './plan.types';
 
 describe('PlanWorkspaceService: the old route writes the workspace of the vendor (W3-13)', () => {
   const tx = { tag: 'tx' };
-  const runner = { run: (work: (t: unknown) => unknown) => Promise.resolve(work(tx)) } as unknown as TransactionRunner;
   const khoa = {
     appUserId: 'u-khoa',
     employeeId: 'emp-khoa',
@@ -56,9 +56,12 @@ describe('PlanWorkspaceService: the old route writes the workspace of the vendor
       resolve?: () => Promise<string | null>;
       adminsFail?: Error;
       updateFail?: Error;
+      employeesFail?: Error;
     } = {},
   ) {
     const order: string[] = [];
+    const runSpy = jest.fn((work: (t: unknown) => unknown) => Promise.resolve(work(tx)));
+    const localRunner = { run: runSpy } as unknown as TransactionRunner;
     const plan =
       options.plan === undefined
         ? { id: 'plan-1', provisioningType: 'K2', hasAdminConsole: false, applicationVendorId: 'v-1' }
@@ -67,24 +70,34 @@ describe('PlanWorkspaceService: the old route writes the workspace of the vendor
       findLookups: jest.fn().mockResolvedValue(plan ? [plan] : []),
       findProfile: jest.fn().mockResolvedValue(options.before === undefined ? null : options.before),
     } as unknown as PlanRepo;
+    const afterAdminsVersion = new Date('2026-12-02T00:00:00.000Z');
     const workspaceAdmins = {
-      set: jest.fn(() => {
+      setInTx: jest.fn(() => {
         order.push('admins');
 
         return options.adminsFail
           ? Promise.reject(options.adminsFail)
-          : Promise.resolve({ updatedAt: '2026-12-02T00:00:00.000Z' });
+          : Promise.resolve({ id: 'ws-1', updatedAt: afterAdminsVersion });
       }),
     } as unknown as WorkspaceAdminsService;
     const workspaces = {
-      update: jest.fn(() => {
+      requireItAdmins: jest.fn(() => {
+        order.push('requireItAdmins');
+
+        return options.employeesFail ? Promise.reject(options.employeesFail) : Promise.resolve();
+      }),
+      updateInTx: jest.fn(() => {
         order.push('update');
 
         return options.updateFail ? Promise.reject(options.updateFail) : Promise.resolve({});
       }),
     } as unknown as WorkspaceService;
     const forSubscription = {
-      resolveAndLock: jest.fn(options.resolve ?? (() => Promise.resolve('ws-1'))),
+      resolveAndLock: jest.fn(() => {
+        order.push('resolveAndLock');
+
+        return (options.resolve ?? (() => Promise.resolve('ws-1')))();
+      }),
     } as unknown as WorkspaceForSubscriptionService;
     const workspaceRepo = {
       find: jest.fn().mockResolvedValue({ id: 'ws-1', updatedAt: version }),
@@ -107,12 +120,13 @@ describe('PlanWorkspaceService: the old route writes the workspace of the vendor
         forSubscription,
         workspaceRepo,
         organizationReads,
-        runner,
+        localRunner,
       ),
       plans: plans as unknown as Record<string, jest.Mock>,
       workspaceAdmins: workspaceAdmins as unknown as Record<string, jest.Mock>,
       workspaces: workspaces as unknown as Record<string, jest.Mock>,
       forSubscription: forSubscription as unknown as Record<string, jest.Mock>,
+      runSpy,
       order,
     };
   }
@@ -134,12 +148,24 @@ describe('PlanWorkspaceService: the old route writes the workspace of the vendor
     ...over,
   });
 
-  it('finds the workspace of the vendor, writes the administrators and then the rest of the profile on the version they leave', async () => {
-    const { service, plans, workspaceAdmins, workspaces, forSubscription, order } = setup();
+  it('locks employees then workspace in a single transaction, checks limits with new values, and updates the profile', async () => {
+    const { service, plans, workspaceAdmins, workspaces, forSubscription, runSpy, order } = setup();
     plans.findProfile.mockReset().mockResolvedValueOnce(null).mockResolvedValueOnce(stored());
 
-    const view = await service.set(khoa, 'plan-1', input);
+    const view = await service.set(khoa, 'plan-1', {
+      ...input,
+      ownerLimit: 1,
+      adminLimit: 4,
+      emergencyAccount: {
+        identity: 'break-glass',
+        occupiesSeat: false,
+        holderEmployeeId: 'emp-break',
+        lastReviewedOn: '2026-12-01',
+      },
+    });
 
+    expect(runSpy).toHaveBeenCalledTimes(1);
+    expect(workspaces.requireItAdmins).toHaveBeenCalledWith(tx, ['emp-break', 'emp-khoa', 'emp-nam']);
     expect(forSubscription.resolveAndLock).toHaveBeenCalledWith(
       tx,
       khoa,
@@ -147,22 +173,74 @@ describe('PlanWorkspaceService: the old route writes the workspace of the vendor
       { vendorId: 'v-1', needsWorkspace: true },
       undefined,
     );
-    expect(order).toEqual(['admins', 'update']);
-    expect(workspaceAdmins.set).toHaveBeenCalledWith(khoa, 'ws-1', {
-      admins: input.members,
-      primaryOwnerEmployeeId: 'emp-khoa',
-      expectedUpdatedAt: version,
-    });
-    expect(workspaces.update).toHaveBeenCalledWith(khoa, 'ws-1', {
-      expectedUpdatedAt: new Date('2026-12-02T00:00:00.000Z'),
-      ownerLimit: null,
-      adminLimit: null,
-      ownerTransferProcedure: null,
-      emergencyAccount: null,
-      ownerAccountEmail: 'it@acme.vn',
-      adminNote: 'Standard note',
-    });
+    expect(order).toEqual(['requireItAdmins', 'resolveAndLock', 'admins', 'update']);
+    expect(workspaceAdmins.setInTx).toHaveBeenCalledWith(
+      tx,
+      khoa,
+      'org-1',
+      'ws-1',
+      {
+        admins: input.members,
+        primaryOwnerEmployeeId: 'emp-khoa',
+        expectedUpdatedAt: version,
+      },
+      {
+        current: { id: 'ws-1', updatedAt: version },
+        limits: { ownerLimit: 1, adminLimit: 4 },
+        employeesChecked: true,
+      },
+    );
+    expect(workspaces.updateInTx).toHaveBeenCalledWith(
+      tx,
+      khoa,
+      'org-1',
+      'ws-1',
+      {
+        expectedUpdatedAt: new Date('2026-12-02T00:00:00.000Z'),
+        ownerLimit: 1,
+        adminLimit: 4,
+        ownerTransferProcedure: null,
+        emergencyAccount: {
+          identity: 'break-glass',
+          occupiesSeat: false,
+          holderEmployeeId: 'emp-break',
+          lastReviewedOn: '2026-12-01',
+        },
+        ownerAccountEmail: 'it@acme.vn',
+        adminNote: 'Standard note',
+      },
+      { current: { id: 'ws-1', updatedAt: new Date('2026-12-02T00:00:00.000Z') }, employeeChecked: true },
+    );
     expect(view.primaryOwner).toEqual({ employeeId: 'emp-khoa', employeeCode: 'KHOA', fullName: 'Khoa' });
+  });
+
+  it('stops on invalid emergency holder before resolveAndLock so no workspace or admin is written', async () => {
+    const { service, forSubscription, workspaceAdmins } = setup({
+      employeesFail: new WorkspaceAdminNotItAdminError('emp-fin'),
+    });
+
+    await expect(
+      service.set(khoa, 'plan-1', {
+        ...input,
+        emergencyAccount: {
+          identity: 'break-glass',
+          occupiesSeat: false,
+          holderEmployeeId: 'emp-fin',
+          lastReviewedOn: '2026-12-01',
+        },
+      }),
+    ).rejects.toBeInstanceOf(PlanWorkspacePersonInvalidError);
+    expect(forSubscription.resolveAndLock).not.toHaveBeenCalled();
+    expect(workspaceAdmins.setInTx).not.toHaveBeenCalled();
+  });
+
+  it('passes through WorkspaceStaleError when a concurrent write moved the workspace version', async () => {
+    const { service } = setup({
+      before: stored({ adminNote: 'Old note' }),
+      adminsFail: new WorkspaceStaleError(new Date('2026-12-03T00:00:00.000Z')),
+    });
+
+    await expect(service.set(khoa, 'plan-1', input)).rejects.toBeInstanceOf(WorkspaceStaleError);
   });
 
   it('writes nothing when the profile already says what the route is given', async () => {
@@ -171,8 +249,8 @@ describe('PlanWorkspaceService: the old route writes the workspace of the vendor
 
     await service.set(khoa, 'plan-1', input);
 
-    expect(workspaceAdmins.set).not.toHaveBeenCalled();
-    expect(workspaces.update).not.toHaveBeenCalled();
+    expect(workspaceAdmins.setInTx).not.toHaveBeenCalled();
+    expect(workspaces.updateInTx).not.toHaveBeenCalled();
   });
 
   it('refuses a plan that does not exist, a plan that needs no admins at the vendor, and an application with no vendor', async () => {
@@ -245,6 +323,6 @@ describe('PlanWorkspaceService: the old route writes the workspace of the vendor
         },
       }),
     ).rejects.toBeInstanceOf(PlanWorkspaceTextInvalidError);
-    expect(workspaceAdmins.set).not.toHaveBeenCalled();
+    expect(workspaceAdmins.setInTx).not.toHaveBeenCalled();
   });
 });

@@ -274,4 +274,61 @@ describe('WorkspaceService', () => {
 
     await expect(service.get('ws-9')).rejects.toBeInstanceOf(WorkspaceNotFoundError);
   });
+
+  describe('updateInTx and requireItAdmins', () => {
+    it('locks distinct employee ids in ascending order via requireItAdmins', async () => {
+      const order: string[] = [];
+      const { service, views } = setup();
+      views.requireItAdmin.mockImplementation((_tx: unknown, employeeId: string) => {
+        order.push(employeeId);
+        return Promise.resolve();
+      });
+
+      await service.requireItAdmins(tx as never, ['emp-nam', 'emp-khoa', 'emp-nam']);
+
+      expect(order).toEqual(['emp-khoa', 'emp-nam']);
+    });
+
+    it('updates inside caller tx using provided current record without re-locking when employeeChecked is true', async () => {
+      const { service, repo, views } = setup();
+      const current = {
+        id: 'ws-1',
+        name: 'Anthropic',
+        responsibleItAdminEmployeeId: 'emp-khoa',
+        ownerLimit: null,
+        adminLimit: null,
+        ownerAccountEmail: null,
+        adminNote: null,
+        ownerTransferProcedure: null,
+        emergencyAccount: null,
+        admins: [
+          { employeeId: 'emp-khoa', role: 'OWNER' as const },
+          { employeeId: 'emp-nam', role: 'ADMIN' as const },
+        ],
+        updatedAt: version,
+      } as WorkspaceRecord;
+
+      await service.updateInTx(
+        tx as never,
+        khoa,
+        'org-1',
+        'ws-1',
+        {
+          expectedUpdatedAt: version,
+          adminLimit: 1,
+          emergencyAccount: {
+            identity: 'break-glass',
+            occupiesSeat: false,
+            holderEmployeeId: 'emp-nam',
+            lastReviewedOn: '2026-12-01',
+          },
+        },
+        { current, employeeChecked: true },
+      );
+
+      expect(views.requireItAdmin).not.toHaveBeenCalled();
+      expect(repo.lock).not.toHaveBeenCalled();
+      expect(repo.update).toHaveBeenCalledWith(tx, 'ws-1', expect.objectContaining({ adminLimit: 1 }));
+    });
+  });
 });

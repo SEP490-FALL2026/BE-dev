@@ -176,4 +176,45 @@ describe('WorkspaceAdminsService', () => {
 
     await expect(service.set(khoa, 'ws-9', body)).rejects.toBeInstanceOf(WorkspaceNotFoundError);
   });
+
+  describe('setInTx', () => {
+    it('validates against caller-supplied limits and skips employee re-locking when employeesChecked is true', async () => {
+      const { service, repo, requireItAdmin } = setup({
+        locked: { adminLimit: 1 },
+      });
+      const current = {
+        id: 'ws-1',
+        responsibleItAdminEmployeeId: 'emp-khoa',
+        primaryOwnerEmployeeId: 'emp-khoa',
+        ownerLimit: 1,
+        adminLimit: 1,
+        admins: [{ employeeId: 'emp-khoa', role: 'OWNER' as const }],
+        updatedAt: version,
+      } as WorkspaceRecord;
+      const fourAdmins = [
+        { employeeId: 'emp-khoa', role: 'OWNER' as const },
+        { employeeId: 'emp-nam', role: 'ADMIN' as const },
+        { employeeId: 'emp-lan', role: 'ADMIN' as const },
+        { employeeId: 'emp-minh', role: 'ADMIN' as const },
+      ];
+
+      await service.setInTx(
+        tx as never,
+        khoa,
+        'org-1',
+        'ws-1',
+        { admins: fourAdmins, primaryOwnerEmployeeId: 'emp-khoa', expectedUpdatedAt: version },
+        { current, limits: { ownerLimit: 1, adminLimit: 3 }, employeesChecked: true },
+      );
+
+      expect(requireItAdmin).not.toHaveBeenCalled();
+      expect((repo as unknown as { lock: jest.Mock }).lock).not.toHaveBeenCalled();
+      expect((repo as unknown as { replaceAdmins: jest.Mock }).replaceAdmins).toHaveBeenCalledWith(
+        tx,
+        'ws-1',
+        fourAdmins,
+        'emp-khoa',
+      );
+    });
+  });
 });

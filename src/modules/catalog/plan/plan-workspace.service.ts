@@ -8,6 +8,7 @@ import {
   WorkspaceLimitExceededError,
   WorkspacePrimaryOwnerNotAdminError,
   WorkspaceRequiredError,
+  WorkspaceStaleError,
   WorkspaceTextInvalidError,
 } from '../workspace/workspace.errors';
 import { WorkspaceRepo } from '../workspace/workspace.repo';
@@ -132,7 +133,7 @@ export class PlanWorkspaceService {
     }
 
     try {
-      await this.writeToWorkspace(actor, vendorId, next);
+      await this.writeToWorkspace(actor, vendorId, next, before?.updatedAt);
     } catch (error) {
       throw this.asPlanError(error);
     }
@@ -140,43 +141,74 @@ export class PlanWorkspaceService {
     return this.view((await this.plans.findProfile(planId)) as WorkspaceProfileRecord);
   }
 
-  /** The administrators first, then the rest of the profile on the version they leave: the limits of the profile are judged against the new people. */
+  /**
+   * Writes admins and profile fields in one transaction (`T-1`, `W-6`): locks all distinct employees `FOR SHARE` in ascending `id` order
+   * (tier 1) before resolving and locking the workspace `FOR UPDATE` (tier 5b), checks limits once against the new profile limits, and rolls back
+   * everything together on any failure.
+   */
   private async writeToWorkspace(
     actor: AuthenticatedPrincipal,
     vendorId: string,
     profile: Omit<WorkspaceProfileRecord, 'updatedAt'>,
+    expectedUpdatedAt?: Date,
   ): Promise<void> {
-    const workspaceId = await this.workspaceOf(actor, vendorId);
-    const current = await this.workspaceRepo.find(workspaceId);
-    if (!current) throw new PlanNotFoundError();
-    const withAdmins = await this.workspaceAdmins.set(actor, workspaceId, {
-      admins: profile.members,
-      primaryOwnerEmployeeId: profile.primaryOwnerEmployeeId,
-      expectedUpdatedAt: current.updatedAt,
-    });
-    await this.workspaces.update(actor, workspaceId, {
-      expectedUpdatedAt: new Date(withAdmins.updatedAt),
-      ownerLimit: profile.ownerLimit,
-      adminLimit: profile.adminLimit,
-      ownerTransferProcedure: profile.ownerTransferProcedure,
-      emergencyAccount: profile.emergencyAccount,
-      ownerAccountEmail: profile.ownerAccountEmail,
-      adminNote: profile.adminNote,
-    });
-  }
-
-  /** The workspace of the vendor the profile is written to: the only one, or one made named after the vendor; several is the caller's to choose. */
-  private async workspaceOf(actor: AuthenticatedPrincipal, vendorId: string): Promise<string> {
     const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('The workspace profile was used before installation');
-    const id = await this.runner.run((tx) =>
-      this.forSubscription.resolveAndLock(tx, actor, organization.id, { vendorId, needsWorkspace: true }, undefined),
-    );
 
-    return id as string;
+    const employeeIds = [
+      ...new Set([
+        ...profile.members.map((member) => member.employeeId),
+        ...(profile.emergencyAccount ? [profile.emergencyAccount.holderEmployeeId] : []),
+      ]),
+    ].sort();
+
+    await this.runner.run(async (tx) => {
+      await this.workspaces.requireItAdmins(tx, employeeIds);
+      const workspaceId = (await this.forSubscription.resolveAndLock(
+        tx,
+        actor,
+        organization.id,
+        { vendorId, needsWorkspace: true },
+        undefined,
+      )) as string;
+      const current = await this.workspaceRepo.find(workspaceId, tx);
+      if (!current) throw new PlanNotFoundError();
+      const withAdmins = await this.workspaceAdmins.setInTx(
+        tx,
+        actor,
+        organization.id,
+        workspaceId,
+        {
+          admins: profile.members,
+          primaryOwnerEmployeeId: profile.primaryOwnerEmployeeId,
+          expectedUpdatedAt: expectedUpdatedAt ?? current.updatedAt,
+        },
+        {
+          current,
+          limits: { ownerLimit: profile.ownerLimit, adminLimit: profile.adminLimit },
+          employeesChecked: true,
+        },
+      );
+      await this.workspaces.updateInTx(
+        tx,
+        actor,
+        organization.id,
+        workspaceId,
+        {
+          expectedUpdatedAt: withAdmins.updatedAt,
+          ownerLimit: profile.ownerLimit,
+          adminLimit: profile.adminLimit,
+          ownerTransferProcedure: profile.ownerTransferProcedure,
+          emergencyAccount: profile.emergencyAccount,
+          ownerAccountEmail: profile.ownerAccountEmail,
+          adminNote: profile.adminNote,
+        },
+        { current: withAdmins, employeeChecked: true },
+      );
+    });
   }
 
-  /** The error of the workspace as the plan route has always said it. */
+  /** The error of the workspace as the plan route answers it. */
   private asPlanError(error: unknown): unknown {
     if (error instanceof WorkspaceAdminNotItAdminError) return new PlanWorkspacePersonInvalidError(error.employeeId);
     if (error instanceof WorkspaceTextInvalidError) return new PlanWorkspaceTextInvalidError();
@@ -185,6 +217,7 @@ export class PlanWorkspaceService {
       return new PlanVendorAdminsInvalidError(error.given, error.minimum);
     if (error instanceof WorkspacePrimaryOwnerNotAdminError) return new PlanPrimaryOwnerNotListedError();
     if (error instanceof WorkspaceRequiredError) return new PlanWorkspaceAmbiguousError(error.workspaceIds);
+    if (error instanceof WorkspaceStaleError) return error;
 
     return error;
   }
