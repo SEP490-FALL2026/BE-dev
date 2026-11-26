@@ -1,4 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { businessDateAt } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
@@ -30,8 +30,8 @@ export class GroupWithdrawalAftermath {
     private readonly audit: AuditApi,
     private readonly outcomes: RequestOutcomeService,
     private readonly resolution: GroupResolutionService,
-    @Optional() private readonly lots?: LicenseLotApi,
-    @Optional() private readonly orgs?: OrganizationReadApi,
+    private readonly lots: LicenseLotApi,
+    private readonly orgs: OrganizationReadApi,
   ) {}
 
   /** Gives back what the people hold, once for all of them, says what happened to each and lets the request follow its lines. */
@@ -83,7 +83,7 @@ export class GroupWithdrawalAftermath {
 
   /** F-18: lock the lot at tier 6a BEFORE checking `invoiceActualMinor` so a concurrent invoice confirmation settles first. */
   private async lockInvoicedLot(tx: DbTx, request: AccessRequestRecord) {
-    if (!this.lots || !request.planId) return null;
+    if (!request.planId) return null;
     const found = await this.lots.findLotOfRequest(request.id, tx);
     if (!found) return null;
     const locked = await this.lots.lockLot(tx, found.id);
@@ -100,11 +100,10 @@ export class GroupWithdrawalAftermath {
   ): Promise<void> {
     const costCenterId =
       request.costCenterId ??
-      (this.orgs
-        ? ((await this.orgs.getUnitCostCenterIds([request.departmentId], tx)).get(request.departmentId) ?? null)
-        : null);
+      (await this.orgs.getUnitCostCenterIds([request.departmentId], tx)).get(request.departmentId) ??
+      null;
     if (!costCenterId) return;
-    const org = this.orgs ? await this.orgs.getOrganization(tx) : null;
+    const org = await this.orgs.getOrganization(tx);
     const withdrawalMonth = firstOfMonth(businessDateAt(now, org?.timeZone ?? 'Asia/Ho_Chi_Minh'));
     for (const entry of toRelease) {
       await this.budgets.recordLotWithdrawalAfterInvoice(tx, {

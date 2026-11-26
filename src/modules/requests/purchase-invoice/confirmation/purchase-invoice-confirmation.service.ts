@@ -186,8 +186,6 @@ export class PurchaseInvoiceConfirmationService {
     row: PurchaseInvoiceRow,
     now: Date,
   ): Promise<{ licenseLotId: string; allocationMonth: string; lotBeneficiaryCount: number } | null> {
-    if (typeof this.plans.lotConfirmationContextOf !== 'function') return null;
-
     return this.plans.lotConfirmationContextOf(row, now, tx);
   }
 

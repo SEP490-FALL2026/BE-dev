@@ -1,4 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { fiscalYearOf } from '../../../core/fiscal-year';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { BudgetsApi } from '../../budgets/public/budgets.api';
@@ -25,9 +25,9 @@ export class GrantSettlementService {
     private readonly budgets: BudgetsApi,
     private readonly licensing: LicensingApi,
     private readonly lineAmounts: LineAmountRepo,
-    @Optional() private readonly lots?: LicenseLotApi,
-    @Optional() private readonly orgs?: OrganizationReadApi,
-    @Optional() private readonly requestsRepo?: AccessRequestRepo,
+    private readonly lots: LicenseLotApi,
+    private readonly orgs: OrganizationReadApi,
+    private readonly requestsRepo: AccessRequestRepo,
   ) {}
 
   release(tx: DbTx, input: CommitmentReleaseInput): Promise<ReleasedCommitment[]> {
@@ -61,7 +61,7 @@ export class GrantSettlementService {
     tx?: DbTx,
   ): Promise<Map<string, { beneficiaries: number; chargedExcess: number }>> {
     const result = new Map<string, { beneficiaries: number; chargedExcess: number }>();
-    if (!this.requestsRepo || lotRequests.length === 0) return result;
+    if (lotRequests.length === 0) return result;
 
     const chargedCounts = await this.budgets.chargedExcessCountsOfLots(
       lotRequests.map((item) => item.lotId),
@@ -112,8 +112,7 @@ export class GrantSettlementService {
   ): facts is GrantOutcomeFacts & { licenseLotId: string; licenseKeyId: string } {
     return (
       outcome === 'COMPLETED' &&
-      Boolean(facts?.fromPool && facts.provisioningType === 'K4' && facts.licenseLotId && facts.licenseKeyId) &&
-      this.lots !== undefined
+      Boolean(facts?.fromPool && facts.provisioningType === 'K4' && facts.licenseLotId && facts.licenseKeyId)
     );
   }
 
@@ -124,9 +123,8 @@ export class GrantSettlementService {
     facts: GrantOutcomeFacts & { licenseLotId: string; licenseKeyId: string },
     now: Date,
   ): Promise<'OWN_REQUEST' | 'ALREADY_BORNE' | 'EXCESS_LICENSE'> {
-    if (!this.lots) return 'ALREADY_BORNE';
     const lot = await this.lots.findLot(facts.licenseLotId, tx);
-    const lotReq = lot?.requestId && this.requestsRepo ? await this.requestsRepo.findById(lot.requestId, tx) : null;
+    const lotReq = lot?.requestId ? await this.requestsRepo.findById(lot.requestId, tx) : null;
     const effectiveM = lotReq ? activeBeneficiaryCountOf(lotReq) : 0;
     const costCenterId = request.costCenterId ?? (await this.deptCostCenterId(request.departmentId, tx));
     if (!costCenterId) return 'ALREADY_BORNE';
@@ -176,7 +174,6 @@ export class GrantSettlementService {
   }
 
   private async deptCostCenterId(departmentId: string, tx: DbTx): Promise<string | null> {
-    if (!this.orgs) return null;
     const map = await this.orgs.getUnitCostCenterIds([departmentId], tx);
 
     return map.get(departmentId) ?? null;

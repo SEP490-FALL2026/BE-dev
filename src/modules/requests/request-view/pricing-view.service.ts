@@ -100,12 +100,12 @@ export interface CostEstimateView {
 export class PricingViewService {
   constructor(
     private readonly finance: FinanceApi,
-    private readonly poolStock?: LicensingPoolStockApi,
+    private readonly poolStock: LicensingPoolStockApi,
   ) {}
 
   /** Computes `vendorChargeUntilRenewal` at read time when commitment is 12 and `free === 0`. */
   async vendorChargeUntilRenewalOf(planId: string | null): Promise<VendorChargeUntilRenewalView | undefined> {
-    if (!planId || !this.poolStock) return undefined;
+    if (!planId) return undefined;
     const context = await this.poolStock.getVendorChargeContext(planId);
     if (!context) return undefined;
     const estimate = vendorChargeUntilRenewalOf(context);

@@ -66,7 +66,6 @@ export class PurchaseInvoicePlanService {
     now: Date,
     tx: DbTx,
   ): Promise<{ licenseLotId: string; allocationMonth: BusinessDate; lotBeneficiaryCount: number } | null> {
-    if (typeof this.pool.lockLot !== 'function') return null;
     const lotId = await this.resolveConfirmationLotId(row, tx);
     if (!lotId) return null;
 
@@ -89,7 +88,7 @@ export class PurchaseInvoicePlanService {
     tx: DbTx,
   ): Promise<string | null> {
     if (row.linkKind === 'LICENSE_LOT' && row.licenseLotId) return row.licenseLotId;
-    if (row.linkKind === 'REQUEST' && row.requestId && typeof this.pool.findLotOfRequest === 'function') {
+    if (row.linkKind === 'REQUEST' && row.requestId) {
       return (await this.pool.findLotOfRequest(row.requestId, tx))?.id ?? null;
     }
 
@@ -165,7 +164,6 @@ export class PurchaseInvoicePlanService {
   }
 
   private async loadUninvoicedRequestLot(requestId: string, tx?: DbTx): Promise<LicenseLotView | null> {
-    if (typeof this.pool.findLotOfRequest !== 'function') return null;
     const requestLot = await this.pool.findLotOfRequest(requestId, tx);
     if (requestLot && requestLot.invoiceActualMinor !== null) {
       throw new PurchaseInvoiceRefusedError('LOT_ALREADY_INVOICED');

@@ -1,4 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { businessDateAt, type BusinessDate } from '../../../../core/business-date';
 import { addMonths } from '../../../../core/fiscal-year';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
@@ -25,22 +25,22 @@ export class PurchaseInvoicePoolService {
     private readonly seatLedger: SeatLedgerApi,
     private readonly grants: LicensingOpenGrantsApi,
     private readonly organizationReads: OrganizationReadApi,
-    @Optional() private readonly lots?: LicenseLotApi,
+    private readonly lots: LicenseLotApi,
   ) {}
 
   findLot(lotId: string, tx?: DbTx) {
-    return this.lots ? this.lots.findLot(lotId, tx) : Promise.resolve(null);
+    return this.lots.findLot(lotId, tx);
   }
 
   findLotOfRequest(requestId: string, tx?: DbTx) {
-    return this.lots ? this.lots.findLotOfRequest(requestId, tx) : Promise.resolve(null);
+    return this.lots.findLotOfRequest(requestId, tx);
   }
 
   lockLot(lotId: string, tx: DbTx) {
-    return this.lots ? this.lots.lockLot(tx, lotId) : Promise.resolve(null);
+    return this.lots.lockLot(tx, lotId);
   }
 
-  get lotApi(): LicenseLotApi | undefined {
+  get lotApi(): LicenseLotApi {
     return this.lots;
   }
 

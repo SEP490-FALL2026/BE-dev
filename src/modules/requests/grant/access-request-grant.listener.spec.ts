@@ -1,9 +1,11 @@
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuditApi } from '../../audit/public/audit.api';
 import type { BudgetsApi } from '../../budgets/public/budgets.api';
+import type { LicenseLotApi } from '../../catalog/public/license-lot.api';
 import type { LicensingApi } from '../../licensing/public/licensing.api';
 import type { GrantRequestGateHook } from '../../licensing/public/licensing.extension-points';
 import type { GrantOutcomeFacts } from '../../licensing/public/licensing.types';
+import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import type { GroupGrantService } from '../group-request/group-grant.service';
@@ -89,6 +91,12 @@ function build(
     { releaseForRequest, committedByRequests } as unknown as BudgetsApi,
     { recordAvoidedCost } as unknown as LicensingApi,
     { of: lineAmountsOf } as unknown as LineAmountRepo,
+    { findLot: jest.fn().mockResolvedValue(null) } as unknown as LicenseLotApi,
+    { getUnitCostCenterIds: jest.fn().mockResolvedValue(new Map()) } as unknown as OrganizationReadApi,
+    {
+      findById: jest.fn().mockResolvedValue(null),
+      findByIds: jest.fn().mockResolvedValue([]),
+    } as unknown as AccessRequestRepo,
   );
   const gate = new AccessRequestGrantGate(
     { lockById, setGrantOutcome } as unknown as AccessRequestRepo,
