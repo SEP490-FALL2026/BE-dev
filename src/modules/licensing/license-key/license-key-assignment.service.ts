@@ -53,7 +53,13 @@ export class LicenseKeyAssignmentService {
     try {
       await this.repo.assign(tx, key.id, input.assignmentId);
     } catch (error) {
-      if (isCheckViolation(error, 'license_key_assignment_plan_account')) {
+      if (
+        isCheckViolation(
+          error,
+          'license_key_assignment_plan_account',
+          'A license key is given to a person only when its plan is bound to an account',
+        )
+      ) {
         throw new ProvisioningPlanBoundToDeviceError();
       }
       throw error;

@@ -143,11 +143,13 @@ describe('SubscriptionPeriodService.recordNext multi-line ACTIVE pricing', () =>
       status?: string;
       unitPrice?: { amountMinor: bigint; currency: string } | null;
       priceSnapshot?: { reportingMinor: bigint; rate: bigint } | null;
+      monthlyUnitPriceMinor?: bigint | null;
     };
     expect(inserted).toMatchObject({
       status: 'ACTIVE',
       unitPrice: { amountMinor: 500000n, currency: 'VND' },
       priceSnapshot: { reportingMinor: 500000n, rate: 1n },
+      monthlyUnitPriceMinor: 500000n,
     });
   });
 });

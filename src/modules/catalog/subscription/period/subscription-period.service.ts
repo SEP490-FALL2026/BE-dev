@@ -255,7 +255,8 @@ export class SubscriptionPeriodService {
       ...state,
       minimumSeatsTotal: previous.minimumSeatsTotal,
       ...priced,
-      monthlyUnitPriceMinor: linePricing.monthlyUnitPriceMinor,
+      monthlyUnitPriceMinor:
+        status === 'ACTIVE' ? linePricing.activeMonthlyUnitPriceMinor : linePricing.monthlyUnitPriceMinor,
       originalPrice: null,
       isPrimaryForPlan: takesPrimary,
       status,
@@ -370,6 +371,7 @@ export class SubscriptionPeriodService {
       priced,
       activePriced,
       monthlyUnitPriceMinor: single.monthlyUnitPriceMinor,
+      activeMonthlyUnitPriceMinor: single.monthlyUnitPriceMinor ?? minor,
       resolved,
       statusState: <T extends Record<string, unknown>>(s: T) => ({
         ...s,
@@ -400,6 +402,7 @@ export class SubscriptionPeriodService {
       priced,
       activePriced: priced,
       monthlyUnitPriceMinor,
+      activeMonthlyUnitPriceMinor: monthlyUnitPriceMinor,
       resolved,
       statusState: <T extends Record<string, unknown>>(s: T) => ({ ...s, ...priced }),
     };

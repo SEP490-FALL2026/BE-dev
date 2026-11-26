@@ -56,6 +56,47 @@ describe('LicenseKeyAssignmentService (S-4)', () => {
     expect(record).not.toHaveBeenCalled();
   });
 
+  it('maps @prisma/adapter-pg P2039 23514 check violation with originalMessage (without constraint field) to ProvisioningPlanBoundToDeviceError', async () => {
+    const dbError = new Prisma.PrismaClientKnownRequestError('trigger error', {
+      code: 'P2039',
+      clientVersion: 'test',
+      meta: {
+        driverAdapterError: {
+          cause: {
+            originalCode: '23514',
+            originalMessage: 'A license key is given to a person only when its plan is bound to an account',
+          },
+        },
+      },
+    });
+    const record = jest.fn();
+    const service = new LicenseKeyAssignmentService(
+      {
+        lock: jest.fn().mockResolvedValue({
+          id: 'k-1',
+          subscriptionId: 'sub-1',
+          status: 'IN_STORE',
+          withdrawnAt: null,
+        }),
+        assign: jest.fn().mockRejectedValue(dbError),
+      } as unknown as LicenseKeyRepo,
+      { lockSeatTarget: jest.fn().mockResolvedValue(null) } as unknown as CatalogApi,
+      { record } as unknown as AuditApi,
+      { lockLot: jest.fn() } as unknown as LicenseLotApi,
+    );
+
+    await expect(
+      service.assign(tx, actor, {
+        organizationId: 'org-1',
+        licenseKeyId: 'k-1',
+        assignmentId: 'asg-1',
+        subscriptionId: 'sub-1',
+      }),
+    ).rejects.toBeInstanceOf(ProvisioningPlanBoundToDeviceError);
+
+    expect(record).not.toHaveBeenCalled();
+  });
+
   it('locks the lot via LicenseLotApi before locking the key when assignment subscriptionId is null (W3-24)', async () => {
     const order: string[] = [];
     const lockLot = jest.fn().mockImplementation(() => {
