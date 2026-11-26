@@ -117,7 +117,7 @@ export class DeviceActivationRepo {
     };
   }
 
-  /** Locks the key `FOR SHARE` (tier 6b) after the caller has locked its subscription (tier 6). */
+  /** Locks the key `FOR SHARE` (tier 7b) after the caller has locked its subscription (tier 6). */
   async lockKeyForShare(tx: DbTx, licenseKeyId: string): Promise<void> {
     await tx.$queryRaw`SELECT id FROM license_keys WHERE id = ${licenseKeyId}::uuid FOR SHARE`;
   }

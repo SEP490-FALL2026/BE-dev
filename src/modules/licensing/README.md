@@ -171,7 +171,7 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   `PATCH /license-keys/{id}` với `expectedUpdatedAt` (`licenseKeyUpdate`); liệt kê trả thêm `maxActivations`, `activationsUsed`,
   `openActivations`, `capReached`, `updatedAt` và `summary.keyBinding/occupied/free`, không lộ `initial_activations_used`; xem đầy
   đủ; rút khỏi kho `licenseKeyWithdraw`), `LicenseKeyAssignmentService` (gán khóa khi hoàn tất cấp K4 `ACCOUNT`, lấy lại khi thu
-  hồi). Tầng khóa: `0b` (khi có `initialActivationsUsed > 0`) → `6` (`subscriptions`) → `6b` (`license_keys`).
+  hồi). Tầng khóa: `0b` (khi có `initialActivationsUsed > 0`) → `6` (`subscriptions`) → `7b` (`license_keys`).
 - `my-software/` — "Phần mềm của tôi" (US-12-15 AC-2, US-16-01 AC-1): `my-software.controller.ts`
   (`GET /me/software-rights`, mọi tài khoản đã đăng nhập (`QĐ-95d`), chỉ quyền cá nhân của chính người gọi), `MySoftwareService`, `MySoftwareRepo`;
   trạng thái theo ngày nghiệp vụ ở `my-software.policy.ts`. Không đọc khóa K4, giá, Cost Center hay định danh tài khoản.

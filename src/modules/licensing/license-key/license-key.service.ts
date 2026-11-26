@@ -52,7 +52,7 @@ const viewOf = (key: LicenseKeyListed, counts: LicenseKeyActivationCounts = NO_C
  * message or a list.
  *
  * Lock order of the routes that write: an import that tells the activations already used holds the state of the seat baseline first (tier 0b),
- * then the purchase `FOR UPDATE` (tier 6) and its plan `FOR SHARE`; a withdrawal or a raise of the cap takes the purchase, then the key (tier 6b).
+ * then the purchase `FOR UPDATE` (tier 6) and its plan `FOR SHARE`; a withdrawal or a raise of the cap takes the purchase, then the key (tier 7b).
  */
 @Injectable()
 export class LicenseKeyService {
@@ -187,7 +187,7 @@ export class LicenseKeyService {
 
   /**
    * Raises the cap of activations of a key (`KHOA-08`): the cap only goes up, and the caller names the version of the key it read, so a raise
-   * made on a stale picture is refused. The purchase is locked first and the key after it (tier 6, then 6b), as a withdrawal does. One event of
+   * made on a stale picture is refused. The purchase is locked first and the key after it (tier 6, then 7b), as a withdrawal does. One event of
    * the audit trail says the old and the new cap and why. Throws LicenseKeyNotFoundError, LicenseKeyStaleError and
    * LicenseKeyMaxActivationsNotRaisedError.
    */
