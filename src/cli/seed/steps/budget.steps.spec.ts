@@ -28,8 +28,8 @@ describe('the base of the budget of the year (T9b)', () => {
     }
   });
 
-  it('keeps ENG at the 170 million of its BM-10 lines and names the light in the label; a day too early says the light is not reached', () => {
-    expect(yearPlanOf(ctx, budget('ENG'))).toEqual({ base: '170000000', label: ' (đèn UNDER)' });
+  it('keeps ENG at the 185 million of its BM-10 lines and names the light in the label; a day too early says the light is not reached', () => {
+    expect(yearPlanOf(ctx, budget('ENG'))).toEqual({ base: '185000000', label: ' (đèn UNDER)' });
     const early = yearPlanOf({ fixture: F, today: '2026-05-10' } as unknown as DemoRunContext, budget('ENG'));
 
     expect(early.label).toContain('chưa đạt được');

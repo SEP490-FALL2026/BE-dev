@@ -27,13 +27,33 @@ it('covers both provisional group lines before the spending approver rejects one
     const group = F.requests.find((request) => request.key === 'R49')!;
     const subscription = F.subscriptions.find((subscription) => subscription.plan === group.plan)!;
     const months = 12 - Number(today.slice(5, 7)) + 1;
-    const provisional = Math.ceil(Number(subscription.unitPrice.amount) / 12) * months * group.beneficiaries!.length;
+    const provisional = Math.ceil(Number(subscription.unitPrice!.amount) / 12) * months * group.beneficiaries!.length;
     const choice = baseFor(F, 'BOD', today)!;
     const { pending } = expectedOf(F, 'BOD', today);
     expect(choice.reservePercent).toBe(10);
     expect(choice.base * 1.1).toBeGreaterThanOrEqual(pending + provisional);
     expect(choice.light).toBe('GREEN');
   }
+});
+
+it('reads per-line monthly prices from lines[] when estimating requests on multi-line subscriptions (W3-28)', () => {
+  const multi = (plan: 'claude-team-standard' | 'claude-team-premium') => ({
+    ...F,
+    requests: [
+      {
+        key: 'RM',
+        requester: 'NV-DEV5',
+        plan,
+        termMonths: 1,
+        target: 'AWAITING_EXECUTION' as const,
+        summary: 'x',
+        reason: 'x',
+      },
+    ],
+  });
+
+  expect(expectedOf(multi('claude-team-standard'), 'ENG', '2026-11-17').committed).toBe(500_000);
+  expect(expectedOf(multi('claude-team-premium'), 'ENG', '2026-11-17').committed).toBe(2_500_000);
 });
 
 const DAYS = ['2026-11-17', '2026-10-01', '2026-12-31'];
@@ -211,7 +231,7 @@ describe('the base counted for the light a department must show (baseFor, SPEC S
       const forecast = expected.spentThrough + expected.committed + expected.pending;
       const monthsLeft = 12 - Number(today.slice(5, 7)) + 1;
 
-      expect(choice.base).toBeGreaterThanOrEqual(170_000_000);
+      expect(choice.base).toBeGreaterThanOrEqual(185_000_000);
       expect(choice.base - 5_000_000).toBeGreaterThanOrEqual(forecast);
       expect(choice.base - 5_000_000 - forecast).toBeGreaterThanOrEqual(375_000 * monthsLeft);
     }

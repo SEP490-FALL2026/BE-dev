@@ -48,6 +48,7 @@ export interface DemoIds {
   lots: Map<string, string>;
   costCenters: Map<string, string>;
   requests: Map<string, string>;
+  seatPurchases: Map<string, string>;
   usageSources: Map<string, string>;
 }
 
@@ -84,6 +85,7 @@ export function emptyIds(): DemoIds {
     lots: new Map(),
     costCenters: new Map(),
     requests: new Map(),
+    seatPurchases: new Map(),
     usageSources: new Map(),
   };
 }

@@ -52,6 +52,8 @@ const APPLICATIONS: DemoApplication[] = [
         controlLevel: 'PARTIAL',
         dataLossOnRemoval: false,
         sharingPolicy: 'NOT_ALLOWED',
+        referencePrice: '500000',
+        referenceCommitmentMonths: 1,
       },
     ],
     'SAAS',
@@ -69,6 +71,8 @@ const APPLICATIONS: DemoApplication[] = [
         controlLevel: 'PARTIAL',
         dataLossOnRemoval: false,
         sharingPolicy: 'NOT_ALLOWED',
+        referencePrice: '508000',
+        referenceCommitmentMonths: 1,
       },
     ],
     'SAAS',
@@ -86,6 +90,8 @@ const APPLICATIONS: DemoApplication[] = [
         controlLevel: 'PARTIAL',
         dataLossOnRemoval: false,
         sharingPolicy: 'NOT_ALLOWED',
+        referencePrice: '300000',
+        referenceCommitmentMonths: 1,
       },
       // A K1 plan with no subscription at all, only a reference price: a request for it is priced from the plan (`QĐ-113a`, R59).
       {
@@ -118,19 +124,19 @@ const APPLICATIONS: DemoApplication[] = [
 ];
 
 const SUBSCRIPTIONS: DemoSubscription[] = [
-  { ...monthly('jira', 'jira-standard', '200000', 'NV-ITA1', 4), renewalInDays: 20 },
-  // The annual one: 12 months of commitment, renewing in 50 days; a seat costs 4.500.000 a year, 375.000 a month.
+  // QĐ-119e & L-2: Jira monthly, 255.000/user/month, 10 users (6 baseline + 4 free), MEMBERS + invoicedLater.
   {
-    key: 'figma',
-    plan: 'figma-professional',
-    kind: 'TERM',
-    unitPrice: { amount: '4500000', currency: 'VND' },
-    billingCycle: 'ANNUAL',
-    termMonths: 12,
-    renewalInDays: 50,
-    noticePeriodDays: 30,
-    responsible: 'NV-ITA2',
-    freeAfterBaseline: 4,
+    ...monthly('jira', 'jira-standard', '255000', 'NV-ITA1', 4),
+    renewalInDays: 20,
+    seatCounting: 'MEMBERS',
+    invoicedLater: true,
+  },
+  // L-2: Figma monthly, 375.000/member/month, MEMBERS + invoicedLater (vendor bills actual members after the month).
+  {
+    ...monthly('figma', 'figma-professional', '375000', 'NV-ITA2', 4),
+    renewalInDays: 20,
+    seatCounting: 'MEMBERS',
+    invoicedLater: true,
   },
   { ...monthly('slack', 'slack-pro', '180000', 'NV-ITA1', 6), renewalInDays: 20 },
   { ...monthly('github', 'github-team', '100000', 'NV-ITA1', 5), renewalInDays: 20 },
@@ -138,18 +144,7 @@ const SUBSCRIPTIONS: DemoSubscription[] = [
   { ...monthly('postman', 'postman-professional', '300000', 'NV-ITA1', 5), renewalInDays: 20 },
   // The IT Admin who leaves answers for it: his departure hands it over (P5).
   { ...monthly('mailchimp', 'mailchimp-standard', '400000', 'NV-ITA4', 4), renewalInDays: 20 },
-  { ...monthly('canva', 'canva-teams', '250000', 'NV-ITA2', 4), renewalInDays: 20 },
-  // K1: bought one by one when a seat is granted, so ChatGPT and Cursor start with none (the MF-5 reduction flows count their seats).
-  { ...monthly('chatgpt', 'chatgpt-plus', '500000', 'NV-ITA1', 0), quantity: 0 },
-  // The vendor quotes 20 USD; a price is written in dong (`QĐ-111an`), so it is 508.000 (at the 25.400 the dataset used to record) and the
-  // dollar quote stays beside it as the original price (FX-1, D-45).
-  {
-    ...monthly('cursor', 'cursor-pro', '508000', 'NV-ITA1', 0),
-    quantity: 0,
-    originalPrice: { amount: '20', currency: 'USD' },
-  },
-  // The K1 plan of the person who leaves today: its one seat is his, so his revocation shows the K1 checklist (D-62).
-  { ...monthly('grammarly', 'grammarly-pro', '300000', 'NV-ITA1', 0), quantity: 1 },
+  { ...monthly('canva', 'canva-teams', '250000', 'NV-ITA2', 2), renewalInDays: 20 },
 ];
 
 /**
@@ -221,13 +216,11 @@ const SEATS: DemoSeat[] = [
   ...seat('postman', ['NV-ENGH', 'NV-LGL1']),
   ...seat('mailchimp', ['NV-DEV4']),
   ...seat('canva', ['NV-DESH', 'NV-DES5']),
-  // The K1 seat of the person who leaves today: its revocation task carries the K1 checklist with the mailbox lock last (D-62).
-  ...seat('grammarly', ['NV-OFF1']),
 ];
 
 /**
  * The reference price of every paid plan (`QĐ-113a`): the price of one seat for a month of the subscription of the plan (a yearly price over 12, rounded
- * up to the dong), or the price of one license of its first lot (K4). A plan the fixture gave a price by hand (a plan with no subscription) keeps it; K5 has none.
+ * up to the dong), or the price of one license of its first lot (K4). A plan the fixture gave a price by hand (K1 or a plan with no subscription) keeps it; K5 has none.
  */
 function withReferencePrices(
   applications: readonly DemoApplication[],
@@ -241,11 +234,20 @@ function withReferencePrices(
 
       return first ? { ...plan, referencePrice: first.unitPrice.amount } : plan;
     }
-    const subscription = subscriptions.find((candidate) => candidate.plan === plan.key);
-    if (!subscription) return plan;
-    const amount = BigInt(subscription.unitPrice.amount);
+    for (const subscription of subscriptions) {
+      const line = subscription.lines?.find((candidate) => candidate.plan === plan.key);
+      if (line) return { ...plan, referencePrice: line.monthlyUnitPrice.amount };
+      if (subscription.plan === plan.key && subscription.unitPrice) {
+        const amount = BigInt(subscription.unitPrice.amount);
 
-    return { ...plan, referencePrice: String(subscription.billingCycle === 'ANNUAL' ? (amount + 11n) / 12n : amount) };
+        return {
+          ...plan,
+          referencePrice: String(subscription.billingCycle === 'ANNUAL' ? (amount + 11n) / 12n : amount),
+        };
+      }
+    }
+
+    return plan;
   };
 
   return applications.map((application) => ({ ...application, plans: application.plans.map(priced) }));

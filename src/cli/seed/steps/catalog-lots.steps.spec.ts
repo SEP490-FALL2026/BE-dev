@@ -61,7 +61,10 @@ describe('the body of a lot the dataset declares (W3-28)', () => {
       unitPrice: { amount: '6000000', currency: 'VND' },
       purpose: 'REPLACEMENT',
     });
-    expect(lotBody(ctx, lot('office-ltsc-2024'), 'plan-2')).toMatchObject({ licenseCount: 25, purpose: 'STOCK' });
+    expect(lotBody(ctx, lot('office-home-business-2024'), 'plan-2')).toMatchObject({
+      licenseCount: 25,
+      purpose: 'STOCK',
+    });
   });
 
   it('writes no field the route refuses (a lot has no owner or number of seats of its own to send)', () => {

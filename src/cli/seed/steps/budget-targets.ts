@@ -1,6 +1,7 @@
 import { dayOffset, daysBetween } from '../demo-dates';
 import type { DemoFixture, DemoRequestScenario, DemoSubscription } from '../fixture/demo-fixture.types';
 import { grantedOnOf } from './baseline.steps';
+import { subscriptionHasPlan, subscriptionMonthlyPriceOf, subscriptionPrimaryPlan } from './catalog.steps';
 
 /**
  * The base of the budget of a department, counted from the day of the seed (SPEC S24 item 1, Q-C): the light a head or Finance sees at the close
@@ -41,11 +42,9 @@ export interface Expected {
 const planOf = (fixture: Basis, key: string) =>
   fixture.applications.flatMap((application) => application.plans).find((plan) => plan.key === key);
 
-/** The price of a seat for a month: a monthly plan its price, an annual one its price over twelve, rounded up as the catalog does. */
-function monthlyPriceOf(subscription: DemoSubscription): number {
-  const amount = Number(subscription.unitPrice.amount);
-
-  return subscription.billingCycle === 'ANNUAL' ? Math.ceil(amount / 12) : amount;
+/** The price of a seat for a month on `planKey`, reading `lines[]` first and falling back to `unitPrice`. */
+function monthlyPriceOf(subscription: DemoSubscription, planKey?: string): number {
+  return subscriptionMonthlyPriceOf(subscription, planKey);
 }
 
 const daysInMonth = (year: number, month: number): number => new Date(Date.UTC(year, month, 0)).getUTCDate();
@@ -68,7 +67,8 @@ function spentThrough(fixture: Basis, today: Day, department: string, month: num
   for (const seat of fixture.seats) {
     const holder = fixture.people.find((person) => person.code === seat.holder);
     const subscription = fixture.subscriptions.find((candidate) => candidate.key === seat.subscription);
-    const plan = subscription ? planOf(fixture, subscription.plan) : undefined;
+    const planKey = subscription ? subscriptionPrimaryPlan(subscription) : undefined;
+    const plan = planKey ? planOf(fixture, planKey) : undefined;
     if (holder?.department !== department || !subscription || plan?.provisioningType !== 'K2') continue;
     // A seat costs a department only on the days its holder is placed in it (`seat-month.policy.ts`), and a person the seed creates is placed from the
     // day of the seed, never earlier (`employee-first-placement.policy.ts`; `POST /employees` places them that day): the days before cost nobody anything.
@@ -78,7 +78,7 @@ function spentThrough(fixture: Basis, today: Day, department: string, month: num
       until: seat.endInDays === undefined ? null : dayOffset(today, seat.endInDays),
     };
     for (let current = 1; current <= month; current++)
-      total += seatMonthCost(monthlyPriceOf(subscription), held, year, current);
+      total += seatMonthCost(monthlyPriceOf(subscription, plan.key), held, year, current);
   }
 
   return total;
@@ -92,17 +92,26 @@ const WAITING_TARGETS: ReadonlySet<string> = new Set([
   'RESERVE_UNCONFIRMED',
 ]);
 
+function planPricingOf(fixture: Basis, planKey: string, referencePrice?: string) {
+  const subscription = fixture.subscriptions.find((candidate) => subscriptionHasPlan(candidate, planKey));
+  if (subscription) {
+    const monthly = monthlyPriceOf(subscription, planKey);
+    const purchase = subscription.unitPrice
+      ? Number(subscription.unitPrice.amount)
+      : monthly * (subscription.billingCycle === 'ANNUAL' ? 12 : 1);
+
+    return { monthly, purchase };
+  }
+
+  return referencePrice ? { monthly: Number(referencePrice), purchase: Number(referencePrice) } : null;
+}
+
 /** What a request costs for the year: the price of a month times the people times the months left in the year it covers (a key bought for a seat costs its price once). */
 function requestCost(fixture: Basis, today: Day, request: DemoRequestScenario): number {
-  const subscription = fixture.subscriptions.find((candidate) => candidate.plan === request.plan);
   const plan = request.plan ? planOf(fixture, request.plan) : undefined;
   if (!plan) return 0;
   // A plan with no subscription is priced by its reference price (`QĐ-113a`): a K1/K2 plan one seat a month, a K4 plan one purchase.
-  const price = subscription
-    ? { monthly: monthlyPriceOf(subscription), purchase: Number(subscription.unitPrice.amount) }
-    : plan.referencePrice
-      ? { monthly: Number(plan.referencePrice), purchase: Number(plan.referencePrice) }
-      : null;
+  const price = planPricingOf(fixture, plan.key, plan.referencePrice);
   if (!price) return 0;
   // The people the spending approver refuses hold nothing: they are never granted (R49).
   const people = (request.beneficiaries ?? [request.requester]).filter(

@@ -13,51 +13,72 @@ import {
 describe('the body of a subscription the dataset declares', () => {
   const employees = new Map(SHARED_DEMO_V4.people.map((person) => [person.code, `id-${person.code}`]));
   const departments = new Map([['ENG', 'id-ENG']]);
+  const plans = new Map(SHARED_DEMO_V4.applications.flatMap((app) => app.plans).map((p) => [p.key, `id-${p.key}`]));
   const ctx = {
     fixture: SHARED_DEMO_V4,
     today: '2026-11-10',
-    ids: { employees, departments },
+    ids: { employees, departments, plans },
   } as unknown as DemoRunContext;
   const subscription = (key: string) => SHARED_DEMO_V4.subscriptions.find((candidate) => candidate.key === key)!;
 
-  it('names the IT Admin who answers for it, no owner department, and a month for a subscription paid by the month', () => {
-    const body = subscriptionBody(ctx, subscription('jira'), 'plan-1');
+  it('names the IT Admin who answers for it, no owner department, and MEMBERS + invoicedLater for Jira & Figma (L-2)', () => {
+    for (const key of ['jira', 'figma']) {
+      const body = subscriptionBody(ctx, subscription(key), 'plan-1');
+      expect(body).toMatchObject({
+        billingCycle: 'MONTHLY',
+        commitmentTermMonths: 1,
+        seatCounting: 'MEMBERS',
+        invoicedLater: true,
+        responsibleItAdminEmployeeId: `id-${subscription(key).responsible}`,
+        startDate: '2026-01-01',
+        endDate: '2026-12-31',
+        renewalDate: '2026-11-30',
+      });
+      expect(body).not.toHaveProperty('ownerDepartmentId');
+    }
+  });
 
+  it('declares Claude Team as one multi-line subscription with minimumSeatsTotal 2 and no dates (W3-28, L-6)', () => {
+    const body = subscriptionBody(ctx, subscription('claude-team'), 'plan-ignored');
+
+    expect(body).not.toHaveProperty('planId');
+    expect(body).not.toHaveProperty('purchasedQuantity');
+    expect(body).not.toHaveProperty('noticeDeadline');
     expect(body).toMatchObject({
-      billingCycle: 'MONTHLY',
-      commitmentTermMonths: 1,
-      responsibleItAdminEmployeeId: 'id-NV-ITA1',
-      startDate: '2026-01-01',
-      endDate: '2026-12-31',
-      renewalDate: '2026-11-30',
-    });
-    expect(body).not.toHaveProperty('ownerDepartmentId');
-  });
-
-  it('names no owner department for a K1 subscription either (QĐ-113g)', () => {
-    expect(subscriptionBody(ctx, subscription('chatgpt'), 'plan-1')).not.toHaveProperty('ownerDepartmentId');
-  });
-
-  it('commits to a year that renews on the day the fixture says, counted from today', () => {
-    expect(subscriptionBody(ctx, subscription('figma'), 'plan-1')).toMatchObject({
+      kind: 'TERM',
       billingCycle: 'ANNUAL',
       commitmentTermMonths: 12,
-      renewalDate: '2026-12-30',
-      endDate: '2026-12-29',
-      startDate: '2025-12-30',
+      minimumSeatsTotal: 2,
+      autoRenew: false,
+      lines: [
+        { planId: 'id-claude-team-standard', monthlyUnitPrice: { amount: '500000', currency: 'VND' }, quantity: 10 },
+        { planId: 'id-claude-team-premium', monthlyUnitPrice: { amount: '2500000', currency: 'VND' }, quantity: 2 },
+      ],
     });
   });
 
-  it('writes the price in dong and, for the plan once priced in dollars, the original price beside it (FX-1)', () => {
-    expect(subscriptionBody(ctx, subscription('cursor'), 'plan-1')).toMatchObject({
-      monthlyUnitPrice: { amount: '508000', currency: 'VND' },
-      unitPrice: { amount: '508000', currency: 'VND' },
-      originalPrice: { amount: '20', currency: 'USD' },
+  it('commits to a year that renews on the day the fixture says, and sets vendorMinimumSeats 50 on Zoom Business', () => {
+    expect(subscriptionBody(ctx, subscription('m365-standard'), 'plan-1')).toMatchObject({
+      billingCycle: 'ANNUAL',
+      commitmentTermMonths: 12,
+      renewalDate: '2027-03-10',
+      endDate: '2027-03-09',
+      startDate: '2026-03-10',
     });
+    expect(subscriptionBody(ctx, subscription('zoom-business'), 'plan-1')).toMatchObject({
+      billingCycle: 'ANNUAL',
+      purchasedQuantity: 50,
+      vendorMinimumSeats: 50,
+      monthlyUnitPrice: { amount: '150000', currency: 'VND' },
+      unitPrice: { amount: '1800000', currency: 'VND' },
+    });
+  });
+
+  it('writes the price in dong for monthly (Jira 255k, QĐ-119e) and annual plans', () => {
     const jira = subscriptionBody(ctx, subscription('jira'), 'plan-1');
     expect(jira).toMatchObject({
-      monthlyUnitPrice: { amount: '200000', currency: 'VND' },
-      unitPrice: { amount: '200000', currency: 'VND' },
+      monthlyUnitPrice: { amount: '255000', currency: 'VND' },
+      unitPrice: { amount: '255000', currency: 'VND' },
     });
     expect(jira).not.toHaveProperty('originalPrice');
     const m365Annual = subscriptionBody(ctx, subscription('m365-standard'), 'plan-1');
@@ -65,11 +86,15 @@ describe('the body of a subscription the dataset declares', () => {
     expect(m365Annual).not.toHaveProperty('unitPrice');
   });
 
-  it('buys the seats of the baseline file and the free ones, or the number the fixture names for a plan with no file', () => {
+  it('buys the seats of the baseline file and the free ones, or the sum of lines[]', () => {
     for (const declared of SHARED_DEMO_V4.subscriptions) {
-      expect(purchasedQuantityOf(ctx, declared)).toBe(
-        declared.quantity ?? baselineSeatsOf(ctx, declared.key) + declared.freeAfterBaseline,
-      );
+      if (declared.lines) {
+        expect(purchasedQuantityOf(ctx, declared)).toBe(12);
+      } else {
+        expect(purchasedQuantityOf(ctx, declared)).toBe(
+          declared.quantity ?? baselineSeatsOf(ctx, declared.key) + declared.freeAfterBaseline,
+        );
+      }
     }
     expect(purchasedQuantityOf(ctx, subscription('onepassword'))).toBe(baselineSeatsOf(ctx, 'onepassword'));
   });
@@ -81,26 +106,28 @@ describe('the workspace profile the dataset records for the plans that need admi
   const ctx = { fixture: SHARED_DEMO_V4, today: '2026-11-10', ids: { employees } } as unknown as DemoRunContext;
   const plan = (key: string) => SHARED_DEMO_V4.applications.flatMap((app) => app.plans).find((p) => p.key === key)!;
 
-  it('names the IT Admin who answers for the subscription as the owner and another IT Admin as the admin, for every plan that needs them', () => {
+  it('records a профиль/profile for K2 plans, multi-line Claude Team plans, and Visio', () => {
     const needing = SHARED_DEMO_V4.applications
       .flatMap((app) => app.plans)
       .filter((p) => p.provisioningType === 'K2' || p.hasAdminConsole === true)
       // A plan with no subscription (Skype, retired in S21) has no IT Admin who answers for it and so no profile.
       .filter(
         (p) =>
-          SHARED_DEMO_V4.subscriptions.some((s) => s.plan === p.key) ||
+          SHARED_DEMO_V4.subscriptions.some((s) => s.plan === p.key || s.lines?.some((l) => l.plan === p.key)) ||
           SHARED_DEMO_V4.lots.some((lot) => lot.plan === p.key) ||
           p.key === 'skype-online',
       );
     expect(needing.map((p) => p.key)).toContain('jetbrains-all');
+    expect(needing.map((p) => p.key)).toContain('claude-team-premium');
     for (const needed of needing) {
       if (needed.key === 'skype-online') {
         expect(workspaceProfileBody(ctx, needed)).toBeNull();
         continue;
       }
       const body = workspaceProfileBody(ctx, needed)!;
-      const responsible = (SHARED_DEMO_V4.subscriptions.find((s) => s.plan === needed.key) ??
-        SHARED_DEMO_V4.lots.find((lot) => lot.plan === needed.key))!.responsible;
+      const responsible = (SHARED_DEMO_V4.subscriptions.find(
+        (s) => s.plan === needed.key || s.lines?.some((l) => l.plan === needed.key),
+      ) ?? SHARED_DEMO_V4.lots.find((lot) => lot.plan === needed.key))!.responsible;
 
       expect(body.primaryOwnerEmployeeId).toBe(`id-${responsible}`);
       expect(body.members).toHaveLength(2);
@@ -139,7 +166,7 @@ describe('the days of a subscription counted from the day of the seed (T5)', () 
     ({ fixture: SHARED_DEMO_V4, today, ids: { employees, departments: new Map() } }) as unknown as DemoRunContext;
   const declared = (key: string) => SHARED_DEMO_V4.subscriptions.find((candidate) => candidate.key === key)!;
   const monthly = (renewalInDays: number) => ({ ...declared('jira'), renewalInDays });
-  const annual = (extra: Record<string, unknown>) => ({ ...declared('figma'), ...extra });
+  const annual = (extra: Record<string, unknown>) => ({ ...declared('m365-standard'), ...extra });
 
   it('anchors the payment day of a monthly plan on today', () => {
     expect(subscriptionBody(ctxOn('2026-11-17'), monthly(20), 'p')).toMatchObject({
@@ -207,12 +234,11 @@ describe('the days of a subscription counted from the day of the seed (T5)', () 
     },
   );
 
-  it('gives the seven monthly K2 plans of the first dataset a payment day 20 days away, and Figma stays at 50', () => {
-    for (const key of ['jira', 'slack', 'github', 'onepassword', 'postman', 'mailchimp', 'canva']) {
+  it('gives the eight monthly K2 plans of the first dataset (including Figma) a payment day 20 days away', () => {
+    for (const key of ['jira', 'figma', 'slack', 'github', 'onepassword', 'postman', 'mailchimp', 'canva']) {
       expect(declared(key).renewalInDays).toBe(20);
     }
-    expect(declared('figma').renewalInDays).toBe(50);
-    for (const key of ['chatgpt', 'cursor', 'grammarly']) expect(declared(key).renewalInDays).toBeUndefined();
+    for (const key of ['chatgpt', 'cursor', 'grammarly']) expect(declared(key)).toBeUndefined();
   });
 });
 
@@ -278,11 +304,16 @@ describe('the body of a plan the dataset declares', () => {
     });
   });
 
-  it('writes the price of the K1 plan that has no subscription, and none for an internal K5 plan', () => {
+  it('writes the reference price and annual K1 commitment (Claude Pro 12) when building plan bodies', () => {
     expect(planBody('app-1', plan('grammarly-business'))).toMatchObject({
       provisioningType: 'K1',
       referencePrice: { amount: '360000', currency: 'VND' },
       referenceCommitmentMonths: 1,
+    });
+    expect(planBody('app-1', plan('claude-pro'), plan('claude-pro').referenceCommitmentMonths)).toMatchObject({
+      provisioningType: 'K1',
+      referencePrice: { amount: '508000', currency: 'VND' },
+      referenceCommitmentMonths: 12,
     });
     expect(planBody('app-1', plan('hr-portal-access'))).not.toHaveProperty('referencePrice');
     expect(planBody('app-1', plan('claude-team-standard'), 12)).toMatchObject({
@@ -291,7 +322,7 @@ describe('the body of a plan the dataset declares', () => {
   });
 
   it('writes the key binding of a K4 plan the fixture binds to the machine, the Windows bundled with it with no price, and none for the others (W2-17)', () => {
-    expect(planBody('app-1', plan('office-ltsc-2024'))).toMatchObject({
+    expect(planBody('app-1', plan('office-home-business-2024'))).toMatchObject({
       provisioningType: 'K4',
       keyBinding: 'DEVICE_KEY',
       referencePrice: { amount: '3500000', currency: 'VND' },
@@ -336,5 +367,7 @@ describe('catalog.subscriptions step', () => {
     expect(patchCall).toBeDefined();
     expect(patchCall![2]).toBe('/subscriptions/sub-draft-1');
     expect(patchCall![3]).toMatchObject({ expectedUpdatedAt: '2026-11-10T00:00:00.000Z' });
+    expect(patchCall![3]).not.toHaveProperty('purchasedQuantity');
+    expect(patchCall![3]).not.toHaveProperty('lines');
   });
 });

@@ -67,7 +67,7 @@ export const FINANCE: Pick<
     {
       department: 'ENG',
       // What the lines of its BM-10 add up to over a year, and a little more: well over what the department spends, so it stays under.
-      base: '170000000',
+      base: '185000000',
       light: 'UNDER',
       note: 'Jira, GitHub, Slack cho cả phòng; ChatGPT Plus, Claude Team (Standard và Premium) cho nhóm R&D.',
     },
@@ -86,7 +86,7 @@ export const FINANCE: Pick<
     },
     {
       department: 'ITO',
-      base: '33000000',
+      base: '36000000',
       light: 'UNDER',
       note: 'Jira, 1Password, Confluence, Microsoft 365, Zoom của phòng IT.',
     },
@@ -130,7 +130,7 @@ export const FINANCE: Pick<
    */
   budgetLines: {
     ENG: [
-      line('Jira', 'Standard', 20, 200000, 12, 'Theo dõi công việc nhóm kỹ thuật'),
+      line('Jira', 'Standard', 20, 255000, 12, 'Theo dõi công việc nhóm kỹ thuật'),
       line('GitHub', 'Team', 9, 100000, 12, 'Quản lý mã nguồn cho cả phòng'),
       line('Slack', 'Pro', 8, 180000, 12, 'Trao đổi hằng ngày của nhóm'),
       line('ChatGPT', 'Plus', 4, 500000, 12, 'Nhóm R&D thử nghiệm trợ lý AI'),
@@ -155,7 +155,7 @@ export const FINANCE: Pick<
       line('Microsoft 365', 'Business Basic', 3, 150000, 12, 'Thư và lịch của nhân viên mới'),
     ],
     ITO: [
-      line('Jira', 'Standard', 6, 200000, 12, 'Theo dõi yêu cầu cấp quyền'),
+      line('Jira', 'Standard', 6, 255000, 12, 'Theo dõi yêu cầu cấp quyền'),
       line('1Password', 'Business', 1, 200000, 12, 'Kho mật khẩu dùng chung của phòng'),
       line('Confluence', 'Standard', 2, 160000, 12, 'Quy trình vận hành của phòng'),
       line('Microsoft 365', 'Business Basic', 3, 150000, 12, 'Thư và lịch của phòng'),
@@ -173,6 +173,6 @@ export const FINANCE: Pick<
     ],
     DES: [line('Postman', 'Professional', 2, 300000, 12, 'Nhóm kiểm thử giao diện')],
     BOD: [line('Slack', 'Pro', 5, 180000, 12, 'Trao đổi của Ban Giám đốc')],
-    FIN: [line('Jira', 'Standard', 4, 200000, 12, 'Theo dõi công việc đối soát')],
+    FIN: [line('Jira', 'Standard', 4, 255000, 12, 'Theo dõi công việc đối soát')],
   },
 };

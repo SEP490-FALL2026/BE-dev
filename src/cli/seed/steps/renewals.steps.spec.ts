@@ -1,7 +1,7 @@
 import { emptyIds, type DemoRunContext } from '../demo-run.types';
 import { SHARED_DEMO_V4 as fixture } from '../fixture/shared-demo-v4';
 import { demoSteps } from '../seed-steps';
-import { CATALOG_STEPS } from './catalog.steps';
+import { CATALOG_STEPS, subscriptionPrimaryPlan } from './catalog.steps';
 import { renewalBody, RENEWAL_STEPS, type Adjustment } from './renewals.steps';
 
 const adjustment: Adjustment = {
@@ -10,10 +10,12 @@ const adjustment: Adjustment = {
   target: 4,
   purchasedQuantity: 7,
   suggestedChoice: 'REDUCE',
+  lines: [{ subscriptionLineId: 'line-1', plan: { id: 'plan-1', name: 'Plan 1' }, seatsToday: 7, need: 4, target: 4 }],
 };
 const spec = (key: string) => {
   const renewal = fixture.renewals.find((row) => row.subscription === key)!;
-  return { ...renewal, unitPrice: fixture.subscriptions.find((row) => row.key === key)!.unitPrice };
+  const sub = fixture.subscriptions.find((row) => row.key === key)!;
+  return { ...renewal, billingCycle: sub.billingCycle, unitPrice: sub.unitPrice, lines: sub.lines };
 };
 
 describe('the recorded subscription adjustments', () => {
@@ -26,25 +28,34 @@ describe('the recorded subscription adjustments', () => {
     const ctx = {
       fixture: { ...fixture, renewals: [fixture.renewals[0]] },
       mode: 'apply',
-      ids: { subscriptions: new Map([['adobe-cc-teams', 'sub-1']]) },
+      ids: { subscriptions: new Map([['adobe-cc-teams', 'sub-1']]), plans: new Map([['adobe-cc-teams', 'plan-1']]) },
       api: { call, signIn: jest.fn().mockResolvedValue(undefined) },
     } as unknown as DemoRunContext;
     await expect(RENEWAL_STEPS[0].run(ctx)).resolves.toMatchObject({ status: 'done' });
     expect(writes).toHaveLength(1);
-    expect(writes[0]).toMatchObject({ subscriptionId: 'sub-1', choice: 'REDUCE', proposedQuantity: 4 });
-  });
-  it('uses the server choice and target and carries the annual price as Money', () => {
-    expect(renewalBody(adjustment, spec('adobe-cc-teams'))).toMatchObject({
+    expect(writes[0]).toMatchObject({
       subscriptionId: 'sub-1',
       choice: 'REDUCE',
-      proposedQuantity: 4,
+      lines: [{ subscriptionLineId: 'line-1', quantity: 4 }],
+    });
+  });
+  it('uses per-line target quantities and preserves line monthly unit prices in nextPeriod (W3-21)', () => {
+    expect(renewalBody(adjustment, spec('adobe-cc-teams'), new Map([['adobe-cc-teams', 'plan-1']]))).toMatchObject({
+      subscriptionId: 'sub-1',
+      choice: 'REDUCE',
+      lines: [{ subscriptionLineId: 'line-1', quantity: 4 }],
       outcome: 'AS_DECIDED',
       nextPeriod: {
-        purchasedQuantity: 4,
+        lines: [
+          {
+            subscriptionLineId: 'line-1',
+            quantity: 4,
+            monthlyUnitPrice: { amount: '1833334', currency: 'VND' },
+          },
+        ],
         startDate: '2026-11-26',
         endDate: '2027-11-25',
         renewalDate: '2027-11-26',
-        unitPrice: { amount: '22000000', currency: 'VND' },
         billingCycle: 'ANNUAL',
         autoRenew: true,
         allowsMidTermReduction: false,
@@ -52,16 +63,31 @@ describe('the recorded subscription adjustments', () => {
     });
   });
   it('records a provider refusal with tagged evidence and no next period', () => {
-    const body = renewalBody({ ...adjustment, target: 5, suggestedChoice: 'RENEW' }, spec('zoom-pro'));
-    expect(body).toMatchObject({ choice: 'RENEW', proposedQuantity: 5, outcome: 'VENDOR_REFUSED' });
+    const body = renewalBody(
+      {
+        ...adjustment,
+        target: 5,
+        suggestedChoice: 'RENEW',
+        lines: [
+          { subscriptionLineId: 'line-1', plan: { id: 'plan-z', name: 'Zoom' }, seatsToday: 5, need: 5, target: 5 },
+        ],
+      },
+      spec('zoom-pro'),
+    );
+    expect(body).toMatchObject({
+      choice: 'RENEW',
+      lines: [{ subscriptionLineId: 'line-1', quantity: 5 }],
+      outcome: 'VENDOR_REFUSED',
+    });
     expect(body.outcomeNote).toContain('[SV-SBF20-ZOOM]');
     expect(body).not.toHaveProperty('nextPeriod');
   });
-  it('refuses an unsupported cancellation or an unknown server choice', () => {
+  it('refuses an unsupported cancellation, missing lines, or an unknown server choice', () => {
     expect(() => renewalBody({ ...adjustment, target: 0, suggestedChoice: 'CANCEL' }, spec('adobe-cc-teams'))).toThrow(
       /target|cancel/i,
     );
     expect(() => renewalBody({ ...adjustment, suggestedChoice: null }, spec('adobe-cc-teams'))).toThrow(/choice/i);
+    expect(() => renewalBody({ ...adjustment, lines: [] }, spec('adobe-cc-teams'))).toThrow(/lines/i);
   });
   it('records each renewal by the IT Admin responsible for its subscription, and runs after the rules and decisions', async () => {
     expect(fixture.renewals.map(({ subscription, by }) => [subscription, by])).toEqual([
@@ -85,7 +111,7 @@ describe('the recorded subscription adjustments', () => {
         renewals: [{ ...spec('zoom-pro'), by: 'NV-ITA2' }],
       },
       mode: 'apply',
-      ids: { subscriptions: new Map([['zoom-pro', 'zoom-id']]) },
+      ids: { subscriptions: new Map([['zoom-pro', 'zoom-id']]), plans: new Map([['zoom-pro', 'plan-z']]) },
       api: { call, signIn: jest.fn().mockResolvedValue(undefined) },
     } as unknown as DemoRunContext;
     await expect(RENEWAL_STEPS[0].run(ctx)).resolves.toMatchObject({ status: 'done' });
@@ -101,6 +127,7 @@ describe('the recorded subscription adjustments', () => {
           ['adobe-cc-teams', 'adobe'],
           ['zoom-pro', 'zoom'],
         ]),
+        plans: new Map(),
       },
       api: { call, signIn: jest.fn().mockResolvedValue(undefined) },
     } as unknown as DemoRunContext;
@@ -119,7 +146,7 @@ describe('selecting the original subscription after recording a renewal', () => 
       ],
     });
     const ids = emptyIds();
-    ids.plans.set(subscription.plan, 'plan-1');
+    ids.plans.set(subscriptionPrimaryPlan(subscription), 'plan-1');
     const ctx = {
       fixture: { ...fixture, subscriptions: [subscription] },
       mode: 'apply',

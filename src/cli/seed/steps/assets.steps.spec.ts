@@ -32,8 +32,8 @@ describe('the key stores of the lots of K4 licenses (W2-25, W3-24)', () => {
 
     const body = (lot: string) =>
       calls.find((entry) => entry.path === `/license-lots/lot-${lot}/keys`)!.body as Record<string, unknown>;
-    expect(body('office-ltsc-2024')).toMatchObject({ maxActivations: 30, initialActivationsUsed: 8 });
-    expect((body('office-ltsc-2024').keys as string[]).length).toBe(1);
+    expect(body('office-home-business-2024')).toMatchObject({ maxActivations: 30, initialActivationsUsed: 8 });
+    expect((body('office-home-business-2024').keys as string[]).length).toBe(1);
     expect(body('jetbrains')).not.toHaveProperty('maxActivations');
     expect(body('jetbrains')).not.toHaveProperty('initialActivationsUsed');
     expect(calls.every((entry) => entry.method === 'POST' && !('subscriptionId' in (entry.body as object)))).toBe(true);
@@ -50,7 +50,12 @@ describe('the key stores of the lots of K4 licenses (W2-25, W3-24)', () => {
   });
 
   it('leaves a store that already has keys as it is', async () => {
-    const { ctx, calls } = context({ 'office-ltsc-2024': 1, jetbrains: 3, 'visio-pro': 3, 'sublime-license': 2 });
+    const { ctx, calls } = context({
+      'office-home-business-2024': 1,
+      jetbrains: 3,
+      'visio-pro': 3,
+      'sublime-license': 2,
+    });
 
     await expect(step.run(ctx)).resolves.toMatchObject({ status: 'present' });
 

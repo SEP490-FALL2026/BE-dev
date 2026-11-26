@@ -57,8 +57,8 @@ function context(api: ReturnType<typeof fakeApi>, mode: 'apply' | 'plan' = 'appl
   const ids = emptyIds();
   for (const person of fixture.people) ids.employees.set(person.code, `employee-${person.code}`);
   ids.plans.set('windows-11-pro-oem', 'plan-windows');
-  ids.plans.set('office-ltsc-2024', 'plan-office');
-  ids.lots.set('office-ltsc-2024', 'lot-office');
+  ids.plans.set('office-home-business-2024', 'plan-office');
+  ids.lots.set('office-home-business-2024', 'lot-office');
 
   return { fixture, ids, mode, demoPassword: 'x', api } as unknown as DemoRunContext;
 }

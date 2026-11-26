@@ -64,4 +64,10 @@ describe('the steps of the shared dataset', () => {
     expect(keys.indexOf('ghost.decisions')).toBeGreaterThan(keys.indexOf('rules.first-run'));
     expect(keys.indexOf('budget.next-year')).toBeGreaterThan(keys.indexOf('budget.year'));
   });
+
+  it('buys extra Canva seats (MUA-…) after R61 opens its tasks and before submitting purchase invoices', () => {
+    const at = (key: string) => keys.indexOf(key);
+    expect(at('catalog.seat-purchases')).toBeGreaterThan(at('requests.R61'));
+    expect(at('catalog.seat-purchases')).toBeLessThan(at('demo.purchase-invoices'));
+  });
 });

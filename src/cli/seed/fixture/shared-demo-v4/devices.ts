@@ -34,14 +34,14 @@ export const DEVICES: DemoDevice[] = [
     signature: true,
     acknowledge: true,
     tools: ['CLAUDE_CODE', 'CODEX'],
-    initialKeyOf: 'office-ltsc-2024',
+    initialKeyOf: 'office-home-business-2024',
   }),
   old(2, {
     holder: 'NV-ITO1',
     signature: true,
     acknowledge: true,
     tools: ['CLAUDE_CODE'],
-    initialKeyOf: 'office-ltsc-2024',
+    initialKeyOf: 'office-home-business-2024',
   }),
   old(3, {
     holder: 'NV-BOD1',
@@ -49,16 +49,22 @@ export const DEVICES: DemoDevice[] = [
     acknowledge: true,
     tools: ['CLAUDE_CODE', 'CODEX'],
     stop: 'COMPLETED',
-    initialKeyOf: 'office-ltsc-2024',
+    initialKeyOf: 'office-home-business-2024',
   }),
-  old(4, { holder: 'NV-BOD4', signature: true, acknowledge: true, stop: 'OPEN', initialKeyOf: 'office-ltsc-2024' }),
-  old(5, { holder: 'NV-FIN2', signature: true, acknowledge: false, initialKeyOf: 'office-ltsc-2024' }),
+  old(4, {
+    holder: 'NV-BOD4',
+    signature: true,
+    acknowledge: true,
+    stop: 'OPEN',
+    initialKeyOf: 'office-home-business-2024',
+  }),
+  old(5, { holder: 'NV-FIN2', signature: true, acknowledge: false, initialKeyOf: 'office-home-business-2024' }),
   old(6, {
     holder: 'NV-ITO2',
     signature: false,
     acknowledge: false,
     changeTo: 'NV-ITOH',
-    initialKeyOf: 'office-ltsc-2024',
+    initialKeyOf: 'office-home-business-2024',
   }),
   old(7, { holder: 'NV-DEV6', signature: false, acknowledge: false, retire: true }),
 ];
@@ -76,7 +82,7 @@ export const NEW_DEVICES: DemoNewDevice[] = [
     serialNumber: 'SV-SN-NEW-0002',
     deviceType: 'LAP',
     bundled: ['windows-11-pro-oem'],
-    keyOf: 'office-ltsc-2024',
+    keyOf: 'office-home-business-2024',
   },
   {
     hostname: 'SV-NEW-0003',
@@ -84,7 +90,7 @@ export const NEW_DEVICES: DemoNewDevice[] = [
     deviceType: 'LAP',
     bundled: ['windows-11-pro-oem'],
     holder: 'NV-DES1',
-    keyOf: 'office-ltsc-2024',
+    keyOf: 'office-home-business-2024',
     condition: 'BROKEN',
   },
   {
@@ -93,7 +99,7 @@ export const NEW_DEVICES: DemoNewDevice[] = [
     deviceType: 'LAP',
     bundled: ['windows-11-pro-oem'],
     holder: 'NV-ITA4',
-    keyOf: 'office-ltsc-2024',
+    keyOf: 'office-home-business-2024',
   },
   {
     hostname: 'SV-NEW-0005',
@@ -101,7 +107,7 @@ export const NEW_DEVICES: DemoNewDevice[] = [
     deviceType: 'LAP',
     bundled: ['windows-11-pro-oem'],
     holder: 'NV-OFF1',
-    keyOf: 'office-ltsc-2024',
+    keyOf: 'office-home-business-2024',
   },
 ];
 

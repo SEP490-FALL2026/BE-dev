@@ -5,7 +5,7 @@ import { ASSET_STEPS } from './steps/assets.steps';
 import { BASELINE_STEPS } from './steps/baseline.steps';
 import { budgetSteps } from './steps/budget.steps';
 import { CATALOG_EXTRA_STEPS } from './steps/catalog-extra.steps';
-import { CATALOG_STEPS } from './steps/catalog.steps';
+import { CATALOG_STEPS, SEAT_PURCHASE_STEPS } from './steps/catalog.steps';
 import { CATALOG_LOT_STEPS } from './steps/catalog-lots.steps';
 import { DEMO_STEPS } from './steps/demo.steps';
 import { DEMO_DOCUMENT_STEPS } from './steps/demo-documents.steps';
@@ -71,6 +71,7 @@ export function demoSteps(fixture: DemoFixture): DemoStep[] {
     pick('budget.cycles'),
     ...budgetSteps(),
     ...requestSteps(fixture.requests),
+    ...SEAT_PURCHASE_STEPS,
     ...RETURN_STEPS,
     ...SAAS_ISSUE_STEPS,
     ...extraSteps(),

@@ -2,6 +2,15 @@ import { dayOffset } from '../demo-dates';
 import { as, listAll, summarize } from '../demo-step-kit';
 import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
 import type { DemoRenewal, DemoSubscription } from '../fixture/demo-fixture.types';
+import { subscriptionMonthlyPriceOf } from './catalog.steps';
+
+export interface AdjustmentLine {
+  subscriptionLineId: string;
+  plan: { id: string; name: string };
+  seatsToday: number;
+  need: number;
+  target: number;
+}
 
 export interface Adjustment {
   subscriptionId: string;
@@ -10,32 +19,55 @@ export interface Adjustment {
   purchasedQuantity: number | null;
   suggestedChoice: 'RENEW' | 'REDUCE' | 'INCREASE' | 'CANCEL' | null;
   seatsNeeded?: { total: number };
+  lines: AdjustmentLine[];
 }
 
 function adjustmentProblem(adjustment: Adjustment): string | null {
   if (adjustment.target <= 0 || adjustment.suggestedChoice === 'CANCEL')
     return 'Cancellation (target zero) is outside these demo outcomes';
   if (adjustment.suggestedChoice === null) return 'The server has no suggested choice';
+  if (adjustment.lines.length === 0) return 'The adjustment returned no subscription lines';
+  if (adjustment.lines.some((line) => line.target <= 0)) return 'A line target of zero is outside these demo outcomes';
   if (adjustment.seatsNeeded && adjustment.target > adjustment.seatsNeeded.total)
     return 'The target exceeds seats needed and requires vendor minimum evidence';
   return null;
 }
 
-/** Record exactly what the server counts; a later period preserves the annual price of the original subscription. */
-export function renewalBody(adjustment: Adjustment, spec: DemoRenewal & Pick<DemoSubscription, 'unitPrice'>) {
+function lineMonthlyPrice(
+  line: AdjustmentLine,
+  subscription: Pick<DemoSubscription, 'billingCycle' | 'unitPrice' | 'lines'>,
+  planIds?: ReadonlyMap<string, string>,
+): { amount: string; currency: 'VND' } {
+  const matchedPlan = planIds ? [...planIds.entries()].find(([, id]) => id === line.plan.id)?.[0] : undefined;
+
+  return { amount: String(subscriptionMonthlyPriceOf(subscription as DemoSubscription, matchedPlan)), currency: 'VND' };
+}
+
+/** Record per-line adjustment targets (`W3-21`); a next period preserves each line's monthly unit price. */
+export function renewalBody(
+  adjustment: Adjustment,
+  spec: DemoRenewal & Pick<DemoSubscription, 'billingCycle' | 'unitPrice' | 'lines'>,
+  planIds?: ReadonlyMap<string, string>,
+) {
   const problem = adjustmentProblem(adjustment);
   if (problem) throw new Error(problem);
   return {
     subscriptionId: adjustment.subscriptionId,
     choice: adjustment.suggestedChoice,
-    proposedQuantity: adjustment.target,
+    lines: adjustment.lines.map((line) => ({
+      subscriptionLineId: line.subscriptionLineId,
+      quantity: line.target,
+    })),
     outcome: spec.outcome,
     outcomeNote: spec.outcomeNote,
     ...(spec.nextPeriod
       ? {
           nextPeriod: {
-            purchasedQuantity: adjustment.target,
-            unitPrice: spec.unitPrice,
+            lines: adjustment.lines.map((line) => ({
+              subscriptionLineId: line.subscriptionLineId,
+              quantity: line.target,
+              monthlyUnitPrice: lineMonthlyPrice(line, spec, planIds),
+            })),
             billingCycle: 'ANNUAL',
             startDate: adjustment.renewalOn,
             endDate: dayOffset(adjustment.renewalOn, 364),
@@ -68,7 +100,16 @@ async function oneRenewal(ctx: DemoRunContext, spec: DemoRenewal) {
     email,
     'POST',
     '/subscription-renewals',
-    renewalBody(adjustment, { ...spec, unitPrice: subscription.unitPrice }),
+    renewalBody(
+      adjustment,
+      {
+        ...spec,
+        billingCycle: subscription.billingCycle,
+        unitPrice: subscription.unitPrice,
+        lines: subscription.lines,
+      },
+      ctx.ids.plans,
+    ),
   );
   return { status: 'done' as const, label: spec.subscription };
 }
