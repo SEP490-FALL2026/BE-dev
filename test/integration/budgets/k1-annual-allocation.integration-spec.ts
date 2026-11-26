@@ -68,6 +68,7 @@ describe('W3-23 P13b: K1 annual allocations, 01/01 pairing, F8 transfer (D-16), 
     revoked?: boolean;
     commit2026?: boolean;
     commit2027?: boolean;
+    commit2027AmountMinor?: bigint;
   }): Promise<{ requestId: string; assignmentId: string; purchaseInvoiceId: string }> {
     const requestId = randomUUID();
     const assignmentId = randomUUID();
@@ -84,9 +85,9 @@ describe('W3-23 P13b: K1 annual allocations, 01/01 pairing, F8 transfer (D-16), 
          (id, organization_id, type, branch, state, plan_id, department_id, cost_center_id,
           requester_employee_id, business_reason, submitted_at, budget_year, amount_months,
           next_year_amount_minor, amount_minor, amount_currency, term_months, unit_price_minor,
-          billing_cycle, pricing_status, expected_end_date, policy, created_by_app_user_id)
+          monthly_price_minor, price_kind, billing_cycle, pricing_status, expected_end_date, policy, created_by_app_user_id)
        VALUES ($1, $2, 'GRANT', 'PAID_IN_CATALOG', 'COMPLETED', $3, $4, $5, $6, 'K1 annual allocation test',
-               '2026-11-05T02:00:00Z', $7, 2, $8, 900000, 'VND', 12, $9, 'MONTHLY', 'PRICED',
+               '2026-11-05T02:00:00Z', $7, 2, $8, 900000, 'VND', 12, $9, $9, 'RECURRING', 'MONTHLY', 'PRICED',
                '2027-11-04', $10::jsonb, $11)`,
       [
         requestId,
@@ -144,8 +145,14 @@ describe('W3-23 P13b: K1 annual allocations, 01/01 pairing, F8 transfer (D-16), 
       await h.ctx.sql.query(
         `INSERT INTO budget_commitments
            (id, organization_id, request_id, cost_center_id, year, amount_minor, currency, state, origin, seat_monthly_minor, unattached_reason)
-         VALUES (gen_random_uuid(), $1, $2, $3, $4, 4500000, 'VND', 'HELD', 'YEAR_START', 450000, 'NO_BUDGET')`,
-        [h.seed.organizationId, requestId, opts.unit.department.unitId, Y2],
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, 'VND', 'HELD', 'YEAR_START', 450000, 'NO_BUDGET')`,
+        [
+          h.seed.organizationId,
+          requestId,
+          opts.unit.department.unitId,
+          Y2,
+          (opts.commit2027AmountMinor ?? 4_500_000n).toString(),
+        ],
       );
     }
 
@@ -213,12 +220,11 @@ describe('W3-23 P13b: K1 annual allocations, 01/01 pairing, F8 transfer (D-16), 
     return recorded.invoiceId;
   }
 
-  async function runYearStartFor(requestId: string, year = Y2): Promise<void> {
+  async function runYearStartFor(requestId: string | null, year = Y2): Promise<void> {
     const runner = h.ctx.app.get(TransactionRunner, { strict: false });
     const batch = h.ctx.app.get(YearStartCommitmentsBatchService, { strict: false });
 
     await runner.run(async (tx) => {
-      // Iterate batches starting just before or scan until requestId is passed.
       let afterId: string | null = null;
       for (;;) {
         const res = await batch.commitBatch(
@@ -231,7 +237,7 @@ describe('W3-23 P13b: K1 annual allocations, 01/01 pairing, F8 transfer (D-16), 
           },
           afterId,
         );
-        if (res.lastId === null || res.lastId >= requestId) break;
+        if (res.lastId === null || (requestId !== null && res.lastId >= requestId)) break;
         afterId = res.lastId;
       }
     });
@@ -373,10 +379,10 @@ describe('W3-23 P13b: K1 annual allocations, 01/01 pairing, F8 transfer (D-16), 
       `INSERT INTO access_requests
          (id, organization_id, type, branch, state, plan_id, department_id, cost_center_id,
           requester_employee_id, business_reason, submitted_at, budget_year, amount_months,
-          amount_minor, amount_currency, term_months, unit_price_minor, billing_cycle, pricing_status,
+          amount_minor, amount_currency, term_months, unit_price_minor, monthly_price_minor, price_kind, billing_cycle, pricing_status,
           policy, created_by_app_user_id)
        VALUES ($1, $2, 'GRANT', 'PAID_IN_CATALOG', 'COMPLETED', $3, $4, $5, $6, 'K1 transfer re-grant',
-               '2027-03-20T02:00:00Z', $7, 7, 3150000, 'VND', 12, '450000', 'MONTHLY', 'PRICED',
+               '2027-03-20T02:00:00Z', $7, 7, 3150000, 'VND', 12, '450000', '450000', 'RECURRING', 'MONTHLY', 'PRICED',
                $8::jsonb, $9)`,
       [
         newRequestId,
@@ -467,28 +473,130 @@ describe('W3-23 P13b: K1 annual allocations, 01/01 pairing, F8 transfer (D-16), 
     expect(releases).toEqual([{ reason: 'TRANSFER_EFFECTIVE', amount_minor: '3150000' }]);
   });
 
-  it('F-21/D-16 trigger guard: rejects decreasing applied_minor on EXPENSED commitment with wrong transfer_returned_minor (23001)', async () => {
+  it('F-21/D-16 trigger guard: rejects wrong transfer_returned_minor, decreasing transfer_returned_minor, and state change (23001)', async () => {
     const unit = await h.departmentWithHead(nextTag('K1-D16-GUARD'));
     const s = await createApprovedK1AnnualScenario({ unit, commit2027: true });
-    await confirmK1Invoice(s.requestId, s.assignmentId, s.purchaseInvoiceId, unit.department.unitId);
+    const invId = await confirmK1Invoice(s.requestId, s.assignmentId, s.purchaseInvoiceId, unit.department.unitId);
 
-    let sqlState: string | undefined;
-    try {
-      await h.ctx.sql.query(
+    const runInvalidUpdate = async (sql: string, params: unknown[]) => {
+      try {
+        await h.ctx.sql.query(sql, params);
+        return undefined;
+      } catch (err) {
+        return (err as { code?: string }).code;
+      }
+    };
+
+    expect(
+      await runInvalidUpdate(
         `UPDATE budget_commitments
             SET applied_minor = applied_minor - 100000,
                 released_minor = released_minor + 100000,
                 transfer_returned_minor = transfer_returned_minor + 100000
           WHERE request_id = $1 AND year = $2`,
         [s.requestId, Y2],
-      );
-    } catch (err) {
-      sqlState = (err as { code?: string }).code;
-    }
-    expect(sqlState).toBe('23001');
+      ),
+    ).toBe('23001');
+
+    // G-16: decreasing transfer_returned_minor (transfer_d < 0) and changing state on transfer return must both be rejected.
+    const { rows: cRows } = await h.ctx.sql.query<{ id: string }>(
+      `SELECT id FROM budget_commitments WHERE request_id = $1 AND year = $2`,
+      [s.requestId, Y2],
+    );
+    await h.ctx.sql.query(
+      `INSERT INTO invoice_year_applications (id, invoice_id, year, cost_center_id, commitment_id, source, applied_minor, tax_variance_minor)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, 'TRANSFER'::"InvoiceYearApplicationSource", -100000, 0)`,
+      [invId, Y2, unit.department.unitId, cRows[0].id],
+    );
+    expect(
+      await runInvalidUpdate(
+        `UPDATE budget_commitments
+            SET state = 'HELD'::"CommitmentState",
+                applied_minor = applied_minor - 100000,
+                released_minor = released_minor + 100000,
+                transfer_returned_minor = transfer_returned_minor + 100000
+          WHERE id = $1`,
+        [cRows[0].id],
+      ),
+    ).toBe('23001');
+    await h.ctx.sql.query(
+      `UPDATE budget_commitments
+          SET applied_minor = applied_minor - 100000,
+              released_minor = released_minor + 100000,
+              transfer_returned_minor = transfer_returned_minor + 100000
+        WHERE id = $1`,
+      [cRows[0].id],
+    );
+    expect(
+      await runInvalidUpdate(
+        `UPDATE budget_commitments
+            SET applied_minor = applied_minor + 100000,
+                released_minor = released_minor - 100000,
+                transfer_returned_minor = transfer_returned_minor - 100000
+          WHERE id = $1`,
+        [cRows[0].id],
+      ),
+    ).toBe('23001');
   });
 
-  it('F-7: K1 annual transfer on 20/12/2026 then 01/01/2027 applies transferred invoice to new department with 0 leftover HELD and 2027 spent = 4.950.000', async () => {
+  it('G-1 (D-16): 4.8M HELD commitment with 4.5M invoice applied and -3.15M transfer yields applied 1.35M and full release without trigger refusal', async () => {
+    const oldUnit = await h.departmentWithHead(nextTag('K1-G1-OLD'));
+    const newUnit = await h.departmentWithHead(nextTag('K1-G1-NEW'));
+    const s = await createApprovedK1AnnualScenario({
+      unit: oldUnit,
+      commit2027: true,
+      commit2027AmountMinor: 4_800_000n,
+    });
+    const invId = await confirmK1Invoice(s.requestId, s.assignmentId, s.purchaseInvoiceId, oldUnit.department.unitId);
+
+    const { rows: beforeRows } = await h.ctx.sql.query<{ state: string; applied_minor: string }>(
+      `SELECT state::text, applied_minor::text FROM budget_commitments WHERE request_id = $1 AND year = $2`,
+      [s.requestId, Y2],
+    );
+    expect(beforeRows).toEqual([{ state: 'HELD', applied_minor: '4500000' }]);
+
+    const runner = h.ctx.app.get(TransactionRunner, { strict: false });
+    const budgets = h.ctx.app.get(BudgetsApi, { strict: false });
+    await runner.run((tx) =>
+      budgets.transferK1AnnualAllocations(tx, {
+        lockSubjectKey: s.assignmentId,
+        invoiceIds: [invId],
+        billingAnchorOn: '2026-11-05',
+        endedOn: '2027-03-20',
+        oldCostCenterId: oldUnit.department.unitId,
+        newCostCenterId: newUnit.department.unitId,
+        oldRequestIds: [s.requestId],
+        newRequestId: null,
+        reference: `transfer:g1:${s.assignmentId}`,
+        now: new Date('2027-03-20T05:00:00Z'),
+      }),
+    );
+
+    const { rows: afterRows } = await h.ctx.sql.query<{
+      state: string;
+      applied_minor: string;
+      released_minor: string;
+      transfer_returned_minor: string;
+    }>(
+      `SELECT state::text, applied_minor::text, released_minor::text, transfer_returned_minor::text
+         FROM budget_commitments WHERE request_id = $1 AND year = $2`,
+      [s.requestId, Y2],
+    );
+    expect(afterRows).toEqual([
+      { state: 'EXPENSED', applied_minor: '1350000', released_minor: '3450000', transfer_returned_minor: '3150000' },
+    ]);
+    const { rows: relRows } = await h.ctx.sql.query<{ amount_minor: string }>(
+      `SELECT r.amount_minor::text
+         FROM budget_commitment_releases r
+         JOIN budget_commitments c ON c.id = r.commitment_id
+        WHERE c.request_id = $1 AND c.year = $2
+        ORDER BY r.amount_minor::bigint`,
+      [s.requestId, Y2],
+    );
+    expect(relRows).toEqual([{ amount_minor: '300000' }, { amount_minor: '3150000' }]);
+  });
+
+  it('F-7 (G-2): K1 annual transfer on 20/12/2026 then full org 01/01/2027 applies transferred invoice to new department with 0 leftover HELD and 2027 spent = 4.950.000', async () => {
     const oldUnit = await h.departmentWithHead(nextTag('K1-F7-OLD'));
     const newUnit = await h.departmentWithHead(nextTag('K1-F7-NEW'));
     const s = await createApprovedK1AnnualScenario({ unit: oldUnit });
@@ -508,10 +616,10 @@ describe('W3-23 P13b: K1 annual allocations, 01/01 pairing, F8 transfer (D-16), 
          (id, organization_id, type, branch, state, plan_id, department_id, cost_center_id,
           requester_employee_id, business_reason, submitted_at, budget_year, amount_months,
           next_year_amount_minor, amount_minor, amount_currency, term_months, unit_price_minor,
-          billing_cycle, pricing_status, expected_end_date, replaces_assignment_id, limit_exemption,
+          monthly_price_minor, price_kind, billing_cycle, pricing_status, expected_end_date, replaces_assignment_id, limit_exemption,
           policy, created_by_app_user_id)
        VALUES ($1, $2, 'GRANT', 'PAID_IN_CATALOG', 'COMPLETED', $3, $4, $5, $6, 'K1 transfer re-grant F-7',
-               '2026-12-20T02:00:00Z', $7, 0, '4500000', 0, 'VND', 12, '450000', 'MONTHLY', 'PRICED',
+               '2026-12-20T02:00:00Z', $7, 0, '4500000', 0, 'VND', 12, '450000', '450000', 'RECURRING', 'MONTHLY', 'PRICED',
                '2027-11-04', $8, 'TRANSFER_GRACE', $9::jsonb, $10)`,
       [
         newRequestId,
@@ -571,7 +679,7 @@ describe('W3-23 P13b: K1 annual allocations, 01/01 pairing, F8 transfer (D-16), 
       }),
     );
 
-    await runYearStartFor(newRequestId, Y2);
+    await runYearStartFor(null, Y2);
 
     const { rows: commitStates } = await h.ctx.sql.query<{ request_id: string; state: string; applied_minor: string }>(
       `SELECT request_id::text, state::text, applied_minor::text

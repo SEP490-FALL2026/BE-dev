@@ -290,4 +290,96 @@ describe('InvoiceAllocationTransferService (W3-23 F8, D-16)', () => {
       now: NOW,
     });
   });
+
+  it('G-1 (D-16): HELD commitment with appliedMinor > 0 that transitions to EXPENSED after release runs transfer return in same call', async () => {
+    const existing2027 = Array.from({ length: 10 }, (_, i) =>
+      alloc({ id: `a-${i + 1}`, month: `2027-${String(i + 1).padStart(2, '0')}-01`, commitmentId: 'c-old-2027' }),
+    );
+    const oldCommit = commitment({
+      state: 'HELD',
+      amountMinor: 4_800_000n,
+      appliedMinor: 4_500_000n,
+      releasedMinor: 0n,
+      transferReturnedMinor: 0n,
+      seatMonthlyMinor: 450_000n,
+    });
+    const release = jest.fn().mockResolvedValue({ released: true, heldMinor: 0n });
+    const releaseExpensedTransfer = jest.fn().mockResolvedValue(undefined);
+
+    const service = new InvoiceAllocationTransferService(
+      {
+        lockOfRequest: jest.fn().mockResolvedValue([oldCommit]),
+        release,
+        releaseExpensedTransfer,
+        applyInvoice: jest.fn(),
+      } as unknown as CommitmentRepo,
+      {
+        lockK1AllocationYears: jest.fn().mockResolvedValue(undefined),
+        ofInvoices: jest.fn().mockResolvedValue(existing2027),
+        insertMany: jest.fn((_tx: unknown, lines: readonly Record<string, unknown>[]) =>
+          Promise.resolve(
+            lines.map((line, i) => ({
+              id: `off-${i + 1}`,
+              taxPartMinor: 0n,
+              adjustsAllocationId: null,
+              commitmentId: null,
+              costCenterId: null,
+              kind: 'TRANSFER_OUT',
+              createdAt: NOW,
+              ...line,
+            })),
+          ),
+        ),
+      } as unknown as InvoiceAllocationRepo,
+      {
+        ofInvoices: jest.fn().mockResolvedValue([
+          {
+            id: 'app-prior',
+            invoiceId: 'inv-1',
+            year: 2027,
+            costCenterId: 'cc-a',
+            commitmentId: 'c-old-2027',
+            source: 'YEAR_START',
+            appliedMinor: 4_500_000n,
+            taxVarianceMinor: 450_000n,
+            createdAt: new Date('2027-01-01T00:00:00.000Z'),
+          },
+        ]),
+        insert: jest.fn().mockResolvedValue({ id: 'app-1' }),
+        sumTransferNegativeOfCommitment: jest.fn().mockResolvedValue(3_150_000n),
+      } as unknown as InvoiceYearApplicationRepo,
+    );
+
+    await service.transfer(TX, {
+      lockSubjectKey: 'asg-1',
+      invoiceIds: ['inv-1'],
+      billingAnchorOn: '2026-11-05',
+      endedOn: '2027-03-20',
+      oldCostCenterId: 'cc-a',
+      newCostCenterId: 'cc-b',
+      oldRequestIds: ['req-old'],
+      newRequestId: null,
+      reference: 'transfer:regrant:assignment:asg-1',
+      now: NOW,
+    });
+
+    expect(release).toHaveBeenCalledWith(TX, expect.objectContaining({ id: 'c-old-2027' }), {
+      takeMinor: 300_000n,
+      reason: 'TRANSFER_EFFECTIVE',
+      reasonText: 'transfer:regrant:assignment:asg-1',
+      releasedByEmployeeId: null,
+      now: NOW,
+    });
+    expect(releaseExpensedTransfer).toHaveBeenCalledWith(TX, expect.objectContaining({ id: 'c-old-2027' }), {
+      transferMinor: 3_150_000n,
+      reference: 'transfer:regrant:assignment:asg-1',
+      now: NOW,
+    });
+    expect(oldCommit).toMatchObject({
+      state: 'EXPENSED',
+      appliedMinor: 1_350_000n,
+      releasedMinor: 3_450_000n,
+      transferReturnedMinor: 3_150_000n,
+    });
+  });
 });

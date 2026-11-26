@@ -212,18 +212,19 @@ export class InvoiceAllocationTransferService {
     if (oldCommitment.state === 'HELD') {
       const heldMinor = oldCommitment.amountMinor - oldCommitment.releasedMinor - oldCommitment.appliedMinor;
       const takeMinor = heldMinor < releaseTarget ? heldMinor : releaseTarget;
-      if (takeMinor <= 0n) return;
-
-      await this.commitments.release(tx, oldCommitment, {
-        takeMinor,
-        reason: 'TRANSFER_EFFECTIVE',
-        reasonText: input.reference,
-        releasedByEmployeeId: null,
-        now: input.now,
-      });
-      oldCommitment.releasedMinor += takeMinor;
-
-      return;
+      if (takeMinor > 0n) {
+        const res = await this.commitments.release(tx, oldCommitment, {
+          takeMinor,
+          reason: 'TRANSFER_EFFECTIVE',
+          reasonText: input.reference,
+          releasedByEmployeeId: null,
+          now: input.now,
+        });
+        oldCommitment.releasedMinor += takeMinor;
+        if (res.released) {
+          oldCommitment.state = oldCommitment.appliedMinor === 0n ? 'RELEASED' : 'EXPENSED';
+        }
+      }
     }
     if (oldCommitment.state !== 'EXPENSED') return;
 
