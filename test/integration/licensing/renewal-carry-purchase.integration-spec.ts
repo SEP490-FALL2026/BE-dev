@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
-import { SeatLedgerApi } from '../../../src/modules/catalog/public/seat-ledger.api';
+import { SeatLedgerApi, seatPurchaseExpectedAmount } from '../../../src/modules/catalog/public/seat-ledger.api';
 import { Barrier } from '../../support/concurrency-harness';
 import { pretendBusinessToday } from '../../support/pretend-today';
 import { RevocationHarness } from '../../support/revocation-harness';
@@ -178,11 +178,19 @@ describe('Renewal carry purchase on ledger and grant shortcut (integration, real
       quantity: number;
       invoice_obligation: string;
       invoice_due_on: string | null;
+      monthly_unit_price_minor: string;
+      billing_cycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER' | null;
+      renewal_date: string | null;
+      end_date: string | null;
     }>(
-      `SELECT code, kind, purchased_on::text, quantity, invoice_obligation, invoice_due_on::text
-         FROM seat_purchases
-        WHERE subscription_line_id = $1
-        ORDER BY recorded_at ASC`,
+      `SELECT sp.code, sp.kind, sp.purchased_on::text, sp.quantity, sp.invoice_obligation, sp.invoice_due_on::text,
+              sl.monthly_unit_price_minor::text, s.billing_cycle::text AS billing_cycle,
+              s.renewal_date::text, s.end_date::text
+         FROM seat_purchases sp
+         JOIN subscription_lines sl ON sl.id = sp.subscription_line_id
+         JOIN subscriptions s ON s.id = sl.subscription_id
+        WHERE sp.subscription_line_id = $1
+        ORDER BY sp.recorded_at ASC`,
       [lineNext],
     );
     expect(purchases.rows).toHaveLength(1);
@@ -190,8 +198,18 @@ describe('Renewal carry purchase on ledger and grant shortcut (integration, real
     expect(purchases.rows[0].kind).toBe('TOP_UP');
     expect(purchases.rows[0].purchased_on).toBe('2027-07-01');
     expect(purchases.rows[0].quantity).toBe(1);
-    expect(purchases.rows[0].invoice_obligation).toBe('DUE_DATE');
+    expect(purchases.rows[0].invoice_obligation).toBe('WORKING_DAYS');
     expect(purchases.rows[0].invoice_due_on).toBe('2027-07-07');
+    expect(
+      seatPurchaseExpectedAmount({
+        seats: purchases.rows[0].quantity,
+        monthlyUnitPriceMinor: BigInt(purchases.rows[0].monthly_unit_price_minor),
+        billingCycle: purchases.rows[0].billing_cycle,
+        renewalDate: purchases.rows[0].renewal_date,
+        endDate: purchases.rows[0].end_date,
+        purchasedOn: purchases.rows[0].purchased_on,
+      }),
+    ).toBe(6_000_000n * 12n);
 
     const changes = await h.ctx.sql.query<{
       delta: number;
