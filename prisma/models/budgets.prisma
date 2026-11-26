@@ -356,6 +356,8 @@ model BudgetCommitment {
   seatMonthlyMinor  BigInt?         @map("seat_monthly_minor")
   // What the seat-months gave back so far (SM1-06): the sum of the reversals of the commitment, moving with `appliedMinor`; the guard of the table accepts a lower `appliedMinor` only by exactly this.
   seatMonthReversedMinor BigInt     @default(0) @map("seat_month_reversed_minor")
+  // What went to another Cost Center after confirmation (`D-16`): equals -SUM(invoice_year_applications) where source = 'TRANSFER' and applied_minor < 0; moves in lockstep with appliedMinor (-d) and releasedMinor (+d) while state stays EXPENSED.
+  transferReturnedMinor BigInt      @default(0) @map("transfer_returned_minor")
   createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt         DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
