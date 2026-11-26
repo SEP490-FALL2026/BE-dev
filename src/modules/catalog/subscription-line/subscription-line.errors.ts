@@ -107,6 +107,13 @@ export class SubscriptionLineWorkspaceMovedError extends Error {
   }
 }
 
+export class SubscriptionLineSubscriptionMovedError extends Error {
+  constructor(readonly currentUpdatedAt: Date) {
+    super('The subscription line moved to another subscription period while acquiring locks.');
+    this.name = 'SubscriptionLineSubscriptionMovedError';
+  }
+}
+
 export class SubscriptionLinePeriodNotTermError extends Error {
   constructor() {
     super('Only term subscriptions have seat lines.');

@@ -25,6 +25,7 @@ import {
   SubscriptionLinePriceNotVndError,
   SubscriptionLineQuantityViaPurchaseError,
   SubscriptionLineStaleError,
+  SubscriptionLineSubscriptionMovedError,
   SubscriptionLineUpdateEmptyError,
   SubscriptionLineWorkspaceMovedError,
 } from './subscription-line.errors';
@@ -67,6 +68,24 @@ async function retryOnLineWorkspaceMove<T>(work: () => Promise<T>): Promise<T> {
       }
       if (error instanceof SubscriptionLineWorkspaceMovedError) {
         throw new SubscriptionLinePeriodStaleError(error.currentUpdatedAt);
+      }
+      throw error;
+    }
+  }
+}
+
+async function retryOnSubscriptionMove<T>(work: () => Promise<T>): Promise<T> {
+  let attempt = 0;
+  for (;;) {
+    try {
+      return await work();
+    } catch (error) {
+      if (error instanceof SubscriptionLineSubscriptionMovedError && attempt < MAX_WORKSPACE_MOVE_RETRIES) {
+        attempt += 1;
+        continue;
+      }
+      if (error instanceof SubscriptionLineSubscriptionMovedError) {
+        throw new SubscriptionLineStaleError(error.currentUpdatedAt);
       }
       throw error;
     }
@@ -174,7 +193,7 @@ export class SubscriptionLineService {
     const planVendorId = await this.plans.vendorIdOf(input.planId, tx);
     if (!planVendorId) throw new PlanNotFoundError();
     const probedWorkspaceId = workspaceRef.get();
-    if (probedWorkspaceId !== null) await this.workspaces.lockBoth(tx, [probedWorkspaceId], planVendorId);
+    const workspaceId = await this.ensureLineWorkspace(tx, actor, probedWorkspaceId, input.planId, planVendorId);
 
     const period = await this.lines.lockPeriod(tx, subscriptionId, 'UPDATE');
     if (!period) throw new SubscriptionLinePeriodNotFoundError();
@@ -183,7 +202,6 @@ export class SubscriptionLineService {
       throw new SubscriptionLineWorkspaceMovedError(period.updatedAt);
     }
     this.assertAddablePeriod(period, actor, input.expectedUpdatedAt);
-    const workspaceId = await this.ensureLineWorkspace(tx, actor, period, input.planId, planVendorId);
 
     return { period, workspaceId };
   }
@@ -191,17 +209,22 @@ export class SubscriptionLineService {
   private async ensureLineWorkspace(
     tx: DbTx,
     actor: AuthenticatedPrincipal,
-    period: PeriodLockRecord,
+    probedWorkspaceId: string | null,
     planId: string,
     planVendorId: string,
   ): Promise<string> {
-    if (period.workspaceId !== null) return period.workspaceId;
+    if (probedWorkspaceId !== null) {
+      await this.workspaces.lockBoth(tx, [probedWorkspaceId], planVendorId);
+
+      return probedWorkspaceId;
+    }
     const [unlockedPlan] = await this.plans.lookups([planId], tx);
     if (!unlockedPlan) throw new PlanNotFoundError();
+    const organizationId = await this.seatLedger.requireOrganizationId(tx);
     const resolved = await this.workspaces.resolveAndLock(
       tx,
       actor,
-      period.organizationId,
+      organizationId,
       { vendorId: planVendorId, needsWorkspace: unlockedPlan.provisioningType === 'K2' },
       undefined,
     );
@@ -248,42 +271,9 @@ export class SubscriptionLineService {
     const monthlyUnitPriceMinor =
       input.monthlyUnitPrice !== undefined ? readVndMinor(input.monthlyUnitPrice) : undefined;
 
-    const updated = await this.runner.run(async (tx) => {
-      const current = await this.lines.lock(tx, lineId);
-      if (!current) throw new SubscriptionLineNotFoundError();
-      const period = await this.lines.lockPeriod(tx, current.subscriptionId, 'SHARE');
-      if (!period) throw new SubscriptionLinePeriodNotFoundError();
-      if (period.responsibleItAdminEmployeeId !== actor.employeeId) throw new SubscriptionLineNotResponsibleError();
-      if (current.closedReason !== null) throw new SubscriptionLineClosedError();
-      if (current.updatedAt.getTime() !== input.expectedUpdatedAt.getTime()) {
-        throw new SubscriptionLineStaleError(current.updatedAt);
-      }
-
-      const saved = await this.lines.update(tx, lineId, {
-        ...(monthlyUnitPriceMinor !== undefined ? { monthlyUnitPriceMinor } : {}),
-        ...(input.minimumSeats !== undefined ? { minimumSeats: input.minimumSeats } : {}),
-      });
-      await this.audit.record(
-        tx,
-        catalogAuditEvent(
-          actor,
-          current.organizationId,
-          'SUBSCRIPTION_LINE.UPDATED',
-          'SUBSCRIPTION_LINE',
-          lineId,
-          {
-            monthlyUnitPriceMinor: current.monthlyUnitPriceMinor.toString(),
-            minimumSeats: current.minimumSeats,
-          },
-          {
-            monthlyUnitPriceMinor: saved.monthlyUnitPriceMinor.toString(),
-            minimumSeats: saved.minimumSeats,
-          },
-        ),
-      );
-
-      return saved;
-    });
+    const updated = await retryOnSubscriptionMove(() =>
+      this.runner.run((tx) => this.updateLineIn(tx, actor, lineId, input, monthlyUnitPriceMinor)),
+    );
 
     const today = await this.seatLedger.businessToday();
     const [plan] = await this.plans.lookups([updated.planId]);
@@ -293,5 +283,47 @@ export class SubscriptionLineService {
     const assignedToday = occupiedMap?.get(`${updated.subscriptionId}:${updated.planId}`) ?? 0;
 
     return toSubscriptionLineDetail(updated, { id: updated.planId, name: plan?.name ?? '' }, seatsToday, assignedToday);
+  }
+
+  private async updateLineIn(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    lineId: string,
+    input: UpdateSubscriptionLineInput,
+    monthlyUnitPriceMinor: bigint | undefined,
+  ) {
+    const probe = await this.lines.find(lineId, tx);
+    if (!probe) throw new SubscriptionLineNotFoundError();
+    const period = await this.lines.lockPeriod(tx, probe.subscriptionId, 'SHARE');
+    if (!period) throw new SubscriptionLinePeriodNotFoundError();
+    const current = await this.lines.lock(tx, lineId);
+    if (!current) throw new SubscriptionLineNotFoundError();
+    if (current.subscriptionId !== probe.subscriptionId) {
+      throw new SubscriptionLineSubscriptionMovedError(current.updatedAt);
+    }
+    if (period.responsibleItAdminEmployeeId !== actor.employeeId) throw new SubscriptionLineNotResponsibleError();
+    if (current.closedReason !== null) throw new SubscriptionLineClosedError();
+    if (current.updatedAt.getTime() !== input.expectedUpdatedAt.getTime()) {
+      throw new SubscriptionLineStaleError(current.updatedAt);
+    }
+
+    const saved = await this.lines.update(tx, lineId, {
+      ...(monthlyUnitPriceMinor !== undefined ? { monthlyUnitPriceMinor } : {}),
+      ...(input.minimumSeats !== undefined ? { minimumSeats: input.minimumSeats } : {}),
+    });
+    await this.audit.record(
+      tx,
+      catalogAuditEvent(
+        actor,
+        current.organizationId,
+        'SUBSCRIPTION_LINE.UPDATED',
+        'SUBSCRIPTION_LINE',
+        lineId,
+        { monthlyUnitPriceMinor: current.monthlyUnitPriceMinor.toString(), minimumSeats: current.minimumSeats },
+        { monthlyUnitPriceMinor: saved.monthlyUnitPriceMinor.toString(), minimumSeats: saved.minimumSeats },
+      ),
+    );
+
+    return saved;
   }
 }

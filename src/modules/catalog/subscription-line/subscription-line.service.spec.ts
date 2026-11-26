@@ -109,6 +109,7 @@ function makeSut(overrides: Record<string, unknown> = {}) {
   const openLines = jest.fn().mockResolvedValue(undefined);
   const seatLedger = {
     openLines,
+    requireOrganizationId: jest.fn().mockResolvedValue('org-1'),
     listPagedByLine: jest.fn().mockResolvedValue({ items: [], total: 0 }),
     businessToday: jest.fn().mockResolvedValue('2026-11-21'),
     seatsOnDays: jest.fn().mockResolvedValue(new Map([['line-1', new Map([['2026-11-21', 5]])]])),
@@ -131,6 +132,10 @@ function makeSut(overrides: Record<string, unknown> = {}) {
     lockBoth: jest.fn().mockImplementation(() => {
       order.push('lockWorkspace');
       return Promise.resolve();
+    }),
+    resolveAndLock: jest.fn().mockImplementation(() => {
+      order.push('resolveAndLock');
+      return Promise.resolve('ws-resolved');
     }),
     ...(overrides.workspaces as object),
   } as unknown as WorkspaceForSubscriptionService;
@@ -324,6 +329,22 @@ describe('SubscriptionLineService (W3-15)', () => {
 
       expect(codeOf(caught)).toEqual({ status: HttpStatus.CONFLICT, code: 'SUBSCRIPTION.LINES_LIMIT' });
       expect(insert).not.toHaveBeenCalled();
+    });
+
+    it('F-4: ensureLineWorkspace locks workspace (5b) before period (6) when period.workspaceId is null', async () => {
+      const { service, order } = makeSut({
+        lines: {
+          readPeriodWorkspace: jest.fn().mockResolvedValue(null),
+          lockPeriod: jest.fn().mockImplementation(() => {
+            order.push('lockPeriod');
+            return Promise.resolve(makePeriod({ workspaceId: null }));
+          }),
+        },
+      });
+
+      await service.addLine(actor, 'sub-1', { ...baseAdd, quantity: 1 });
+
+      expect(order).toEqual(['resolveAndLock', 'lockPeriod', 'lockPlan']);
     });
   });
 });

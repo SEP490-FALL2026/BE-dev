@@ -84,14 +84,24 @@ function codeOf(error: unknown): { status: number; code: string | undefined } {
 
 function makeSut(overrides: Record<string, unknown> = {}) {
   const tx = {} as DbTx;
+  const order: string[] = [];
   const runner = {
     run: jest.fn(async (work: (t: DbTx) => Promise<unknown>) => work(tx)),
   } as unknown as TransactionRunner;
   const update = jest.fn().mockResolvedValue(makeLine({ monthlyUnitPriceMinor: 420_000n }));
   const lines = {
-    lockPeriod: jest.fn().mockResolvedValue(makePeriod()),
-    lock: jest.fn().mockResolvedValue(makeLine()),
-    find: jest.fn().mockResolvedValue(makeLine()),
+    lockPeriod: jest.fn().mockImplementation(() => {
+      order.push('lockPeriod');
+      return Promise.resolve(makePeriod());
+    }),
+    lock: jest.fn().mockImplementation(() => {
+      order.push('lockLine');
+      return Promise.resolve(makeLine());
+    }),
+    find: jest.fn().mockImplementation(() => {
+      order.push('findLine');
+      return Promise.resolve(makeLine());
+    }),
     update,
     ...(overrides.lines as object),
   } as unknown as SubscriptionLineRepo;
@@ -117,7 +127,7 @@ function makeSut(overrides: Record<string, unknown> = {}) {
     runner,
   );
 
-  return { service, update, auditRecord };
+  return { service, update, auditRecord, order, lines };
 }
 
 describe('SubscriptionLineService updateLine', () => {
@@ -195,5 +205,37 @@ describe('SubscriptionLineService updateLine', () => {
         resourceId: 'line-1',
       }),
     );
+  });
+
+  it('F-4: reads line unlocked, locks period (6) before line (6c), and retries if subscriptionId moved', async () => {
+    const { service, order } = makeSut();
+
+    await service.updateLine(actor, 'line-1', updBody);
+
+    expect(order).toEqual(['findLine', 'lockPeriod', 'lockLine']);
+
+    const find = jest
+      .fn()
+      .mockResolvedValueOnce(makeLine({ subscriptionId: 'sub-old' }))
+      .mockResolvedValueOnce(makeLine({ subscriptionId: 'sub-new' }));
+    const lock = jest.fn().mockResolvedValue(makeLine({ subscriptionId: 'sub-new' }));
+    const lockPeriod = jest.fn().mockResolvedValue(makePeriod({ id: 'sub-new' }));
+    const retrySut = makeSut({ lines: { find, lock, lockPeriod } });
+
+    await retrySut.service.updateLine(actor, 'line-1', updBody);
+    expect(lockPeriod).toHaveBeenNthCalledWith(1, expect.anything(), 'sub-old', 'SHARE');
+    expect(lockPeriod).toHaveBeenNthCalledWith(2, expect.anything(), 'sub-new', 'SHARE');
+    expect(retrySut.update).toHaveBeenCalledTimes(1);
+
+    const alwaysMoved = makeSut({
+      lines: {
+        find: jest.fn().mockResolvedValue(makeLine({ subscriptionId: 'sub-old' })),
+        lock: jest.fn().mockResolvedValue(makeLine({ subscriptionId: 'sub-new' })),
+        lockPeriod: jest.fn().mockResolvedValue(makePeriod()),
+      },
+    });
+    const staleErr = await alwaysMoved.service.updateLine(actor, 'line-1', updBody).catch((e: unknown) => e);
+    expect(staleErr).toBeInstanceOf(SubscriptionLineStaleError);
+    expect(codeOf(staleErr)).toEqual({ status: HttpStatus.CONFLICT, code: 'SUBSCRIPTION_LINE.STALE' });
   });
 });

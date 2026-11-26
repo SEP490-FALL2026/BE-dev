@@ -54,6 +54,13 @@ export class SeatLedgerService {
   ) {}
 
   /** Opens the ledger of newly activated lines (`ADJUSTMENT` / `INITIAL`), without closed-month restriction. */
+  async requireOrganizationId(tx?: DbTx): Promise<string> {
+    const organization = await this.organizationReads.getOrganization(tx);
+    if (!organization) throw new Error('Subscriptions were used before installation');
+
+    return organization.id;
+  }
+
   async openLines(tx: DbTx, input: OpenLinesInput): Promise<SeatChangeRecord[]> {
     const ordered = [...input.lines].sort((a, b) => a.lineId.localeCompare(b.lineId));
     const created: SeatChangeRecord[] = [];
