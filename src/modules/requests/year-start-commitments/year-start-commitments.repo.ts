@@ -2,9 +2,16 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../../generated/prisma/client';
 import { fromDateColumn, type BusinessDate } from '../../../core/business-date';
 import { DONG } from '../../../core/money/money';
+import { roundHalfAway } from '../../../core/seat-month-cost';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { BillingCycleCode } from '../access-request/access-request.types';
 import { YEAR_START_REQUEST_STATES } from './year-start-commitments.policy';
+
+const CYCLE_MONTHS: Readonly<Record<Exclude<BillingCycleCode, 'OTHER'>, bigint>> = {
+  MONTHLY: 1n,
+  QUARTERLY: 3n,
+  ANNUAL: 12n,
+};
 
 /** A request the pass may commit for, as it stands now (its row is locked until the transaction ends). */
 export interface YearStartCandidate {
@@ -24,6 +31,7 @@ export interface YearStartCandidate {
   amountCurrency: string | null;
   /** The price of a seat per billing period the approval worked out at, in that currency (`unit_price_minor`, `billing_cycle` of the request). */
   unitPriceMinor: bigint | null;
+  monthlyPriceMinor?: bigint | null;
   billingCycle: BillingCycleCode | null;
 }
 
@@ -214,6 +222,13 @@ export class YearStartCommitmentsRepo {
       nextYearAmountMinor: row.next_year_amount_minor,
       amountCurrency: row.amount_currency,
       unitPriceMinor: row.unit_price_minor,
+      monthlyPriceMinor:
+        row.amount_currency === DONG &&
+        row.unit_price_minor !== null &&
+        row.billing_cycle !== null &&
+        row.billing_cycle !== 'OTHER'
+          ? roundHalfAway(row.unit_price_minor, CYCLE_MONTHS[row.billing_cycle])
+          : null,
       billingCycle: row.billing_cycle,
     }));
   }

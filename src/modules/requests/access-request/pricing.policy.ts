@@ -2,6 +2,7 @@ import type { BillingCycleCode, MissingPriceReason, PricingRecord } from './acce
 import type { BusinessDate } from '../../../core/business-date';
 import { fiscalYearOf } from '../../../core/fiscal-year';
 import { MAX_AMOUNT_MINOR, type Money } from '../../../core/money/money';
+import { roundHalfAway } from '../../../core/seat-month-cost';
 import { calendarMonthsIn, monthsBeginningIn } from '../../../core/term-limit';
 
 /**
@@ -60,7 +61,7 @@ export type Pricing =
     }
   | { status: 'MISSING'; reason: MissingPriceReason; budgetYear: number };
 
-/** Whole minor units, rounded up once (`R-B01`) for legacy callers without `monthlyPriceMinor` (quotes and line allocation). */
+/** Whole minor units, rounded up once (`R-B01`) for non-K1/K2 callers without `monthlyPriceMinor` (quotes). */
 const ceilDiv = (numerator: bigint, denominator: bigint): bigint => (numerator + denominator - 1n) / denominator;
 
 function legacySeatMonthlyOf(unitPrice?: Money | null, billingCycle?: BillingCycleCode | null): bigint | null {
@@ -106,7 +107,7 @@ export function monthlyPriceOf(price: {
   if (price.billingCycle === null || price.billingCycle === 'OTHER') return null;
 
   return {
-    amountMinor: ceilDiv(price.unitPrice.amountMinor, BigInt(CYCLE_MONTHS[price.billingCycle])),
+    amountMinor: roundHalfAway(price.unitPrice.amountMinor, BigInt(CYCLE_MONTHS[price.billingCycle])),
     currency: price.unitPrice.currency,
   };
 }
@@ -144,6 +145,16 @@ export function annualVendorAmountOf(price: {
   return { amountMinor: monthly.amountMinor * 12n, currency: monthly.currency };
 }
 
+function resolvedMonthlyForRecord(input: PricingInput, unitPrice: Money): bigint | null | undefined {
+  if (input.monthlyPriceMinor !== undefined) return input.monthlyPriceMinor;
+  const isK1OrK2 = input.provisioningType === 'K1' || input.provisioningType === 'K2';
+  if (input.kind !== 'RECURRING' || !isK1OrK2 || input.billingCycle === null || input.billingCycle === 'OTHER') {
+    return undefined;
+  }
+
+  return roundHalfAway(unitPrice.amountMinor, BigInt(CYCLE_MONTHS[input.billingCycle]));
+}
+
 export function requestAmountOf(input: PricingInput): Pricing {
   const year = fiscalYearOf(input.checkDate);
   // A price of nothing is no price: a paid request never costs 0 (`FR-3.2`), so the price data is incomplete and the request is not
@@ -153,6 +164,7 @@ export function requestAmountOf(input: PricingInput): Pricing {
   }
   const { unitPrice } = input;
   const people = BigInt(input.beneficiaries);
+  const resolvedMonthlyPriceMinor = resolvedMonthlyForRecord(input, unitPrice);
   const priced = (facts: {
     amountMinor: bigint;
     cycle: BillingCycleCode;
@@ -166,7 +178,7 @@ export function requestAmountOf(input: PricingInput): Pricing {
       status: 'PRICED',
       amount: { amountMinor: facts.amountMinor, currency: unitPrice.currency },
       unitPrice,
-      ...(input.monthlyPriceMinor !== undefined ? { monthlyPriceMinor: input.monthlyPriceMinor } : {}),
+      ...(resolvedMonthlyPriceMinor !== undefined ? { monthlyPriceMinor: resolvedMonthlyPriceMinor } : {}),
       billingCycle: facts.cycle,
       kind: input.kind,
       months: facts.months,
@@ -214,10 +226,17 @@ function recurringAmountOf(
   const year = fiscalYearOf(input.checkDate);
   const cycleMonths = BigInt(CYCLE_MONTHS[billingCycle]);
   const monthlyMinor = input.monthlyPriceMinor;
-  const costOf = (months: number): bigint =>
-    monthlyMinor !== undefined && monthlyMinor !== null
-      ? monthlyMinor * BigInt(months) * BigInt(input.beneficiaries)
-      : ceilDiv(input.unitPrice.amountMinor * BigInt(months) * BigInt(input.beneficiaries), cycleMonths);
+  const isK1OrK2 = input.provisioningType === 'K1' || input.provisioningType === 'K2';
+  const costOf = (months: number): bigint => {
+    if (monthlyMinor !== undefined && monthlyMinor !== null) {
+      return monthlyMinor * BigInt(months) * BigInt(input.beneficiaries);
+    }
+    if (isK1OrK2) {
+      return roundHalfAway(input.unitPrice.amountMinor, cycleMonths) * BigInt(months) * BigInt(input.beneficiaries);
+    }
+
+    return ceilDiv(input.unitPrice.amountMinor * BigInt(months) * BigInt(input.beneficiaries), cycleMonths);
+  };
   const start = input.from !== undefined && input.from > input.checkDate ? input.from : input.checkDate;
   const startYear = fiscalYearOf(start);
   const countMonths = (inYear: number): number =>

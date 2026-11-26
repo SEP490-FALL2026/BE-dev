@@ -1,5 +1,6 @@
 import { MAX_AMOUNT_MINOR } from '../../../core/money/money';
 import {
+  approvalMonthlyFromSaved,
   bearingDepartmentOf,
   carriedOverByCostCenter,
   judgeYearStart,
@@ -86,7 +87,25 @@ describe('BR-MF1-09: the commitment made on 01/01 for a right that goes on', () 
       ).toMatchObject({ amountMinor: 240000n, seatMonthlyMinor: 20000n });
       expect(
         amount([seat()], { ...MONTHLY, billingCycle: 'ANNUAL', unitPrice: { amountMinor: 100n, currency: 'VND' } }),
-      ).toMatchObject({ seatMonthlyMinor: 9n });
+      ).toMatchObject({ seatMonthlyMinor: 8n });
+      expect(approvalMonthlyFromSaved(10_000_000n)).toBe(833_333n);
+      expect(
+        amount(
+          [
+            seat({
+              termLimited: true,
+              expectedEndDate: '2027-08-14',
+              savedMinor: 2_000_000n,
+              validUntil: '2027-03-01',
+              approvalPrice: {
+                unitPrice: { amountMinor: 10_000_000n, currency: 'VND' },
+                billingCycle: 'ANNUAL',
+              },
+            }),
+          ],
+          { ...MONTHLY, unitPrice: { amountMinor: 1_000_000n, currency: 'VND' } },
+        ),
+      ).toMatchObject({ amountMinor: 1_666_666n });
     });
 
     it('BR-MF1-09e: a seat already over before 01/01 is left out of the amount', () => {

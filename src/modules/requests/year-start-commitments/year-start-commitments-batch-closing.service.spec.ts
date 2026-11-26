@@ -140,4 +140,25 @@ describe('YearStartCommitmentsBatchService: a seat that closes before the term i
       }),
     ).toEqual([expect.objectContaining({ requestId: 'r-1', amountMinor: 1_200_000n, seatMonthlyMinor: 100_000n })]);
   });
+
+  it('B-5: approvalPriceOf and approvalMonthlyFromSaved use roundHalfAway (10.000.000 ANNUAL -> 833.333/month)', async () => {
+    const annualTerm = candidate({
+      unitPriceMinor: 10_000_000n,
+      billingCycle: 'ANNUAL',
+      nextYearAmountMinor: 5_000_000n,
+    });
+    expect(await held(annualTerm, '2027-03-01')).toEqual([
+      expect.objectContaining({ requestId: 'r-1', amountMinor: 1_666_666n, seatMonthlyMinor: 650_000n }),
+    ]);
+
+    const annualPerpetual = candidate({
+      termMonths: null,
+      unitPriceMinor: null,
+      billingCycle: null,
+      nextYearAmountMinor: 10_000_000n,
+    });
+    expect(await held(annualPerpetual, '2027-03-01')).toEqual([
+      expect.objectContaining({ requestId: 'r-1', amountMinor: 1_666_666n, seatMonthlyMinor: 833_333n }),
+    ]);
+  });
 });

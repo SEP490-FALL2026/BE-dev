@@ -1,7 +1,13 @@
 import type { Prisma } from '../../../generated/prisma/client';
 import { fromDateColumn, toDateColumn } from '../../../core/business-date';
-import type { PricingRecord } from './access-request.types';
-import type { MissingPriceReason } from './access-request.types';
+import { roundHalfAway } from '../../../core/seat-month-cost';
+import type { BillingCycleCode, MissingPriceReason, PricingRecord } from './access-request.types';
+
+const CYCLE_MONTHS: Readonly<Record<Exclude<BillingCycleCode, 'OTHER'>, bigint>> = {
+  MONTHLY: 1n,
+  QUARTERLY: 3n,
+  ANNUAL: 12n,
+};
 
 /** The columns of a request that carry its price, as the database returns them. */
 type PricingRow = Pick<
@@ -19,8 +25,25 @@ type PricingRow = Pick<
   | 'nextYearAmountMinor'
 >;
 
+function hydratedMonthlyPriceMinor(row: PricingRow): bigint | null | undefined {
+  if (row.priceKind === 'ONE_TIME') return null;
+  if (
+    row.pricingStatus !== 'PRICED' ||
+    row.priceKind !== 'RECURRING' ||
+    row.unitPriceMinor === null ||
+    row.amountCurrency === null ||
+    row.billingCycle === null ||
+    row.billingCycle === 'OTHER'
+  ) {
+    return undefined;
+  }
+
+  return roundHalfAway(row.unitPriceMinor, CYCLE_MONTHS[row.billingCycle]);
+}
+
 export function toPricing(row: PricingRow): PricingRecord {
   const currency = row.amountCurrency;
+  const monthlyPriceMinor = hydratedMonthlyPriceMinor(row);
 
   return {
     status: row.pricingStatus,
@@ -31,6 +54,7 @@ export function toPricing(row: PricingRow): PricingRecord {
     budgetYear: row.budgetYear,
     amount: row.amountMinor !== null && currency !== null ? { amountMinor: row.amountMinor, currency } : null,
     unitPrice: row.unitPriceMinor !== null && currency !== null ? { amountMinor: row.unitPriceMinor, currency } : null,
+    ...(monthlyPriceMinor !== undefined ? { monthlyPriceMinor } : {}),
     billingCycle: row.billingCycle,
     nextYearAmount:
       row.nextYearAmountMinor !== null && currency !== null ? { amountMinor: row.nextYearAmountMinor, currency } : null,

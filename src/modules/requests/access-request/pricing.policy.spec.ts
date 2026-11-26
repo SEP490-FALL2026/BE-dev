@@ -366,7 +366,6 @@ describe('W3-02: calendar months for K2, rolling months for K1, seatMonthlyOf, a
   it('seatMonthlyOf returns monthlyPriceMinor directly without reverse division', () => {
     const base = { monthlyPriceMinor: 500_000n, kind: 'RECURRING' as const, months: 2 };
     expect(seatMonthlyOf({ ...base, costMinor: 1_000_000n, seats: 1 })).toBe(500_000n);
-    // Mixed-end group (1.500.000 over max 2 months and 2 seats): must not divide 1.500.000 / 4 = 375.000.
     expect(seatMonthlyOf({ ...base, costMinor: 1_500_000n, seats: 2 })).toBe(500_000n);
     expect(seatMonthlyOf({ ...base, kind: 'ONE_TIME', months: null, costMinor: 5_000n, seats: 1 })).toBeNull();
     expect(seatMonthlyOf({ ...base, months: 0, costMinor: 5_000n, seats: 1 })).toBeNull();

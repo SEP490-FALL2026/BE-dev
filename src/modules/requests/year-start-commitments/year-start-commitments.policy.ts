@@ -1,5 +1,6 @@
 import { addDays, type BusinessDate } from '../../../core/business-date';
 import { DONG, MAX_AMOUNT_MINOR, type Money } from '../../../core/money/money';
+import { roundHalfAway } from '../../../core/seat-month-cost';
 import type { BillingCycleCode } from '../access-request/access-request.types';
 import { monthlyPriceOf, requestAmountOf } from '../access-request/pricing.policy';
 
@@ -31,10 +32,10 @@ export interface YearStartSeat {
   /** What the approval kept of this seat for the year that begins (`QĐ-111k`, M-13): null when it kept nothing (a request of an older release). */
   savedMinor: bigint | null;
   /**
-   * The price of a seat the approval worked the kept number out at, in dong (the unit price and billing cycle the request carries): a seat that
+   * The price of a seat the approval worked the kept number out at, in dong (the unit price, monthly price, and billing cycle the request carries): a seat that
    * closes before its term is counted at this price, never at the price of 01/01 (`QĐ-111ak`). Null when the request does not carry one.
    */
-  approvalPrice: Pick<YearStartPrice, 'unitPrice' | 'billingCycle'> | null;
+  approvalPrice: Pick<YearStartPrice, 'unitPrice' | 'monthlyPriceMinor' | 'billingCycle'> | null;
 }
 
 /** What a plan is bought at, as the catalog says it. */
@@ -82,16 +83,18 @@ export function seatCountsOn(seat: YearStartSeat, yearStart: BusinessDate): bool
   return last === null || last >= yearStart;
 }
 
-const ceilDiv = (dividend: bigint, divisor: bigint): bigint => (dividend + divisor - 1n) / divisor;
+/** The price of a month a right with no end was approved at, from what the approval kept of the year (twelve months, rounded half away from zero). */
+export const approvalMonthlyFromSaved = (savedMinor: bigint): bigint => roundHalfAway(savedMinor, 12n);
 
-/** The price of a month a right with no end was approved at, from what the approval kept of the year (twelve months, rounded up to the minor unit). */
-export const approvalMonthlyFromSaved = (savedMinor: bigint): bigint => ceilDiv(savedMinor, 12n);
-
-function approvalPriceOfSeat(seat: YearStartSeat): Pick<YearStartPrice, 'unitPrice' | 'billingCycle'> | null {
+function approvalPriceOfSeat(
+  seat: YearStartSeat,
+): Pick<YearStartPrice, 'unitPrice' | 'monthlyPriceMinor' | 'billingCycle'> | null {
   if (seat.approvalPrice !== null) return seat.approvalPrice;
   if (!seat.termLimited && seat.savedMinor !== null) {
+    const monthly = approvalMonthlyFromSaved(seat.savedMinor);
     return {
-      unitPrice: { amountMinor: approvalMonthlyFromSaved(seat.savedMinor), currency: DONG },
+      unitPrice: { amountMinor: monthly, currency: DONG },
+      monthlyPriceMinor: monthly,
       billingCycle: 'MONTHLY',
     };
   }
@@ -121,6 +124,9 @@ function keptAmountOf(seat: YearStartSeat, yearStart: BusinessDate): bigint | nu
   const monthsToClose = requestAmountOf({
     kind: 'RECURRING',
     unitPrice: price.unitPrice,
+    monthlyPriceMinor:
+      price.monthlyPriceMinor ??
+      monthlyPriceOf({ unitPrice: price.unitPrice, billingCycle: price.billingCycle })?.amountMinor,
     billingCycle: price.billingCycle,
     beneficiaries: 1,
     checkDate: yearStart,

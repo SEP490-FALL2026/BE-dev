@@ -9,6 +9,7 @@ import type { YearStartHoldInput } from '../../budgets/public/budgets.types';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { LicensingOpenGrantsApi } from '../../licensing/public/licensing-open-grants.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { monthlyPriceOf } from '../access-request/pricing.policy';
 import { YearStartCommitmentsRepo, type YearStartCandidate } from './year-start-commitments.repo';
 import {
   YEAR_START_PLAN_KINDS,
@@ -72,8 +73,13 @@ function approvalPriceOf(
   return (requestId) => {
     const request = byId.get(requestId);
     if (!request || request.amountCurrency !== DONG || request.unitPriceMinor === null) return null;
+    const unitPrice = { amountMinor: request.unitPriceMinor, currency: DONG };
+    const monthlyPriceMinor =
+      request.monthlyPriceMinor ??
+      monthlyPriceOf({ unitPrice, billingCycle: request.billingCycle })?.amountMinor ??
+      null;
 
-    return { unitPrice: { amountMinor: request.unitPriceMinor, currency: DONG }, billingCycle: request.billingCycle };
+    return { unitPrice, monthlyPriceMinor, billingCycle: request.billingCycle };
   };
 }
 
@@ -309,10 +315,13 @@ export class YearStartCommitmentsBatchService {
       ...(await this.unclaimedSeatsOf(tx, candidates, year, keptOf)),
       ...(await this.grantedSeatsOf(tx, candidates, year, keptOf, confirmedInvoices)),
     ]) {
+      const savedMonthly =
+        !seat.termLimited && seat.savedMinor !== null ? approvalMonthlyFromSaved(seat.savedMinor) : null;
       const approvalPrice =
-        !seat.termLimited && seat.savedMinor !== null
+        savedMonthly !== null
           ? {
-              unitPrice: { amountMinor: approvalMonthlyFromSaved(seat.savedMinor), currency: DONG },
+              unitPrice: { amountMinor: savedMonthly, currency: DONG },
+              monthlyPriceMinor: savedMonthly,
               billingCycle: 'MONTHLY' as const,
             }
           : priceOf(requestId);

@@ -11,7 +11,7 @@ import { CatalogApi } from '../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { chargedCostCenterId } from '../access-request/access-request.policy';
-import { seatMonthlyOf } from '../access-request/pricing.policy';
+import { monthlyPriceOf, seatMonthlyOf } from '../access-request/pricing.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { BudgetCheckRepo, type CheckRecord } from '../spend/budget-check.repo';
@@ -100,10 +100,7 @@ export class SpendEffectsService {
     now: Date,
   ): Promise<{ seatMonthlyMinor: bigint | null; months: MonthSliceInput[] | undefined }> {
     const planPrice = request.planId !== null ? await this.catalog.getPlanPrice(request.planId, tx) : undefined;
-    const monthlyPriceMinor =
-      request.pricing.monthlyPriceMinor !== undefined
-        ? request.pricing.monthlyPriceMinor
-        : planPrice?.monthlyPriceMinor;
+    const monthlyPriceMinor = this.savedMonthlyPriceOf(request.pricing, planPrice?.monthlyPriceMinor);
     const seatMonthlyMinor = seatMonthlyOf({
       monthlyPriceMinor,
       unitPrice: request.pricing.unitPrice,
@@ -118,6 +115,18 @@ export class SpendEffectsService {
         ? await this.monthlySlicesForHold(tx, request, year.year, seats, planPrice?.provisioningType, now)
         : undefined;
     return { seatMonthlyMinor, months };
+  }
+
+  private savedMonthlyPriceOf(
+    pricing: AccessRequestRecord['pricing'],
+    catalogMonthly: bigint | null | undefined,
+  ): bigint | null | undefined {
+    if (pricing.monthlyPriceMinor !== undefined) return pricing.monthlyPriceMinor;
+    if (pricing.unitPrice !== null && pricing.billingCycle !== null && pricing.billingCycle !== 'OTHER') {
+      return monthlyPriceOf({ unitPrice: pricing.unitPrice, billingCycle: pricing.billingCycle })?.amountMinor ?? null;
+    }
+
+    return catalogMonthly;
   }
 
   private async monthlySlicesForHold(
