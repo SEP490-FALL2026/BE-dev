@@ -54,8 +54,9 @@ Trạng thái: `chưa` · `đang làm` · `xong` (chỉ sau khi đối chiếu t
 
 ## CI GitHub
 
-| Commit | Link run | quality | http | integration | timing | serial | e2e-smoke | Ghi chú |
-| ------ | -------- | ------- | ---- | ----------- | ------ | ------ | --------- | ------- |
+| Commit   | Link run                                                           | quality     | http        | integration | timing      | serial      | e2e-smoke   | Ghi chú                                                                                            |
+| -------- | ------------------------------------------------------------------ | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- | -------------------------------------------------------------------------------------------------- |
+| 839f20b2 | https://github.com/SEP490-FALL2026/BE-dev/actions/runs/45752366446 | in_progress | in_progress | in_progress | in_progress | in_progress | in_progress | Chốt toàn bộ đợt 3 tới P23 (`c4125175`); chưa làm `FIX-W3.md` & `F8/D-13` theo chỉ đạo Owner 25/11 |
 
 ## Đối chiếu tiêu chí (LUẬT CỨNG 6)
 
