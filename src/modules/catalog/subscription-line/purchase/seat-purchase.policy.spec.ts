@@ -8,6 +8,7 @@ import {
   SeatPurchaseStockAvailableError,
   SeatPurchaseTierStepOneItemError,
 } from './seat-purchase.errors';
+import { toSeatPurchaseApiException } from './seat-purchase.http-errors';
 import {
   assertLinePurchasableForPurchase,
   assertPurchaseDateWithinBounds,
@@ -291,22 +292,42 @@ describe('seat-purchase.policy (W3-18)', () => {
 
   describe('W3-19 tierStepSeats & replacesFromLineId', () => {
     it('validates mode exclusivity and single-item constraint', () => {
-      expect(() =>
-        assertPurchaseModeValid({
-          itemCount: 1,
-          tierStepSeats: 50,
-          replacesFromLineId: 'line-old',
-          targetLineId: 'line-new',
-        }),
-      ).toThrow(SeatPurchaseConflictingModeError);
+      const check = (run: () => unknown, ErrorClass: new (...args: never[]) => Error, code: string) => {
+        let caught: unknown;
+        try {
+          run();
+        } catch (error) {
+          caught = error;
+        }
+        expect(caught).toBeInstanceOf(ErrorClass);
+        expect((toSeatPurchaseApiException(caught) as { getResponse: () => unknown }).getResponse()).toMatchObject({
+          code,
+        });
+      };
 
-      expect(() => assertPurchaseModeValid({ itemCount: 2, tierStepSeats: 50, targetLineId: 'line-new' })).toThrow(
-        SeatPurchaseTierStepOneItemError,
+      check(
+        () =>
+          assertPurchaseModeValid({
+            itemCount: 1,
+            tierStepSeats: 50,
+            replacesFromLineId: 'line-old',
+            targetLineId: 'line-new',
+          }),
+        SeatPurchaseConflictingModeError,
+        'VALIDATION_ERROR',
       );
 
-      expect(() =>
-        assertPurchaseModeValid({ itemCount: 2, replacesFromLineId: 'line-old', targetLineId: 'line-new' }),
-      ).toThrow(SeatPurchaseReplacementOneItemError);
+      check(
+        () => assertPurchaseModeValid({ itemCount: 2, tierStepSeats: 50, targetLineId: 'line-new' }),
+        SeatPurchaseTierStepOneItemError,
+        'SEAT_PURCHASE.TIER_STEP_ONE_ITEM',
+      );
+
+      check(
+        () => assertPurchaseModeValid({ itemCount: 2, replacesFromLineId: 'line-old', targetLineId: 'line-new' }),
+        SeatPurchaseReplacementOneItemError,
+        'VALIDATION_ERROR',
+      );
     });
 
     it.each([

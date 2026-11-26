@@ -285,7 +285,9 @@ describe('SubscriptionPeriodService: the periods the renewal reads, the shared p
       subscriptions.find.mockResolvedValue(record());
       subscriptions.successorsOf.mockResolvedValue(new Map([['sub-1', 'sub-2']]));
 
-      await expect(service.recordNext(tx, actor, input)).rejects.toThrow(SubscriptionPeriodRefusedError);
+      const err = await service.recordNext(tx, actor, input).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(SubscriptionPeriodRefusedError);
+      expect(err).toMatchObject({ reason: 'ALREADY_RENEWED' });
     });
 
     it('renews multi-line period: closes old lines RENEWED on startDate-1, creates only quantity > 0 lines, opens ledger, and copies workspace/minTotal', async () => {

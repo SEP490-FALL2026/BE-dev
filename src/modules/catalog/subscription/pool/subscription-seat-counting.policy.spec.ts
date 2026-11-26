@@ -3,7 +3,21 @@ import {
   SubscriptionMembersMonthlyOnlyError,
   SubscriptionMembersPaymentDayRequiredError,
 } from '../subscription.errors';
+import { toSubscriptionApiException } from '../subscription.http-errors';
 import { assertPoolTerms } from './subscription-pool.policy';
+
+const expectSubError = (run: () => unknown, ErrorClass: new (...args: never[]) => Error, code: string) => {
+  let caught: unknown;
+  try {
+    run();
+  } catch (error) {
+    caught = error;
+  }
+  expect(caught).toBeInstanceOf(ErrorClass);
+  expect((toSubscriptionApiException(caught) as { getResponse?: () => unknown }).getResponse?.()).toMatchObject({
+    code,
+  });
+};
 
 describe('W3-11 (QĐ-115g): a subscription counted by the members the vendor counts', () => {
   const members = (over: Partial<Parameters<typeof assertPoolTerms>[0]> = {}) => ({
@@ -25,18 +39,28 @@ describe('W3-11 (QĐ-115g): a subscription counted by the members the vendor cou
   });
 
   it('refuses a commitment of a year, with the code of the rule', () => {
-    expect(() => assertPoolTerms(members({ commitmentTermMonths: 12, billingCycle: 'ANNUAL' }))).toThrow(
+    expectSubError(
+      () => assertPoolTerms(members({ commitmentTermMonths: 12, billingCycle: 'ANNUAL' })),
       SubscriptionMembersMonthlyOnlyError,
+      'SUBSCRIPTION.MEMBERS_MONTHLY_ONLY',
     );
   });
 
   it('refuses an active subscription with no payment day, refuses clearing it while active, and lets a draft have none', () => {
-    expect(() => assertPoolTerms(members({ renewalDate: null }))).toThrow(SubscriptionMembersPaymentDayRequiredError);
-    expect(() => assertPoolTerms(members({ renewalDate: undefined }))).toThrow(
+    expectSubError(
+      () => assertPoolTerms(members({ renewalDate: null })),
       SubscriptionMembersPaymentDayRequiredError,
+      'SUBSCRIPTION.MEMBERS_PAYMENT_DAY_REQUIRED',
     );
-    expect(() => assertPoolTerms(members({ activating: false, active: true, renewalDate: null }))).toThrow(
+    expectSubError(
+      () => assertPoolTerms(members({ renewalDate: undefined })),
       SubscriptionMembersPaymentDayRequiredError,
+      'SUBSCRIPTION.MEMBERS_PAYMENT_DAY_REQUIRED',
+    );
+    expectSubError(
+      () => assertPoolTerms(members({ activating: false, active: true, renewalDate: null })),
+      SubscriptionMembersPaymentDayRequiredError,
+      'SUBSCRIPTION.MEMBERS_PAYMENT_DAY_REQUIRED',
     );
     expect(() => assertPoolTerms(members({ renewalDate: null, activating: false }))).not.toThrow();
   });

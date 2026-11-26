@@ -1,9 +1,11 @@
+import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import {
   LicenseKeyInitialActivationsExceedMaxError,
   LicenseKeyInitialActivationsOnAccountPlanError,
   LicenseKeyMaxActivationsNotRaisedError,
   LicenseKeyStateError,
 } from './license-key.errors';
+import { toLicenseKeyApiException } from './license-key.http-errors';
 import {
   activationsUsedOf,
   assertAssignable,
@@ -213,23 +215,52 @@ describe('the activations of a key (KHOA-08, C-6)', () => {
   });
 
   it('refuses activations already used above the cap of the batch', () => {
-    expect(() => assertInitialActivationsAllowed({ initial: 6, maxActivations: 5, keyBinding: 'DEVICE_KEY' })).toThrow(
-      LicenseKeyInitialActivationsExceedMaxError,
-    );
-    expect(() => assertInitialActivationsAllowed({ initial: 2, maxActivations: 1, keyBinding: 'DEVICE_KEY' })).toThrow(
-      LicenseKeyInitialActivationsExceedMaxError,
-    );
+    for (const input of [
+      { initial: 6, maxActivations: 5, keyBinding: 'DEVICE_KEY' as const },
+      { initial: 2, maxActivations: 1, keyBinding: 'DEVICE_KEY' as const },
+    ]) {
+      try {
+        assertInitialActivationsAllowed(input);
+        throw new Error('Expected LICENSE_KEY.INITIAL_ACTIVATIONS_EXCEED_MAX');
+      } catch (error) {
+        expect(error).toBeInstanceOf(LicenseKeyInitialActivationsExceedMaxError);
+        const mapped = toLicenseKeyApiException(error);
+        expect(mapped).toBeInstanceOf(ApiException);
+        expect((mapped as ApiException).getResponse()).toMatchObject({
+          code: 'LICENSE_KEY.INITIAL_ACTIVATIONS_EXCEED_MAX',
+        });
+      }
+    }
   });
 
   it('refuses activations already used on a plan whose keys go to an account: only its machines count them', () => {
-    expect(() => assertInitialActivationsAllowed({ initial: 1, maxActivations: 5, keyBinding: 'ACCOUNT' })).toThrow(
-      LicenseKeyInitialActivationsOnAccountPlanError,
-    );
+    try {
+      assertInitialActivationsAllowed({ initial: 1, maxActivations: 5, keyBinding: 'ACCOUNT' });
+      throw new Error('Expected LICENSE_KEY.INITIAL_ACTIVATIONS_ON_ACCOUNT_PLAN');
+    } catch (error) {
+      expect(error).toBeInstanceOf(LicenseKeyInitialActivationsOnAccountPlanError);
+      const mapped = toLicenseKeyApiException(error);
+      expect(mapped).toBeInstanceOf(ApiException);
+      expect((mapped as ApiException).getResponse()).toMatchObject({
+        code: 'LICENSE_KEY.INITIAL_ACTIVATIONS_ON_ACCOUNT_PLAN',
+      });
+    }
   });
 
   it('lets the cap only go up', () => {
     expect(() => assertMaxActivationsRaised(30, 40)).not.toThrow();
-    expect(() => assertMaxActivationsRaised(40, 35)).toThrow(LicenseKeyMaxActivationsNotRaisedError);
-    expect(() => assertMaxActivationsRaised(40, 40)).toThrow(LicenseKeyMaxActivationsNotRaisedError);
+    for (const next of [35, 40]) {
+      try {
+        assertMaxActivationsRaised(40, next);
+        throw new Error('Expected LICENSE_KEY.MAX_ACTIVATIONS_NOT_RAISED');
+      } catch (error) {
+        expect(error).toBeInstanceOf(LicenseKeyMaxActivationsNotRaisedError);
+        const mapped = toLicenseKeyApiException(error);
+        expect(mapped).toBeInstanceOf(ApiException);
+        expect((mapped as ApiException).getResponse()).toMatchObject({
+          code: 'LICENSE_KEY.MAX_ACTIVATIONS_NOT_RAISED',
+        });
+      }
+    }
   });
 });

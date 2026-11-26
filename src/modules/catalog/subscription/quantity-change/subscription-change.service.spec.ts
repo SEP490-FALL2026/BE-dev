@@ -3,6 +3,7 @@ import type { AuthenticatedPrincipal } from '../../../../infrastructure/security
 import type { LockedPlan } from '../../plan/plan-facts.service';
 import { SubscriptionChangeService } from '../subscription-change.service';
 import { SubscriptionPrimaryRetiredError, SubscriptionUpdateEmptyError } from '../subscription.errors';
+import { toSubscriptionApiException } from '../subscription.http-errors';
 import { SEAT_LEDGER_ROUTES } from '../subscription.policy';
 import type { SubscriptionRecord, SubscriptionView } from '../subscription.types';
 import type { UpdateSubscriptionInput } from '../subscription.service';
@@ -142,9 +143,11 @@ describe('SubscriptionChangeService', () => {
   it('refuses an update that only sends quantityChangeReason with SubscriptionUpdateEmptyError', async () => {
     const { service, runner } = makeSut();
 
-    await expect(service.update(actor, 'sub-1', { quantityChangeReason: 'Only reason' })).rejects.toThrow(
-      SubscriptionUpdateEmptyError,
-    );
+    const err = await service.update(actor, 'sub-1', { quantityChangeReason: 'Only reason' }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(SubscriptionUpdateEmptyError);
+    expect((toSubscriptionApiException(err) as { getResponse?: () => unknown }).getResponse?.()).toMatchObject({
+      code: 'SUBSCRIPTION.UPDATE_EMPTY',
+    });
     expect(runner.run).not.toHaveBeenCalled();
   });
 
@@ -163,9 +166,13 @@ describe('SubscriptionChangeService', () => {
     async (_name, input, version) => {
       const { service, runner, recordAudit, guard } = makeSut();
 
-      await expect(service.update(actor, 'sub-1', input, version)).rejects.toMatchObject({
+      const err = await service.update(actor, 'sub-1', input, version).catch((e: unknown) => e);
+      expect(err).toMatchObject({
         name: 'SubscriptionSeatCountViaLedgerError',
         routes: SEAT_LEDGER_ROUTES,
+      });
+      expect((toSubscriptionApiException(err) as { getResponse?: () => unknown }).getResponse?.()).toMatchObject({
+        code: 'SUBSCRIPTION.SEAT_COUNT_VIA_LEDGER',
       });
       expect(runner.run).not.toHaveBeenCalled();
       expect(recordAudit).not.toHaveBeenCalled();
@@ -177,9 +184,11 @@ describe('SubscriptionChangeService', () => {
   it('refuses to mark a subscription as the one that prices its plan, and lets the mark be taken off', async () => {
     const { service, runner } = makeSut();
 
-    await expect(service.update(actor, 'sub-1', { isPrimaryForPlan: true }, baseDate)).rejects.toThrow(
-      SubscriptionPrimaryRetiredError,
-    );
+    const err = await service.update(actor, 'sub-1', { isPrimaryForPlan: true }, baseDate).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(SubscriptionPrimaryRetiredError);
+    expect((toSubscriptionApiException(err) as { getResponse?: () => unknown }).getResponse?.()).toMatchObject({
+      code: 'SUBSCRIPTION.PRIMARY_RETIRED',
+    });
     expect(runner.run).not.toHaveBeenCalled();
     await expect(service.update(actor, 'sub-1', { isPrimaryForPlan: false }, baseDate)).resolves.toBeDefined();
   });

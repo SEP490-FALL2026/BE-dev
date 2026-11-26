@@ -6,6 +6,7 @@ import {
   WorkspaceResponsibleNotItAdminError,
   WorkspaceTextInvalidError,
 } from './workspace.errors';
+import { toWorkspaceApiException } from './workspace.http-errors';
 import {
   assertAdminsShape,
   assertResponsible,
@@ -20,6 +21,19 @@ const KHOA = 'khoa';
 const NAM = 'nam';
 const LAN = 'lan';
 
+const expectWorkspaceError = (run: () => unknown, ErrorClass: new (...args: never[]) => Error, code: string) => {
+  let caught: unknown;
+  try {
+    run();
+  } catch (error) {
+    caught = error;
+  }
+  expect(caught).toBeInstanceOf(ErrorClass);
+  expect((toWorkspaceApiException(caught) as { getResponse?: () => unknown }).getResponse?.()).toMatchObject({ code });
+
+  return caught;
+};
+
 describe('the text of a workspace', () => {
   it('collapses blanks, takes nothing or blanks for null, and refuses more than 2000 characters', () => {
     expect(cleanWorkspaceText('  a   b ')).toBe('a b');
@@ -27,7 +41,11 @@ describe('the text of a workspace', () => {
     expect(cleanWorkspaceText(null)).toBeNull();
     expect(cleanWorkspaceText(undefined)).toBeNull();
     expect(cleanWorkspaceText('x'.repeat(2000))).toHaveLength(2000);
-    expect(() => cleanWorkspaceText('x'.repeat(2001))).toThrow(WorkspaceTextInvalidError);
+    expectWorkspaceError(
+      () => cleanWorkspaceText('x'.repeat(2001)),
+      WorkspaceTextInvalidError,
+      'WORKSPACE.TEXT_INVALID',
+    );
   });
 });
 
@@ -46,32 +64,41 @@ describe('who administers a workspace', () => {
   it('needs at least two different people (the minimum is two)', () => {
     expect(MIN_WORKSPACE_ADMINS).toBe(2);
     expect(() => assertAdminsShape(shape())).not.toThrow();
-    expect(() => assertAdminsShape(shape({ admins: [{ employeeId: KHOA, role: 'OWNER' }] }))).toThrow(
+    const err = expectWorkspaceError(
+      () => assertAdminsShape(shape({ admins: [{ employeeId: KHOA, role: 'OWNER' }] })),
       WorkspaceAdminsTooFewError,
+      'WORKSPACE.ADMINS_TOO_FEW',
     );
-    try {
-      assertAdminsShape(shape({ admins: [{ employeeId: KHOA, role: 'OWNER' }] }));
-    } catch (error) {
-      expect(error).toMatchObject({ given: 1, minimum: 2 });
-    }
+    expect(err).toMatchObject({ given: 1, minimum: 2 });
   });
 
   it('counts a person named twice once', () => {
-    expect(() =>
-      assertAdminsShape(
-        shape({
-          admins: [
-            { employeeId: KHOA, role: 'OWNER' },
-            { employeeId: KHOA, role: 'ADMIN' },
-          ],
-        }),
-      ),
-    ).toThrow(WorkspaceAdminsTooFewError);
+    expectWorkspaceError(
+      () =>
+        assertAdminsShape(
+          shape({
+            admins: [
+              { employeeId: KHOA, role: 'OWNER' },
+              { employeeId: KHOA, role: 'ADMIN' },
+            ],
+          }),
+        ),
+      WorkspaceAdminsTooFewError,
+      'WORKSPACE.ADMINS_TOO_FEW',
+    );
   });
 
   it('wants the primary owner among the administrators, with the role OWNER', () => {
-    expect(() => assertAdminsShape(shape({ primaryOwnerEmployeeId: LAN }))).toThrow(WorkspacePrimaryOwnerNotAdminError);
-    expect(() => assertAdminsShape(shape({ primaryOwnerEmployeeId: NAM }))).toThrow(WorkspacePrimaryOwnerNotAdminError);
+    expectWorkspaceError(
+      () => assertAdminsShape(shape({ primaryOwnerEmployeeId: LAN })),
+      WorkspacePrimaryOwnerNotAdminError,
+      'WORKSPACE.PRIMARY_OWNER_NOT_ADMIN',
+    );
+    expectWorkspaceError(
+      () => assertAdminsShape(shape({ primaryOwnerEmployeeId: NAM })),
+      WorkspacePrimaryOwnerNotAdminError,
+      'WORKSPACE.PRIMARY_OWNER_NOT_ADMIN',
+    );
   });
 
   it.each([
@@ -82,13 +109,12 @@ describe('who administers a workspace', () => {
       ...Array.from({ length: owners }, (_, index) => ({ employeeId: `o${index}`, role: 'OWNER' as const })),
       ...Array.from({ length: admins }, (_, index) => ({ employeeId: `a${index}`, role: 'ADMIN' as const })),
     ];
-    try {
-      assertAdminsShape({ admins: people, primaryOwnerEmployeeId: 'o0', ownerLimit, adminLimit });
-      throw new Error('not refused');
-    } catch (error) {
-      expect(error).toBeInstanceOf(WorkspaceLimitExceededError);
-      expect(error).toMatchObject({ role });
-    }
+    const err = expectWorkspaceError(
+      () => assertAdminsShape({ admins: people, primaryOwnerEmployeeId: 'o0', ownerLimit, adminLimit }),
+      WorkspaceLimitExceededError,
+      'WORKSPACE.LIMIT_EXCEEDED',
+    );
+    expect(err).toMatchObject({ role });
   });
 
   it('lets the limit itself pass', () => {
@@ -99,8 +125,12 @@ describe('who administers a workspace', () => {
 describe('who answers for a workspace', () => {
   it('lets only the IT Admin in charge change it; nobody is in charge of one without a person', () => {
     expect(() => assertResponsible(KHOA, KHOA)).not.toThrow();
-    expect(() => assertResponsible(NAM, KHOA)).toThrow(WorkspaceNotResponsibleError);
-    expect(() => assertResponsible(KHOA, null)).toThrow(WorkspaceNotResponsibleError);
+    expectWorkspaceError(() => assertResponsible(NAM, KHOA), WorkspaceNotResponsibleError, 'WORKSPACE.NOT_RESPONSIBLE');
+    expectWorkspaceError(
+      () => assertResponsible(KHOA, null),
+      WorkspaceNotResponsibleError,
+      'WORKSPACE.NOT_RESPONSIBLE',
+    );
   });
 
   it('judges the person named first, then whether they already answer for it', () => {
@@ -113,9 +143,11 @@ describe('who answers for a workspace', () => {
     expect(judgeResponsibleChange({ currentEmployeeId: null, toEmployeeId: NAM, toIsUsableItAdmin: true })).toBe(
       'CHANGE',
     );
-    expect(() =>
-      judgeResponsibleChange({ currentEmployeeId: NAM, toEmployeeId: NAM, toIsUsableItAdmin: false }),
-    ).toThrow(WorkspaceResponsibleNotItAdminError);
+    expectWorkspaceError(
+      () => judgeResponsibleChange({ currentEmployeeId: NAM, toEmployeeId: NAM, toIsUsableItAdmin: false }),
+      WorkspaceResponsibleNotItAdminError,
+      'WORKSPACE.RESPONSIBLE_NOT_IT_ADMIN',
+    );
   });
 });
 

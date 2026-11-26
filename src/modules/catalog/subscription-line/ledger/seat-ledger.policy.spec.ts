@@ -33,7 +33,17 @@ describe('seat-ledger policy — effectiveOn closed month guard (B2-R15)', () =>
   });
 
   it('rejects 2026-11-30 (day before month start) and allows boundary 2026-12-01 on 2026-12-02', () => {
-    expect(() => assertManualEffectiveOn('2026-11-30', '2026-12-02')).toThrow(SeatLedgerEffectiveInClosedMonthError);
+    let caught: unknown;
+    try {
+      assertManualEffectiveOn('2026-11-30', '2026-12-02');
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(SeatLedgerEffectiveInClosedMonthError);
+    expect((toSeatLedgerApiException(caught) as { getResponse: () => unknown }).getResponse()).toMatchObject({
+      code: 'SEAT_LEDGER.EFFECTIVE_IN_CLOSED_MONTH',
+      details: { earliestOn: '2026-12-01' },
+    });
     expect(() => assertManualEffectiveOn('2026-12-01', '2026-12-02')).not.toThrow();
     expect(() => assertManualEffectiveOn('2026-12-02', '2026-12-02')).not.toThrow();
   });

@@ -1,3 +1,4 @@
+import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import type { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { LicenseLotApi } from '../../catalog/public/license-lot.api';
@@ -6,6 +7,7 @@ import { LicenseKeyLotRequestNotOpenError } from '../license-key/license-key.err
 import { ProvisioningNotInChargeError } from '../provisioning/provisioning.errors';
 import type { ProvisioningTaskRepo } from '../provisioning/provisioning-task.repo';
 import type { ProvisioningTaskFrame } from '../provisioning/provisioning-task-frame.service';
+import { toLotCreateApiException } from './license-lot-create.controller';
 import { LicenseLotCreateService } from './license-lot-create.service';
 
 const actor = {
@@ -71,18 +73,26 @@ describe('LicenseLotCreateService (a lot for a request is judged against its gra
   ])('refuses a lot for a request with %s, and makes nothing', async (_name, task) => {
     const { service, createLot } = setup(task);
 
-    await expect(service.create(actor, { ...base, purpose: 'REQUEST', requestId: 'req-1' })).rejects.toThrow(
-      LicenseKeyLotRequestNotOpenError,
-    );
+    const err = await service
+      .create(actor, { ...base, purpose: 'REQUEST', requestId: 'req-1' })
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(LicenseKeyLotRequestNotOpenError);
+    const mapped = toLotCreateApiException(err);
+    expect(mapped).toBeInstanceOf(ApiException);
+    expect((mapped as ApiException).getResponse()).toMatchObject({ code: 'LICENSE_LOT.REQUEST_REQUIRED' });
     expect(createLot).not.toHaveBeenCalled();
   });
 
   it('refuses a caller who does not act for the department of the beneficiary, and makes nothing', async () => {
     const { service, createLot } = setup({ status: 'IN_PROGRESS', planId: 'plan-1' }, false);
 
-    await expect(service.create(actor, { ...base, purpose: 'REQUEST', requestId: 'req-1' })).rejects.toThrow(
-      ProvisioningNotInChargeError,
-    );
+    const err = await service
+      .create(actor, { ...base, purpose: 'REQUEST', requestId: 'req-1' })
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ProvisioningNotInChargeError);
+    const mapped = toLotCreateApiException(err);
+    expect(mapped).toBeInstanceOf(ApiException);
+    expect((mapped as ApiException).getResponse()).toMatchObject({ code: 'LICENSE_LOT.NOT_IN_CHARGE' });
     expect(createLot).not.toHaveBeenCalled();
   });
 

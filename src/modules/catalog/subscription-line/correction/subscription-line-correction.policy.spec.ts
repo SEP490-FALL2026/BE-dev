@@ -8,6 +8,7 @@ import {
   SeatLedgerMidTermReductionNotAllowedError,
   SeatLedgerReductionExceedsPurchaseError,
 } from './subscription-line-correction.errors';
+import { toSeatCorrectionApiException } from './subscription-line-correction.http-errors';
 import {
   assertLineCorrectable,
   assertMidTermReductionAllowed,
@@ -16,62 +17,87 @@ import {
   vendorCorrectionRecipients,
 } from './subscription-line-correction.policy';
 
+const expectCorrectionError = (run: () => unknown, ErrorClass: new (...args: never[]) => Error, code: string) => {
+  let caught: unknown;
+  try {
+    run();
+  } catch (error) {
+    caught = error;
+  }
+  expect(caught).toBeInstanceOf(ErrorClass);
+  expect((toSeatCorrectionApiException(caught) as { getResponse?: () => unknown }).getResponse?.()).toMatchObject({
+    code,
+  });
+};
+
 describe('subscription-line-correction.policy (W3-19)', () => {
   const updatedAt = new Date('2026-11-20T00:00:00.000Z');
 
   describe('assertLineCorrectable', () => {
     it('rejects non-responsible IT Admin with SubscriptionLineNotResponsibleError (Ca 8)', () => {
-      expect(() =>
-        assertLineCorrectable({
-          responsibleItAdminEmployeeId: 'it-resp',
-          actorEmployeeId: 'it-nam',
-          closedReason: null,
-          ledgerOpenedOn: '2026-11-01',
-          periodStatus: 'ACTIVE',
-          lineUpdatedAt: updatedAt,
-          expectedUpdatedAt: updatedAt,
-        }),
-      ).toThrow(SubscriptionLineNotResponsibleError);
+      expectCorrectionError(
+        () =>
+          assertLineCorrectable({
+            responsibleItAdminEmployeeId: 'it-resp',
+            actorEmployeeId: 'it-nam',
+            closedReason: null,
+            ledgerOpenedOn: '2026-11-01',
+            periodStatus: 'ACTIVE',
+            lineUpdatedAt: updatedAt,
+            expectedUpdatedAt: updatedAt,
+          }),
+        SubscriptionLineNotResponsibleError,
+        'SUBSCRIPTION_LINE.NOT_RESPONSIBLE',
+      );
     });
 
     it('rejects closed or unopened lines with SubscriptionLineClosedError', () => {
-      expect(() =>
-        assertLineCorrectable({
-          responsibleItAdminEmployeeId: 'it-resp',
-          actorEmployeeId: 'it-resp',
-          closedReason: 'RENEWED',
-          ledgerOpenedOn: '2026-11-01',
-          periodStatus: 'ACTIVE',
-          lineUpdatedAt: updatedAt,
-          expectedUpdatedAt: updatedAt,
-        }),
-      ).toThrow(SubscriptionLineClosedError);
+      expectCorrectionError(
+        () =>
+          assertLineCorrectable({
+            responsibleItAdminEmployeeId: 'it-resp',
+            actorEmployeeId: 'it-resp',
+            closedReason: 'RENEWED',
+            ledgerOpenedOn: '2026-11-01',
+            periodStatus: 'ACTIVE',
+            lineUpdatedAt: updatedAt,
+            expectedUpdatedAt: updatedAt,
+          }),
+        SubscriptionLineClosedError,
+        'SUBSCRIPTION_LINE.CLOSED',
+      );
 
-      expect(() =>
-        assertLineCorrectable({
-          responsibleItAdminEmployeeId: 'it-resp',
-          actorEmployeeId: 'it-resp',
-          closedReason: null,
-          ledgerOpenedOn: null,
-          periodStatus: 'DRAFT',
-          lineUpdatedAt: updatedAt,
-          expectedUpdatedAt: updatedAt,
-        }),
-      ).toThrow(SubscriptionLineClosedError);
+      expectCorrectionError(
+        () =>
+          assertLineCorrectable({
+            responsibleItAdminEmployeeId: 'it-resp',
+            actorEmployeeId: 'it-resp',
+            closedReason: null,
+            ledgerOpenedOn: null,
+            periodStatus: 'DRAFT',
+            lineUpdatedAt: updatedAt,
+            expectedUpdatedAt: updatedAt,
+          }),
+        SubscriptionLineClosedError,
+        'SUBSCRIPTION_LINE.CLOSED',
+      );
     });
 
     it('rejects stale expectedUpdatedAt with SubscriptionLineStaleError', () => {
-      expect(() =>
-        assertLineCorrectable({
-          responsibleItAdminEmployeeId: 'it-resp',
-          actorEmployeeId: 'it-resp',
-          closedReason: null,
-          ledgerOpenedOn: '2026-11-01',
-          periodStatus: 'ACTIVE',
-          lineUpdatedAt: updatedAt,
-          expectedUpdatedAt: new Date('2026-11-19T00:00:00.000Z'),
-        }),
-      ).toThrow(SubscriptionLineStaleError);
+      expectCorrectionError(
+        () =>
+          assertLineCorrectable({
+            responsibleItAdminEmployeeId: 'it-resp',
+            actorEmployeeId: 'it-resp',
+            closedReason: null,
+            ledgerOpenedOn: '2026-11-01',
+            periodStatus: 'ACTIVE',
+            lineUpdatedAt: updatedAt,
+            expectedUpdatedAt: new Date('2026-11-19T00:00:00.000Z'),
+          }),
+        SubscriptionLineStaleError,
+        'SUBSCRIPTION_LINE.STALE',
+      );
     });
   });
 
@@ -158,39 +184,50 @@ describe('subscription-line-correction.policy (W3-19)', () => {
 
   describe('mid-term seat reduction (Ca 3 & Ca 4)', () => {
     it('throws SeatLedgerMidTermReductionNotAllowedError when allowsMidTermReduction is false (Ca 4)', () => {
-      expect(() => assertMidTermReductionAllowed({ allowsMidTermReduction: false })).toThrow(
+      expectCorrectionError(
+        () => assertMidTermReductionAllowed({ allowsMidTermReduction: false }),
         SeatLedgerMidTermReductionNotAllowedError,
+        'SEAT_LEDGER.MID_TERM_REDUCTION_NOT_ALLOWED',
       );
       expect(() => assertMidTermReductionAllowed({ allowsMidTermReduction: true })).not.toThrow();
     });
 
     it('enforces same-line positive purchase target and boundary 1 + 2 <= 3 vs 1 + 3 > 3 (Ca 3)', () => {
-      expect(() =>
-        assertRefundReductionWithinPurchase({
-          lineId: 'line-1',
-          refundedChange: { subscriptionLineId: 'line-other', reason: 'TOP_UP', delta: 3 },
-          alreadyReduced: 0,
-          requestedQuantity: 1,
-        }),
-      ).toThrow(SeatLedgerInvalidRefundTargetError);
+      expectCorrectionError(
+        () =>
+          assertRefundReductionWithinPurchase({
+            lineId: 'line-1',
+            refundedChange: { subscriptionLineId: 'line-other', reason: 'TOP_UP', delta: 3 },
+            alreadyReduced: 0,
+            requestedQuantity: 1,
+          }),
+        SeatLedgerInvalidRefundTargetError,
+        'VALIDATION_ERROR',
+      );
 
-      expect(() =>
-        assertRefundReductionWithinPurchase({
-          lineId: 'line-1',
-          refundedChange: { subscriptionLineId: 'line-1', reason: 'REDUCE', delta: -1 },
-          alreadyReduced: 0,
-          requestedQuantity: 1,
-        }),
-      ).toThrow(SeatLedgerInvalidRefundTargetError);
+      expectCorrectionError(
+        () =>
+          assertRefundReductionWithinPurchase({
+            lineId: 'line-1',
+            refundedChange: { subscriptionLineId: 'line-1', reason: 'REDUCE', delta: -1 },
+            alreadyReduced: 0,
+            requestedQuantity: 1,
+          }),
+        SeatLedgerInvalidRefundTargetError,
+        'VALIDATION_ERROR',
+      );
 
-      expect(() =>
-        assertRefundReductionWithinPurchase({
-          lineId: 'line-1',
-          refundedChange: { subscriptionLineId: 'line-1', reason: 'TOP_UP', delta: 3 },
-          alreadyReduced: 1,
-          requestedQuantity: 3,
-        }),
-      ).toThrow(SeatLedgerReductionExceedsPurchaseError);
+      expectCorrectionError(
+        () =>
+          assertRefundReductionWithinPurchase({
+            lineId: 'line-1',
+            refundedChange: { subscriptionLineId: 'line-1', reason: 'TOP_UP', delta: 3 },
+            alreadyReduced: 1,
+            requestedQuantity: 3,
+          }),
+        SeatLedgerReductionExceedsPurchaseError,
+        'SEAT_LEDGER.REDUCTION_EXCEEDS_PURCHASE',
+      );
 
       expect(() =>
         assertRefundReductionWithinPurchase({

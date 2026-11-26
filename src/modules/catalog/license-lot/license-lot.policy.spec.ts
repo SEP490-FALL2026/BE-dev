@@ -16,6 +16,17 @@ import {
   judgeContractChange,
 } from './license-lot.policy';
 
+const expectLotError = (run: () => unknown, ErrorClass: new (...args: never[]) => Error, code: string) => {
+  let caught: unknown;
+  try {
+    run();
+  } catch (error) {
+    caught = error;
+  }
+  expect(caught).toBeInstanceOf(ErrorClass);
+  expect((toLicenseLotApiException(caught) as { getResponse?: () => unknown }).getResponse?.()).toMatchObject({ code });
+};
+
 describe('what a lot of licenses may be (W3-24)', () => {
   const account = { planProvisioningType: 'K4', keyBinding: 'ACCOUNT' as const, requestId: undefined };
   const machine = { planProvisioningType: 'K4', keyBinding: 'DEVICE_KEY' as const, requestId: undefined };
@@ -29,41 +40,61 @@ describe('what a lot of licenses may be (W3-24)', () => {
   });
 
   it('refuses a plan that is not K4, with the code of the rule', () => {
-    expect(() => assertCreatable({ ...account, planProvisioningType: 'K2', purpose: 'STOCK' })).toThrow(
+    expectLotError(
+      () => assertCreatable({ ...account, planProvisioningType: 'K2', purpose: 'STOCK' }),
       LicenseLotPlanNotK4Error,
+      'LICENSE_LOT.PLAN_NOT_K4',
     );
-    expect(() => assertCreatable({ ...account, planProvisioningType: 'NONE', purpose: 'REPLACEMENT' })).toThrow(
+    expectLotError(
+      () => assertCreatable({ ...account, planProvisioningType: 'NONE', purpose: 'REPLACEMENT' }),
       LicenseLotPlanNotK4Error,
+      'LICENSE_LOT.PLAN_NOT_K4',
     );
   });
 
   it('refuses a purpose the plan cannot take: a request for a key on a machine, stock without key binding, or a plan bundled with the machine', () => {
-    expect(() => assertCreatable({ ...machine, purpose: 'REQUEST', requestId: 'r-1' })).toThrow(
+    expectLotError(
+      () => assertCreatable({ ...machine, purpose: 'REQUEST', requestId: 'r-1' }),
       LicenseLotPurposeNotAvailableError,
+      'LICENSE_LOT.PURPOSE_NOT_AVAILABLE',
     );
-    expect(() => assertCreatable({ ...account, keyBinding: null, purpose: 'STOCK' })).toThrow(
+    expectLotError(
+      () => assertCreatable({ ...account, keyBinding: null, purpose: 'STOCK' }),
       LicenseLotPurposeNotAvailableError,
+      'LICENSE_LOT.PURPOSE_NOT_AVAILABLE',
     );
-    expect(() => assertCreatable({ ...account, keyBinding: 'DEVICE_BUNDLED', purpose: 'STOCK' })).toThrow(
+    expectLotError(
+      () => assertCreatable({ ...account, keyBinding: 'DEVICE_BUNDLED', purpose: 'STOCK' }),
       LicenseLotPurposeNotAvailableError,
+      'LICENSE_LOT.PURPOSE_NOT_AVAILABLE',
     );
-    expect(() => assertCreatable({ ...account, keyBinding: 'DEVICE_BUNDLED', purpose: 'REPLACEMENT' })).toThrow(
+    expectLotError(
+      () => assertCreatable({ ...account, keyBinding: 'DEVICE_BUNDLED', purpose: 'REPLACEMENT' }),
       LicenseLotPurposeNotAvailableError,
+      'LICENSE_LOT.PURPOSE_NOT_AVAILABLE',
     );
   });
 
   it('asks a lot for a request to name the request', () => {
-    expect(() => assertCreatable({ ...account, purpose: 'REQUEST' })).toThrow(LicenseLotRequestRequiredError);
+    expectLotError(
+      () => assertCreatable({ ...account, purpose: 'REQUEST' }),
+      LicenseLotRequestRequiredError,
+      'LICENSE_LOT.REQUEST_REQUIRED',
+    );
   });
 });
 
 describe('the contract of a lot (QĐ-115au)', () => {
   it('asks the reason to leave a contract for another or for none, and not for the first one', () => {
-    expect(() => judgeContractChange({ current: 'c-1', next: 'c-2', reason: undefined })).toThrow(
+    expectLotError(
+      () => judgeContractChange({ current: 'c-1', next: 'c-2', reason: undefined }),
       LicenseLotContractReasonRequiredError,
+      'LICENSE_LOT.CONTRACT_REASON_REQUIRED',
     );
-    expect(() => judgeContractChange({ current: 'c-1', next: null, reason: '   ' })).toThrow(
+    expectLotError(
+      () => judgeContractChange({ current: 'c-1', next: null, reason: '   ' }),
       LicenseLotContractReasonRequiredError,
+      'LICENSE_LOT.CONTRACT_REASON_REQUIRED',
     );
     expect(judgeContractChange({ current: 'c-1', next: 'c-2', reason: 'The vendor signed again' })).toBe('CHANGED');
     expect(judgeContractChange({ current: null, next: 'c-1', reason: undefined })).toBe('CHANGED');

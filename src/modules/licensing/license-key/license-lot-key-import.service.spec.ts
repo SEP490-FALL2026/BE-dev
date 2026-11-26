@@ -114,17 +114,21 @@ describe('LicenseLotKeyImportService (the keys of a lot of licenses)', () => {
   });
 
   it('refuses a lot that does not exist, and an IT Admin who does not answer for it on the route of the lot', async () => {
-    await expect(
-      setup(null).service.import(actor, 'lot-9', { keys: ['AAAA-0001'] }, { responsibleOnly: true }),
-    ).rejects.toThrow(LicenseKeyLotNotFoundError);
-    await expect(
-      setup(lotOf({ responsibleItAdminEmployeeId: 'emp-other' })).service.import(
-        actor,
-        'lot-1',
-        { keys: ['AAAA-0001'] },
-        { responsibleOnly: true },
-      ),
-    ).rejects.toThrow(LicenseKeyLotNotResponsibleError);
+    const notFoundErr = await setup(null)
+      .service.import(actor, 'lot-9', { keys: ['AAAA-0001'] }, { responsibleOnly: true })
+      .catch((e: unknown) => e);
+    expect(notFoundErr).toBeInstanceOf(LicenseKeyLotNotFoundError);
+    expect(
+      (toLicenseKeyApiException(notFoundErr) as { getResponse?: () => { code?: string } }).getResponse?.().code,
+    ).toBe('LICENSE_LOT.NOT_FOUND');
+
+    const notRespErr = await setup(lotOf({ responsibleItAdminEmployeeId: 'emp-other' }))
+      .service.import(actor, 'lot-1', { keys: ['AAAA-0001'] }, { responsibleOnly: true })
+      .catch((e: unknown) => e);
+    expect(notRespErr).toBeInstanceOf(LicenseKeyLotNotResponsibleError);
+    expect(
+      (toLicenseKeyApiException(notRespErr) as { getResponse?: () => { code?: string } }).getResponse?.().code,
+    ).toBe('LICENSE_LOT.NOT_RESPONSIBLE');
   });
 
   it('requires the responsible IT Admin and a legacy subscription lot when importing via the old route', async () => {
@@ -161,9 +165,13 @@ describe('LicenseLotKeyImportService (the keys of a lot of licenses)', () => {
   it('refuses more keys than licenses for a plan bound to an account (K-A6), and keeps nothing', async () => {
     const { service, repo } = setup(lotOf(), 2);
 
-    await expect(
-      service.import(actor, 'lot-1', { keys: ['AAAA-0001', 'BBBB-0002'] }, { responsibleOnly: true }),
-    ).rejects.toThrow(LicenseKeyLotKeysExceedLicensesError);
+    const err = await service
+      .import(actor, 'lot-1', { keys: ['AAAA-0001', 'BBBB-0002'] }, { responsibleOnly: true })
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(LicenseKeyLotKeysExceedLicensesError);
+    expect((toLicenseKeyApiException(err) as { getResponse?: () => { code?: string } }).getResponse?.().code).toBe(
+      'LICENSE_LOT.KEYS_EXCEED_LICENSES',
+    );
     expect(repo.insertManyIfNew).not.toHaveBeenCalled();
   });
 
@@ -218,22 +226,21 @@ describe('LicenseLotKeyImportService (the keys of a lot of licenses)', () => {
         { responsibleOnly: true },
       ),
     ).resolves.toMatchObject({ imported: 1 });
-    await expect(
-      setup(lotOf({ keyBinding: 'DEVICE_BUNDLED' })).service.import(
-        actor,
-        'lot-1',
-        { keys: ['AAAA-0001'] },
-        { responsibleOnly: true },
-      ),
-    ).rejects.toThrow(LicenseKeyPlanHasNoKeysError);
-    await expect(
-      setup(lotOf({ applicationStatus: 'RETIRED' })).service.import(
-        actor,
-        'lot-1',
-        { keys: ['AAAA-0001'] },
-        { responsibleOnly: true },
-      ),
-    ).rejects.toThrow(LicenseKeyApplicationRetiredError);
+    const noKeysErr = await setup(lotOf({ keyBinding: 'DEVICE_BUNDLED' }))
+      .service.import(actor, 'lot-1', { keys: ['AAAA-0001'] }, { responsibleOnly: true })
+      .catch((e: unknown) => e);
+    expect(noKeysErr).toBeInstanceOf(LicenseKeyPlanHasNoKeysError);
+    expect(
+      (toLicenseKeyApiException(noKeysErr) as { getResponse?: () => { code?: string } }).getResponse?.().code,
+    ).toBe('LICENSE_KEY.PLAN_HAS_NO_KEYS');
+
+    const retiredErr = await setup(lotOf({ applicationStatus: 'RETIRED' }))
+      .service.import(actor, 'lot-1', { keys: ['AAAA-0001'] }, { responsibleOnly: true })
+      .catch((e: unknown) => e);
+    expect(retiredErr).toBeInstanceOf(LicenseKeyApplicationRetiredError);
+    expect(
+      (toLicenseKeyApiException(retiredErr) as { getResponse?: () => { code?: string } }).getResponse?.().code,
+    ).toBe('LICENSE_KEY.APPLICATION_RETIRED');
   });
 
   it('reads the purchase of a key list from the lot when there is one, else from the subscription of wave 2, else refuses', async () => {
@@ -245,7 +252,13 @@ describe('LicenseLotKeyImportService (the keys of a lot of licenses)', () => {
     old.catalog.findSeatTarget.mockResolvedValue({ purchasedQuantity: 5, keyBinding: 'DEVICE_KEY' });
     await expect(old.service.purchaseOf('sub-1')).resolves.toEqual({ purchased: 5, keyBinding: 'DEVICE_KEY' });
 
-    await expect(setup(null).service.purchaseOf('x')).rejects.toThrow(SeatTargetNotFoundError);
+    const missingErr = await setup(null)
+      .service.purchaseOf('x')
+      .catch((e: unknown) => e);
+    expect(missingErr).toBeInstanceOf(SeatTargetNotFoundError);
+    expect(
+      (toLicenseKeyApiException(missingErr) as { getResponse?: () => { code?: string } }).getResponse?.().code,
+    ).toBe('SUBSCRIPTION.NOT_FOUND');
   });
 
   it('locks the lot of a key before the key, and the subscription only when there is no lot', async () => {

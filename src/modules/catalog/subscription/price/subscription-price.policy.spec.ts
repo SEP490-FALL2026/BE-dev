@@ -1,4 +1,5 @@
 import { SubscriptionPriceNotVndError } from '../subscription.errors';
+import { toSubscriptionApiException } from '../subscription.http-errors';
 import { missingDataOf } from '../subscription.policy';
 import {
   PRICE_CURRENCY,
@@ -19,12 +20,17 @@ describe('QĐ-111an: the price of a subscription is in dong, with a snapshot of 
     });
 
     it.each(['USD', 'EUR', 'JPY', 'XYZ'])('refuses %s with the currency it was given', (currency) => {
-      expect(() => assertPriceInDong(currency)).toThrow(SubscriptionPriceNotVndError);
+      let caught: unknown;
       try {
         assertPriceInDong(currency);
       } catch (error) {
-        expect((error as SubscriptionPriceNotVndError).currency).toBe(currency);
+        caught = error;
       }
+      expect(caught).toBeInstanceOf(SubscriptionPriceNotVndError);
+      expect((caught as SubscriptionPriceNotVndError).currency).toBe(currency);
+      expect((toSubscriptionApiException(caught) as { getResponse?: () => unknown }).getResponse?.()).toMatchObject({
+        code: 'SUBSCRIPTION.PRICE_NOT_VND',
+      });
     });
   });
 
@@ -55,9 +61,16 @@ describe('QĐ-111an: the price of a subscription is in dong, with a snapshot of 
     });
 
     it('is only for dong: a price in another currency is a programming error, never converted here', () => {
-      expect(() => uniformSnapshotOf({ amountMinor: 1_000n, currency: 'USD' }, '2026-11-14')).toThrow(
-        SubscriptionPriceNotVndError,
-      );
+      let caught: unknown;
+      try {
+        uniformSnapshotOf({ amountMinor: 1_000n, currency: 'USD' }, '2026-11-14');
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(SubscriptionPriceNotVndError);
+      expect((toSubscriptionApiException(caught) as { getResponse?: () => unknown }).getResponse?.()).toMatchObject({
+        code: 'SUBSCRIPTION.PRICE_NOT_VND',
+      });
     });
   });
 

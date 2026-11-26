@@ -4,6 +4,7 @@ import type { AuditApi } from '../../audit/public/audit.api';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { WorkspaceViewService } from '../workspace/workspace-view.service';
 import { LicenseLotNotFoundError, LicenseLotResponsibleNotItAdminError } from './license-lot.errors';
+import { toLicenseLotApiException } from './license-lot.http-errors';
 import type { LicenseLotRepo } from './license-lot.repo';
 import type { LicenseLotDetail, LicenseLotRecord } from './license-lot.types';
 import type { LicenseLotViewService } from './license-lot-view.service';
@@ -81,11 +82,28 @@ describe('LicenseLotResponsibleService (the Super Admin names who answers for a 
   });
 
   it('refuses a person who is not an IT Admin who works now, and a lot that does not exist', async () => {
-    await expect(
-      setup({ usable: false }).service.change(actor, 'lot-1', { employeeId: 'emp-x', reason: 'x' }),
-    ).rejects.toThrow(LicenseLotResponsibleNotItAdminError);
-    await expect(
-      setup({ lot: null }).service.change(actor, 'lot-9', { employeeId: 'emp-it2', reason: 'x' }),
-    ).rejects.toThrow(LicenseLotNotFoundError);
+    const notItErr = await setup({ usable: false })
+      .service.change(actor, 'lot-1', { employeeId: 'emp-x', reason: 'x' })
+      .catch((e: unknown) => e);
+    expect(notItErr).toBeInstanceOf(LicenseLotResponsibleNotItAdminError);
+    expect(
+      (toLicenseLotApiException(notItErr) as { getStatus?: () => number; getResponse?: () => unknown }).getStatus?.(),
+    ).toBe(422);
+    expect((toLicenseLotApiException(notItErr) as { getResponse?: () => unknown }).getResponse?.()).toMatchObject({
+      code: 'LICENSE_LOT.RESPONSIBLE_NOT_IT_ADMIN',
+    });
+
+    const notFoundErr = await setup({ lot: null })
+      .service.change(actor, 'lot-9', { employeeId: 'emp-it2', reason: 'x' })
+      .catch((e: unknown) => e);
+    expect(notFoundErr).toBeInstanceOf(LicenseLotNotFoundError);
+    expect(
+      (
+        toLicenseLotApiException(notFoundErr) as { getStatus?: () => number; getResponse?: () => unknown }
+      ).getStatus?.(),
+    ).toBe(404);
+    expect((toLicenseLotApiException(notFoundErr) as { getResponse?: () => unknown }).getResponse?.()).toMatchObject({
+      code: 'LICENSE_LOT.NOT_FOUND',
+    });
   });
 });

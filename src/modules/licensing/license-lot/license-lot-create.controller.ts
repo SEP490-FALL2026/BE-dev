@@ -74,7 +74,7 @@ const LOT_REFUSALS = {
 };
 
 /** What this route answers for the two refusals only licensing knows; the rest is the answer of the lot routes of the catalog. */
-function toLotCreateApiException(error: unknown): unknown {
+export function toLotCreateApiException(error: unknown): unknown {
   if (error instanceof ProvisioningNotInChargeError) return notInCharge;
   if (error instanceof LicenseKeyLotRequestNotOpenError) return requestRequired;
 

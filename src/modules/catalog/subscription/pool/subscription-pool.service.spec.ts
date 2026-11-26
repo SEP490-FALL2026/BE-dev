@@ -7,6 +7,7 @@ import {
   SubscriptionVendorAdminsRequiredError,
   SubscriptionWorkspaceMovedError,
 } from '../subscription.errors';
+import { toSubscriptionApiException } from '../subscription.http-errors';
 import type { SubscriptionRecord } from '../subscription.types';
 import { SubscriptionPoolService, retryOnWorkspaceMove } from './subscription-pool.service';
 
@@ -154,9 +155,11 @@ describe('SubscriptionPoolService.assertVendorAdmins and assertActivation', () =
       workingCount: 1,
     });
 
-    await expect(service.assertVendorAdmins(tx, k2Plan, 'org-1', 'ws-a')).rejects.toThrow(
-      SubscriptionVendorAdminsRequiredError,
-    );
+    const err = await service.assertVendorAdmins(tx, k2Plan, 'org-1', 'ws-a').catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(SubscriptionVendorAdminsRequiredError);
+    expect((toSubscriptionApiException(err) as { getResponse?: () => unknown }).getResponse?.()).toMatchObject({
+      code: 'SUBSCRIPTION.VENDOR_ADMINS_REQUIRED',
+    });
     expect(workingAdminCount).toHaveBeenCalledWith(tx, 'ws-a');
   });
 
@@ -167,9 +170,11 @@ describe('SubscriptionPoolService.assertVendorAdmins and assertActivation', () =
       workingCount: 2,
     });
 
-    await expect(service.assertVendorAdmins(tx, k2Plan, 'org-1', null)).rejects.toThrow(
-      SubscriptionVendorAdminsRequiredError,
-    );
+    const err = await service.assertVendorAdmins(tx, k2Plan, 'org-1', null).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(SubscriptionVendorAdminsRequiredError);
+    expect((toSubscriptionApiException(err) as { getResponse?: () => unknown }).getResponse?.()).toMatchObject({
+      code: 'SUBSCRIPTION.VENDOR_ADMINS_REQUIRED',
+    });
     expect(workingAdminCount).not.toHaveBeenCalled();
   });
 
@@ -189,9 +194,11 @@ describe('SubscriptionPoolService.assertVendorAdmins and assertActivation', () =
       workingCount: 1,
     });
 
-    await expect(service.assertVendorAdmins(tx, k2Plan, 'org-1', 'ws-a')).rejects.toThrow(
-      SubscriptionVendorAdminsRequiredError,
-    );
+    const err = await service.assertVendorAdmins(tx, k2Plan, 'org-1', 'ws-a').catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(SubscriptionVendorAdminsRequiredError);
+    expect((toSubscriptionApiException(err) as { getResponse?: () => unknown }).getResponse?.()).toMatchObject({
+      code: 'SUBSCRIPTION.VENDOR_ADMINS_REQUIRED',
+    });
     expect(isClosed).not.toHaveBeenCalled();
   });
 
@@ -208,9 +215,13 @@ describe('SubscriptionPoolService.assertVendorAdmins and assertActivation', () =
       workingCount: 1,
     });
 
-    await expect(closedShort.service.assertActivation(tx, k2Plan, 'TERM', state, false, 'org-1')).rejects.toThrow(
-      SubscriptionVendorAdminsRequiredError,
-    );
+    const err = await closedShort.service
+      .assertActivation(tx, k2Plan, 'TERM', state, false, 'org-1')
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(SubscriptionVendorAdminsRequiredError);
+    expect((toSubscriptionApiException(err) as { getResponse?: () => unknown }).getResponse?.()).toMatchObject({
+      code: 'SUBSCRIPTION.VENDOR_ADMINS_REQUIRED',
+    });
     await expect(
       closedShort.service.assertActivation(tx, k2Plan, 'TERM', state, true, 'org-1'),
     ).resolves.toBeUndefined();
@@ -234,9 +245,11 @@ describe('SubscriptionPoolService.assertVendorAdmins and assertActivation', () =
         ],
       });
 
-      await expect(service.assertNoLiveDuplicate(tx, k2Plan, null, 'ws-a')).rejects.toThrow(
-        SubscriptionDuplicatePlanError,
-      );
+      const dupErr = await service.assertNoLiveDuplicate(tx, k2Plan, null, 'ws-a').catch((e: unknown) => e);
+      expect(dupErr).toBeInstanceOf(SubscriptionDuplicatePlanError);
+      expect((toSubscriptionApiException(dupErr) as { getResponse?: () => unknown }).getResponse?.()).toMatchObject({
+        code: 'SUBSCRIPTION.DUPLICATE_PLAN',
+      });
       await expect(service.assertNoLiveDuplicate(tx, k2Plan, null, 'ws-b')).resolves.toBeUndefined();
       await expect(service.assertNoLiveDuplicate(tx, k2Plan, 'sub-1', 'ws-a')).resolves.toBeUndefined();
     });
@@ -278,8 +291,8 @@ describe('SubscriptionPoolService.assertVendorAdmins and assertActivation', () =
         renewalDate: '2026-12-05',
       } as unknown as SubscriptionRecord;
 
-      await expect(
-        service.judgeChange(tx, {
+      const payDayErr = await service
+        .judgeChange(tx, {
           plan: k2Plan,
           current,
           state: {
@@ -294,11 +307,15 @@ describe('SubscriptionPoolService.assertVendorAdmins and assertActivation', () =
           input: { renewalDate: null },
           actor: { employeeId: 'it-1' } as never,
           organizationId: 'org-1',
-        }),
-      ).rejects.toThrow(SubscriptionMembersPaymentDayRequiredError);
+        })
+        .catch((e: unknown) => e);
+      expect(payDayErr).toBeInstanceOf(SubscriptionMembersPaymentDayRequiredError);
+      expect((toSubscriptionApiException(payDayErr) as { getResponse?: () => unknown }).getResponse?.()).toMatchObject({
+        code: 'SUBSCRIPTION.MEMBERS_PAYMENT_DAY_REQUIRED',
+      });
 
-      await expect(
-        service.judgeChange(tx, {
+      const dupWsErr = await service
+        .judgeChange(tx, {
           plan: k2Plan,
           current,
           state: {
@@ -313,8 +330,12 @@ describe('SubscriptionPoolService.assertVendorAdmins and assertActivation', () =
           input: { workspaceId: 'ws-b' },
           actor: { employeeId: 'it-1' } as never,
           organizationId: 'org-1',
-        }),
-      ).rejects.toThrow(SubscriptionDuplicatePlanError);
+        })
+        .catch((e: unknown) => e);
+      expect(dupWsErr).toBeInstanceOf(SubscriptionDuplicatePlanError);
+      expect((toSubscriptionApiException(dupWsErr) as { getResponse?: () => unknown }).getResponse?.()).toMatchObject({
+        code: 'SUBSCRIPTION.DUPLICATE_PLAN',
+      });
     });
   });
 });
