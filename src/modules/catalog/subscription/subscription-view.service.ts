@@ -116,10 +116,10 @@ export class SubscriptionViewService {
    */
   async expiryReadings(records: readonly SubscriptionRecord[]): Promise<Map<string, ExpiryReadingView>> {
     const today = await this.organizationReads.businessToday();
-    const [seats, continued] = await Promise.all([this.seatsOf(records, today), this.continuedAmong(records)]);
+    const [seats, continued] = await Promise.all([this.seatsAndPlansOf(records, today), this.continuedAmong(records)]);
     const points = await this.pointsOf(records, today, continued);
 
-    return this.readingsAt(records, points.points, today, seats);
+    return this.readingsAt(records, points.points, today, seats.bySubscription);
   }
 
   /** Which of these subscriptions a later period continues: one read for all of them. */
@@ -166,11 +166,13 @@ export class SubscriptionViewService {
     );
   }
 
-  /** The seats each of these subscriptions holds from today on, and how many of them are being taken back: one read for all of them. */
-  private seatsOf(records: readonly SubscriptionRecord[], today: BusinessDate): Promise<SeatCounts> {
+  private seatsAndPlansOf(
+    records: readonly SubscriptionRecord[],
+    today: BusinessDate,
+  ): Promise<{ bySubscription: SeatCounts; bySubscriptionPlan: ReadonlyMap<string, number> }> {
     return records.length === 0
-      ? Promise.resolve(new Map())
-      : this.occupancy.get().seatsOfSubscriptions(
+      ? Promise.resolve({ bySubscription: new Map(), bySubscriptionPlan: new Map<string, number>() })
+      : this.occupancy.get().seatsAndPlansOfSubscriptions(
           records.map((record) => record.id),
           today,
         );
@@ -248,13 +250,13 @@ export class SubscriptionViewService {
 
     const vendorAdmins = await this.vendorAdminsOf(records);
     const today = await this.organizationReads.businessToday();
-    const seatCounts = await this.seatsOf(records, today);
+    const { bySubscription: seatCounts, bySubscriptionPlan } = await this.seatsAndPlansOf(records, today);
     const { points, windows } = await this.pointsOf(records, today, await this.continuedAmong(records));
     const readings = this.readingsAt(records, points, today, seatCounts);
     const answerer = await this.answerersOf(records);
     // A period that has lines is priced by its lines: the mark of the subscription that prices its plan is retired for it.
     const lined = await this.lotFacts.withLines(records.map((record) => record.id));
-    const linesCtx = await this.readLinesContext(records, today);
+    const linesCtx = await this.readLinesContext(records, today, bySubscriptionPlan);
     const adjustment = (record: SubscriptionRecord, effectivePurchasedQuantity: number | null) => ({
       logoUrl: record.applicationLogoUrl,
       responsibleItAdmin: answerer(record),
@@ -352,7 +354,11 @@ export class SubscriptionViewService {
     return views;
   }
 
-  private async readLinesContext(records: readonly SubscriptionRecord[], today: BusinessDate) {
+  private async readLinesContext(
+    records: readonly SubscriptionRecord[],
+    today: BusinessDate,
+    lineOccupied: ReadonlyMap<string, number>,
+  ) {
     const linesBySub: ReadonlyMap<string, SubscriptionLineWithSeats[]> = this.lotFacts.linesForSubscriptions
       ? await this.lotFacts.linesForSubscriptions(records, today)
       : new Map();
@@ -361,14 +367,6 @@ export class SubscriptionViewService {
     const planNameById = new Map(
       linePlans.filter((plan): plan is NonNullable<typeof plan> => plan !== null).map((plan) => [plan.id, plan.name]),
     );
-    const reader = this.occupancy.get();
-    const lineOccupied: ReadonlyMap<string, number> =
-      allLinePlanIds.length > 0
-        ? await reader.occupiedBySubscriptionPlans(
-            records.map((record) => record.id),
-            today,
-          )
-        : new Map();
 
     return { linesBySub, planNameById, lineOccupied };
   }

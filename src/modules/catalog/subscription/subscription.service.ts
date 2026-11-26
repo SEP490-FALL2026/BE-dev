@@ -501,7 +501,7 @@ export class SubscriptionService {
           planId: plan.id,
           monthlyUnitPriceMinor,
           minimumSeats: state.vendorMinimumSeats ?? null,
-          quantity: state.purchasedQuantity ?? 0,
+          quantity: state.purchasedQuantity,
         },
       ],
     });

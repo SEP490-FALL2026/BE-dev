@@ -61,6 +61,72 @@ export class SharedPoolCapacityRepo {
   }
 
   /**
+   * Single-statement read returning both subscription-level peak/revocation occupancy and today's per-`(subscription, plan)`
+   * assignment counts (`G-8`, `ia1-collections-query-count`).
+   */
+  async occupancyWithPlansOfMany(
+    subscriptionIds: readonly string[],
+    today: BusinessDate,
+    tx?: DbTx,
+  ): Promise<{ bySubscription: Map<string, SubscriptionOccupancy>; bySubscriptionPlan: Map<string, number> }> {
+    const bySubscription = new Map<string, SubscriptionOccupancy>();
+    const bySubscriptionPlan = new Map<string, number>();
+    if (subscriptionIds.length === 0) return { bySubscription, bySubscriptionPlan };
+
+    const client = tx ?? this.prisma;
+    const rows = await client.$queryRaw<
+      { subscription_id: string; plan_id: string | null; occupied: bigint; in_revocation: bigint }[]
+    >`
+      WITH "open" AS (
+        SELECT a."subscription_id", a."plan_id", a."valid_from", a."valid_until",
+               EXISTS (
+                 SELECT 1 FROM "provisioning_tasks" t
+                  WHERE t."assignment_id" = a."id"
+                    AND t."kind" = 'REVOKE'
+                    AND t."status" NOT IN ('COMPLETED', 'CLOSED_FAILED', 'CANCELLED')
+               ) AS "revoking"
+          FROM "license_assignments" a
+         WHERE a."subscription_id" = ANY(${[...subscriptionIds]}::uuid[])
+           AND (a."valid_until" IS NULL OR ${today}::date < a."valid_until")
+      ), "days" AS (
+        SELECT DISTINCT o."subscription_id", GREATEST(o."valid_from", ${today}::date) AS "day" FROM "open" o
+      )
+      SELECT d."subscription_id" AS subscription_id,
+             NULL::uuid AS plan_id,
+             MAX((
+               SELECT count(*) FROM "open" b
+                WHERE b."subscription_id" = d."subscription_id"
+                  AND b."valid_from" <= d."day"
+                  AND (b."valid_until" IS NULL OR d."day" < b."valid_until")
+             )) AS occupied,
+             MAX((
+               SELECT count(*) FROM "open" r WHERE r."subscription_id" = d."subscription_id" AND r."revoking"
+             )) AS in_revocation
+        FROM "days" d
+       GROUP BY d."subscription_id"
+      UNION ALL
+      SELECT o."subscription_id" AS subscription_id,
+             o."plan_id" AS plan_id,
+             count(*) AS occupied,
+             0::bigint AS in_revocation
+        FROM "open" o
+       WHERE o."valid_from" <= ${today}::date
+       GROUP BY o."subscription_id", o."plan_id"`;
+    for (const row of rows) {
+      if (row.plan_id === null) {
+        bySubscription.set(row.subscription_id, {
+          occupied: Number(row.occupied),
+          inRevocation: Number(row.in_revocation),
+        });
+      } else {
+        bySubscriptionPlan.set(`${row.subscription_id}:${row.plan_id}`, Number(row.occupied));
+      }
+    }
+
+    return { bySubscription, bySubscriptionPlan };
+  }
+
+  /**
    * Peak occupancy from `today` on scoped to `(subscription_id, plan_id)` so multi-plan period rows count each
    * plan line's assignments separately.
    */

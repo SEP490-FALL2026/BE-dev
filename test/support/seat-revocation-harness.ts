@@ -53,11 +53,15 @@ export class SeatRevocationHarness extends TransferHarness {
         { employee_code: code, account_identifier: `${code.toLowerCase()}@acme.vn`, granted_on: '2026-01-05' },
       ]),
     );
-    const found = await assignmentIdOf(
+    let found = await assignmentIdOf(
       this.ctx,
       target.subscriptionId ? { subscriptionId: target.subscriptionId } : { planId: target.planId ?? '' },
       person.employeeId,
     );
+    if (!found && target.subscriptionId) {
+      const planId = target.planId ?? (await this.planOf(target.subscriptionId));
+      found = await assignmentIdOf(this.ctx, { planId }, person.employeeId);
+    }
     if (!found) throw new Error(`no seat of ${code}`);
 
     return found;

@@ -95,13 +95,13 @@ describe('SubscriptionViewService lines & D-18 (W3-15)', () => {
       } as unknown as PlanFactsService,
       {
         get: () => ({
-          seatsOfSubscriptions: jest.fn().mockResolvedValue(new Map([['sub-1', { occupied: 3, inRevocation: 0 }]])),
-          occupiedBySubscriptionPlans: jest.fn().mockResolvedValue(
-            new Map([
+          seatsAndPlansOfSubscriptions: jest.fn().mockResolvedValue({
+            bySubscription: new Map([['sub-1', { occupied: 3, inRevocation: 0 }]]),
+            bySubscriptionPlan: new Map([
               ['sub-1:plan-1', 2],
               ['sub-1:plan-2', 1],
             ]),
-          ),
+          }),
         }),
       } as unknown as SeatOccupancyHook,
       { idsWithSuccessor: jest.fn().mockResolvedValue(new Set()) } as unknown as SubscriptionGrantingRepo,

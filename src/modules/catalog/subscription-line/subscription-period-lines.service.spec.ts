@@ -192,7 +192,31 @@ describe('SubscriptionPeriodLinesService (P18 renewal close & continuation lines
     });
   });
 
-  it('F-3: activatePeriod refuses multi-line un-opened activation rather than falling back to idx === 0', async () => {
+  it('G-9: activatePeriod leaves the seat ledger unopened when purchasedQuantity is null', async () => {
+    lines.ofSubscriptions.mockResolvedValueOnce(new Map([['sub-1', [line({ id: 'line-1', ledgerOpenedOn: null })]]]));
+    lines.update.mockResolvedValueOnce(line({ id: 'line-1', ledgerOpenedOn: null }));
+
+    await expect(
+      service.activatePeriod(
+        tx,
+        {
+          id: 'sub-1',
+          planId: 'plan-1',
+          planProvisioningType: 'K2',
+          kind: 'TERM',
+          workspace: { id: 'ws-1', name: 'Workspace' },
+          startDate: '2026-06-01',
+          purchasedQuantity: null,
+          monthlyUnitPriceMinor: 50000n,
+          vendorMinimumSeats: null,
+        },
+        'emp-1',
+      ),
+    ).resolves.toBeUndefined();
+    expect(seatLedger.openLines).not.toHaveBeenCalled();
+  });
+
+  it('G-3 & F-3: activatePeriod refuses multi-line un-opened activation rather than falling back to idx === 0', async () => {
     lines.ofSubscriptions.mockResolvedValueOnce(
       new Map([
         [

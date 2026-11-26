@@ -101,6 +101,35 @@ export class AssignmentSeatOccupancy implements SeatOccupancyReader, OnModuleIni
     const seatMap = tx
       ? await this.capacity.occupancyOf(tx, subscriptionIds, day)
       : await this.capacity.occupancyOfMany(subscriptionIds, day);
+
+    return this.mergeActivationOccupancy(seatMap, subscriptionIds, tx);
+  }
+
+  async seatsAndPlansOfSubscriptions(
+    subscriptionIds: readonly string[],
+    day: BusinessDate,
+    tx?: DbTx,
+  ): Promise<{
+    bySubscription: ReadonlyMap<string, { occupied: number; inRevocation: number }>;
+    bySubscriptionPlan: ReadonlyMap<string, number>;
+  }> {
+    const { bySubscription, bySubscriptionPlan } = await this.capacity.occupancyWithPlansOfMany(
+      subscriptionIds,
+      day,
+      tx,
+    );
+
+    return {
+      bySubscription: await this.mergeActivationOccupancy(bySubscription, subscriptionIds, tx),
+      bySubscriptionPlan,
+    };
+  }
+
+  private async mergeActivationOccupancy(
+    seatMap: ReadonlyMap<string, { occupied: number; inRevocation: number }>,
+    subscriptionIds: readonly string[],
+    tx?: DbTx,
+  ): Promise<Map<string, { occupied: number; inRevocation: number }>> {
     const activationOccupied = await this.deviceActivations.occupiedBySubscriptions(subscriptionIds, tx);
     const lotIds = await this.lots.idsOfLots([...activationOccupied.keys()], tx);
     const merged = new Map(seatMap);

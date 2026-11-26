@@ -56,10 +56,12 @@ export class SubscriptionSeatUsageService {
 
     const lines = await this.catalog.getSubscriptionServingLineIds(target.subscriptionId!, asOf);
     if (!lines.hasLines) return target.purchasedQuantity;
-    if (lines.servingLineIds.length === 0) return 0;
+    if (lines.servingLineIds.length === 0) return target.purchasedQuantity === null ? null : 0;
 
     const byLine = await this.seatLedger.seatsOnDays(lines.servingLineIds, asOf, asOf);
+    const values = lines.servingLineIds.map((lineId) => byLine.get(lineId)?.get(asOf) ?? null);
+    if (values.every((value) => value === null)) return null;
 
-    return lines.servingLineIds.reduce((sum, lineId) => sum + (byLine.get(lineId)?.get(asOf) ?? 0), 0);
+    return values.reduce<number>((sum, value) => sum + (value ?? 0), 0);
   }
 }

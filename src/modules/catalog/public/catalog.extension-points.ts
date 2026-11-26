@@ -50,6 +50,18 @@ export interface SeatOccupancyReader {
     day: BusinessDate,
     tx?: DbTx,
   ): Promise<ReadonlyMap<string, { occupied: number; inRevocation: number }>>;
+  /**
+   * Combined single-query read for `GET /subscriptions`: returns both subscription-level peak/revocation occupancy and
+   * per-`(subscription, plan)` today occupancy (`G-8`).
+   */
+  seatsAndPlansOfSubscriptions(
+    subscriptionIds: readonly string[],
+    day: BusinessDate,
+    tx?: DbTx,
+  ): Promise<{
+    bySubscription: ReadonlyMap<string, { occupied: number; inRevocation: number }>;
+    bySubscriptionPlan: ReadonlyMap<string, number>;
+  }>;
   occupiedBySubscriptionPlans(
     subscriptionIds: readonly string[],
     day: BusinessDate,

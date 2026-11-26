@@ -23,6 +23,10 @@ describe('AssignmentSeatOccupancy (S-6)', () => {
     const capacity = {
       occupancyOf: jest.fn().mockResolvedValue(new Map([['sub-seat', { occupied: 2, inRevocation: 1 }]])),
       occupancyOfMany: jest.fn().mockResolvedValue(new Map([['sub-seat', { occupied: 2, inRevocation: 1 }]])),
+      occupancyWithPlansOfMany: jest.fn().mockResolvedValue({
+        bySubscription: new Map([['sub-seat', { occupied: 2, inRevocation: 1 }]]),
+        bySubscriptionPlan: new Map([['sub-seat:plan-1', 2]]),
+      }),
     } as unknown as SharedPoolCapacityRepo;
 
     const deviceActivations = {
@@ -140,6 +144,15 @@ describe('AssignmentSeatOccupancy (S-6)', () => {
       });
 
       await expect(listener.hasLotBeenUsed('lot-1', tx)).rejects.toThrow('not bound');
+    });
+
+    it('G-8: reads subscription and per-plan occupancy in a single query via occupancyWithPlansOfMany', async () => {
+      const { listener } = setup();
+
+      const combined = await listener.seatsAndPlansOfSubscriptions(['sub-seat', 'sub-key-only'], day, tx);
+      expect(combined.bySubscription.get('sub-seat')).toEqual({ occupied: 3, inRevocation: 1 });
+      expect(combined.bySubscription.get('sub-key-only')).toEqual({ occupied: 4, inRevocation: 0 });
+      expect(combined.bySubscriptionPlan.get('sub-seat:plan-1')).toBe(2);
     });
   });
 });

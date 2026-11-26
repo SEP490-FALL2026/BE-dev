@@ -11,7 +11,7 @@ export interface CreatePeriodLineInput {
   planId: string;
   monthlyUnitPriceMinor: bigint;
   minimumSeats: number | null;
-  quantity: number;
+  quantity: number | null;
 }
 
 /**
@@ -145,7 +145,7 @@ export class SubscriptionPeriodLinesService {
       lines: readonly CreatePeriodLineInput[];
     },
   ): Promise<SubscriptionLineRecord[]> {
-    const created: Array<{ record: SubscriptionLineRecord; quantity: number }> = [];
+    const created: Array<{ record: SubscriptionLineRecord; quantity: number | null }> = [];
     for (const item of input.lines) {
       const record = await this.lines.insert(tx, {
         organizationId: input.organizationId,
@@ -158,9 +158,12 @@ export class SubscriptionPeriodLinesService {
       created.push({ record, quantity: item.quantity });
     }
 
-    if (input.status === 'ACTIVE' && input.startDate !== null) {
+    const toOpen = created.filter(
+      (entry): entry is { record: SubscriptionLineRecord; quantity: number } => entry.quantity !== null,
+    );
+    if (input.status === 'ACTIVE' && input.startDate !== null && toOpen.length > 0) {
       await this.seatLedger.openLines(tx, {
-        lines: created.map(({ record, quantity }) => ({
+        lines: toOpen.map(({ record, quantity }) => ({
           lineId: record.id,
           effectiveOn: input.startDate!,
           quantity,
@@ -231,8 +234,9 @@ export class SubscriptionPeriodLinesService {
     if (unOpened.length > 1) {
       throw new SubscriptionLinePeriodStillDraftError(['MULTIPLE_UNOPENED_LINES']);
     }
+    if (period.purchasedQuantity === null) return;
 
-    const initialQuantity = period.purchasedQuantity ?? 0;
+    const initialQuantity = period.purchasedQuantity;
     await this.seatLedger.openLines(tx, {
       lines: [
         {

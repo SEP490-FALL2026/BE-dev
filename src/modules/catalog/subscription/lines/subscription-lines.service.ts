@@ -224,7 +224,9 @@ export class SubscriptionMultiLineService {
     firstPlan: LockedPlan,
     workspaceId: string | null,
   ) {
-    const totalQuantity = lines.reduce((sum, line) => sum + line.quantity, 0);
+    const totalQuantity = lines.every((line) => line.quantity === null)
+      ? undefined
+      : lines.reduce((sum, line) => sum + (line.quantity ?? 0), 0);
     const commitmentTermMonths = input.commitmentTermMonths ?? firstPlan.referenceCommitmentMonths ?? undefined;
     const state = {
       ...declaredStateOf({ ...input, purchasedQuantity: totalQuantity, commitmentTermMonths }),

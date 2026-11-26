@@ -191,6 +191,12 @@ export class AssignmentService {
           isMachineAccount: false,
           machineAccountNote: null,
           createdByAppUserId: actor.appUserId,
+          ...(input.target.provisioningType === 'K1' && input.target.subscriptionId === null
+            ? {
+                personalCommitmentMonths: input.target.referenceCommitmentMonths ?? 1,
+                billingAnchorOn: row.effectiveFrom,
+              }
+            : {}),
         });
       } catch (error) {
         throw toAssignmentFailure(error, index) ?? error;

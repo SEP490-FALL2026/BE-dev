@@ -112,11 +112,15 @@ export class ReturnHarness extends SpendHarness {
         },
       ]),
     );
-    const found = await assignmentIdOf(
+    let found = await assignmentIdOf(
       this.ctx,
       one.subscriptionId ? { subscriptionId: one.subscriptionId } : { planId: one.planId ?? '' },
       person.employeeId,
     );
+    if (!found && one.subscriptionId) {
+      const planId = target.planId ?? (await this.planOf(one.subscriptionId));
+      found = await assignmentIdOf(this.ctx, { planId }, person.employeeId);
+    }
     if (!found) throw new Error(`no seat of ${code}`);
 
     return found;

@@ -93,4 +93,28 @@ describe('SubscriptionSeatUsageService K2 lines (DL-2, W3-15)', () => {
       asOf: '2026-11-21',
     });
   });
+
+  it('G-9: returns purchased = null and free = null when serving lines have no opened ledger yet', async () => {
+    const service = new SubscriptionSeatUsageService(
+      { countOccupying: jest.fn().mockResolvedValue(0) } as unknown as AssignmentRepo,
+      { occupiedBySubscription: jest.fn().mockResolvedValue(0) } as unknown as DeviceActivationRepo,
+      { businessToday: jest.fn().mockResolvedValue('2026-11-21') } as unknown as OrganizationReadApi,
+      {
+        findSeatTarget: jest.fn().mockResolvedValue({ ...k2Target, purchasedQuantity: null }),
+        getSubscriptionServingLineIds: jest.fn().mockResolvedValue({ hasLines: true, servingLineIds: ['line-1'] }),
+      } as unknown as CatalogApi,
+      { findLot: jest.fn() } as unknown as LicenseLotApi,
+      {
+        seatsOnDays: jest.fn().mockResolvedValue(new Map([['line-1', new Map([['2026-11-21', null]])]])),
+      } as unknown as SeatLedgerApi,
+    );
+
+    await expect(service.get('sub-1')).resolves.toEqual({
+      subscriptionId: 'sub-1',
+      purchased: null,
+      occupied: 0,
+      free: null,
+      asOf: '2026-11-21',
+    });
+  });
 });

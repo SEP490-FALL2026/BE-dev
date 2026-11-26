@@ -22,6 +22,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS test_legacy_perpetual_lot ON subscriptions;
 CREATE TRIGGER test_legacy_perpetual_lot AFTER INSERT OR UPDATE OF status, purchased_quantity ON subscriptions
   FOR EACH ROW WHEN (NEW.kind = 'PERPETUAL' AND NEW.status = 'ACTIVE')
   EXECUTE FUNCTION test_legacy_perpetual_lot();
