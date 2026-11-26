@@ -95,6 +95,15 @@ describe('shared-pool-line warehouse identity (integration; W3-04)', () => {
         WHERE id = $1::uuid`,
       [poolSub, Number(monthly)],
     );
+    await h.ctx.sql.query(
+      `UPDATE subscription_lines
+          SET monthly_unit_price_minor = $2,
+              start_date = '2026-07-01'::date,
+              end_date = '2027-06-30'::date,
+              renewal_date = '2027-07-01'::date
+        WHERE subscription_id = $1::uuid`,
+      [poolSub, Number(monthly)],
+    );
 
     for (let i = 0; i < 4; i += 1) {
       await insertSeat(
