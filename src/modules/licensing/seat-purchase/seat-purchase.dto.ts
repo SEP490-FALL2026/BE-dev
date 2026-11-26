@@ -33,7 +33,9 @@ export const seatPurchaseBodySchema = z
         { message: 'Each (requestId, beneficiaryEmployeeId) pair may appear only once.' },
       )
       .meta({ description: 'Unique pending request items receiving newly bought seats.' }),
-    purchasedOn: businessDate.meta({ description: 'Business date when the seats are purchased from the vendor.' }),
+    purchasedOn: businessDate.meta({
+      description: 'Business date when the seats are purchased from the vendor; it must exist (2026-02-30 is refused).',
+    }),
     tierStepSeats: z.number().int().positive().max(10_000).optional().meta({
       description:
         'Optional vendor tier-step seat count (requires items.length === 1; cannot combine with replacesFromLineId).',

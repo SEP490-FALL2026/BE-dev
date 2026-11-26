@@ -19,7 +19,7 @@ const ANSWERS: Readonly<Record<RenewalProblem, { status: HttpStatus; message: st
   NOT_RENEWABLE: {
     status: HttpStatus.CONFLICT,
     message:
-      'Only a fixed-seat live shared-pool term has an adjustment point (details.reason: PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED, CANCELLED, MEMBER_COUNTED).',
+      'Only a fixed-seat live shared-pool term has an adjustment point (PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED, CANCELLED, MEMBER_COUNTED).',
   },
   CONTRACT_DATA_INCOMPLETE: {
     status: HttpStatus.CONFLICT,

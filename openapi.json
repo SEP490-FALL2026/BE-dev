@@ -48477,12 +48477,12 @@
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
                   "SUBSCRIPTION_RENEWAL.NOT_RENEWABLE": {
-                    "summary": "Only a fixed-seat live shared-pool term has an adjustment point (details.reason: PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED, CANCELLED, MEMBER_COUNTED).",
+                    "summary": "Only a fixed-seat live shared-pool term has an adjustment point (PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED, CANCELLED, MEMBER_COUNTED).",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "SUBSCRIPTION_RENEWAL.NOT_RENEWABLE",
-                        "message": "Only a fixed-seat live shared-pool term has an adjustment point (details.reason: PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED, CANCELLED, MEMBER_COUNTED).",
+                        "message": "Only a fixed-seat live shared-pool term has an adjustment point (PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED, CANCELLED, MEMBER_COUNTED).",
                         "details": { "reason": "ALREADY_CONTINUED" },
                         "requestId": "req_example"
                       }
@@ -48928,12 +48928,12 @@
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
                   "SUBSCRIPTION_RENEWAL.NOT_RENEWABLE": {
-                    "summary": "Only a fixed-seat live shared-pool term has an adjustment point (details.reason: PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED, CANCELLED, MEMBER_COUNTED).",
+                    "summary": "Only a fixed-seat live shared-pool term has an adjustment point (PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED, CANCELLED, MEMBER_COUNTED).",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "SUBSCRIPTION_RENEWAL.NOT_RENEWABLE",
-                        "message": "Only a fixed-seat live shared-pool term has an adjustment point (details.reason: PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED, CANCELLED, MEMBER_COUNTED).",
+                        "message": "Only a fixed-seat live shared-pool term has an adjustment point (PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED, CANCELLED, MEMBER_COUNTED).",
                         "details": { "reason": "ALREADY_CONTINUED" },
                         "requestId": "req_example"
                       }
@@ -130299,7 +130299,7 @@
           "purchasedOn": {
             "type": "string",
             "format": "date",
-            "description": "Business date when the seats are purchased from the vendor."
+            "description": "Business date when the seats are purchased from the vendor; it must exist (2026-02-30 is refused)."
           },
           "tierStepSeats": {
             "description": "Optional vendor tier-step seat count (requires items.length === 1; cannot combine with replacesFromLineId).",
