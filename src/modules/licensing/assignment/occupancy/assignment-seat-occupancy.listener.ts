@@ -131,13 +131,17 @@ export class AssignmentSeatOccupancy implements SeatOccupancyReader, OnModuleIni
     tx?: DbTx,
   ): Promise<Map<string, { occupied: number; inRevocation: number }>> {
     const activationOccupied = await this.deviceActivations.occupiedBySubscriptions(subscriptionIds, tx);
-    const lotIds = await this.lots.idsOfLots([...activationOccupied.keys()], tx);
+    const lotIds = await this.lots.idsOfLots(subscriptionIds, tx);
     const merged = new Map(seatMap);
+    for (const lotId of lotIds) {
+      const current = merged.get(lotId);
+      // A lot is counted by the lot alone; once its keys return to store (`0` open keys), never fall back to `seatMap` (DL-2).
+      merged.set(lotId, { inRevocation: current?.inRevocation ?? 0, occupied: activationOccupied.get(lotId) ?? 0 });
+    }
     for (const [subId, extra] of activationOccupied) {
+      if (lotIds.has(subId)) continue;
       const current = merged.get(subId);
-      // A lot is counted by the lot alone; the assignments the seat map found for its subscription are already in the figure of the lot (DL-2).
-      const occupied = lotIds.has(subId) ? extra : (current?.occupied ?? 0) + extra;
-      merged.set(subId, { inRevocation: current?.inRevocation ?? 0, occupied });
+      merged.set(subId, { inRevocation: current?.inRevocation ?? 0, occupied: (current?.occupied ?? 0) + extra });
     }
 
     return merged;

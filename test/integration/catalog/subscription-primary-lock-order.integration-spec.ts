@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
+import { addDays } from '../../../src/core/business-date';
 import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../src/infrastructure/security/tokens/access-token-verifier.port';
 import { CatalogApi } from '../../../src/modules/catalog/public/catalog.api';
@@ -65,6 +66,10 @@ describe('Subscription primary change and pool seat addition lock order (integra
     let currentPrimary = subS.id;
 
     for (let i = 0; i < 20; i += 1) {
+      const nextStart = addDays('2026-03-15', i + 1);
+      const nextEnd = addDays('2027-03-14', i + 1);
+      today(nextStart);
+
       const wsRes = await request(h.server())
         .post('/api/v1/workspaces')
         .set(h.as(h.it1))
@@ -83,11 +88,11 @@ describe('Subscription primary change and pool seat addition lock order (integra
          ) VALUES (
            $1, $2, $3, 'TERM', 'DRAFT', $4, $5, 5,
            3000000, 'VND', 250000,
-           '2026-03-15', 1, '2026-03-15', 'SAME_CURRENCY',
+           $7::date, 1, $7::date, 'SAME_CURRENCY',
            3000000, 'VND', 'ANNUAL', 12,
-           '2026-03-15', '2027-03-14', $6
+           $7::date, $8::date, $6
          )`,
-        [draftId, h.seed.organizationId, planId, currentPrimary, workspaceId, h.it1.employeeId],
+        [draftId, h.seed.organizationId, planId, currentPrimary, workspaceId, h.it1.employeeId, nextStart, nextEnd],
       );
 
       const barrier = new Barrier(2);
@@ -98,11 +103,11 @@ describe('Subscription primary change and pool seat addition lock order (integra
           if (!target?.subscriptionLineId) throw new Error('Expected active K2 subscription line');
           return ledger.recordVendor(tx, target.subscriptionLineId, {
             delta: 1,
-            effectiveOn: '2026-03-15',
+            effectiveOn: nextStart,
             note: 'Primary lock order verification',
             actor,
             alreadyLocked: true,
-            today: '2026-03-15',
+            today: nextStart,
           });
         });
       })();

@@ -95,7 +95,7 @@ describe('license key import and the kind of its plan, racing (integration, P28-
     await holder.query('BEGIN');
     await holder.query(`SELECT id FROM plans WHERE id = $1 FOR UPDATE`, [planId]);
     await holder.query(
-      `UPDATE applications SET status = 'RETIRED' WHERE id = (SELECT application_id FROM plans WHERE id = $1)`,
+      `UPDATE applications SET retired_at = now() WHERE id = (SELECT application_id FROM plans WHERE id = $1)`,
       [planId],
     );
 

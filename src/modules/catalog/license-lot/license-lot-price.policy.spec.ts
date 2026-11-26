@@ -1,6 +1,7 @@
 import {
   accountLotGrantable,
   chooseAccountLot,
+  countOpenTasksByLotDetailed,
   excessGrantableOf,
   pickK4LotUnitPrice,
   type AccountLotCandidate,
@@ -141,5 +142,49 @@ describe('chooseAccountLot (W3-24 & F11)', () => {
 
     expect(decision.kind).toBe('RESERVED_FOR_REQUEST');
     if (decision.kind === 'RESERVED_FOR_REQUEST') expect(decision.lot.id).toBe('lot-duc');
+  });
+
+  it('G-5: FIFO task attribution skips a REQUEST lot whose excessCap is exhausted and routes to the next lot', () => {
+    const detailed = countOpenTasksByLotDetailed(
+      [
+        {
+          id: 'lot-req-a',
+          purchasedOn: '2027-01-01',
+          purpose: 'REQUEST',
+          requestId: 'req-c',
+          legacySubscriptionId: null,
+          free: 3,
+          keysInStore: 3,
+          excessCap: 1,
+        },
+        {
+          id: 'lot-req-b',
+          purchasedOn: '2027-01-02',
+          purpose: 'REQUEST',
+          requestId: 'req-d',
+          legacySubscriptionId: null,
+          free: 3,
+          keysInStore: 3,
+          excessCap: 1,
+        },
+      ],
+      [
+        {
+          taskId: 'task-1',
+          requestId: 'req-other-1',
+          subscriptionId: null,
+          createdAt: new Date('2027-01-03T00:00:00Z'),
+        },
+        {
+          taskId: 'task-2',
+          requestId: 'req-other-2',
+          subscriptionId: null,
+          createdAt: new Date('2027-01-03T00:01:00Z'),
+        },
+      ],
+    );
+
+    expect(detailed.get('lot-req-a')).toEqual({ total: 1, excess: 1 });
+    expect(detailed.get('lot-req-b')).toEqual({ total: 1, excess: 1 });
   });
 });

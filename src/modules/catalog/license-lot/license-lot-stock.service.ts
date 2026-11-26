@@ -222,6 +222,15 @@ export class LicenseLotStockService {
         legacySubscriptionId: l.legacySubscriptionId,
         free: Math.max(0, l.licenseCount - (taken.get(l.id)?.occupied ?? 0)),
         keysInStore: keys.get(l.id)?.inStore ?? 0,
+        excessCap:
+          l.purpose === 'REQUEST'
+            ? Math.max(
+                0,
+                l.licenseCount -
+                  (reservations?.get(l.id)?.beneficiaries ?? 1) -
+                  (reservations?.get(l.id)?.chargedExcess ?? 0),
+              )
+            : Number.POSITIVE_INFINITY,
       })),
       tasks,
     );

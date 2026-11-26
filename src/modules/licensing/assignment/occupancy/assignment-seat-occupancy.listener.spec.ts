@@ -154,5 +154,16 @@ describe('AssignmentSeatOccupancy (S-6)', () => {
       expect(combined.bySubscription.get('sub-key-only')).toEqual({ occupied: 4, inRevocation: 0 });
       expect(combined.bySubscriptionPlan.get('sub-seat:plan-1')).toBe(2);
     });
+
+    it('uses 0 from device_activation_occupied when a K4 lot has no open keys even if seatMap reported a closed assignment', async () => {
+      const { listener, capacity, deviceActivations } = setup(['lot-empty']);
+      (capacity.occupancyOfMany as jest.Mock).mockResolvedValueOnce(
+        new Map([['lot-empty', { occupied: 1, inRevocation: 0 }]]),
+      );
+      (deviceActivations.occupiedBySubscriptions as jest.Mock).mockResolvedValueOnce(new Map());
+
+      const merged = await listener.seatsOfSubscriptions(['lot-empty'], day);
+      expect(merged.get('lot-empty')).toEqual({ occupied: 0, inRevocation: 0 });
+    });
   });
 });

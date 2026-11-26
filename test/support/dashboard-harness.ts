@@ -84,11 +84,15 @@ export class DashboardHarness extends NoticeHarness {
         ...(end ? { expected_end_date: end } : {}),
       },
     ]);
-    const found = (
+    let found = (
       await this.assignmentsOf(
         target.subscriptionId ? { subscriptionId: target.subscriptionId } : { planId: target.planId ?? '' },
       )
     ).find((assignment) => assignment.employeeId === person.employeeId);
+    if (!found && target.subscriptionId) {
+      const planId = await this.planOf(target.subscriptionId);
+      found = (await this.assignmentsOf({ planId })).find((assignment) => assignment.employeeId === person.employeeId);
+    }
     if (!found) throw new Error(`no seat of ${code}`);
 
     return found.id;

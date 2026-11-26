@@ -108,6 +108,7 @@ export function countOpenTasksByLotDetailed(
     legacySubscriptionId: string | null;
     free: number;
     keysInStore: number;
+    excessCap?: number;
   }[],
   tasks: readonly { taskId: string; requestId: string | null; subscriptionId: string | null; createdAt: Date }[],
 ): Map<string, { total: number; excess: number }> {
@@ -177,6 +178,7 @@ function tallyFifoTasks(
     requestId: string | null;
     free: number;
     keysInStore: number;
+    excessCap?: number;
   }[],
   remainingTasks: readonly { taskId: string; requestId: string | null; createdAt: Date }[],
   counts: Map<string, { total: number; excess: number }>,
@@ -189,10 +191,18 @@ function tallyFifoTasks(
       ? a.createdAt.getTime() - b.createdAt.getTime()
       : a.taskId.localeCompare(b.taskId),
   );
-  for (let i = 0; i < orderedTasks.length; i += 1) {
-    const target = orderedLots.find((l) => Math.min(l.free, l.keysInStore) - (counts.get(l.id)?.total ?? 0) > 0);
+  for (const task of orderedTasks) {
+    const target = orderedLots.find((l) => {
+      const entry = counts.get(l.id);
+      if (Math.min(l.free, l.keysInStore) - (entry?.total ?? 0) <= 0) return false;
+      if (l.purpose === 'REQUEST' && task.requestId !== l.requestId && l.excessCap !== undefined) {
+        return (entry?.excess ?? 0) < l.excessCap;
+      }
+
+      return true;
+    });
     if (!target) break;
-    addTaskCount(counts, target, orderedTasks[i]);
+    addTaskCount(counts, target, task);
   }
 }
 

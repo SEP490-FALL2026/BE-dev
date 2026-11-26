@@ -505,7 +505,7 @@ describe('W3-23 P13b: K1 annual allocations, 01/01 pairing, F8 transfer (D-16), 
     );
     await h.ctx.sql.query(
       `INSERT INTO invoice_year_applications (id, invoice_id, year, cost_center_id, commitment_id, source, applied_minor, tax_variance_minor)
-       VALUES (gen_random_uuid(), $1, $2, $3, $4, 'TRANSFER'::"InvoiceYearApplicationSource", -100000, 0)`,
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, 'TRANSFER', -100000, 0)`,
       [invId, Y2, unit.department.unitId, cRows[0].id],
     );
     expect(
@@ -547,7 +547,15 @@ describe('W3-23 P13b: K1 annual allocations, 01/01 pairing, F8 transfer (D-16), 
       commit2027: true,
       commit2027AmountMinor: 4_800_000n,
     });
-    const invId = await confirmK1Invoice(s.requestId, s.assignmentId, s.purchaseInvoiceId, oldUnit.department.unitId);
+    const invId = await confirmK1Invoice(
+      s.requestId,
+      s.assignmentId,
+      s.purchaseInvoiceId,
+      oldUnit.department.unitId,
+      '2026-11-01',
+      NET_ANNUAL,
+      0n,
+    );
 
     const { rows: beforeRows } = await h.ctx.sql.query<{ state: string; applied_minor: string }>(
       `SELECT state::text, applied_minor::text FROM budget_commitments WHERE request_id = $1 AND year = $2`,
