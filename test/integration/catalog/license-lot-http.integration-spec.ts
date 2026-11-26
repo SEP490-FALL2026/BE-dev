@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { ApiAccount, adminToken, createActivatedAccount } from '../../support/api-accounts';
 import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from '../../support/http-test-app';
-import { declareApplication } from '../../support/builders/catalog.builder';
+import { declareApplication, declareSubscription } from '../../support/builders/catalog.builder';
 
 interface LotWire {
   id: string;
@@ -231,21 +231,53 @@ describe('the lots of licenses over HTTP (integration, real PostgreSQL)', () => 
     expect(again.changed).toBe(false);
   });
 
-  it('still takes the keys of a lot by the old route that names the purchase, and answers 404 for an id that is not a lot', async () => {
+  it('refuses a new lot without legacySubscriptionId on the old import route (404), and restricts legacy lots to the responsible IT Admin (403)', async () => {
     const lot = await makeLot();
+    const legacyId = await declareSubscription(ctx, it1.accessToken, {
+      planId: await plan(),
+      kind: 'PERPETUAL',
+      purchasedQuantity: 3,
+      unitPrice: { amount: '5000000', currency: 'VND' },
+      startDate: '2026-01-05',
+    });
+
+    expect(
+      codeOf(
+        await request(server())
+          .post('/api/v1/license-keys/imports')
+          .set(as(it1.accessToken))
+          .send({ subscriptionId: lot.id, keys: keysOf(1, 'F') })
+          .expect(404),
+      ),
+    ).toBe('LICENSE_LOT.NOT_FOUND');
+
+    expect(
+      codeOf(
+        await request(server())
+          .post('/api/v1/license-keys/imports')
+          .set(as(it2.accessToken))
+          .send({ subscriptionId: legacyId, keys: keysOf(1, 'G') })
+          .expect(403),
+      ),
+    ).toBe('LICENSE_LOT.NOT_RESPONSIBLE');
 
     const imported = dataOf<{ imported: number }>(
       await request(server())
         .post('/api/v1/license-keys/imports')
-        .set(as(it2.accessToken))
-        .send({ subscriptionId: lot.id, keys: keysOf(1, 'F') })
+        .set(as(it1.accessToken))
+        .send({ subscriptionId: legacyId, keys: keysOf(1, 'H') })
         .expect(201),
     );
     expect(imported.imported).toBe(1);
-    await request(server())
-      .post('/api/v1/license-keys/imports')
-      .set(as(it1.accessToken))
-      .send({ subscriptionId: '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11', keys: keysOf(1, 'G') })
-      .expect(404);
+
+    expect(
+      codeOf(
+        await request(server())
+          .post('/api/v1/license-keys/imports')
+          .set(as(it1.accessToken))
+          .send({ subscriptionId: '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11', keys: keysOf(1, 'I') })
+          .expect(404),
+      ),
+    ).toBe('LICENSE_LOT.NOT_FOUND');
   });
 });

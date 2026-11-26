@@ -13,6 +13,7 @@ import {
   LicenseKeyLotNotResponsibleError,
   LicenseKeyPlanHasNoKeysError,
 } from './license-key.errors';
+import { toLicenseKeyApiException } from './license-key.http-errors';
 import type { LicenseKeyRepo } from './license-key.repo';
 import type { LicenseKeyCipher } from './license-key-cipher.service';
 import type { LicenseKeyImportSettingsService } from './license-key-import-settings.service';
@@ -124,11 +125,32 @@ describe('LicenseLotKeyImportService (the keys of a lot of licenses)', () => {
     ).rejects.toThrow(LicenseKeyLotNotResponsibleError);
   });
 
-  it('leaves the old route open to every IT Admin', async () => {
-    const { service } = setup(lotOf({ responsibleItAdminEmployeeId: 'emp-other' }));
+  it('requires the responsible IT Admin and a legacy subscription lot when importing via the old route', async () => {
+    const notResponsibleErr = await setup(
+      lotOf({ legacySubscriptionId: 'lot-1', responsibleItAdminEmployeeId: 'emp-other' }),
+    )
+      .service.import(actor, 'lot-1', { keys: ['AAAA-0001'] }, { responsibleOnly: true, legacyOnly: true })
+      .catch((e: unknown) => e);
+    expect(notResponsibleErr).toBeInstanceOf(LicenseKeyLotNotResponsibleError);
+    expect(
+      (toLicenseKeyApiException(notResponsibleErr) as { getResponse?: () => { code?: string } }).getResponse?.().code,
+    ).toBe('LICENSE_LOT.NOT_RESPONSIBLE');
+
+    const notFoundErr = await setup(lotOf({ legacySubscriptionId: null }))
+      .service.import(actor, 'lot-1', { keys: ['AAAA-0001'] }, { responsibleOnly: true, legacyOnly: true })
+      .catch((e: unknown) => e);
+    expect(notFoundErr).toBeInstanceOf(LicenseKeyLotNotFoundError);
+    expect(
+      (toLicenseKeyApiException(notFoundErr) as { getResponse?: () => { code?: string } }).getResponse?.().code,
+    ).toBe('LICENSE_LOT.NOT_FOUND');
 
     await expect(
-      service.import(actor, 'lot-1', { keys: ['AAAA-0001'] }, { responsibleOnly: false }),
+      setup(lotOf({ legacySubscriptionId: 'lot-1' })).service.import(
+        actor,
+        'lot-1',
+        { keys: ['AAAA-0001'] },
+        { responsibleOnly: true, legacyOnly: true },
+      ),
     ).resolves.toMatchObject({
       imported: 1,
     });

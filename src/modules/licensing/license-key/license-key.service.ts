@@ -70,8 +70,9 @@ export class LicenseKeyService {
   ) {}
 
   /**
-   * Keeps every valid key of the batch in the lot born from this subscription and reports each line that was not kept (the route of wave 2, open to every IT Admin;
-   * the route of the lot is `LicenseLotKeyImportService` too). Throws LicenseKeyLotNotFoundError for a purchase that is no lot, and the errors of
+   * Keeps every valid key of the batch in the lot born from this legacy subscription and reports each line that was not kept.
+   * Only the IT Admin who answers for the lot may import into it, and only lots with `legacySubscriptionId === input.subscriptionId`
+   * are accepted on this legacy route. Throws LicenseKeyLotNotFoundError, LicenseKeyLotNotResponsibleError, and the errors of
    * `LicenseLotKeyImportService.import`.
    */
   import(
@@ -83,7 +84,7 @@ export class LicenseKeyService {
       initialActivationsUsed?: number;
     },
   ): Promise<ImportResult> {
-    return this.lotKeys.import(actor, input.subscriptionId, input, { responsibleOnly: false });
+    return this.lotKeys.import(actor, input.subscriptionId, input, { responsibleOnly: true, legacyOnly: true });
   }
 
   /** The keys of a purchase, masked, with the capacity they give and what their activations say. Throws SeatTargetNotFoundError. */

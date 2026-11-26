@@ -65,18 +65,18 @@ export class LicenseLotKeyImportService {
 
   /**
    * Keeps every valid key of the batch in the lot and reports each line that was not kept; a wrong line never spoils the others. One cap of activations and
-   * one count of activations already used for the whole batch. `responsibleOnly` is the route of the lot, which only the IT Admin who answers for it uses; the route
-   * of wave 2 stays open to every IT Admin. Throws LicenseKeyLotNotFoundError, LicenseKeyLotNotResponsibleError, LicenseKeyLotKeysExceedLicensesError,
-   * LicenseKeyPlanHasNoKeysError, LicenseKeyApplicationRetiredError, LicenseKeyInitializationClosedError, LicenseKeyInitialActivationsOnAccountPlanError and
-   * LicenseKeyInitialActivationsExceedMaxError; nothing is kept then.
+   * one count of activations already used for the whole batch. `responsibleOnly` restricts imports to the IT Admin who answers for the lot; `legacyOnly` restricts
+   * the legacy import route to lots whose `legacySubscriptionId` matches `lotId`. Throws LicenseKeyLotNotFoundError, LicenseKeyLotNotResponsibleError,
+   * LicenseKeyLotKeysExceedLicensesError, LicenseKeyPlanHasNoKeysError, LicenseKeyApplicationRetiredError, LicenseKeyInitializationClosedError,
+   * LicenseKeyInitialActivationsOnAccountPlanError and LicenseKeyInitialActivationsExceedMaxError; nothing is kept then.
    */
   async import(
     actor: AuthenticatedPrincipal,
     lotId: string,
     input: { keys: readonly string[]; maxActivations?: number; initialActivationsUsed?: number },
-    options: { responsibleOnly: boolean },
+    options: { responsibleOnly: boolean; legacyOnly?: boolean },
   ): Promise<ImportResult> {
-    if (!(await this.lots.findLot(lotId))) throw new LicenseKeyLotNotFoundError();
+    this.requireMatchingLot(await this.lots.findLot(lotId), lotId, options);
     const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('A license key was imported before installation');
     const { rows, errors } = judgeBatch(input.keys);
@@ -88,34 +88,15 @@ export class LicenseLotKeyImportService {
 
     const stored = await this.runner.run(async (tx) => {
       const initialActivationsUsed = await this.importSettings.initialActivationsUsed(tx, input.initialActivationsUsed);
-      const held = await this.lots.lockLot(tx, lotId);
-      if (!held) throw new LicenseKeyLotNotFoundError();
+      const held = this.requireMatchingLot(await this.lots.lockLot(tx, lotId), lotId, options);
       await this.assertImportable(tx, held, actor, options, sealed.length);
       const maxActivations = await this.importSettings.maxActivations(tx, held.planId, input.maxActivations);
       assertInitialActivationsAllowed({ initial: initialActivationsUsed, maxActivations, keyBinding: held.keyBinding });
 
-      // One statement for the whole batch (a thousand round trips outlasted the transaction on a busy server).
-      const keptIds = await this.repo.insertManyIfNew(
-        tx,
-        sealed.map((row) => {
-          const { keyId, ciphertext } = this.cipher.encrypt(row.id, row.key);
-
-          return {
-            id: row.id,
-            organizationId: organization.id,
-            subscriptionId: held.legacySubscriptionId,
-            licenseLotId: held.id,
-            costBorne: held.purpose !== 'REQUEST',
-            fingerprint: row.fingerprint,
-            masked: maskKey(row.key),
-            ciphertext,
-            cipherKeyId: keyId,
-            importedByAppUserId: actor.appUserId,
-            maxActivations,
-            initialActivationsUsed,
-          };
-        }),
-      );
+      const keptIds = await this.insertBatch(tx, held, organization.id, actor.appUserId, sealed, {
+        maxActivations,
+        initialActivationsUsed,
+      });
       let kept = 0;
       for (const row of sealed) {
         if (keptIds.has(row.id)) kept += 1;
@@ -136,6 +117,48 @@ export class LicenseLotKeyImportService {
     });
 
     return { imported: stored.kept, errors: lines.sort((a, b) => a.line - b.line), summary: stored.summary };
+  }
+
+  private requireMatchingLot(
+    lot: LicenseLotView | null,
+    lotId: string,
+    options: { legacyOnly?: boolean },
+  ): LicenseLotView {
+    if (!lot || (options.legacyOnly && lot.legacySubscriptionId !== lotId)) throw new LicenseKeyLotNotFoundError();
+
+    return lot;
+  }
+
+  private insertBatch(
+    tx: DbTx,
+    held: LicenseLotView,
+    organizationId: string,
+    importedByAppUserId: string,
+    sealed: readonly { id: string; fingerprint: string; key: string }[],
+    settings: { maxActivations: number; initialActivationsUsed: number },
+  ): Promise<Set<string>> {
+    // One statement for the whole batch (a thousand round trips outlasted the transaction on a busy server).
+    return this.repo.insertManyIfNew(
+      tx,
+      sealed.map((row) => {
+        const { keyId, ciphertext } = this.cipher.encrypt(row.id, row.key);
+
+        return {
+          id: row.id,
+          organizationId,
+          subscriptionId: held.legacySubscriptionId,
+          licenseLotId: held.id,
+          costBorne: held.purpose !== 'REQUEST',
+          fingerprint: row.fingerprint,
+          masked: maskKey(row.key),
+          ciphertext,
+          cipherKeyId: keyId,
+          importedByAppUserId,
+          maxActivations: settings.maxActivations,
+          initialActivationsUsed: settings.initialActivationsUsed,
+        };
+      }),
+    );
   }
 
   /** The purchase a list of keys is read for: its lot when it is one, else the subscription of wave 2. Throws SeatTargetNotFoundError. */
