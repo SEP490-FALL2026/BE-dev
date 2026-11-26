@@ -76,6 +76,7 @@ export class WorkspaceViewService {
 
   /** The context of these workspaces, built with one read of the names, one of the accounts and one of the counts, whatever their number. */
   private async contexts(records: readonly WorkspaceRecord[], tx?: DbTx): Promise<Map<string, WorkspaceContext>> {
+    if (records.length === 0) return new Map();
     const everyone = [...new Set(records.flatMap(peopleOf))];
     const employees = everyone.length > 0 ? await this.organizationReads.getEmployees(everyone, tx) : [];
     const names = new Map(employees.map((employee) => [employee.id, employee.fullName]));
@@ -83,7 +84,12 @@ export class WorkspaceViewService {
       [...new Set(records.flatMap((record) => record.admins.map((admin) => admin.employeeId)))],
       tx,
     );
-    const counts = await this.repo.subscriptionCountsOf(records.map((record) => record.id));
+    const today = await this.organizationReads.businessToday(new Date(), tx);
+    const counts = await this.repo.subscriptionCountsOf(
+      records.map((record) => record.id),
+      today,
+      tx,
+    );
 
     return new Map(
       records.map((record) => [record.id, { names, working, subscriptionCount: counts.get(record.id) ?? 0 }]),

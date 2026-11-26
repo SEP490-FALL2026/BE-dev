@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../../generated/prisma/client';
-import { fromDateColumn, toDateColumn } from '../../../core/business-date';
+import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/business-date';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
@@ -246,11 +246,28 @@ export class WorkspaceRepo {
   }
 
   /**
-   * How many subscriptions each of these workspaces holds. No subscription belongs to a workspace until the column that says so exists (the
-   * package that adds it fills this in), so every workspace holds none.
+   * How many live subscriptions each of these workspaces holds on `today`: unclosed (`closed_at IS NULL`) drafts, or active periods not continued
+   * by a later period (`renewed_from_id`) and not past their `end_date` (perpetuals have no end). Matches `isLiveSubscription` + `closed_at IS NULL`.
    */
-  subscriptionCountsOf(ids: readonly string[]): Promise<Map<string, number>> {
-    return Promise.resolve(new Map(ids.map((id) => [id, 0])));
+  async subscriptionCountsOf(ids: readonly string[], today: BusinessDate, tx?: DbTx): Promise<Map<string, number>> {
+    if (ids.length === 0) return new Map();
+    const rows = await (tx ?? this.prisma).$queryRaw<{ workspace_id: string; total: number }[]>`
+      SELECT s.workspace_id, count(*)::int AS total
+        FROM subscriptions s
+       WHERE s.workspace_id = ANY(${[...ids]}::uuid[])
+         AND s.closed_at IS NULL
+         AND (
+           s.status = 'DRAFT'
+           OR (
+             s.status = 'ACTIVE'
+             AND NOT EXISTS (SELECT 1 FROM subscriptions n WHERE n.renewed_from_id = s.id)
+             AND (s.kind = 'PERPETUAL' OR s.end_date IS NULL OR s.end_date >= ${today}::date)
+           )
+         )
+       GROUP BY s.workspace_id`;
+    const byId = new Map(rows.map((row) => [row.workspace_id, row.total]));
+
+    return new Map(ids.map((id) => [id, byId.get(id) ?? 0]));
   }
 
   /** Display names keyed by id for these workspaces (absent ids are omitted). */

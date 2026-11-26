@@ -40,11 +40,17 @@ describe('WorkspaceViewService', () => {
         ? jest.fn().mockRejectedValue(options.lockFails)
         : jest.fn().mockResolvedValue(undefined),
     } as unknown as OrganizationReadApi;
+    const subscriptionCountsOf = jest.fn().mockResolvedValue(new Map([['ws-1', 2]]));
     const repo = {
-      subscriptionCountsOf: jest.fn().mockResolvedValue(new Map([['ws-1', 3]])),
+      subscriptionCountsOf,
     } as unknown as WorkspaceRepo;
 
-    return { service: new WorkspaceViewService(repo, organizationReads, identity), identity, organizationReads };
+    return {
+      service: new WorkspaceViewService(repo, organizationReads, identity),
+      identity,
+      organizationReads,
+      subscriptionCountsOf,
+    };
   }
 
   const workspace = {
@@ -137,7 +143,7 @@ describe('WorkspaceViewService', () => {
   });
 
   it('builds the rows and the detail with the names, the accounts and the counts read once', async () => {
-    const { service, organizationReads } = setup({ usable: ['khoa'] });
+    const { service, organizationReads, subscriptionCountsOf } = setup({ usable: ['khoa'] });
 
     const [row] = await service.summaries([workspace], tx);
     const detail = await service.detail(workspace, tx);
@@ -146,9 +152,10 @@ describe('WorkspaceViewService', () => {
       id: 'ws-1',
       adminCount: 2,
       workingAdminCount: 1,
-      subscriptionCount: 3,
+      subscriptionCount: 2,
       flags: ['ADMINS_BELOW_MINIMUM'],
     });
+    expect(subscriptionCountsOf).toHaveBeenCalledWith(['ws-1'], '2026-12-09', tx);
     expect(detail.admins.map((admin) => admin.name)).toEqual(['Khoa', 'Nam']);
     expect((organizationReads as unknown as { getEmployees: jest.Mock }).getEmployees).toHaveBeenCalledTimes(2);
   });
