@@ -108,11 +108,33 @@ describe('W3-25 P20: license-lot charges, 3-order allocation invariant (= A), an
         h.finance.appUserId,
       ],
     );
-    for (let i = 0; i < members.length; i += 1) {
+    if (opts.type === 'GROUP_GRANT') {
+      const needStepId = randomUUID();
       await h.ctx.sql.query(
-        `INSERT INTO access_request_beneficiaries (request_id, employee_id, position) VALUES ($1, $2, $3)`,
-        [requestId, members[i], i + 1],
+        `INSERT INTO access_request_steps
+           (id, request_id, kind, sequence, state, assignee_employee_id, routing_row, sla_working_days, assigned_at, decided_at)
+         VALUES ($1, $2, 'NEED', 1, 'APPROVED', $3, 1, 3, now(), now())`,
+        [needStepId, requestId, opts.unit.head.employeeId],
       );
+      for (let i = 0; i < members.length; i += 1) {
+        await h.ctx.sql.query(
+          `WITH b AS (
+             INSERT INTO access_request_beneficiaries (request_id, employee_id, position)
+             VALUES ($1, $2, $3)
+             RETURNING request_id, employee_id
+           )
+           INSERT INTO access_request_lines (request_id, employee_id, state, need_step_id)
+           SELECT request_id, employee_id, 'APPROVED', $4 FROM b`,
+          [requestId, members[i], i + 1, needStepId],
+        );
+      }
+    } else {
+      for (let i = 0; i < members.length; i += 1) {
+        await h.ctx.sql.query(
+          `INSERT INTO access_request_beneficiaries (request_id, employee_id, position) VALUES ($1, $2, $3)`,
+          [requestId, members[i], i + 1],
+        );
+      }
     }
     await h.ctx.sql.query(
       `INSERT INTO budget_commitments

@@ -341,10 +341,11 @@ describe('the licenses of a lot (integration, real PostgreSQL & real services, F
       ctx.sql.query(`UPDATE license_keys SET license_lot_id = $2 WHERE id = $1`, [account.keyIds[0], otherLotId]),
     ).rejects.toMatchObject({ code: '55000', constraint: 'license_key_columns_fixed' });
     await expect(
-      ctx.sql.query(`UPDATE license_lots SET purpose = 'REQUEST', request_id = $2 WHERE id = $1`, [
-        machine.lotId,
-        randomUUID(),
-      ]),
+      ctx.sql.query(
+        `INSERT INTO license_lots (id, organization_id, plan_id, purchased_on, license_count, unit_price_minor, purpose, request_id, updated_at)
+         VALUES (gen_random_uuid(), $1, $2, '2026-09-01', 1, 1000000, 'REQUEST', $3, now())`,
+        [seed.organizationId, machine.planId, randomUUID()],
+      ),
     ).rejects.toMatchObject({ constraint: 'license_lots_purpose_binding' });
     // T-9: STOCK is valid for ACCOUNT K4 plans.
     await expect(

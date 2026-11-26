@@ -81,9 +81,10 @@ describe('lot invoice confirmation vs group member withdrawal race (integration,
     const checkId = randomUUID();
     await h.ctx.sql.query(
       `INSERT INTO request_budget_checks
-         (id, organization_id, request_id, number, trigger, route, stale_cost_evidence, plan_line_overdue,
-          period_closed, off_plan, currency, binding_total_minor, ran_by_employee_id)
-       VALUES ($1, $2, $3, 1, 'SUBMISSION', 'SPEND_APPROVAL', false, false, false, false, 'VND', $4, $5)`,
+         (id, organization_id, request_id, number, trigger, route, outcome, stale_cost_evidence,
+          plan_line_overdue, period_closed, off_plan, currency, binding_total_minor, ran_by_employee_id)
+       VALUES ($1, $2, $3, 1, 'SUBMISSION', 'SPEND_APPROVAL', 'WITHIN_BASE'::"BudgetCheckOutcome",
+               false, false, false, false, 'VND', $4, $5)`,
       [checkId, h.seed.organizationId, reqId, totalMinor, h.boss.employeeId],
     );
     await h.ctx.sql.query(
@@ -93,12 +94,14 @@ describe('lot invoice confirmation vs group member withdrawal race (integration,
     );
     for (let i = 0; i < members.length; i += 1) {
       await h.ctx.sql.query(
-        `INSERT INTO access_request_beneficiaries (request_id, employee_id, position) VALUES ($1, $2, $3)`,
-        [reqId, members[i], i + 1],
-      );
-      await h.ctx.sql.query(
-        `INSERT INTO access_request_lines (request_id, employee_id, state, need_step_id) VALUES ($1, $2, 'APPROVED', $3)`,
-        [reqId, members[i], needStepId],
+        `WITH b AS (
+           INSERT INTO access_request_beneficiaries (request_id, employee_id, position)
+           VALUES ($1, $2, $3)
+           RETURNING request_id, employee_id
+         )
+         INSERT INTO access_request_lines (request_id, employee_id, state, need_step_id)
+         SELECT request_id, employee_id, 'APPROVED', $4 FROM b`,
+        [reqId, members[i], i + 1, needStepId],
       );
       await h.ctx.sql.query(
         `INSERT INTO access_request_line_amounts (request_id, employee_id, budget_year, amount_minor, currency, held)

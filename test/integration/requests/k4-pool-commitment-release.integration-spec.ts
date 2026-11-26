@@ -180,9 +180,10 @@ describe('BR-MF1-09: the commitment of a K4 request granted from the key pool (i
     const checkId = randomUUID();
     await h.ctx.sql.query(
       `INSERT INTO request_budget_checks
-         (id, organization_id, request_id, number, trigger, route, stale_cost_evidence, plan_line_overdue,
-          period_closed, off_plan, currency, binding_total_minor, ran_by_employee_id)
-       VALUES ($1, $2, $3, 1, 'SUBMISSION', 'SPEND_APPROVAL', false, false, false, false, 'VND', 24000000, $4)`,
+         (id, organization_id, request_id, number, trigger, route, outcome, stale_cost_evidence,
+          plan_line_overdue, period_closed, off_plan, currency, binding_total_minor, ran_by_employee_id)
+       VALUES ($1, $2, $3, 1, 'SUBMISSION', 'SPEND_APPROVAL', 'WITHIN_BASE'::"BudgetCheckOutcome",
+               false, false, false, false, 'VND', 24000000, $4)`,
       [checkId, h.seed.organizationId, reqDuc, h.boss.employeeId],
     );
     await h.ctx.sql.query(
@@ -192,12 +193,14 @@ describe('BR-MF1-09: the commitment of a K4 request granted from the key pool (i
     );
     for (let i = 0; i < members.length; i += 1) {
       await h.ctx.sql.query(
-        `INSERT INTO access_request_beneficiaries (request_id, employee_id, position) VALUES ($1, $2, $3)`,
-        [reqDuc, members[i], i + 1],
-      );
-      await h.ctx.sql.query(
-        `INSERT INTO access_request_lines (request_id, employee_id, state, need_step_id) VALUES ($1, $2, 'APPROVED', $3)`,
-        [reqDuc, members[i], needStepId],
+        `WITH b AS (
+           INSERT INTO access_request_beneficiaries (request_id, employee_id, position)
+           VALUES ($1, $2, $3)
+           RETURNING request_id, employee_id
+         )
+         INSERT INTO access_request_lines (request_id, employee_id, state, need_step_id)
+         SELECT request_id, employee_id, 'APPROVED', $4 FROM b`,
+        [reqDuc, members[i], i + 1, needStepId],
       );
       await h.ctx.sql.query(
         `INSERT INTO access_request_line_amounts (request_id, employee_id, budget_year, amount_minor, currency, held)
