@@ -9,6 +9,7 @@ import {
   type PendingSpendContributions,
 } from '../public/budgets.extension-points';
 import type { SeatMonthRepo } from '../seat-month/seat-month.repo';
+import type { RunningUncommittedFactsService } from '../running-uncommitted/running-uncommitted-facts.service';
 import { BudgetReviewFiguresService } from './budget-review-figures.service';
 import { BudgetReviewPriceService } from './budget-review-price.service';
 import { knownPriceIncrease } from './budget-review.policy';
@@ -204,6 +205,7 @@ describe('BudgetReviewFiguresService (W3-07 Q-G priorYearReleasedMinor)', () => 
       { totals: jest.fn().mockResolvedValue(new Map()) } as unknown as PendingSpendContributions,
       { itemsOf: jest.fn().mockResolvedValue(new Map()) } as unknown as BudgetReviewPriceService,
       {} as SeatMonthRepo,
+      { ofYear: jest.fn().mockResolvedValue(new Map()) } as unknown as RunningUncommittedFactsService,
     );
 
     return { service, budgets };
