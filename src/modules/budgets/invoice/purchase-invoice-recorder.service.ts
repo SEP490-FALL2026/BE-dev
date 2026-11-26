@@ -1,4 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { DONG } from '../../../core/money/money';
 import { Prisma } from '../../../generated/prisma/client';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
@@ -43,7 +43,7 @@ export class PurchaseInvoiceRecorderService {
     private readonly thresholds: ThresholdAlertService,
     private readonly allocations: InvoiceAllocationRepo,
     private readonly yearApplications: InvoiceYearApplicationRepo,
-    @Optional() private readonly lotInvoices?: LicenseLotInvoiceService,
+    private readonly lotInvoices: LicenseLotInvoiceService,
   ) {}
 
   /** Throws PurchaseInvoiceRecordRefusedError. */
@@ -118,7 +118,7 @@ export class PurchaseInvoiceRecorderService {
 
   /** Compensates a confirmed `REQUEST` lot invoice on group member withdrawal (`F13c`, `D-16`). */
   recordLotWithdrawalAfterInvoice(tx: DbTx, input: LotWithdrawalAfterInvoiceInput): Promise<void> {
-    return this.lotInvoices ? this.lotInvoices.recordLotWithdrawalAfterInvoice(tx, input) : Promise.resolve();
+    return this.lotInvoices.recordLotWithdrawalAfterInvoice(tx, input);
   }
 
   private async recordLotIfPresent(
@@ -126,7 +126,7 @@ export class PurchaseInvoiceRecorderService {
     actor: AuthenticatedPrincipal,
     input: PurchaseInvoiceRecordInput,
   ): Promise<PurchaseInvoiceRecorded | null> {
-    if (!input.licenseLotId || !this.lotInvoices) return null;
+    if (!input.licenseLotId) return null;
 
     return this.lotInvoices.recordLotInvoiceConfirmation(tx, actor, input);
   }

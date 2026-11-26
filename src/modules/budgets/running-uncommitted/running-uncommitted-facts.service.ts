@@ -51,9 +51,7 @@ export class RunningUncommittedFactsService {
     if (year !== todayYear && year !== todayYear + 1) return empty;
 
     const seats = await this.licensing.getSeatsInForceOn(resolvedToday, tx);
-    const k1Seats = this.licensing.getUnrequestedK1SeatsInForceOn
-      ? await this.licensing.getUnrequestedK1SeatsInForceOn(resolvedToday, tx)
-      : [];
+    const k1Seats = await this.licensing.getUnrequestedK1SeatsInForceOn(resolvedToday, tx);
     if (seats.length === 0 && k1Seats.length === 0) return empty;
 
     const ccByEntity = await this.resolveSeatCostCenters([...seats, ...k1Seats], resolvedToday, tx);

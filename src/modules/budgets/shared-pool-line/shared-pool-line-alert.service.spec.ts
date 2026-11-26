@@ -2,6 +2,7 @@ import type { DbTx, TransactionRunner } from '../../../infrastructure/database/t
 import type { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import type { NotificationsApi } from '../../notifications/public/notifications.api';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import type { LicenseLotCostService } from './license-lot-cost.service';
 import { SharedPoolLineAlertService } from './shared-pool-line-alert.service';
 import type { SharedPoolLineDetail, SharedPoolLineFactsService } from './shared-pool-line-facts.service';
 
@@ -43,12 +44,16 @@ describe('SharedPoolLineAlertService (IDLE_SEAT_COST_RATIO_HIGH, R1)', () => {
     const runner = {
       run: jest.fn((fn: (tx: DbTx) => Promise<unknown>) => fn({} as DbTx)),
     };
+    const lotCosts = {
+      idleAlertsForMonth: jest.fn().mockResolvedValue([]),
+    };
     const service = new SharedPoolLineAlertService(
       facts as unknown as SharedPoolLineFactsService,
       identity as unknown as IdentityAccessApi,
       organizationReads as unknown as OrganizationReadApi,
       notifications as unknown as NotificationsApi,
       runner as unknown as TransactionRunner,
+      lotCosts as unknown as LicenseLotCostService,
     );
 
     return { service, identity, notifications, runner };

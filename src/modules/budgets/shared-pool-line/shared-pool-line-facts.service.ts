@@ -1,4 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { addDays, monthBoundsOf, type BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { SeatLedgerApi, type SubscriptionLineRecord } from '../../catalog/public/seat-ledger.api';
@@ -237,8 +237,8 @@ export class SharedPoolLineFactsService {
     private readonly periods: SubscriptionPeriodApi,
     private readonly licensing: LicensingSeatMonthApi,
     private readonly organizationReads: OrganizationReadApi,
-    @Optional() private readonly seatLedger?: SeatLedgerApi,
-    @Optional() private readonly lotCosts?: LicenseLotCostService,
+    private readonly seatLedger: SeatLedgerApi,
+    private readonly lotCosts: LicenseLotCostService,
   ) {}
 
   /** Shared-pool lines for `month`, sorted by subscription id, up to `limit`. */
@@ -338,12 +338,8 @@ export class SharedPoolLineFactsService {
     }
 
     const lineIds = activeLines.map(({ line }) => line.id);
-    const seatsMap = this.seatLedger
-      ? await this.seatLedger.seatsOnDays(lineIds, minFrom, monthEnd, tx)
-      : new Map<string, ReadonlyMap<BusinessDate, number | null>>();
-    const nextLineQNextMap = this.seatLedger
-      ? await this.seatLedger.nextLineQuantities(lineIds, tx)
-      : new Map<string, number>();
+    const seatsMap = await this.seatLedger.seatsOnDays(lineIds, minFrom, monthEnd, tx);
+    const nextLineQNextMap = await this.seatLedger.nextLineQuantities(lineIds, tx);
     const priorTargets =
       priorLineIds.length > 0 ? await this.licensing.getPriorLineTargets([...new Set(priorLineIds)], tx) : [];
 
@@ -387,10 +383,9 @@ export class SharedPoolLineFactsService {
           tx,
         )
       : { varianceMinor: 0n, varianceInReviewMinor: 0n };
-    const lotPool =
-      org && this.lotCosts
-        ? await this.lotCosts.poolTotalsInRange(org.id, `${year}-01-01`, nextStart, tx)
-        : { lotIdleNetMinor: 0n, deviceLotPurchasesMinor: 0n, replacementKeysMinor: 0n };
+    const lotPool = org
+      ? await this.lotCosts.poolTotalsInRange(org.id, `${year}-01-01`, nextStart, tx)
+      : { lotIdleNetMinor: 0n, deviceLotPurchasesMinor: 0n, replacementKeysMinor: 0n };
     const totalIdleMinor = idleCostMinor + lotPool.lotIdleNetMinor;
 
     return {

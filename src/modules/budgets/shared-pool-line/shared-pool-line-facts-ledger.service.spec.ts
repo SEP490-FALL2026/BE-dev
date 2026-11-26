@@ -5,6 +5,7 @@ import type { SubscriptionPeriodApi } from '../../catalog/public/subscription-pe
 import type { LicensingSeatMonthApi } from '../../licensing/public/licensing-seat-month.api';
 import type { SeatOfMonth } from '../../licensing/public/licensing-seat-month.types';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import type { LicenseLotCostService } from './license-lot-cost.service';
 import { SharedPoolLineFactsService } from './shared-pool-line-facts.service';
 import type { SharedPoolLineRepo } from './shared-pool-line.repo';
 
@@ -87,12 +88,18 @@ describe('SharedPoolLineFactsService — ledger & label (1) (W3-22 & B2-R7)', ()
       seatsOnDays: jest.fn().mockResolvedValue(new Map()),
       nextLineQuantities: jest.fn().mockResolvedValue(new Map()),
     };
+    const lotCosts = {
+      poolTotalsInRange: jest
+        .fn()
+        .mockResolvedValue({ lotIdleNetMinor: 0n, deviceLotPurchasesMinor: 0n, replacementKeysMinor: 0n }),
+    };
     const service = new SharedPoolLineFactsService(
       poolRepo as unknown as SharedPoolLineRepo,
       periods as unknown as SubscriptionPeriodApi,
       licensing as unknown as LicensingSeatMonthApi,
       organizationReads as unknown as OrganizationReadApi,
       seatLedger as unknown as SeatLedgerApi,
+      lotCosts as unknown as LicenseLotCostService,
     );
 
     return { service, poolRepo, periods, licensing, organizationReads, seatLedger };

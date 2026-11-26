@@ -1,4 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
@@ -21,7 +21,7 @@ export class SharedPoolLineAlertService {
     private readonly organizationReads: OrganizationReadApi,
     private readonly notifications: NotificationsApi,
     private readonly runner: TransactionRunner,
-    @Optional() private readonly lotCosts?: LicenseLotCostService,
+    private readonly lotCosts: LicenseLotCostService,
   ) {}
 
   /** Evaluates `month` (`YYYY-MM-01`) and delivers new `IDLE_SEAT_COST_RATIO_HIGH` and `LICENSE_LOT_IDLE_COST_HIGH` alerts; returns count written. */
@@ -32,7 +32,7 @@ export class SharedPoolLineAlertService {
     const exceeding = (await this.facts.linesOfMonth(month, undefined, MAX_ALERT_SUBSCRIPTIONS)).filter(
       (line) => line.exceedsIdleRatioThreshold,
     );
-    const exceedingLots = this.lotCosts ? await this.lotCosts.idleAlertsForMonth(org.id, month) : [];
+    const exceedingLots = await this.lotCosts.idleAlertsForMonth(org.id, month);
     if (exceeding.length === 0 && exceedingLots.length === 0) return 0;
 
     const { subDeliveries, lotDeliveries } = await this.buildDeliveries(exceeding, exceedingLots);

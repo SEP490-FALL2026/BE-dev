@@ -7,6 +7,7 @@ import type { PurchaseInvoiceRecordInput } from '../public/budgets.types';
 import type { ThresholdAlertService } from '../threshold/threshold-alert.service';
 import type { InvoiceAllocationRepo } from './invoice-allocation.repo';
 import type { InvoiceYearApplicationRepo } from './invoice-year-application.repo';
+import type { LicenseLotInvoiceService } from './license-lot-invoice.service';
 import { PurchaseInvoiceRecorderService } from './purchase-invoice-recorder.service';
 
 const ACTOR = { employeeId: 'finance-1', appUserId: 'u-1', roles: ['FINANCE'] } as unknown as AuthenticatedPrincipal;
@@ -77,6 +78,10 @@ function build(opts: { commitments?: ReturnType<typeof commitment>[] } = {}) {
     } as unknown as ThresholdAlertService,
     { lockK1AllocationYears, insertMany: allocInsertMany } as unknown as InvoiceAllocationRepo,
     { insert: appInsert } as unknown as InvoiceYearApplicationRepo,
+    {
+      recordLotInvoiceConfirmation: jest.fn(),
+      recordLotWithdrawalAfterInvoice: jest.fn().mockResolvedValue(undefined),
+    } as unknown as LicenseLotInvoiceService,
   );
 
   return { service, calls, lockOfRequest, applyInvoice, insert, lockK1AllocationYears, allocInsertMany, appInsert };
