@@ -201,7 +201,7 @@ describe('progress of the departures and the transfers on the overviews (integra
 
       await request(h.server())
         .post(`/api/v1/offboarding-cases/${wire.id}/it-admin-handover`)
-        .set(h.as(leaver.account))
+        .set(h.as(h.sa))
         .send({ toItAdminEmployeeId: it1.employeeId })
         .expect(200);
       expect((await progressOf(OVERVIEW_PATHS.superAdmin, h.sa)).sections.departures.itHandoverPending.count).toBe(0);
@@ -363,7 +363,7 @@ describe('progress of the departures and the transfers on the overviews (integra
 
       await request(h.server())
         .post(`/api/v1/department-transfers/${transfer.id}/revocations`)
-        .set(h.as(it1))
+        .set(h.as(it2.account))
         .expect(200);
 
       const after = (await progressOf(OVERVIEW_PATHS.itAdmin, it1)).sections.transfers.revocationFailed.count ?? 0;
