@@ -6,7 +6,6 @@ import { CatalogApi } from '../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
-import { monthlyPriceOf } from '../access-request/pricing.policy';
 import { pricedPeople } from '../access-request/group-request.types';
 import { RequestTermEndsService } from '../repricing/request-term-ends.service';
 import { SpendEffectsService } from '../spend-effects/spend-effects.service';
@@ -140,12 +139,7 @@ export class GroupSpendHold {
   }
 
   private savedMonthlyPriceOf(pricing: AccessRequestRecord['pricing']): bigint | undefined {
-    if (pricing.monthlyPriceMinor !== undefined && pricing.monthlyPriceMinor !== null) {
-      return pricing.monthlyPriceMinor;
-    }
-    if (pricing.unitPrice === null) return undefined;
-
-    return monthlyPriceOf({ unitPrice: pricing.unitPrice, billingCycle: pricing.billingCycle })?.amountMinor;
+    return pricing.monthlyPriceMinor ?? undefined;
   }
 
   private planPricingFacts(tx: DbTx, request: AccessRequestRecord) {

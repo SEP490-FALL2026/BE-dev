@@ -64,6 +64,14 @@ export type Pricing =
 /** Whole minor units, rounded up once (`R-B01`) for non-K1/K2 callers without `monthlyPriceMinor` (quotes). */
 const ceilDiv = (numerator: bigint, denominator: bigint): bigint => (numerator + denominator - 1n) / denominator;
 
+/** Monthly price rounded up once to the minor unit, used for quotes and non-catalog recurring items (`QĐ-113a`, `BR-MF1-06d`). */
+export function ceilMonthlyPriceOf(unitPrice: Money, billingCycle: Exclude<BillingCycleCode, 'OTHER'>): Money {
+  return {
+    amountMinor: ceilDiv(unitPrice.amountMinor, BigInt(CYCLE_MONTHS[billingCycle])),
+    currency: unitPrice.currency,
+  };
+}
+
 function legacySeatMonthlyOf(unitPrice?: Money | null, billingCycle?: BillingCycleCode | null): bigint | null {
   if (!unitPrice || !billingCycle || billingCycle === 'OTHER') return null;
 

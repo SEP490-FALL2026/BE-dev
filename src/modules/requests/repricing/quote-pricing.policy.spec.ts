@@ -1,6 +1,6 @@
 import type { BusinessDate } from '../../../core/business-date';
 import type { Quote } from '../access-request/assessment-record.types';
-import { priceFromQuote, type QuotePricingInput } from './quote-pricing.policy';
+import { priceFromQuote, pricingRecordOfQuote, type QuotePricingInput } from './quote-pricing.policy';
 
 const day = (value: string): BusinessDate => value;
 const dong = (units: number) => ({ amountMinor: BigInt(units) * 100n, currency: 'VND' });
@@ -48,6 +48,15 @@ describe('the amount of a request from a quote (US-05-06 AC-14, BR-MF1-06)', () 
   it('BR-MF1-06d: a quarterly or annual price is a third or a twelfth a month, rounded up once', () => {
     expect(priced({ quote: quote({ billingCycle: 'QUARTERLY', unitPrice: dong(30) }) }).amount).toEqual(dong(30));
     expect(priced({ quote: quote({ billingCycle: 'ANNUAL', unitPrice: dong(120) }) }).amount).toEqual(dong(30));
+  });
+
+  it('B-5: populates monthlyPriceMinor on quote pricing and PricingRecord for persistence at submit time', () => {
+    const res = priced({
+      quote: quote({ billingCycle: 'ANNUAL', unitPrice: { amountMinor: 10_000_000n, currency: 'VND' } }),
+    });
+    const record = pricingRecordOfQuote(res, null);
+
+    expect(record.monthlyPriceMinor).toBe(833_334n);
   });
 
   describe('what is refused', () => {

@@ -20,6 +20,7 @@ const candidate = (patch: Partial<YearStartCandidate> = {}): YearStartCandidate 
   nextYearAmountMinor: 4_200_000n,
   amountCurrency: 'VND',
   unitPriceMinor: 600_000n,
+  monthlyPriceMinor: 600_000n,
   billingCycle: 'MONTHLY',
   ...patch,
 });
@@ -99,7 +100,7 @@ describe('YearStartCommitmentsBatchService: a seat that closes before the term i
   });
 
   it('holds what the approval kept when the request carries no price to count with (nothing is worked out at the price of 01/01)', async () => {
-    const unpriced = candidate({ unitPriceMinor: null, billingCycle: null });
+    const unpriced = candidate({ unitPriceMinor: null, monthlyPriceMinor: null, billingCycle: null });
 
     expect(await held(unpriced, '2027-04-01')).toEqual([expect.objectContaining({ amountMinor: 4_200_000n })]);
   });
@@ -116,6 +117,7 @@ describe('YearStartCommitmentsBatchService: a seat that closes before the term i
       budgetYear: 2026,
       nextYearAmountMinor: 1_200_000n,
       unitPriceMinor: null,
+      monthlyPriceMinor: null,
       billingCycle: null,
     });
     const year2: YearStartPassContext = { organizationId: 'org-1', year: 2028, now: new Date(), today: '2028-01-05' };
@@ -133,6 +135,7 @@ describe('YearStartCommitmentsBatchService: a seat that closes before the term i
       budgetYear: 2026,
       nextYearAmountMinor: 1_200_000n,
       unitPriceMinor: null,
+      monthlyPriceMinor: null,
       billingCycle: null,
     });
     expect(
@@ -143,9 +146,10 @@ describe('YearStartCommitmentsBatchService: a seat that closes before the term i
     ).toEqual([expect.objectContaining({ requestId: 'r-1', amountMinor: 1_200_000n, seatMonthlyMinor: 100_000n })]);
   });
 
-  it('B-5: approvalPriceOf and approvalMonthlyFromSaved use roundHalfAway (10.000.000 ANNUAL -> 833.333/month)', async () => {
+  it('B-5: approvalPriceOf reads stored monthlyPriceMinor directly without dividing unitPriceMinor / cycle', async () => {
     const annualTerm = candidate({
       unitPriceMinor: 10_000_000n,
+      monthlyPriceMinor: 833_333n,
       billingCycle: 'ANNUAL',
       nextYearAmountMinor: 5_000_000n,
     });
@@ -153,9 +157,32 @@ describe('YearStartCommitmentsBatchService: a seat that closes before the term i
       expect.objectContaining({ requestId: 'r-1', amountMinor: 1_666_666n, seatMonthlyMinor: 650_000n }),
     ]);
 
+    // Mutation killer: stored monthlyPriceMinor (700.000) differs from unitPriceMinor / 12 (833.333).
+    const storedDistinct = candidate({
+      unitPriceMinor: 10_000_000n,
+      monthlyPriceMinor: 700_000n,
+      billingCycle: 'ANNUAL',
+      nextYearAmountMinor: 5_000_000n,
+    });
+    expect(await held(storedDistinct, '2027-03-01')).toEqual([
+      expect.objectContaining({ requestId: 'r-1', amountMinor: 1_400_000n }),
+    ]);
+
+    // When stored monthlyPriceMinor is null even with unitPriceMinor present, 01/01 does not divide unitPriceMinor / cycle.
+    const unbackfilled = candidate({
+      unitPriceMinor: 10_000_000n,
+      monthlyPriceMinor: null,
+      billingCycle: 'ANNUAL',
+      nextYearAmountMinor: 5_000_000n,
+    });
+    expect(await held(unbackfilled, '2027-03-01')).toEqual([
+      expect.objectContaining({ requestId: 'r-1', amountMinor: 5_000_000n }),
+    ]);
+
     const annualPerpetual = candidate({
       termMonths: null,
       unitPriceMinor: null,
+      monthlyPriceMinor: null,
       billingCycle: null,
       nextYearAmountMinor: 10_000_000n,
     });

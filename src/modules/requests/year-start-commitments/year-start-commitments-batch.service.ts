@@ -9,7 +9,6 @@ import type { YearStartHoldInput } from '../../budgets/public/budgets.types';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { LicensingOpenGrantsApi } from '../../licensing/public/licensing-open-grants.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import { monthlyPriceOf } from '../access-request/pricing.policy';
 import { YearStartCommitmentsRepo, type YearStartCandidate } from './year-start-commitments.repo';
 import {
   YEAR_START_PLAN_KINDS,
@@ -74,14 +73,17 @@ function approvalPriceOf(
 
   return (requestId) => {
     const request = byId.get(requestId);
-    if (!request || request.amountCurrency !== DONG || request.unitPriceMinor === null) return null;
-    const unitPrice = { amountMinor: request.unitPriceMinor, currency: DONG };
-    const monthlyPriceMinor =
-      request.monthlyPriceMinor ??
-      monthlyPriceOf({ unitPrice, billingCycle: request.billingCycle })?.amountMinor ??
-      null;
+    if (
+      !request ||
+      request.amountCurrency !== DONG ||
+      request.monthlyPriceMinor === null ||
+      request.monthlyPriceMinor === undefined
+    ) {
+      return null;
+    }
+    const unitPrice = { amountMinor: request.unitPriceMinor ?? request.monthlyPriceMinor, currency: DONG };
 
-    return { unitPrice, monthlyPriceMinor, billingCycle: request.billingCycle };
+    return { unitPrice, monthlyPriceMinor: request.monthlyPriceMinor, billingCycle: request.billingCycle };
   };
 }
 

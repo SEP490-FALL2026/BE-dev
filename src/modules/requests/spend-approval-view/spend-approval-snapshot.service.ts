@@ -112,7 +112,7 @@ export class SpendApprovalSnapshotService {
       const [target] = await this.catalog.findPlanSeatTargets([request.planId]);
       provisioningType = target?.provisioningType;
       referenceCommitmentMonths = target?.referenceCommitmentMonths;
-      if (monthlyPriceMinor === undefined) {
+      if (monthlyPriceMinor === undefined || monthlyPriceMinor === null) {
         monthlyPriceMinor = (await this.catalog.getPlanPrice(request.planId))?.monthlyPriceMinor;
       }
     }

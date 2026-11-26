@@ -101,6 +101,7 @@ describe('GroupSpendHold (B-5 submit-time price retention)', () => {
             amountMinor: cols.amountMinor,
             amountCurrency: cols.amountCurrency,
             unitPriceMinor: cols.unitPriceMinor,
+            monthlyPriceMinor: cols.monthlyPriceMinor,
             billingCycle: cols.billingCycle,
             nextYearAmountMinor: cols.nextYearAmountMinor,
           }),
@@ -256,5 +257,34 @@ describe('GroupSpendHold (B-5 submit-time price retention)', () => {
         held: false,
       },
     ]);
+  });
+
+  it('B-5: pricingColumns persists monthlyPriceMinor and toPricing reads stored column without dividing unitPrice / cycle', () => {
+    const cols = pricingColumns({
+      status: 'PRICED',
+      missingReason: null,
+      kind: 'RECURRING',
+      budgetYear: 2026,
+      expectedEndDate: null,
+      amountMonths: 2,
+      amount: { amountMinor: 1_700_000n, currency: 'VND' },
+      unitPrice: { amountMinor: 10_000_000n, currency: 'VND' },
+      monthlyPriceMinor: 850_000n,
+      billingCycle: 'ANNUAL',
+      nextYearAmount: null,
+    });
+    expect(cols.monthlyPriceMinor).toBe(850_000n);
+
+    const readStored = toPricing({
+      ...cols,
+      monthlyPriceMinor: 850_000n,
+    });
+    expect(readStored.monthlyPriceMinor).toBe(850_000n);
+
+    const readNull = toPricing({
+      ...cols,
+      monthlyPriceMinor: null,
+    });
+    expect(readNull.monthlyPriceMinor).toBeNull();
   });
 });

@@ -125,6 +125,31 @@ describe('SpendEffectsService (W3-07 monthly slicing on hold)', () => {
     );
   });
 
+  it('B-5: hold reads stored pricing.monthlyPriceMinor without dividing unitPrice/cycle', async () => {
+    const { service, holdForRequest } = makeService({
+      provisioningType: 'K2',
+      monthlyPriceMinor: 777_000n,
+      today: '2026-11-15',
+    });
+
+    await service.hold(
+      TX,
+      ACTOR,
+      baseRequest({
+        pricing: {
+          ...baseRequest().pricing,
+          unitPrice: { amountMinor: 10_000_000n, currency: 'VND' },
+          monthlyPriceMinor: null,
+          billingCycle: 'ANNUAL',
+        },
+      }),
+      'chk-1',
+      NOW,
+    );
+
+    expect(holdForRequest).toHaveBeenCalledWith(TX, ACTOR, expect.objectContaining({ seatMonthlyMinor: 777_000n }));
+  });
+
   it('omits months for K1 and K4 commitments', async () => {
     const k1 = makeService({ provisioningType: 'K1', today: '2026-11-15' });
     await k1.service.hold(TX, ACTOR, baseRequest(), 'chk-1', NOW);

@@ -2,7 +2,7 @@ import type { BusinessDate } from '../../../core/business-date';
 import { DONG, type Money } from '../../../core/money/money';
 import type { PricingRecord } from '../access-request/access-request.types';
 import type { Quote, QuoteCycle } from '../access-request/assessment-record.types';
-import { requestAmountOf } from '../access-request/pricing.policy';
+import { ceilMonthlyPriceOf, requestAmountOf } from '../access-request/pricing.policy';
 
 /**
  * What a request for software that is not in the catalog costs, from the quote the IT Admin records (`US-05-06` AC-14, `QĐ-84e`,
@@ -38,6 +38,7 @@ export type QuotePricing =
       status: 'PRICED';
       amount: Money;
       unitPrice: Money;
+      monthlyPriceMinor: bigint;
       billingCycle: QuoteCycle;
       months: number | null;
       budgetYear: number;
@@ -71,6 +72,7 @@ export function priceFromQuote(input: QuotePricingInput): QuotePricing {
     status: 'PRICED',
     amount: priced.amount,
     unitPrice: quote.unitPrice,
+    monthlyPriceMinor: ceilMonthlyPriceOf(quote.unitPrice, quote.billingCycle).amountMinor,
     billingCycle: quote.billingCycle,
     months: priced.months,
     budgetYear: priced.budgetYear,
@@ -92,6 +94,7 @@ export function pricingRecordOfQuote(
     budgetYear: priced.budgetYear,
     amount: priced.amount,
     unitPrice: priced.unitPrice,
+    monthlyPriceMinor: priced.monthlyPriceMinor,
     billingCycle: priced.billingCycle,
     nextYearAmount: priced.nextYearAmount,
   };

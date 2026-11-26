@@ -11,7 +11,7 @@ import { CatalogApi } from '../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { chargedCostCenterId } from '../access-request/access-request.policy';
-import { monthlyPriceOf, seatMonthlyOf } from '../access-request/pricing.policy';
+import { seatMonthlyOf } from '../access-request/pricing.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { BudgetCheckRepo, type CheckRecord } from '../spend/budget-check.repo';
@@ -121,12 +121,7 @@ export class SpendEffectsService {
     pricing: AccessRequestRecord['pricing'],
     catalogMonthly: bigint | null | undefined,
   ): bigint | null | undefined {
-    if (pricing.monthlyPriceMinor !== undefined) return pricing.monthlyPriceMinor;
-    if (pricing.unitPrice !== null && pricing.billingCycle !== null && pricing.billingCycle !== 'OTHER') {
-      return monthlyPriceOf({ unitPrice: pricing.unitPrice, billingCycle: pricing.billingCycle })?.amountMinor ?? null;
-    }
-
-    return catalogMonthly;
+    return pricing.monthlyPriceMinor ?? catalogMonthly;
   }
 
   private async monthlySlicesForHold(

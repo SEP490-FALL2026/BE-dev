@@ -32,6 +32,7 @@ export const SELECT_REQUEST = {
   amountMinor: true,
   amountCurrency: true,
   unitPriceMinor: true,
+  monthlyPriceMinor: true,
   billingCycle: true,
   expectedEndDate: true,
   nextYearAmountMinor: true,
