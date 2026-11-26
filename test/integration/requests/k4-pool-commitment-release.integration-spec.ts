@@ -177,10 +177,18 @@ describe('BR-MF1-09: the commitment of a K4 request granted from the key pool (i
               ($4, $2, 'SPEND_APPROVAL', 2, 'APPROVED', $5, 1, 3, now(), now())`,
       [needStepId, reqDuc, u.head.employeeId, spendStepId, h.boss.employeeId],
     );
+    const checkId = randomUUID();
     await h.ctx.sql.query(
-      `INSERT INTO spend_decisions (step_id, request_id, decision, decided_by_employee_id, decided_at)
-       VALUES ($1, $2, 'APPROVED', $3, now())`,
-      [spendStepId, reqDuc, h.boss.employeeId],
+      `INSERT INTO request_budget_checks
+         (id, organization_id, request_id, number, trigger, route, stale_cost_evidence, plan_line_overdue,
+          period_closed, off_plan, currency, binding_total_minor, ran_by_employee_id)
+       VALUES ($1, $2, $3, 1, 'SUBMISSION', 'SPEND_APPROVAL', false, false, false, false, 'VND', 24000000, $4)`,
+      [checkId, h.seed.organizationId, reqDuc, h.boss.employeeId],
+    );
+    await h.ctx.sql.query(
+      `INSERT INTO spend_decisions (step_id, request_id, check_id, decision, decided_by_employee_id, decided_at)
+       VALUES ($1, $2, $3, 'APPROVED', $4, now())`,
+      [spendStepId, reqDuc, checkId, h.boss.employeeId],
     );
     for (let i = 0; i < members.length; i += 1) {
       await h.ctx.sql.query(

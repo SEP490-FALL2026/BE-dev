@@ -108,11 +108,11 @@ describe('W3-25 P20: license-lot charges, 3-order allocation invariant (= A), an
         h.finance.appUserId,
       ],
     );
-    for (const empId of members) {
-      await h.ctx.sql.query(`INSERT INTO access_request_beneficiaries (request_id, employee_id) VALUES ($1, $2)`, [
-        requestId,
-        empId,
-      ]);
+    for (let i = 0; i < members.length; i += 1) {
+      await h.ctx.sql.query(
+        `INSERT INTO access_request_beneficiaries (request_id, employee_id, position) VALUES ($1, $2, $3)`,
+        [requestId, members[i], i + 1],
+      );
     }
     await h.ctx.sql.query(
       `INSERT INTO budget_commitments

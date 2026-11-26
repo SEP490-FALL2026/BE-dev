@@ -1,4 +1,5 @@
 import request from 'supertest';
+import { pretendBusinessToday } from '../../support/pretend-today';
 import type { TaskWire } from '../../support/provisioning-harness';
 import { RevocationHarness } from '../../support/revocation-harness';
 
@@ -287,11 +288,13 @@ describe('BR-MF1-09: a K4 key back to the store and withdrawn from it (integrati
   });
 
   it('T-5: keeps lot unitPrice locked (409 LICENSE_LOT.PRICE_LOCKED) after a key was granted and then revoked', async () => {
-    const seat = await heldSeat(2);
-    await h.ctx.sql.query(
-      `UPDATE license_assignments SET valid_from = '2026-01-05', granted_on = '2026-01-05' WHERE id = $1`,
-      [seat.assignmentId],
-    );
+    let seat: Awaited<ReturnType<typeof heldSeat>>;
+    const clock = pretendBusinessToday(h.ctx.app, '2026-01-05');
+    try {
+      seat = await heldSeat(2);
+    } finally {
+      clock.mockRestore();
+    }
 
     await h
       .revoked(seat.taskId, {

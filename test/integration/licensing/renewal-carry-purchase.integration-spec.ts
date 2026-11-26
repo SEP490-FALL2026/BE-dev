@@ -86,6 +86,37 @@ async function ensureOpenedLine(input: {
   return lineId;
 }
 
+async function grantableRequest(
+  beneficiaryId: string,
+  planId: string,
+  departmentId = h.seed.departmentId,
+): Promise<string> {
+  const requestId = h.gate.grantable(beneficiaryId, planId, departmentId);
+  const { rows } = await h.ctx.sql.query<{ id: string }>(
+    `SELECT id FROM cost_centers WHERE department_id = $1 AND status = 'ACTIVE' ORDER BY created_at LIMIT 1`,
+    [departmentId],
+  );
+  const costCenterId = rows[0]?.id ?? (await h.ownUnit()).id;
+  const policyJson = JSON.stringify({
+    version: 1,
+    branch: 'PAID_IN_CATALOG',
+    chain: ['NEED', 'SPEND_APPROVAL'],
+    slaWorkingDays: 3,
+  });
+  await h.ctx.sql.query(
+    `INSERT INTO access_requests
+       (id, organization_id, type, branch, state, plan_id, department_id, cost_center_id,
+        requester_employee_id, business_reason, submitted_at, budget_year, amount_months,
+        amount_currency, unit_price_minor, amount_minor, billing_cycle, pricing_status, policy, created_by_app_user_id)
+     VALUES ($1, $2, 'GRANT', 'PAID_IN_CATALOG', 'AWAITING_EXECUTION', $3, $4, $5, $6,
+             'Renewal carry purchase grant test', now(), 2026, 1, 'VND', 1000000, 1000000,
+             'MONTHLY', 'PRICED', $7::jsonb, $8)`,
+    [requestId, h.seed.organizationId, planId, departmentId, costCenterId, beneficiaryId, policyJson, h.it1.appUserId],
+  );
+
+  return requestId;
+}
+
 /**
  * `W3-16` & `W3-18` (Q-B, real PostgreSQL):
  * 1. Granting into an open seat of the running period carries onto a pre-opened next period line that lacks capacity by recording
@@ -178,7 +209,7 @@ describe('Renewal carry purchase on ledger and grant shortcut (integration, real
     // Grant on 2027-06-20 takes the 12th free seat on lineOld, then carryOrBuy purchases +1 on lineNext for 2027-07-01.
     pretendBusinessToday(h.ctx.app, '2027-06-20');
     const beneficiaryId = nextPerson();
-    const requestId = h.gate.grantable(beneficiaryId, planId);
+    const requestId = await grantableRequest(beneficiaryId, planId);
 
     const granted = await h.grant({ requestId }).expect(201);
     const task = h.dataOf<{ task: { assignmentId: string; purchase: { kind: string } | null } }>(granted).task;
@@ -315,7 +346,7 @@ describe('Renewal carry purchase on ledger and grant shortcut (integration, real
     const actor = h.actorOf(h.it1);
 
     for (let i = 0; i < 20; i += 1) {
-      const requestId = h.gate.grantable(nextPerson(), planId);
+      const requestId = await grantableRequest(nextPerson(), planId);
       const barrier = new Barrier(2);
 
       const grantCarry = (async () => {
@@ -372,7 +403,7 @@ describe('Renewal carry purchase on ledger and grant shortcut (integration, real
     await h.seat({ subscriptionId: subId }, code());
 
     const beneficiaryId = nextPerson();
-    const requestId = h.gate.grantable(beneficiaryId, planId);
+    const requestId = await grantableRequest(beneficiaryId, planId);
     const res = await h.grant({ requestId, purchase: {} }).expect(201);
     const task = h.dataOf<{ task: { assignmentId: string; purchase: { kind: string } | null } }>(res).task;
 
@@ -423,13 +454,13 @@ describe('Renewal carry purchase on ledger and grant shortcut (integration, real
     const it2 = await h.account('E-IT2-F5', it2Emp, 'IT_ADMIN');
     const dept = await h.department('D-F5', it2Emp);
     const beneficiaryId = await h.member(dept.code, 'M-F5', 'Designer');
-    const requestId = h.gate.grantable(beneficiaryId, planId, dept.id);
+    const requestId = await grantableRequest(beneficiaryId, planId, dept.id);
 
     await h.grant({ requestId, purchase: {} }, it2).expect(201);
 
     const { rows } = await h.ctx.sql.query<{ recipient_employee_id: string; code: string; subject_id: string }>(
       `SELECT recipient_employee_id, code::text, subject_id
-         FROM notifications
+         FROM in_app_notifications
         WHERE subject_id = $1 AND code = 'SUBSCRIPTION_SEATS_BOUGHT'`,
       [subId],
     );

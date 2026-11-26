@@ -197,7 +197,9 @@ describe('the licenses of a lot (integration, real PostgreSQL & real services, F
         }),
       )
       .catch((error: unknown) => error);
-    expect(isCheckViolation(overAssignError, 'license_lots_capacity')).toBe(true);
+    expect(isCheckViolation(overAssignError, 'license_lots_capacity', 'The licenses of the lot are all taken')).toBe(
+      true,
+    );
   });
 
   it('counts unkeyed legacy assignments once and keyed assignments once against device_activation_occupied', async () => {
@@ -232,7 +234,9 @@ describe('the licenses of a lot (integration, real PostgreSQL & real services, F
         }),
       )
       .catch((error: unknown) => error);
-    expect(isCheckViolation(legacyOverCapError, 'license_lots_capacity')).toBe(true);
+    expect(isCheckViolation(legacyOverCapError, 'license_lots_capacity', 'The licenses of the lot are all taken')).toBe(
+      true,
+    );
     await ctx.sql.query(`UPDATE license_lots SET license_count = 3 WHERE id = $1`, [legacy]);
     await runner.run((tx) =>
       assignments.assign(tx, itActor(), {

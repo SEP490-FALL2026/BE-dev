@@ -78,10 +78,18 @@ describe('lot invoice confirmation vs group member withdrawal race (integration,
               ($4, $2, 'SPEND_APPROVAL', 2, 'APPROVED', $5, 1, 3, now(), now())`,
       [needStepId, reqId, unit.head.employeeId, spendStepId, h.boss.employeeId],
     );
+    const checkId = randomUUID();
     await h.ctx.sql.query(
-      `INSERT INTO spend_decisions (step_id, request_id, decision, decided_by_employee_id, decided_at)
-       VALUES ($1, $2, 'APPROVED', $3, now())`,
-      [spendStepId, reqId, h.boss.employeeId],
+      `INSERT INTO request_budget_checks
+         (id, organization_id, request_id, number, trigger, route, stale_cost_evidence, plan_line_overdue,
+          period_closed, off_plan, currency, binding_total_minor, ran_by_employee_id)
+       VALUES ($1, $2, $3, 1, 'SUBMISSION', 'SPEND_APPROVAL', false, false, false, false, 'VND', $4, $5)`,
+      [checkId, h.seed.organizationId, reqId, totalMinor, h.boss.employeeId],
+    );
+    await h.ctx.sql.query(
+      `INSERT INTO spend_decisions (step_id, request_id, check_id, decision, decided_by_employee_id, decided_at)
+       VALUES ($1, $2, $3, 'APPROVED', $4, now())`,
+      [spendStepId, reqId, checkId, h.boss.employeeId],
     );
     for (let i = 0; i < members.length; i += 1) {
       await h.ctx.sql.query(

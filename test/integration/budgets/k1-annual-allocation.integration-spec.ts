@@ -106,10 +106,11 @@ describe('W3-23 P13b: K1 annual allocations, 01/01 pairing, F8 transfer (D-16), 
     await h.ctx.sql.query(
       `INSERT INTO license_assignments
          (id, organization_id, source, kind, plan_id, subscription_id, employee_id, account_identifier,
-          normalized_account_identifier, cost_center_id, owning_department_id, valid_from, granted_on,
-          valid_until, expected_end_date, personal_commitment_months, billing_anchor_on, created_by_app_user_id)
+          normalized_account_identifier, cost_center_id, owning_department_id, valid_from, valid_from_basis,
+          granted_on, valid_until, expected_end_date, personal_commitment_months, billing_anchor_on,
+          created_by_app_user_id)
        VALUES ($1, $2, 'REQUEST', 'PERSONAL', $3, NULL, $4, $5, $5, $6, $7,
-               '2026-11-05', '2026-11-05', $8, '2027-11-04', 12, '2026-11-05', $9)`,
+               '2026-11-05', 'ACTUAL'::"AssignmentDateBasis", '2026-11-05', $8, '2027-11-04', 12, '2026-11-05', $9)`,
       [
         assignmentId,
         h.seed.organizationId,
@@ -125,8 +126,10 @@ describe('W3-23 P13b: K1 annual allocations, 01/01 pairing, F8 transfer (D-16), 
 
     await h.ctx.sql.query(
       `INSERT INTO provisioning_tasks
-         (id, organization_id, kind, status, channel, request_id, assignment_id, completed_at, completed_by_app_user_id)
-       VALUES (gen_random_uuid(), $1, 'GRANT', 'COMPLETED', 'MANUAL', $2, $3, '2026-11-05T03:00:00Z', $4)`,
+         (id, organization_id, kind, status, channel, request_id, assignment_id, claimed_by_app_user_id,
+          claimed_at, completed_at, completed_by_app_user_id, evidence, max_attempts, created_by_app_user_id)
+       VALUES (gen_random_uuid(), $1, 'GRANT', 'COMPLETED', 'MANUAL', $2, $3, $4,
+               '2026-11-05T02:30:00Z', '2026-11-05T03:00:00Z', $4, 'K1 annual grant completed', 1, $4)`,
       [h.seed.organizationId, requestId, assignmentId, h.finance.appUserId],
     );
 
