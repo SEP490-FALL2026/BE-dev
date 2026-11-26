@@ -63,7 +63,11 @@ describe('the budget of the year after on the spend step of a request (QĐ-111al
   /** A plan of a new application at that price a month. */
   const planAt = async (monthly: number): Promise<string> => {
     const subscription = await h.subscription(100, 'K1');
-    await h.ctx.sql.query(`UPDATE subscriptions SET unit_price_minor = $2, price_reporting_minor = $2 WHERE id = $1`, [
+    await h.ctx.sql.query(
+      `UPDATE subscriptions SET unit_price_minor = $2, monthly_unit_price_minor = $2, price_reporting_minor = $2 WHERE id = $1`,
+      [subscription, monthly],
+    );
+    await h.ctx.sql.query(`UPDATE subscription_lines SET monthly_unit_price_minor = $2 WHERE subscription_id = $1`, [
       subscription,
       monthly,
     ]);
@@ -257,7 +261,11 @@ describe('the budget of the year after on the spend step of a request (QĐ-111al
   /** A plan of that kind at that price a month. */
   async function planAtKind(kind: 'K1' | 'K2', monthly: number): Promise<string> {
     const subscription = await h.subscription(100, kind);
-    await h.ctx.sql.query(`UPDATE subscriptions SET unit_price_minor = $2, price_reporting_minor = $2 WHERE id = $1`, [
+    await h.ctx.sql.query(
+      `UPDATE subscriptions SET unit_price_minor = $2, monthly_unit_price_minor = $2, price_reporting_minor = $2 WHERE id = $1`,
+      [subscription, monthly],
+    );
+    await h.ctx.sql.query(`UPDATE subscription_lines SET monthly_unit_price_minor = $2 WHERE subscription_id = $1`, [
       subscription,
       monthly,
     ]);
