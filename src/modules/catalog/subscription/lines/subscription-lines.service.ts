@@ -225,8 +225,9 @@ export class SubscriptionMultiLineService {
     workspaceId: string | null,
   ) {
     const totalQuantity = lines.reduce((sum, line) => sum + line.quantity, 0);
+    const commitmentTermMonths = input.commitmentTermMonths ?? firstPlan.referenceCommitmentMonths ?? undefined;
     const state = {
-      ...declaredStateOf({ ...input, purchasedQuantity: totalQuantity }),
+      ...declaredStateOf({ ...input, purchasedQuantity: totalQuantity, commitmentTermMonths }),
       responsibleItAdminEmployeeId: await this.poolRules.responsibleOfDeclaration(
         tx,
         firstPlan.id,
@@ -234,7 +235,7 @@ export class SubscriptionMultiLineService {
       ),
     };
     const singleResolved =
-      lines.length === 1
+      lines.length > 0
         ? resolveSubscriptionPrices({
             kind: 'TERM',
             billingCycle: input.billingCycle ?? null,
@@ -247,19 +248,7 @@ export class SubscriptionMultiLineService {
     const checkState = {
       ...state,
       workspaceId,
-      unitPrice: priced.unitPrice ?? {
-        amountMinor: lines[0].monthlyUnitPriceMinor,
-        currency: 'VND',
-        recordedOn: '2026-01-01',
-      },
-      priceSnapshot: priced.priceSnapshot ?? {
-        rate: 1n,
-        rateDate: '2026-01-01',
-        rateSource: 'SAME_CURRENCY' as const,
-        reportingMinor: lines[0].monthlyUnitPriceMinor,
-        reportingCurrency: 'VND',
-        exchangeRateId: null,
-      },
+      ...fallbackCheckPrice(priced, lines[0].monthlyUnitPriceMinor),
     };
     assertSubscriptionShape({
       planProvisioningType: firstPlan.provisioningType,
@@ -278,4 +267,25 @@ export class SubscriptionMultiLineService {
 
     return { state, priced, singleMonthlyMinor: singleResolved.monthlyUnitPriceMinor, complete };
   }
+}
+
+function fallbackCheckPrice(
+  priced: Awaited<ReturnType<SubscriptionPricingService['priceToday']>>,
+  firstLineMonthlyMinor: bigint,
+) {
+  return {
+    unitPrice: priced.unitPrice ?? {
+      amountMinor: firstLineMonthlyMinor,
+      currency: 'VND',
+      recordedOn: '2026-01-01',
+    },
+    priceSnapshot: priced.priceSnapshot ?? {
+      rate: 1n,
+      rateDate: '2026-01-01',
+      rateSource: 'SAME_CURRENCY' as const,
+      reportingMinor: firstLineMonthlyMinor,
+      reportingCurrency: 'VND',
+      exchangeRateId: null,
+    },
+  };
 }
