@@ -353,5 +353,29 @@ describe('RenewalRecordService', () => {
         }),
       );
     });
+
+    it('F-10: rejects legacy body choice=CANCEL on 1-line annual period after deadline with 422 REDUCTION_AFTER_DEADLINE', async () => {
+      const late = buildMulti('2027-06-05', [
+        {
+          subscriptionLineId: 'line-std',
+          planId: 'plan-std',
+          seatsToday: 12,
+          seatsAtDeadline: 12,
+          minimumSeats: null,
+          need: 12,
+          target: 12,
+        },
+      ]);
+
+      const err = await late.service
+        .record(actor, { subscriptionId: 'sub-1', choice: 'CANCEL', outcome: 'AS_DECIDED' })
+        .catch((e: unknown) => e);
+
+      expect(err).toBeInstanceOf(RenewalError);
+      expect((err as RenewalError).problem).toBe('REDUCTION_AFTER_DEADLINE');
+      const apiErr = toRenewalApiException(err) as ApiException;
+      expect(apiErr.getStatus()).toBe(HttpStatus.UNPROCESSABLE_ENTITY);
+      expect(apiErr.getResponse()).toMatchObject({ code: 'SUBSCRIPTION_RENEWAL.REDUCTION_AFTER_DEADLINE' });
+    });
   });
 });

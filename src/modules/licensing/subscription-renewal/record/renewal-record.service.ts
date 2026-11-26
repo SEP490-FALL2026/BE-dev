@@ -228,7 +228,7 @@ export class RenewalRecordService {
     const { adjustment } = ready;
     const counts = await this.readCounts(tx, period, adjustment, today);
 
-    const lateSingle = lineCount === 1 && choice !== 'CANCEL' && isLateAnnualProposal(adjustment, today);
+    const lateSingle = lineCount === 1 && isLateAnnualProposal(adjustment, today);
     if (lateSingle) {
       const line = computedLines.lines[0];
       const given = quantity ?? 0;
