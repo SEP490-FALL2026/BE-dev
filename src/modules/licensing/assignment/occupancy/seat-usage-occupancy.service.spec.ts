@@ -1,6 +1,7 @@
 import type { CatalogApi } from '../../../catalog/public/catalog.api';
 import type { LicenseLotApi } from '../../../catalog/public/license-lot.api';
 import type { OrganizationReadApi } from '../../../organization/public/organization-read.api';
+import type { SeatLedgerApi } from '../../../catalog/public/seat-ledger.api';
 import type { DeviceActivationRepo } from '../../device-activation/device-activation.repo';
 import { SubscriptionSeatUsageService } from './seat-usage-occupancy.service';
 import type { AssignmentRepo } from '../assignment.repo';
@@ -32,6 +33,7 @@ describe('SubscriptionSeatUsageService.get (seats taken by assignments and by op
       organizationReads as unknown as OrganizationReadApi,
       catalog as unknown as CatalogApi,
       lots as unknown as LicenseLotApi,
+      { seatsOnDays: jest.fn().mockResolvedValue(new Map()) } as unknown as SeatLedgerApi,
     );
 
     return { service, repo, deviceActivations };

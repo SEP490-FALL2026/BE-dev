@@ -24,8 +24,8 @@ export class LicensingPoolStockApi {
   constructor(
     private readonly pool: SharedPoolService,
     private readonly organizationReads: OrganizationReadApi,
-    private readonly catalog?: CatalogApi,
-    private readonly periods?: SubscriptionPeriodApi,
+    private readonly catalog: CatalogApi,
+    private readonly periods: SubscriptionPeriodApi,
   ) {}
 
   /**
@@ -38,7 +38,6 @@ export class LicensingPoolStockApi {
 
   /** Returns pool + chosen line context for `vendorChargeUntilRenewal` on a K2 plan when `free === 0`. */
   async getVendorChargeContext(planId: string): Promise<PlanVendorChargeContext | null> {
-    if (!this.catalog || !this.periods) return null;
     const [target] = await this.catalog.findPlanSeatTargets([planId]);
     if (target?.provisioningType !== 'K2') return null;
 

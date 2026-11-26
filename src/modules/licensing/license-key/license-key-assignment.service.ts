@@ -1,4 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { isCheckViolation } from '../../../infrastructure/database/unique-violation';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
@@ -23,7 +23,7 @@ export class LicenseKeyAssignmentService {
     private readonly repo: LicenseKeyRepo,
     private readonly catalog: CatalogApi,
     private readonly audit: AuditApi,
-    @Optional() private readonly lotApi?: LicenseLotApi,
+    private readonly lotApi: LicenseLotApi,
   ) {}
 
   /**
@@ -42,7 +42,7 @@ export class LicenseKeyAssignmentService {
       licenseLotId?: string | null;
     },
   ): Promise<{ licenseKeyId: string; licenseLotId: string | null; costBorne: boolean }> {
-    if (input.licenseLotId && this.lotApi) {
+    if (input.licenseLotId) {
       await this.lotApi.lockLot(tx, input.licenseLotId);
     } else if (input.subscriptionId !== null) {
       await this.catalog.lockSeatTarget(tx, { subscriptionId: input.subscriptionId });

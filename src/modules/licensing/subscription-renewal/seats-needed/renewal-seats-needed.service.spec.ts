@@ -23,7 +23,12 @@ function build(facts: Partial<SeatsNeededFacts>, pendingIds: string[] = [], open
   const approvedAwaitingGrantOfPlan = jest.fn().mockResolvedValue(awaitingGrant);
   const hook = new RenewalHoldHook();
   hook.bind({ pendingRenewalsOf, openRequestsOfPlan, approvedAwaitingGrantOfPlan } as unknown as RenewalHold);
-  const service = new RenewalSeatsNeededService({ seatsNeededFacts } as unknown as SubscriptionRenewalSeatRepo, hook);
+  const service = new RenewalSeatsNeededService(
+    { seatsNeededFacts } as unknown as SubscriptionRenewalSeatRepo,
+    hook,
+    { linesOfSubscription: jest.fn().mockResolvedValue([]) } as unknown as SeatLedgerApi,
+    { chosenLinesOfPlans: jest.fn().mockResolvedValue(new Map()) } as unknown as SharedPoolService,
+  );
 
   return { service, seatsNeededFacts, pendingRenewalsOf, openRequestsOfPlan, approvedAwaitingGrantOfPlan };
 }

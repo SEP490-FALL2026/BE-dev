@@ -1,4 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { CatalogApi } from '../../catalog/public/catalog.api';
@@ -15,7 +15,7 @@ export class SharedPoolVacancyService {
   constructor(
     private readonly catalog: CatalogApi,
     private readonly capacity: SharedPoolCapacityRepo,
-    @Optional() private readonly lotStock?: LicenseLotStockApi,
+    private readonly lotStock: LicenseLotStockApi,
   ) {}
 
   async vacanciesOn(asOf: BusinessDate, tx?: DbTx): Promise<SharedPoolVacancy[]> {
@@ -42,22 +42,20 @@ export class SharedPoolVacancyService {
       });
     }
 
-    if (this.lotStock) {
-      for (const lot of await this.lotStock.listAccountVacancies(asOf, tx)) {
-        if (lot.free <= 0) continue;
-        byId.set(lot.lotId, {
-          subscriptionId: lot.lotId,
-          planId: lot.planId,
-          applicationId: lot.applicationId,
-          provisioningType: 'K4',
-          pricingModel: lot.pricingModel,
-          subjectKind: 'LICENSE_LOT',
-          keyBinding: 'ACCOUNT',
-          purchased: lot.purchased,
-          occupied: lot.occupied,
-          free: lot.free,
-        });
-      }
+    for (const lot of await this.lotStock.listAccountVacancies(asOf, tx)) {
+      if (lot.free <= 0) continue;
+      byId.set(lot.lotId, {
+        subscriptionId: lot.lotId,
+        planId: lot.planId,
+        applicationId: lot.applicationId,
+        provisioningType: 'K4',
+        pricingModel: lot.pricingModel,
+        subjectKind: 'LICENSE_LOT',
+        keyBinding: 'ACCOUNT',
+        purchased: lot.purchased,
+        occupied: lot.occupied,
+        free: lot.free,
+      });
     }
 
     return [...byId.values()];

@@ -75,6 +75,7 @@ function makeWriter(overrides: WriterOverrides = {}) {
     {
       lockLiveRevocation: overrides.lockLiveRevocation ?? jest.fn(() => Promise.resolve(null)),
       endReplacedRight: overrides.endReplacedRight ?? jest.fn(() => Promise.resolve(null)),
+      k1TermsOfReplaced: jest.fn(() => Promise.resolve(null)),
     } as unknown as ProvisioningReplacementService,
     {
       buyForItems: jest.fn(),

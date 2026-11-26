@@ -22,7 +22,7 @@ export class SubscriptionSeatUsageService {
     private readonly organizationReads: OrganizationReadApi,
     private readonly catalog: CatalogApi,
     private readonly lots: LicenseLotApi,
-    private readonly seatLedger?: SeatLedgerApi,
+    private readonly seatLedger: SeatLedgerApi,
   ) {}
 
   /** The seats bought, taken and free on today in the organization calendar. Throws SeatTargetNotFoundError. */
@@ -52,7 +52,7 @@ export class SubscriptionSeatUsageService {
     asOf: string,
   ): Promise<number | null> {
     if (lotLicenseCount !== null) return lotLicenseCount;
-    if (target.provisioningType !== 'K2' || !this.seatLedger) return target.purchasedQuantity;
+    if (target.provisioningType !== 'K2') return target.purchasedQuantity;
 
     const lines = await this.catalog.getSubscriptionServingLineIds(target.subscriptionId!, asOf);
     if (!lines.hasLines) return target.purchasedQuantity;

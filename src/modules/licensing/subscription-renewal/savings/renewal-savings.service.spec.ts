@@ -85,6 +85,7 @@ function build(
     { endingAmong: jest.fn() } as unknown as SubscriptionRenewalRepo,
     { getPurchaseFacts } as unknown as SubscriptionPeriodApi,
     { getSubscriptionPrice } as unknown as CatalogApi,
+    { linesOfSubscriptions: jest.fn().mockResolvedValue(new Map()) } as unknown as SeatLedgerApi,
   );
 
   return { service, lockByNextSubscriptionId, recordRealisedSaving, getPurchaseFacts, getSubscriptionPrice };

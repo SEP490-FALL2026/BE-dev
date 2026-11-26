@@ -96,6 +96,7 @@ function makeWriter(overrides: {
     {
       lockLiveRevocation: jest.fn().mockResolvedValue(null),
       endReplacedRight: jest.fn().mockResolvedValue(overrides.replacesAssignmentId ?? null),
+      k1TermsOfReplaced: jest.fn().mockResolvedValue(null),
     } as unknown as ProvisioningReplacementService,
     { buyForItems, notifySeatsBought } as unknown as SeatLedgerApi,
   );
@@ -243,6 +244,7 @@ describe('ProvisioningGrantWriter.takeSeat (W3-18 K2 shortcut + K1 legacy)', () 
       {
         lockLiveRevocation: jest.fn().mockResolvedValue(null),
         endReplacedRight: jest.fn().mockResolvedValue(null),
+        k1TermsOfReplaced: jest.fn().mockResolvedValue(null),
       } as unknown as ProvisioningReplacementService,
       { buyForItems } as unknown as SeatLedgerApi,
     );

@@ -1,4 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { LicenseLotApi } from '../../catalog/public/license-lot.api';
@@ -20,7 +20,7 @@ export class LicenseLotCreateService {
     private readonly lots: LicenseLotApi,
     private readonly tasks: ProvisioningTaskRepo,
     private readonly frame: ProvisioningTaskFrame,
-    @Optional() private readonly runner?: TransactionRunner,
+    private readonly runner: TransactionRunner,
   ) {}
 
   /**
@@ -29,28 +29,16 @@ export class LicenseLotCreateService {
    */
   async create(actor: AuthenticatedPrincipal, input: CreateLicenseLotInput): Promise<{ id: string }> {
     if (input.purpose !== 'REQUEST') return this.lots.createLot(actor, input);
-    if (this.runner) {
-      return this.runner.run(async (tx) => {
-        await this.assertRequestLot(tx, actor, input);
 
-        return this.lots.createLot(actor, input, tx);
-      });
-    }
-    await this.assertRequestLot(undefined, actor, input);
+    return this.runner.run(async (tx) => {
+      await this.assertRequestLot(tx, actor, input);
 
-    return this.lots.createLot(actor, input);
+      return this.lots.createLot(actor, input, tx);
+    });
   }
 
-  private async assertRequestLot(
-    tx: DbTx | undefined,
-    actor: AuthenticatedPrincipal,
-    input: CreateLicenseLotInput,
-  ): Promise<void> {
-    const task = input.requestId
-      ? tx && typeof this.tasks.lockGrantOf === 'function'
-        ? await this.tasks.lockGrantOf(tx, input.requestId)
-        : await this.tasks.findGrantOf(input.requestId, undefined, tx)
-      : null;
+  private async assertRequestLot(tx: DbTx, actor: AuthenticatedPrincipal, input: CreateLicenseLotInput): Promise<void> {
+    const task = input.requestId ? await this.tasks.lockGrantOf(tx, input.requestId) : null;
     if (!task || OVER.has(task.status) || task.assignment.planId !== input.planId) {
       throw new LicenseKeyLotRequestNotOpenError();
     }

@@ -286,4 +286,23 @@ describe('SubscriptionRenewalAutoService (W3-21 cutoff lock, Ca B auto-renew, Ca
     expect(repo.insert).not.toHaveBeenCalled();
     expect(outcomes.recordIn).not.toHaveBeenCalled();
   });
+
+  it('writes and tells nothing when the period already has its deadline event', async () => {
+    const { service, periods, repo, audit, notifier } = setup();
+    periods.lockPeriod.mockResolvedValue(makePeriod({ autoRenew: false }));
+    repo.insertDeadlineEvent.mockResolvedValue(null);
+
+    const recorded = await service.handlePassedRenewalDay({
+      organizationId: 'org-1',
+      today: '2027-07-02',
+      period: makePeriod({ autoRenew: false }),
+      adjustment: ADJUSTMENT,
+      kind: 'EXPIRY_MARKED',
+      people: PEOPLE,
+    });
+
+    expect(recorded).toBe(false);
+    expect(audit.record).not.toHaveBeenCalled();
+    expect(notifier.tell).not.toHaveBeenCalled();
+  });
 });

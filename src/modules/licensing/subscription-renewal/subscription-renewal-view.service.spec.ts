@@ -3,6 +3,7 @@ import type { SubscriptionPeriodApi } from '../../catalog/public/subscription-pe
 import type { FinanceApi } from '../../finance/public/finance.api';
 import type { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import type { SubscriptionRenewalKpiService } from './kpi/subscription-renewal-kpi.service';
+import type { SubscriptionRenewalLinesService } from './lines/subscription-renewal-lines.service';
 import type { RenewalSeatsNeededService } from './seats-needed/renewal-seats-needed.service';
 import { RenewalPartiesService } from './subscription-renewal-parties.service';
 import type { RenewalRankingService } from './subscription-renewal-ranking.service';
@@ -30,7 +31,7 @@ describe('RenewalViewService.missedAdjustmentKpiOf (W3-22 KPI-4)', () => {
       {} as RenewalRankingService,
       {} as RenewalSeatsNeededService,
       {} as FinanceApi,
-      undefined,
+      {} as SubscriptionRenewalLinesService,
       kpiMissed as unknown as SubscriptionRenewalKpiService,
     );
 

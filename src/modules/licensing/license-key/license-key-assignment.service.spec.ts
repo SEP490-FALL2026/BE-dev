@@ -41,6 +41,7 @@ describe('LicenseKeyAssignmentService (S-4)', () => {
       } as unknown as LicenseKeyRepo,
       { lockSeatTarget: jest.fn().mockResolvedValue(null) } as unknown as CatalogApi,
       { record } as unknown as AuditApi,
+      { lockLot: jest.fn() } as unknown as LicenseLotApi,
     );
 
     await expect(

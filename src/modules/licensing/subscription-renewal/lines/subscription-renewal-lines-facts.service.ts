@@ -1,4 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { addDays, type BusinessDate } from '../../../../core/business-date';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import { CatalogApi } from '../../../catalog/public/catalog.api';
@@ -43,7 +43,7 @@ export class SubscriptionRenewalLinesFactsService {
     private readonly renewalHold: RenewalHoldHook,
     private readonly targets: SubscriptionLineTargetRepo,
     private readonly autoRepo: SubscriptionRenewalAutoRepo,
-    @Optional() private readonly catalog?: CatalogApi,
+    private readonly catalog: CatalogApi,
   ) {}
 
   async lineViewsOf(
@@ -54,7 +54,7 @@ export class SubscriptionRenewalLinesFactsService {
     if (computed.lines.length === 0) return { lines: [], shortfall: 0 };
 
     const planIds = [...new Set(computed.lines.map((line) => line.planId))];
-    const plans = this.catalog ? await this.catalog.getPlanSummaries(planIds) : [];
+    const plans = await this.catalog.getPlanSummaries(planIds);
     const planNames = new Map(plans.map((plan) => [plan.planId, plan.planName]));
 
     return {

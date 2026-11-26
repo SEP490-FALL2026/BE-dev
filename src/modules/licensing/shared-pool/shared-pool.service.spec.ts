@@ -36,6 +36,10 @@ describe('SharedPoolService (ledger seats & chooseLine)', () => {
       capacityRepo as unknown as SharedPoolCapacityRepo,
       {} as unknown as SharedPoolAvoidedCostRepo,
       seatLedger as unknown as SeatLedgerApi,
+      {
+        accountLotCandidates: jest.fn().mockResolvedValue([]),
+        chooseAccountLot: jest.fn(),
+      } as unknown as LicenseLotStockApi,
     );
 
     const stock = await service.stockOf(tx, 'plan-1', '2026-11-21', 'K2');
@@ -87,6 +91,10 @@ describe('SharedPoolService (ledger seats & chooseLine)', () => {
       capacityRepo as unknown as SharedPoolCapacityRepo,
       {} as unknown as SharedPoolAvoidedCostRepo,
       seatLedger as unknown as SeatLedgerApi,
+      {
+        accountLotCandidates: jest.fn().mockResolvedValue([]),
+        chooseAccountLot: jest.fn(),
+      } as unknown as LicenseLotStockApi,
     );
 
     const chosen = await service.chooseLine(tx, {
@@ -105,6 +113,10 @@ describe('SharedPoolService (ledger seats & chooseLine)', () => {
       {} as unknown as SharedPoolCapacityRepo,
       {} as unknown as SharedPoolAvoidedCostRepo,
       {} as unknown as SeatLedgerApi,
+      {
+        accountLotCandidates: jest.fn().mockResolvedValue([]),
+        chooseAccountLot: jest.fn(),
+      } as unknown as LicenseLotStockApi,
     );
 
     expect(await service.chooseLine(tx, { planId: 'plan-k1', provisioningType: 'K1', today: '2026-11-21' })).toBeNull();
@@ -162,6 +174,10 @@ describe('SharedPoolService (ledger seats & chooseLine)', () => {
       capacityRepo as unknown as SharedPoolCapacityRepo,
       {} as unknown as SharedPoolAvoidedCostRepo,
       seatLedger as unknown as SeatLedgerApi,
+      {
+        accountLotCandidates: jest.fn().mockResolvedValue([]),
+        chooseAccountLot: jest.fn(),
+      } as unknown as LicenseLotStockApi,
     );
 
     const chosen = await service.chosenLinesOfPlans(['plan-1'], '2026-11-21', tx);

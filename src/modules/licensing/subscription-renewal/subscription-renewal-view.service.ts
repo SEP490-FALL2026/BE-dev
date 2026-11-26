@@ -1,4 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import { pageOf, type Page } from '../../../core/application/pagination';
 import { formatAmount } from '../../../core/money/money';
@@ -49,8 +49,8 @@ export class RenewalViewService {
     private readonly ranking: RenewalRankingService,
     private readonly seatsNeeded: RenewalSeatsNeededService,
     private readonly finance: FinanceApi,
-    @Optional() private readonly lines?: SubscriptionRenewalLinesService,
-    @Optional() private readonly kpi?: SubscriptionRenewalKpiService,
+    private readonly lines: SubscriptionRenewalLinesService,
+    private readonly kpi: SubscriptionRenewalKpiService,
   ) {}
 
   /** Throws RenewalError (`READ_FORBIDDEN`). */
@@ -73,9 +73,7 @@ export class RenewalViewService {
     );
     const periods = await this.periodsOf(items.map((item) => item.subscriptionId));
     const admins = await this.itAdminsOf([...periods.values()]);
-    const linesMap = this.periods.linesOfSubscriptions
-      ? await this.periods.linesOfSubscriptions(items.map((item) => item.subscriptionId))
-      : new Map<string, { closedReason: string | null }[]>();
+    const linesMap = await this.periods.linesOfSubscriptions(items.map((item) => item.subscriptionId));
 
     return pageOf(
       items.flatMap((item) => {
@@ -239,9 +237,6 @@ export class RenewalViewService {
     months: readonly BusinessDate[],
   ): Promise<SubscriptionKpi4Summary> {
     this.scopeOf(actor);
-    if (!this.kpi) {
-      return { subscriptionId, totalSeatMonths: 0, totalAmountMinor: 0n, lines: [] };
-    }
 
     return this.kpi.kpi4ForSubscription(subscriptionId, months);
   }
@@ -304,8 +299,6 @@ export class RenewalViewService {
     period: RenewalPeriodFacts,
     today: BusinessDate,
   ): Promise<{ lines: RenewalLineWire[]; shortfall: number }> {
-    if (!this.lines) return Promise.resolve({ lines: [], shortfall: 0 });
-
     return this.lines.lineViewsOf(period, today);
   }
 

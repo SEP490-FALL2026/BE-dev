@@ -1,4 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { addDays, type BusinessDate } from '../../../../core/business-date';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import { CatalogApi } from '../../../catalog/public/catalog.api';
@@ -45,7 +45,7 @@ export class RenewalSavingsService {
     private readonly renewals: SubscriptionRenewalRepo,
     private readonly periods: SubscriptionPeriodApi,
     private readonly catalog: CatalogApi,
-    @Optional() private readonly seatLedger?: SeatLedgerApi,
+    private readonly seatLedger: SeatLedgerApi,
   ) {}
 
   endingAmong(subscriptionIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
@@ -79,7 +79,7 @@ export class RenewalSavingsService {
       return null;
     }
 
-    if (this.seatLedger && next.startDate !== null) {
+    if (next.startDate !== null) {
       const perLine = await this.computePerLineSaving(tx, prior, next);
       if (perLine) return perLine;
     }
@@ -104,7 +104,7 @@ export class RenewalSavingsService {
   }
 
   private async computePerLineSaving(tx: DbTx, prior: SubscriptionPurchaseFacts, next: SubscriptionPurchaseFacts) {
-    const linesMap = await this.seatLedger!.linesOfSubscriptions([prior.subscriptionId, next.subscriptionId], tx);
+    const linesMap = await this.seatLedger.linesOfSubscriptions([prior.subscriptionId, next.subscriptionId], tx);
     const priorLines = (linesMap.get(prior.subscriptionId) ?? []).filter((l) => l.closedReason !== 'REMOVED');
     const nextLines = linesMap.get(next.subscriptionId) ?? [];
     if (priorLines.length === 0 || nextLines.length === 0 || next.startDate === null) return null;
@@ -113,13 +113,13 @@ export class RenewalSavingsService {
     const closedDates = priorLines.map((l) => l.closedOn ?? defaultClosedOn);
     const minPriorDay = closedDates.reduce((a, b) => (a <= b ? a : b));
     const maxPriorDay = closedDates.reduce((a, b) => (a >= b ? a : b));
-    const priorSeatsMap = await this.seatLedger!.seatsOnDays(
+    const priorSeatsMap = await this.seatLedger.seatsOnDays(
       priorLines.map((l) => l.id),
       minPriorDay,
       maxPriorDay,
       tx,
     );
-    const nextSeatsMap = await this.seatLedger!.seatsOnDays(
+    const nextSeatsMap = await this.seatLedger.seatsOnDays(
       nextLines.map((l) => l.id),
       next.startDate,
       next.startDate,

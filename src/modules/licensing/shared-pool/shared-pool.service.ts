@@ -107,7 +107,7 @@ export class SharedPoolService {
     private readonly capacityRepo: SharedPoolCapacityRepo,
     private readonly avoidedCosts: SharedPoolAvoidedCostRepo,
     private readonly seatLedger: SeatLedgerApi,
-    @Optional() private readonly lotStock?: LicenseLotStockApi,
+    private readonly lotStock: LicenseLotStockApi,
     @Optional() private readonly gate?: GrantRequestGateHook,
   ) {}
 
@@ -140,19 +140,16 @@ export class SharedPoolService {
     if (provisioningType === 'K1') {
       return { free: 0, inRevocation: 0, freeSubscriptionIds: [], freeBySubscription: new Map() };
     }
-    if (provisioningType === 'K4' && this.lotStock) {
+    if (provisioningType === 'K4') {
       return this.stockOfLots(tx, planId, options?.requestId ?? null);
     }
     const subscriptions = await this.grantableOf(tx, planId, today);
 
-    return this.stockOfSubscriptions(tx, planId, subscriptions, today, provisioningType === 'K4');
+    return this.stockOfSubscriptions(tx, planId, subscriptions, today);
   }
 
   /** Stock of a K4 `ACCOUNT` plan derived from its license lots and F11 reservation state. */
   async stockOfLots(tx: DbTx, planId: string, requestId: string | null): Promise<PoolStock> {
-    if (!this.lotStock) {
-      return { free: 0, inRevocation: 0, freeSubscriptionIds: [], freeBySubscription: new Map() };
-    }
     const raw = await this.lotStock.accountLotCandidates(planId, undefined, tx);
     const reservations = await this.lotReservationsOf(raw, tx);
     const candidates =
@@ -180,18 +177,15 @@ export class SharedPoolService {
     planId: string,
     subscriptions: readonly PoolSubscription[],
     today: BusinessDate,
-    withKeys: boolean,
   ): Promise<PoolStock> {
     const ids = subscriptions.map((subscription) => subscription.subscriptionId);
     const occupancy = await this.capacityRepo.occupancyOfPlan(tx, ids, planId, today);
     const lineIds = subscriptions
       .map((s) => s.subscriptionLineId)
       .filter((id): id is string => typeof id === 'string' && id.length > 0);
-    const ledgerSeats =
-      !withKeys && lineIds.length > 0 ? await this.seatLedger.seatsOnDays(lineIds, today, today, tx) : undefined;
-    const keys = withKeys ? await this.capacityRepo.freeKeysOf(tx, ids) : null;
+    const ledgerSeats = lineIds.length > 0 ? await this.seatLedger.seatsOnDays(lineIds, today, today, tx) : undefined;
 
-    return stockFrom(subscriptions, occupancy, keys, ledgerSeats, today);
+    return stockFrom(subscriptions, occupancy, null, ledgerSeats, today);
   }
 
   /** The kind of provisioning of the plan. Throws SeatTargetNotFoundError when the plan does not exist. */
@@ -243,7 +237,7 @@ export class SharedPoolService {
         stocks.set(target.planId, { kind: 'NONE', free: 0, inRevocation: 0 });
         continue;
       }
-      if (keyPlans.has(target.planId) && this.lotStock) {
+      if (keyPlans.has(target.planId)) {
         const k4Stock = await this.stockOfLotsWithoutTx(target.planId);
         stocks.set(target.planId, { kind: 'KEYS', free: k4Stock.free, inRevocation: k4Stock.inRevocation });
         continue;
@@ -264,9 +258,6 @@ export class SharedPoolService {
   }
 
   private async stockOfLotsWithoutTx(planId: string): Promise<PoolStock> {
-    if (!this.lotStock) {
-      return { free: 0, inRevocation: 0, freeSubscriptionIds: [], freeBySubscription: new Map() };
-    }
     const raw = await this.lotStock.accountLotCandidates(planId);
     const reservations = await this.lotReservationsOf(raw);
     const candidates = reservations.size > 0 ? await this.lotStock.accountLotCandidates(planId, { reservations }) : raw;
@@ -290,20 +281,14 @@ export class SharedPoolService {
     },
   ): Promise<string | null> {
     if (input.provisioningType === 'K1') return null;
-    if (input.provisioningType === 'K4' && this.lotStock) {
+    if (input.provisioningType === 'K4') {
       return this.chooseK4AccountLot(tx, input);
     }
     const subscriptions = await this.grantableOf(tx, input.planId, input.today);
-    if (input.provisioningType !== 'K2' && input.provisioningType !== 'K4') {
+    if (input.provisioningType !== 'K2') {
       return subscriptions[0]?.subscriptionId ?? null;
     }
-    const stock = await this.stockOfSubscriptions(
-      tx,
-      input.planId,
-      subscriptions,
-      input.today,
-      input.provisioningType === 'K4',
-    );
+    const stock = await this.stockOfSubscriptions(tx, input.planId, subscriptions, input.today);
 
     return choosePoolLine(subscriptions, stock)?.subscriptionId ?? null;
   }
@@ -317,7 +302,6 @@ export class SharedPoolService {
     tx: DbTx,
     input: { planId: string; lotId: string; requestId?: string | null },
   ): Promise<void> {
-    if (!this.lotStock) return;
     const raw = await this.lotStock.accountLotCandidates(input.planId, undefined, tx);
     const match = raw.find((l) => l.id === input.lotId || l.legacySubscriptionId === input.lotId);
     if (!match || match.purpose !== 'REQUEST' || match.requestId === (input.requestId ?? null)) return;
@@ -334,7 +318,6 @@ export class SharedPoolService {
     tx: DbTx,
     input: { planId: string; requestId?: string | null; excludeTaskId?: string; allowPurchase?: boolean },
   ): Promise<string | null> {
-    if (!this.lotStock) return null;
     const raw = await this.lotStock.accountLotCandidates(input.planId, { excludeTaskId: input.excludeTaskId }, tx);
     if (raw.length === 0) return null;
     const reservations = await this.lotReservationsOf(raw, tx);

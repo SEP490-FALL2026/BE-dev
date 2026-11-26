@@ -363,10 +363,7 @@ export class ProvisioningGrantWriter {
     if (target.provisioningType !== 'K1') {
       return { expectedEndDate: defaultEndDate, k1Fields: null };
     }
-    const replacedTerms =
-      replaced !== null && typeof this.replacements.k1TermsOfReplaced === 'function'
-        ? await this.replacements.k1TermsOfReplaced(tx, replaced)
-        : null;
+    const replacedTerms = replaced !== null ? await this.replacements.k1TermsOfReplaced(tx, replaced) : null;
     if (replacedTerms?.personalCommitmentMonths === 12) {
       return {
         expectedEndDate: replacedTerms.expectedEndDate ?? defaultEndDate,

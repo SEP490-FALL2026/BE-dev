@@ -25,45 +25,53 @@ const base: CreateLicenseLotInput = {
 };
 
 function setup(task: { status: string; planId: string } | null = null, inCharge = true) {
+  const tx = { kind: 'tx' } as unknown as DbTx;
+  const run = jest.fn((fn: (t: DbTx) => Promise<unknown>) => fn(tx));
   const createLot = jest.fn().mockResolvedValue({ id: 'lot-1' });
-  const findGrantOf = jest
-    .fn()
-    .mockResolvedValue(
-      task ? { id: 'task-1', status: task.status, assignment: { planId: task.planId, employeeId: 'emp-ben' } } : null,
-    );
+  const taskRecord = task
+    ? { id: 'task-1', status: task.status, assignment: { planId: task.planId, employeeId: 'emp-ben' } }
+    : null;
+  const findGrantOf = jest.fn().mockResolvedValue(taskRecord);
+  const lockGrantOf = jest.fn().mockResolvedValue(taskRecord);
   const requireActingItAdmin = jest.fn(() =>
     inCharge ? Promise.resolve({ bySubstitute: false }) : Promise.reject(new ProvisioningNotInChargeError()),
   );
   const service = new LicenseLotCreateService(
     { createLot } as unknown as LicenseLotApi,
-    { findGrantOf } as unknown as ProvisioningTaskRepo,
+    { findGrantOf, lockGrantOf } as unknown as ProvisioningTaskRepo,
     { requireActingItAdmin } as unknown as ProvisioningTaskFrame,
+    { run } as unknown as TransactionRunner,
   );
 
-  return { service, createLot, findGrantOf, requireActingItAdmin };
+  return { service, createLot, findGrantOf, lockGrantOf, requireActingItAdmin, tx, run };
 }
 
 describe('LicenseLotCreateService (a lot for a request is judged against its grant task)', () => {
   it('makes a lot of any other purpose with no look at the tasks, for any IT Admin', async () => {
-    const { service, createLot, findGrantOf } = setup();
+    const { service, createLot, findGrantOf, lockGrantOf } = setup();
 
     await expect(service.create(actor, base)).resolves.toEqual({ id: 'lot-1' });
 
     expect(createLot).toHaveBeenCalledWith(actor, base);
     expect(findGrantOf).not.toHaveBeenCalled();
+    expect(lockGrantOf).not.toHaveBeenCalled();
   });
 
   it('makes a lot for a request when its grant task is open for the plan and the caller acts for the beneficiary', async () => {
-    const { service, createLot, requireActingItAdmin } = setup({ status: 'QUEUED', planId: 'plan-1' });
+    const { service, createLot, lockGrantOf, requireActingItAdmin, tx } = setup({
+      status: 'QUEUED',
+      planId: 'plan-1',
+    });
     const input = { ...base, purpose: 'REQUEST' as const, requestId: 'req-1' };
 
     await expect(service.create(actor, input)).resolves.toEqual({ id: 'lot-1' });
 
-    expect(requireActingItAdmin).toHaveBeenCalledWith(undefined, actor, {
+    expect(lockGrantOf).toHaveBeenCalledWith(tx, 'req-1');
+    expect(requireActingItAdmin).toHaveBeenCalledWith(tx, actor, {
       beneficiaryEmployeeId: 'emp-ben',
       taskId: 'task-1',
     });
-    expect(createLot).toHaveBeenCalledWith(actor, input);
+    expect(createLot).toHaveBeenCalledWith(actor, input, tx);
   });
 
   it.each([

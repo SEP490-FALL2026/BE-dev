@@ -60,6 +60,10 @@ describe('RenewalRecordService', () => {
       { businessToday, getOrganization } as unknown as OrganizationReadApi,
       { recordingAccessOf, proposed: jest.fn(), told: jest.fn() } as unknown as RenewalRecordTrail,
       runner,
+      {
+        computeForPeriod: jest.fn().mockResolvedValue({ servingLines: [], lines: [], shortfall: 0 }),
+        persistProposalTargets: jest.fn(),
+      } as unknown as SubscriptionRenewalLinesService,
     );
 
     return { service, lockPeriod, recordingAccessOf, businessToday, tx };

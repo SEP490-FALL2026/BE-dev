@@ -1,4 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import { SubscriptionPeriodApi } from '../../../catalog/public/subscription-period.api';
@@ -87,7 +87,7 @@ export class RenewalRecordService {
     private readonly organizationReads: OrganizationReadApi,
     private readonly trail: RenewalRecordTrail,
     private readonly runner: TransactionRunner,
-    @Optional() private readonly lines?: SubscriptionRenewalLinesService,
+    private readonly lines: SubscriptionRenewalLinesService,
   ) {}
 
   /**
@@ -139,9 +139,7 @@ export class RenewalRecordService {
     const ending =
       (await this.repo.endingAmong([period.subscriptionId], tx)).has(period.subscriptionId) &&
       decidedCancelOf(cases) === null;
-    const computedLines = this.lines
-      ? await this.lines.computeForPeriod(period, today, tx)
-      : { servingLines: [], lines: [], shortfall: 0 };
+    const computedLines = await this.lines.computeForPeriod(period, today, tx);
 
     const { adjustment, counts, choice, quantity, lineDecisions } = input.lines
       ? await this.checkLineProposal(tx, period, ending, today, input, note, computedLines)
@@ -321,7 +319,7 @@ export class RenewalRecordService {
       activeSeatsAtDecision: counts.heldPastRenewal,
       snapshot: { source: 'NOT_CONNECTED', takenAt: when.now.toISOString() },
     });
-    if (this.lines && lineDecisions.length > 0) {
+    if (lineDecisions.length > 0) {
       await this.lines.persistProposalTargets(tx, {
         renewalOn: adjustment.end,
         renewalId: proposed.id,

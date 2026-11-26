@@ -246,7 +246,7 @@ export class RenewalOutcomeService {
     renewalId: string,
     nextPeriod: RecordOutcomeNextPeriodInput,
   ): Promise<void> {
-    const targets = (await this.repo.lineTargetsOfRenewal?.(renewalId, tx)) ?? [];
+    const targets = await this.repo.lineTargetsOfRenewal(renewalId, tx);
     const proposed = targets.filter((t) => t.recordedQuantity !== null);
     if (proposed.length === 0) return;
     if (!nextPeriod.lines) {

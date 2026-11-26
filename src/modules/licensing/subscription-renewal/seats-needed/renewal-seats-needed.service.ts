@@ -1,4 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../../core/business-date';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import { SeatLedgerApi, type SubscriptionLineRecord } from '../../../catalog/public/seat-ledger.api';
@@ -35,12 +35,12 @@ export class RenewalSeatsNeededService {
   constructor(
     private readonly seats: SubscriptionRenewalSeatRepo,
     private readonly renewalHold: RenewalHoldHook,
-    @Optional() private readonly seatLedger?: SeatLedgerApi,
-    @Optional() private readonly sharedPool?: SharedPoolService,
+    private readonly seatLedger: SeatLedgerApi,
+    private readonly sharedPool: SharedPoolService,
   ) {}
 
   async countFor(input: SeatsNeededInput, tx?: DbTx): Promise<SeatsNeededCounts> {
-    const lines = this.seatLedger ? await this.seatLedger.linesOfSubscription(input.subscriptionId, tx) : [];
+    const lines = await this.seatLedger.linesOfSubscription(input.subscriptionId, tx);
     if (lines.length === 0) return this.countLegacy(input, tx);
     return this.countByLines(lines, input, tx);
   }
@@ -57,8 +57,7 @@ export class RenewalSeatsNeededService {
     const emptyWaiting: ReadonlyMap<string, unknown> = new Map();
     const waiting = allEndingIds.length === 0 ? emptyWaiting : await hold.pendingRenewalsOf(allEndingIds, tx);
     const planIds = [...new Set(lines.map((line) => line.planId))];
-    const emptyChosen: ReadonlyMap<string, { subscriptionId: string; subscriptionLineId: string | null }> = new Map();
-    const chosen = this.sharedPool ? await this.sharedPool.chosenLinesOfPlans(planIds, today, tx) : emptyChosen;
+    const chosen = await this.sharedPool.chosenLinesOfPlans(planIds, today, tx);
 
     let openRequests = 0;
     for (const planId of planIds) openRequests += await hold.openRequestsOfPlan(planId, tx);
@@ -87,13 +86,7 @@ export class RenewalSeatsNeededService {
     for (const line of lines) {
       const facts = ctx.factsByPlan.get(line.planId);
       const pending = facts ? facts.endingAssignmentIds.filter((id) => ctx.waiting.has(id)).length : 0;
-      const pointsToLine = isLineChosenForAwaiting(
-        line,
-        lines.length,
-        input.isPrimaryForPlan,
-        ctx.chosen,
-        Boolean(this.sharedPool),
-      );
+      const pointsToLine = ctx.chosen.get(line.planId)?.subscriptionLineId === line.id;
       const awaiting = await this.takePlanAwaiting(line.planId, pointsToLine, awaitingByPlan, hold, tx);
       perLine.push({
         heldPastRenewal: facts?.heldPastRenewal ?? 0,
@@ -141,15 +134,4 @@ export class RenewalSeatsNeededService {
       openRequests: await hold.openRequestsOfPlan(input.planId, tx),
     };
   }
-}
-
-function isLineChosenForAwaiting(
-  line: SubscriptionLineRecord,
-  lineCount: number,
-  isPrimaryForPlan: boolean,
-  chosen: ReadonlyMap<string, { subscriptionId: string; subscriptionLineId: string | null }>,
-  hasSharedPool: boolean,
-): boolean {
-  const chosenLineId = chosen.get(line.planId)?.subscriptionLineId ?? null;
-  return chosenLineId === line.id || (!hasSharedPool && lineCount === 1 && isPrimaryForPlan);
 }

@@ -1,4 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { addDays, monthBoundsOf, type BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { CatalogPricingApi } from '../../catalog/public/catalog-pricing.api';
@@ -23,12 +23,12 @@ export class LicensingSeatMonthApi {
     private readonly seats: AssignmentSeatMonthRepo,
     private readonly catalogPricing: CatalogPricingApi,
     private readonly renewals: SubscriptionRenewalRepo,
-    @Optional() private readonly lineTargets?: SubscriptionLineTargetRepo,
+    private readonly lineTargets: SubscriptionLineTargetRepo,
   ) {}
 
   /** Locked target snapshots of prior lines (`subscription_line_targets`). */
   async getPriorLineTargets(priorLineIds: readonly string[], tx?: DbTx): Promise<PriorLineLockedTarget[]> {
-    if (!this.lineTargets || priorLineIds.length === 0) return [];
+    if (priorLineIds.length === 0) return [];
     const rows = await this.lineTargets.ofLines(priorLineIds, tx);
 
     return rows.map((row) => ({

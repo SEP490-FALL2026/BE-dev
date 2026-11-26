@@ -139,7 +139,7 @@ describe('RenewalOutcomeService', () => {
       endDate: '2028-06-30',
     });
     const service = new RenewalOutcomeService(
-      { recordOutcome } as unknown as SubscriptionRenewalRepo,
+      { recordOutcome, lineTargetsOfRenewal: jest.fn().mockResolvedValue([]) } as unknown as SubscriptionRenewalRepo,
       { notEndedBy: jest.fn().mockResolvedValue([]) } as unknown as SubscriptionRenewalSeatRepo,
       { carry: jest.fn().mockResolvedValue(0) } as unknown as AssignmentService,
       { recordNextPeriod } as unknown as SubscriptionPeriodApi,
@@ -256,7 +256,7 @@ describe('RenewalOutcomeService', () => {
     });
     const closeExpiredLines = jest.fn().mockResolvedValue(undefined);
     const service = new RenewalOutcomeService(
-      { recordOutcome } as unknown as SubscriptionRenewalRepo,
+      { recordOutcome, lineTargetsOfRenewal: jest.fn().mockResolvedValue([]) } as unknown as SubscriptionRenewalRepo,
       { notEndedBy: jest.fn().mockResolvedValue([]) } as unknown as SubscriptionRenewalSeatRepo,
       { carry: jest.fn() } as unknown as AssignmentService,
       { closeExpiredLines } as unknown as SubscriptionPeriodApi,
