@@ -8,6 +8,7 @@ import { SeatMonthRepo } from '../../../src/modules/budgets/seat-month/seat-mont
 import { SharedPoolLineAlertService } from '../../../src/modules/budgets/shared-pool-line/shared-pool-line-alert.service';
 import { SharedPoolLineFactsService } from '../../../src/modules/budgets/shared-pool-line/shared-pool-line-facts.service';
 import { InvoiceHarness } from '../../support/invoice-harness';
+import { pretendBusinessToday } from '../../support/pretend-today';
 import type { Unit } from '../../support/spend-harness';
 
 const h = new InvoiceHarness();
@@ -548,7 +549,13 @@ describe('W3-25 P20: license-lot charges, 3-order allocation invariant (= A), an
     );
     expect(notices.length).toBeGreaterThanOrEqual(1);
 
-    const figures = await h.ctx.app.get(SharedPoolLineFactsService, { strict: false }).yearFigures(2027, 12);
+    let figures: Awaited<ReturnType<SharedPoolLineFactsService['yearFigures']>>;
+    const clock = pretendBusinessToday(h.ctx.app, '2028-01-01');
+    try {
+      figures = await h.ctx.app.get(SharedPoolLineFactsService, { strict: false }).yearFigures(2027, 12);
+    } finally {
+      clock.mockRestore();
+    }
     expect(figures.deviceLotPurchasesMinor).toBe(20n * M);
     expect(figures.replacementKeysMinor).toBe(6n * M);
     const { rows: stockAccAllocs } = await h.ctx.sql.query<{ bucket: string; amount_minor: string }>(

@@ -196,7 +196,7 @@ describe('lot invoice confirmation vs group member withdrawal race (integration,
 
       const [confirmRes, withdrawRes] = await Promise.all([confirmTask, withdrawTask]);
 
-      expect(confirmRes.status).toBe(200);
+      expect(confirmRes.status).toBe(201);
       expect(withdrawRes.status).toBe(200);
 
       const { rows: buckets } = await h.ctx.sql.query<{ bucket: string; total: string }>(

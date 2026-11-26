@@ -508,11 +508,11 @@ describe('W3-23 P13b: K1 annual allocations, 01/01 pairing, F8 transfer (D-16), 
          (id, organization_id, type, branch, state, plan_id, department_id, cost_center_id,
           requester_employee_id, business_reason, submitted_at, budget_year, amount_months,
           next_year_amount_minor, amount_minor, amount_currency, term_months, unit_price_minor,
-          billing_cycle, pricing_status, expected_end_date, replaces_assignment_id, policy,
-          created_by_app_user_id)
+          billing_cycle, pricing_status, expected_end_date, replaces_assignment_id, limit_exemption,
+          policy, created_by_app_user_id)
        VALUES ($1, $2, 'GRANT', 'PAID_IN_CATALOG', 'COMPLETED', $3, $4, $5, $6, 'K1 transfer re-grant F-7',
                '2026-12-20T02:00:00Z', $7, 0, '4500000', 0, 'VND', 12, '450000', 'MONTHLY', 'PRICED',
-               '2027-11-04', $8, $9::jsonb, $10)`,
+               '2027-11-04', $8, 'TRANSFER_GRACE', $9::jsonb, $10)`,
       [
         newRequestId,
         h.seed.organizationId,
