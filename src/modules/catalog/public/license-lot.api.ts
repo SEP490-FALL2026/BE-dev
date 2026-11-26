@@ -23,7 +23,10 @@ export class LicenseLotApi {
    */
   async createLot(actor: AuthenticatedPrincipal, input: CreateLicenseLotInput, tx?: DbTx): Promise<{ id: string }> {
     try {
-      return { id: (await this.creator.create(actor, input, tx)).id };
+      const created =
+        tx === undefined ? await this.creator.create(actor, input) : await this.creator.create(actor, input, tx);
+
+      return { id: created.id };
     } catch (error) {
       // The route that calls is another module's: it gets the answer of the lot routes, not the errors of the catalog.
       throw toLicenseLotApiException(error);

@@ -18,7 +18,7 @@ const empRef = { employeeId: EMP_ID, employeeCode: 'EMP-01', fullName: 'Nguyen V
 const baseRequestView = (over: Record<string, unknown> = {}) => ({
   id: REQ_ID,
   type: 'GRANT',
-  branch: 'PAID',
+  branch: 'PAID_IN_CATALOG',
   state: 'AWAITING_SPEND_DECISION',
   routing: { mode: 'VIA_HEAD', oneStepReason: null },
   plan: { planId: PLAN_ID, planName: 'Standard', applicationId: DEPT_ID, applicationName: 'Lan' },
@@ -54,8 +54,8 @@ const baseRequestView = (over: Record<string, unknown> = {}) => ({
   renewal: null,
   needStep: {
     id: STEP_ID,
-    kind: 'NEED',
     state: 'APPROVED',
+    routingRow: 1,
     waitingReason: null,
     slaWorkingDays: 3,
     createdAt: TS,
