@@ -24,7 +24,6 @@ function build(input: { applicationResponsible: string | null; usable: readonly 
     {} as never,
     { responsibleItAdminIdOf } as never,
     {} as never,
-    {} as never,
   );
 
   return { service, responsibleItAdminIdOf, findUsableItAdminEmployeeIds };
@@ -121,7 +120,6 @@ describe('SubscriptionPoolService.assertVendorAdmins and assertActivation', () =
       { findLivenessOfPooledPlans } as never,
       {} as never,
       baselinePhase as never,
-      {} as never,
       {} as never,
       { workingAdminCount } as never,
     );

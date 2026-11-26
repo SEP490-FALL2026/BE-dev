@@ -1,7 +1,4 @@
 import request from 'supertest';
-import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
-import { principal } from '../../support/ai-assist-fakes';
-import { CatalogApi } from '../../../src/modules/catalog/public/catalog.api';
 import type { ApiAccount } from '../../support/api-accounts';
 import { buildActivatedAccount } from '../../support/builders/account.builder';
 import { SeatHarness } from '../../support/seat-baseline-harness';
@@ -168,29 +165,5 @@ describe('the notice of a rise of the seats bought of a subscription (X-IT.7)', 
       expect(h.codeOf(refused)).toBe('SUBSCRIPTION.VERSION_REQUIRED');
       expect(await quantityOf(id)).toBe(4);
     });
-
-    it.each(['K2', 'K1'] as const)(
-      'a seat bought for a %s grant between the read and the PATCH makes the PATCH stale',
-      async (type) => {
-        const id = await h.subscription(4, type);
-        const seen = await read(id);
-
-        // What a grant does in its own transaction: lock the target, then buy the seat (the K1 grant takes its own seat the same way).
-        const catalog = h.ctx.app.get(CatalogApi, { strict: false });
-        await h.ctx.app.get(TransactionRunner).run(async (tx) => {
-          await catalog.lockSeatTarget(tx, { subscriptionId: id });
-          await catalog.incrementLegacyPoolSeat(tx, principal(h.it1.employeeId), id, null);
-        });
-        expect(await quantityOf(id)).toBe(5);
-
-        const refused = await patch(id, {
-          purchasedQuantity: 9,
-          expectedUpdatedAt: seen,
-          quantityChangeReason: 'More seats',
-        }).expect(409);
-        expect(h.codeOf(refused)).toBe('SUBSCRIPTION.STALE');
-        expect(await quantityOf(id)).toBe(5);
-      },
-    );
   });
 });

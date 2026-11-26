@@ -318,27 +318,25 @@ export class ProvisioningGrantWriter {
     facts: { requestId: string; beneficiaryEmployeeId: string; today: string },
   ): Promise<void> {
     if (target.subscriptionId === null) return;
-    if (provisioningType === 'K2' && target.subscriptionLineId) {
-      const { purchase } = await this.seatLedger.buyForItems(
-        tx,
-        target.subscriptionLineId,
-        [{ requestId: facts.requestId, beneficiaryEmployeeId: facts.beneficiaryEmployeeId }],
-        facts.today,
-        { actor, alreadyLocked: true, today: facts.today },
-      );
-      await this.seatLedger.notifySeatsBought(tx, {
-        organizationId: purchase.organizationId,
-        subscriptionId: target.subscriptionId,
-        subscriptionLineId: target.subscriptionLineId,
-        seatPurchaseId: purchase.id,
-        quantity: purchase.quantity,
-        responsibleItAdminEmployeeId: target.responsibleItAdminEmployeeId ?? null,
-        actor,
-      });
-
-      return;
+    if (provisioningType !== 'K2' || !target.subscriptionLineId) {
+      throw new SeatTargetNotFoundError('SUBSCRIPTION');
     }
-    await this.catalog.incrementLegacyPoolSeat(tx, actor, target.subscriptionId, facts.requestId);
+    const { purchase } = await this.seatLedger.buyForItems(
+      tx,
+      target.subscriptionLineId,
+      [{ requestId: facts.requestId, beneficiaryEmployeeId: facts.beneficiaryEmployeeId }],
+      facts.today,
+      { actor, alreadyLocked: true, today: facts.today },
+    );
+    await this.seatLedger.notifySeatsBought(tx, {
+      organizationId: purchase.organizationId,
+      subscriptionId: target.subscriptionId,
+      subscriptionLineId: target.subscriptionLineId,
+      seatPurchaseId: purchase.id,
+      quantity: purchase.quantity,
+      responsibleItAdminEmployeeId: target.responsibleItAdminEmployeeId ?? null,
+      actor,
+    });
   }
 
   private async k1GrantFields(

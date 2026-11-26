@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import { DONG } from '../../../core/money/money';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { isLineServingOn } from '../subscription-line/subscription-line.policy';
 import { SubscriptionLineRepo } from '../subscription-line/subscription-line.repo';
 import { SubscriptionPoolService } from './pool/subscription-pool.service';
@@ -57,18 +56,6 @@ export class SubscriptionFactsService {
       .map((line) => line.id);
 
     return { hasLines: true, servingLineIds };
-  }
-
-  /** Temporary legacy seat increment kept only for K1 (until P13a) and K4 (until P20), plus pre-P15 K2 periods without a line.
-   * Throws PoolSeatNotAddableError.
-   */
-  incrementLegacySeat(
-    tx: DbTx,
-    actor: AuthenticatedPrincipal,
-    subscriptionId: string,
-    requestId: string | null = null,
-  ): Promise<number> {
-    return this.pool.incrementLegacySeat(tx, actor, subscriptionId, requestId);
   }
 
   /** Every active subscription of the company, for the baseline of the budget: one statement. */

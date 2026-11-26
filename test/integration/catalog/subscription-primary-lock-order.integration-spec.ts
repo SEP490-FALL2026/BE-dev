@@ -1,6 +1,7 @@
 import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../src/infrastructure/security/tokens/access-token-verifier.port';
 import { CatalogApi } from '../../../src/modules/catalog/public/catalog.api';
+import { SeatLedgerApi } from '../../../src/modules/catalog/public/seat-ledger.api';
 import { Barrier } from '../../support/concurrency-harness';
 import { SubscriptionHttpHarness, type SubscriptionWire } from '../../support/subscription-http-harness';
 
@@ -49,6 +50,7 @@ describe('Subscription primary change and pool seat addition lock order (integra
 
     const runner = h.ctx.app.get(TransactionRunner, { strict: false });
     const catalog = h.ctx.app.get(CatalogApi, { strict: false });
+    const ledger = h.ctx.app.get(SeatLedgerApi, { strict: false });
     const actor: AuthenticatedPrincipal = {
       subject: h.it1.appUserId,
       appUserId: h.it1.appUserId,
@@ -65,7 +67,18 @@ describe('Subscription primary change and pool seat addition lock order (integra
       const barrier = new Barrier(2);
       const addSeatTask = (async () => {
         await barrier.wait();
-        return runner.run((tx) => catalog.incrementLegacyPoolSeat(tx, actor, currentPrimary, null));
+        return runner.run(async (tx) => {
+          const target = await catalog.lockSeatTarget(tx, { subscriptionId: currentPrimary });
+          if (!target?.subscriptionLineId) throw new Error('Expected active K2 subscription line');
+          return ledger.recordVendor(tx, target.subscriptionLineId, {
+            delta: 1,
+            effectiveOn: '2026-03-15',
+            note: 'Primary lock order verification',
+            actor,
+            alreadyLocked: true,
+            today: '2026-03-15',
+          });
+        });
       })();
       const makePrimaryTask = (async () => {
         await barrier.wait();

@@ -1,7 +1,4 @@
 import request from 'supertest';
-import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
-import { CatalogApi } from '../../../src/modules/catalog/public/catalog.api';
-import { principal } from '../../support/ai-assist-fakes';
 import { SeatHarness } from '../../support/seat-baseline-harness';
 
 const h = new SeatHarness();
@@ -31,15 +28,15 @@ describe('subscription quantity change rules (real PostgreSQL)', () => {
     expect(h.codeOf(res)).toBe('SUBSCRIPTION.VERSION_REQUIRED');
   });
 
-  it('refuses a PATCH with stale expectedUpdatedAt after addPoolSeat: 409 SUBSCRIPTION.STALE', async () => {
+  it('refuses a PATCH with stale expectedUpdatedAt after an earlier PATCH: 409 SUBSCRIPTION.STALE', async () => {
     const id = await h.subscription(6, 'K2');
     const seen = await read(id);
 
-    const catalog = h.ctx.app.get(CatalogApi, { strict: false });
-    await h.ctx.app.get(TransactionRunner).run(async (tx) => {
-      await catalog.lockSeatTarget(tx, { subscriptionId: id });
-      await catalog.incrementLegacyPoolSeat(tx, principal(h.it1.employeeId), id, null);
-    });
+    await patch(id, {
+      purchasedQuantity: 7,
+      quantityChangeReason: 'Team growth',
+      expectedUpdatedAt: seen,
+    }).expect(200);
 
     const res = await patch(id, {
       purchasedQuantity: 10,

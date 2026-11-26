@@ -3,6 +3,7 @@ import type { AuthenticatedPrincipal } from '../../../../infrastructure/security
 import type { CatalogApi } from '../../../catalog/public/catalog.api';
 import type { SeatLedgerApi } from '../../../catalog/public/seat-ledger.api';
 import type { AssignmentService } from '../../assignment/assignment.service';
+import { SeatTargetNotFoundError } from '../../public/licensing.errors';
 import type { GrantRequestGateHook } from '../../public/licensing.extension-points';
 import type { SharedPoolService } from '../../shared-pool/shared-pool.service';
 import type { ProvisioningGrantTaskService } from './provisioning-grant-task.service';
@@ -31,7 +32,6 @@ function makeWriter(overrides: {
     changes: [],
   });
   const notifySeatsBought = jest.fn().mockResolvedValue(1);
-  const incrementLegacyPoolSeat = jest.fn().mockResolvedValue(6);
   const createFromRequest = jest.fn().mockResolvedValue({ id: 'asg-1' });
   const isPlanTarget = overrides.provisioningType === 'K1';
   const lockSeatTarget = jest.fn().mockResolvedValue({
@@ -67,7 +67,6 @@ function makeWriter(overrides: {
     {
       findSeatTarget: jest.fn().mockResolvedValue({ planId: 'plan-1', status: 'ACTIVE' }),
       lockSeatTarget,
-      incrementLegacyPoolSeat,
     } as unknown as CatalogApi,
     {
       get: () => ({
@@ -99,12 +98,12 @@ function makeWriter(overrides: {
     { buyForItems, notifySeatsBought } as unknown as SeatLedgerApi,
   );
 
-  return { writer, buyForItems, notifySeatsBought, incrementLegacyPoolSeat, lockSeatTarget, createFromRequest };
+  return { writer, buyForItems, notifySeatsBought, lockSeatTarget, createFromRequest };
 }
 
 describe('ProvisioningGrantWriter.takeSeat (W3-18 K2 shortcut + K1 legacy)', () => {
   it('K2 purchase with subscriptionLineId calls SeatLedgerApi.buyForItems(tx, lineId, [item], today) and notifySeatsBought (F-5)', async () => {
-    const { writer, buyForItems, notifySeatsBought, incrementLegacyPoolSeat, lockSeatTarget } = makeWriter({
+    const { writer, buyForItems, notifySeatsBought, lockSeatTarget } = makeWriter({
       provisioningType: 'K2',
       subscriptionLineId: 'line-1',
       responsibleItAdminEmployeeId: 'emp-owner',
@@ -144,11 +143,10 @@ describe('ProvisioningGrantWriter.takeSeat (W3-18 K2 shortcut + K1 legacy)', () 
       responsibleItAdminEmployeeId: 'emp-owner',
       actor,
     });
-    expect(incrementLegacyPoolSeat).not.toHaveBeenCalled();
   });
 
-  it('P13a W3-17: K1 grants without subscription, skips incrementLegacyPoolSeat, and records personalCommitmentMonths & billingAnchorOn', async () => {
-    const { writer, buyForItems, incrementLegacyPoolSeat, lockSeatTarget, createFromRequest } = makeWriter({
+  it('P13a W3-17: K1 grants without subscription and records personalCommitmentMonths & billingAnchorOn', async () => {
+    const { writer, buyForItems, lockSeatTarget, createFromRequest } = makeWriter({
       provisioningType: 'K1',
       referenceCommitmentMonths: 12,
       purchased: false,
@@ -167,7 +165,6 @@ describe('ProvisioningGrantWriter.takeSeat (W3-18 K2 shortcut + K1 legacy)', () 
     } as never);
 
     expect(lockSeatTarget).toHaveBeenCalledWith(tx, { planId: 'plan-1' });
-    expect(incrementLegacyPoolSeat).not.toHaveBeenCalled();
     expect(buyForItems).not.toHaveBeenCalled();
     expect(createFromRequest).toHaveBeenCalledWith(
       tx,
@@ -179,9 +176,8 @@ describe('ProvisioningGrantWriter.takeSeat (W3-18 K2 shortcut + K1 legacy)', () 
     );
   });
 
-  it('K4 uses license lots, skips incrementLegacyPoolSeat, and stores subscriptionId = null for new lots (W3-24)', async () => {
+  it('K4 uses license lots and stores subscriptionId = null for new lots (W3-24)', async () => {
     const buyForItems = jest.fn();
-    const incrementLegacyPoolSeat = jest.fn();
     const createFromRequest = jest
       .fn<
         Promise<{ id: string }>,
@@ -213,7 +209,7 @@ describe('ProvisioningGrantWriter.takeSeat (W3-18 K2 shortcut + K1 legacy)', () 
         service: jest.fn(),
       } as unknown as ProvisioningHolderService,
       { assertSeatTargetUsable: jest.fn(), createFromRequest } as unknown as AssignmentService,
-      { lockSeatTarget, incrementLegacyPoolSeat } as unknown as CatalogApi,
+      { lockSeatTarget } as unknown as CatalogApi,
       {
         get: () => ({
           claimForGrant: jest.fn().mockResolvedValue({
@@ -268,11 +264,33 @@ describe('ProvisioningGrantWriter.takeSeat (W3-18 K2 shortcut + K1 legacy)', () 
       requestId: 'req-1',
     });
     expect(lockSeatTarget).toHaveBeenCalledWith(tx, { licenseLotId: 'lot-1', planId: 'plan-1' });
-    expect(incrementLegacyPoolSeat).not.toHaveBeenCalled();
     expect(buyForItems).not.toHaveBeenCalled();
     expect(createFromRequest).toHaveBeenCalledTimes(1);
     const createdArgs = createFromRequest.mock.calls[0]?.[2];
     expect(createdArgs?.target.subscriptionId).toBeNull();
     expect(createdArgs?.target.licenseLotId).toBe('lot-1');
+  });
+
+  it('F-6: K2 purchase without subscriptionLineId throws SeatTargetNotFoundError without falling back to legacy pool', async () => {
+    const { writer, buyForItems } = makeWriter({
+      provisioningType: 'K2',
+      subscriptionLineId: null,
+      purchased: true,
+    });
+
+    await expect(
+      writer.write(tx, actor, { requestId: 'req-1', beneficiaryEmployeeId: 'emp-1', purchase: {} }, {
+        answer: { seat: 'PERSONAL', employeeId: 'emp-1', planId: 'plan-1', departmentId: 'dept-1' },
+        plan: { planId: 'plan-1', provisioningType: 'K2', keyBinding: null },
+        serviceIdentifier: null,
+        organization: { id: 'org-1' },
+        today: '2026-11-21',
+        inCharge: null,
+        maxAttempts: 3,
+        holderContractEnd: null,
+        holderHasTerm: false,
+      } as never),
+    ).rejects.toThrow(SeatTargetNotFoundError);
+    expect(buyForItems).not.toHaveBeenCalled();
   });
 });

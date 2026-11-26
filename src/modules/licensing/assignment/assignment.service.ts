@@ -487,26 +487,25 @@ export class AssignmentService {
       planId: input.planId,
       servingOn: input.carrying.startDate,
     });
-    if (nextTarget?.subscriptionLineId) {
-      const { purchase } = await this.seatLedger.buyForItems(
-        tx,
-        nextTarget.subscriptionLineId,
-        [{ requestId: input.requestId, beneficiaryEmployeeId: input.beneficiaryEmployeeId }],
-        input.carrying.startDate,
-        { actor, today: input.today, alreadyLocked: true, checkClosedMonth: false },
-      );
-      await this.seatLedger.notifySeatsBought(tx, {
-        organizationId: purchase.organizationId,
-        subscriptionId,
-        subscriptionLineId: nextTarget.subscriptionLineId,
-        seatPurchaseId: purchase.id,
-        quantity: purchase.quantity,
-        responsibleItAdminEmployeeId: nextTarget.responsibleItAdminEmployeeId ?? null,
-        actor,
-      });
-    } else {
-      await this.catalog.incrementLegacyPoolSeat(tx, actor, subscriptionId, input.requestId);
+    if (!nextTarget?.subscriptionLineId) {
+      throw new ProvisioningSubscriptionError('NEXT_PERIOD_SEATS');
     }
+    const { purchase } = await this.seatLedger.buyForItems(
+      tx,
+      nextTarget.subscriptionLineId,
+      [{ requestId: input.requestId, beneficiaryEmployeeId: input.beneficiaryEmployeeId }],
+      input.carrying.startDate,
+      { actor, today: input.today, alreadyLocked: true, checkClosedMonth: false },
+    );
+    await this.seatLedger.notifySeatsBought(tx, {
+      organizationId: purchase.organizationId,
+      subscriptionId,
+      subscriptionLineId: nextTarget.subscriptionLineId,
+      seatPurchaseId: purchase.id,
+      quantity: purchase.quantity,
+      responsibleItAdminEmployeeId: nextTarget.responsibleItAdminEmployeeId ?? null,
+      actor,
+    });
     try {
       await this.carrying.carry(tx, input.carrying);
     } catch (error) {

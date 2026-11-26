@@ -7,7 +7,6 @@ import { OrganizationReadApi } from '../../../organization/public/organization-r
 import { catalogAuditEvent, type CatalogAuditActor } from '../../catalog-audit-event.mapper';
 import { PlanFactsService, type LockedPlan } from '../../plan/plan-facts.service';
 import { needsVendorAdmins } from '../../plan/plan-vendor-admins.policy';
-import { PoolSeatNotAddableError } from '../../public/catalog.errors';
 import { SeatBaselinePhaseHook } from '../../public/catalog.extension-points';
 import {
   SubscriptionDuplicatePlanError,
@@ -26,9 +25,7 @@ import {
   liveIdsByWorkspacePlan,
   liveWorkspaceSiblingsOf,
 } from './subscription-pool.policy';
-import { SubscriptionSeatIncreaseService } from '../seat-increase/subscription-seat-increase.service';
 import { WorkspaceForSubscriptionService } from '../../workspace/workspace-for-subscription.service';
-import { stateOf } from '../subscription.mapper';
 import { SubscriptionRepo } from '../subscription.repo';
 import type {
   BillingCycle,
@@ -94,7 +91,6 @@ export class SubscriptionPoolService {
     private readonly audit: AuditApi,
     private readonly baselinePhase: SeatBaselinePhaseHook,
     private readonly planFacts: PlanFactsService,
-    private readonly seatIncrease: SubscriptionSeatIncreaseService,
     private readonly workspaces: WorkspaceForSubscriptionService,
   ) {}
 
@@ -292,53 +288,6 @@ export class SubscriptionPoolService {
     await this.releasePrimary(tx, actor, organizationId, previous.id);
 
     return true;
-  }
-
-  /**
-   * Legacy seat increment kept for K1 (until P13a) and K4 (until P20), plus pre-P15 K2 subscriptions without a line:
-   * raises `purchased_quantity` by 1 under the caller's subscription lock, records audit, and notifies K2/K4 responsible IT Admin.
-   * Throws PoolSeatNotAddableError.
-   */
-  async incrementLegacySeat(
-    tx: DbTx,
-    actor: AuthenticatedPrincipal,
-    subscriptionId: string,
-    requestId: string | null = null,
-  ): Promise<number> {
-    const current = await this.subscriptions.find(subscriptionId, tx);
-    if (!current) throw new PoolSeatNotAddableError('NOT_FOUND');
-    if (current.status !== 'ACTIVE') throw new PoolSeatNotAddableError('NOT_ACTIVE');
-    const organization = await this.organizationReads.getOrganization(tx);
-    if (!organization) throw new Error('A seat was bought before installation');
-
-    const next = (current.purchasedQuantity ?? 0) + 1;
-    await this.subscriptions.update(tx, current.id, { ...stateOf(current), purchasedQuantity: next });
-    await this.audit.record(
-      tx,
-      catalogAuditEvent(
-        actor,
-        organization.id,
-        'SUBSCRIPTION.UPDATED',
-        'Subscription',
-        current.id,
-        { purchasedQuantity: current.purchasedQuantity },
-        { purchasedQuantity: next, cause: 'SEAT_BOUGHT_WITH_GRANT' },
-      ),
-    );
-    // The IT Admin who answers for a K2 or K4 pool is told of the seat bought for a request (`QĐ-110v`); a K1 purchase tells nobody (`S-4`).
-    await this.seatIncrease.told(tx, {
-      organizationId: organization.id,
-      subscriptionId: current.id,
-      planProvisioningType: current.planProvisioningType,
-      status: current.status,
-      responsibleItAdminEmployeeId: current.responsibleItAdminEmployeeId,
-      from: current.purchasedQuantity,
-      to: next,
-      requestId,
-      actor,
-    });
-
-    return next;
   }
 
   /** Only an active subscription that no later period continues prices its plan; the flag of the others of the plan is taken off first. */

@@ -7,7 +7,7 @@ import type { CatalogApi } from '../../catalog/public/catalog.api';
 import type { SeatLedgerApi } from '../../catalog/public/seat-ledger.api';
 import type { SubscriptionPeriodApi } from '../../catalog/public/subscription-period.api';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import { AssignmentConflictError } from '../public/licensing.errors';
+import { AssignmentConflictError, ProvisioningSubscriptionError } from '../public/licensing.errors';
 import type { AssignmentCarryRepo } from './assignment-carry.repo';
 import type { AssignmentDepartmentRepo } from './assignment-department.repo';
 import { AssignmentRepo } from './assignment.repo';
@@ -101,7 +101,6 @@ describe('AssignmentService.carryOrBuy (Q-B next-period ledger purchase)', () =>
       changes: [],
     });
     const notifySeatsBought = jest.fn().mockResolvedValue(1);
-    const incrementLegacyPoolSeat = jest.fn();
 
     const service = new AssignmentService(
       {
@@ -122,7 +121,7 @@ describe('AssignmentService.carryOrBuy (Q-B next-period ledger purchase)', () =>
       } as unknown as AssignmentRepo,
       {} as unknown as AssignmentDepartmentRepo,
       {} as unknown as OrganizationReadApi,
-      { lockSeatTarget, incrementLegacyPoolSeat } as unknown as CatalogApi,
+      { lockSeatTarget } as unknown as CatalogApi,
       { record: jest.fn().mockResolvedValue(undefined) } as unknown as AuditApi,
       { buyForItems, notifySeatsBought } as unknown as SeatLedgerApi,
       {
@@ -185,7 +184,6 @@ describe('AssignmentService.carryOrBuy (Q-B next-period ledger purchase)', () =>
       startDate: '2027-07-01',
       actorAppUserId: 'user-1',
     });
-    expect(incrementLegacyPoolSeat).not.toHaveBeenCalled();
   });
 
   it('rethrows non-capacity carry errors without calling SeatLedgerApi.buyForItems', async () => {
@@ -245,6 +243,74 @@ describe('AssignmentService.carryOrBuy (Q-B next-period ledger purchase)', () =>
     ).rejects.toMatchObject({
       name: AssignmentConflictError.name,
       conflict: 'OVERLAP',
+    });
+    expect(buyForItems).not.toHaveBeenCalled();
+  });
+
+  it('F-6: throws ProvisioningSubscriptionError(NEXT_PERIOD_SEATS) when carrying lacks room and next period has no line', async () => {
+    const tx = { kind: 'tx' } as unknown as DbTx;
+    const noRoomError = carryRefusal('23514', 'The seats of the subscription are all taken');
+    const buyForItems = jest.fn();
+    const service = new AssignmentService(
+      {
+        insert: jest.fn().mockResolvedValue({
+          id: 'asg-1',
+          organizationId: 'org-1',
+          source: 'REQUEST',
+          kind: 'PERSONAL',
+          planId: 'plan-1',
+          subscriptionId: 'sub-old',
+          employeeId: 'emp-minh',
+          effectiveFrom: '2027-06-20',
+          effectiveFromBasis: 'ACTUAL',
+          validUntil: null,
+          expectedEndDate: null,
+          owningDepartmentId: 'dept-eng',
+        }),
+      } as unknown as AssignmentRepo,
+      {} as unknown as AssignmentDepartmentRepo,
+      {} as unknown as OrganizationReadApi,
+      {
+        lockSeatTarget: jest.fn().mockResolvedValue({
+          kind: 'SUBSCRIPTION',
+          subscriptionId: 'sub-next',
+          subscriptionLineId: null,
+          planId: 'plan-1',
+        }),
+      } as unknown as CatalogApi,
+      { record: jest.fn().mockResolvedValue(undefined) } as unknown as AuditApi,
+      { buyForItems } as unknown as SeatLedgerApi,
+      {
+        getPeriods: jest
+          .fn()
+          .mockResolvedValueOnce([
+            { subscriptionId: 'sub-old', renewedById: 'sub-next', adjustment: { end: '2027-06-30' } },
+          ])
+          .mockResolvedValueOnce([{ subscriptionId: 'sub-next', status: 'ACTIVE', startDate: '2027-07-01' }]),
+      } as unknown as SubscriptionPeriodApi,
+      { carryBehindSavepoint: jest.fn().mockResolvedValue(noRoomError) } as unknown as AssignmentCarryRepo,
+    );
+
+    await expect(
+      service.createFromRequest(tx, carryActor, {
+        organizationId: 'org-1',
+        requestId: 'req-minh',
+        departmentId: 'dept-eng',
+        target: { kind: 'SUBSCRIPTION', subscriptionId: 'sub-old', planId: 'plan-1' } as never,
+        holder: {
+          kind: 'PERSONAL',
+          employeeId: 'emp-minh',
+          accountIdentifier: 'minh@acme.vn',
+          reason: null,
+          costCenterId: null,
+          owningDepartmentId: null,
+        },
+        effectiveFrom: '2027-06-20',
+        expectedEndDate: null,
+      }),
+    ).rejects.toMatchObject({
+      name: ProvisioningSubscriptionError.name,
+      problem: 'NEXT_PERIOD_SEATS',
     });
     expect(buyForItems).not.toHaveBeenCalled();
   });

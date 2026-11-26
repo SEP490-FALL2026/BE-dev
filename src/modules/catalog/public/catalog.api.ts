@@ -200,19 +200,6 @@ export class CatalogApi {
   }
 
   /**
-   * Temporary legacy seat increment kept only for K1 (until P13a) and K4 (until P20), plus pre-P15 K2 periods with no line.
-   * K2 line purchases must use `SeatLedgerApi.buyForItems`. Throws PoolSeatNotAddableError.
-   */
-  incrementLegacyPoolSeat(
-    tx: DbTx,
-    actor: AuthenticatedPrincipal,
-    subscriptionId: string,
-    requestId: string | null = null,
-  ): Promise<number> {
-    return this.subscriptions.incrementLegacySeat(tx, actor, subscriptionId, requestId);
-  }
-
-  /**
    * Attaches the purchase documents of a purchase invoice (`PI-1`) to it in the transaction of the caller: only `PURCHASE_DOCUMENT` files the actor uploaded
    * that are uploaded and not attached yet. Throws DocumentAttachRefusedError.
    */
