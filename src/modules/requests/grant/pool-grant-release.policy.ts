@@ -9,7 +9,13 @@ import type { GrantOutcome, GrantOutcomeFacts, ProvisioningKind } from '../../li
  * revocation so each rule has one home.
  */
 export function releasesAllOnPoolGrant(outcome: GrantOutcome, facts: GrantOutcomeFacts | undefined): boolean {
-  return outcome === 'COMPLETED' && facts !== undefined && facts.fromPool && facts.provisioningType === 'K4';
+  return (
+    outcome === 'COMPLETED' &&
+    facts !== undefined &&
+    facts.fromPool &&
+    facts.provisioningType === 'K4' &&
+    facts.licenseLotId === undefined
+  );
 }
 
 export interface PoolAvoidedCostInput {

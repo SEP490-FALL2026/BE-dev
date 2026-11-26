@@ -6,7 +6,15 @@ import { Contributions } from '../../../core/extension/contributions';
  * the owning module supplies at read time (`NotificationNameSource`); the kinds a sentence can name are fixed here, once.
  */
 export type NameKind =
-  'REQUEST' | 'EMPLOYEE' | 'DEPARTMENT' | 'COST_CENTER' | 'APPLICATION' | 'PLAN' | 'SUBSCRIPTION' | 'WORKSPACE';
+  | 'REQUEST'
+  | 'EMPLOYEE'
+  | 'DEPARTMENT'
+  | 'COST_CENTER'
+  | 'APPLICATION'
+  | 'PLAN'
+  | 'SUBSCRIPTION'
+  | 'WORKSPACE'
+  | 'LICENSE_LOT';
 
 /** The module that owns the table of some kinds answers for their display names, in one query per kind. */
 export interface NotificationNameSource {

@@ -123,6 +123,12 @@ export interface CommitmentReleaseInput {
    * reason and reference gives nothing again, so the event is released once whatever repeats it.
    */
   reference?: string;
+  /** Set for a license-lot invoice (`REQUEST`, `STOCK`, `REPLACEMENT`, `OPENING`) to allocate across CC and lot pool buckets. */
+  licenseLotId?: string | null;
+  /** Confirmation month (`YYYY-MM-01`) for license-lot invoice allocations; defaults to `serviceMonth`. */
+  allocationMonth?: BusinessDate | null;
+  /** Active non-withdrawn beneficiary count `m` of a `REQUEST` lot at confirmation time. */
+  lotBeneficiaryCount?: number | null;
   now: Date;
 }
 
@@ -223,6 +229,12 @@ export interface PurchaseInvoiceRecordInput {
       requestId: string | null;
     }[];
   } | null;
+  /** Set for a license-lot invoice (`REQUEST`, `STOCK`, `REPLACEMENT`, `OPENING`) to allocate across CC and lot pool buckets. */
+  licenseLotId?: string | null;
+  /** Confirmation month (`YYYY-MM-01`) for license-lot invoice allocations; defaults to `serviceMonth`. */
+  allocationMonth?: BusinessDate | null;
+  /** Active non-withdrawn beneficiary count `m` of a `REQUEST` lot at confirmation time. */
+  lotBeneficiaryCount?: number | null;
   now: Date;
 }
 
@@ -293,6 +305,35 @@ export interface K1TransferAllocationInput {
   newCostCenterId: string;
   oldRequestIds: readonly string[];
   newRequestId: string | null;
+  reference: string;
+  now: Date;
+}
+
+export interface ExcessLicenseGrantInput {
+  organizationId: string;
+  licenseLotId: string;
+  licenseKeyId: string;
+  grantRequestId: string;
+  costCenterId: string;
+  keyCostBorneBeforeGrant: boolean;
+  grantMonth: BusinessDate;
+  effectiveBeneficiaryCount: number;
+  reference: string;
+  now: Date;
+}
+
+export interface ExcessLicenseGrantRecorded {
+  kind: 'OWN_REQUEST' | 'ALREADY_BORNE' | 'EXCESS_LICENSE';
+  chargeMinor: bigint;
+  markCostBorne: boolean;
+  releaseCommitmentAll: boolean;
+}
+
+export interface LotWithdrawalAfterInvoiceInput {
+  licenseLotId: string;
+  requestId: string;
+  costCenterId: string;
+  withdrawalMonth: BusinessDate;
   reference: string;
   now: Date;
 }

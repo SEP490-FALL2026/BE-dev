@@ -54,6 +54,10 @@ export class AssignmentSeatOccupancy implements SeatOccupancyReader, OnModuleIni
     return this.deviceActivations.keyCountsOfLots(lotIds, tx);
   }
 
+  openGrantTasksWithoutKeyOfPlans(planIds: readonly string[], tx?: DbTx) {
+    return this.deviceActivations.openGrantTasksWithoutKeyOfPlans(planIds, tx);
+  }
+
   openHolderCount(planIds: readonly string[], day: BusinessDate): Promise<number> {
     return this.repo.countHoldersOfPlans(planIds, day);
   }

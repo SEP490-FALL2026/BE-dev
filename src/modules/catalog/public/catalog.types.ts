@@ -1,7 +1,10 @@
 import type { BusinessDate } from '../../../core/business-date';
 
 /** What a seat is held against: a subscription of a paid plan (optionally naming the line and serving day), or an internal plan that has no subscription. */
-export type SeatTargetRef = { subscriptionId: string; planId?: string; servingOn?: BusinessDate } | { planId: string };
+export type SeatTargetRef =
+  | { subscriptionId: string; planId?: string; servingOn?: BusinessDate }
+  | { licenseLotId: string; planId?: string }
+  | { planId: string };
 
 /** What holds a set of plans: a bounded list of assignments and the counts that are not bounded. */
 export interface OpenSeatHoldings {
@@ -22,6 +25,8 @@ export interface OpenSeatHolding {
 export interface SeatTarget {
   kind: 'SUBSCRIPTION' | 'PLAN';
   subscriptionId: string | null;
+  /** The lot id when targeting a K4 license lot (`W3-24`); null/undefined otherwise. */
+  licenseLotId?: string | null;
   /** The subscription line serving `servingOn` for K2 targets; null for PLAN, K1, K4, or when no line serves that day. */
   subscriptionLineId?: string | null;
   planId: string;

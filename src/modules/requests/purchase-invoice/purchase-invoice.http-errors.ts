@@ -15,6 +15,7 @@ const STATUS: Record<PurchaseInvoiceRefusal, HttpStatus> = {
   REQUEST_NOT_PURCHASABLE: HttpStatus.CONFLICT,
   SEAT_PURCHASE_REQUIRED: HttpStatus.UNPROCESSABLE_ENTITY,
   SEAT_PURCHASE_INVOICED: HttpStatus.CONFLICT,
+  LOT_ALREADY_INVOICED: HttpStatus.CONFLICT,
   LINE_ALREADY_INVOICED: HttpStatus.UNPROCESSABLE_ENTITY,
   INVALID_LINE_SELECTION: HttpStatus.UNPROCESSABLE_ENTITY,
   NO_VENDOR: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -61,6 +62,7 @@ export const PURCHASE_INVOICE_ERROR_EXAMPLES = {
     new PurchaseInvoiceRefusedError('SEAT_PURCHASE_REQUIRED', undefined, { seatPurchaseIds: ['<seat-purchase-id>'] }),
   ),
   SEAT_PURCHASE_INVOICED: example(new PurchaseInvoiceRefusedError('SEAT_PURCHASE_INVOICED')),
+  LOT_ALREADY_INVOICED: example(new PurchaseInvoiceRefusedError('LOT_ALREADY_INVOICED')),
   LINE_ALREADY_INVOICED: example(
     new PurchaseInvoiceRefusedError('LINE_ALREADY_INVOICED', undefined, { lineIds: ['<subscription-line-id>'] }),
   ),

@@ -1,7 +1,7 @@
-import type { WorkspaceRepo } from '../workspace/workspace.repo';
-import type { WorkspaceViewService } from '../workspace/workspace-view.service';
-import type { WorkspaceRecord } from '../workspace/workspace.types';
-import { WorkspaceApi } from './workspace.api';
+import type { WorkspaceRepo } from './workspace.repo';
+import type { WorkspaceViewService } from './workspace-view.service';
+import type { WorkspaceRecord } from './workspace.types';
+import { WorkspaceApi } from '../public/workspace.api';
 
 describe('WorkspaceApi', () => {
   const khoa = { employeeId: 'khoa', role: 'OWNER' as const };

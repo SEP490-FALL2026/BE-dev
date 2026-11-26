@@ -5,6 +5,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { BudgetsApi } from '../../budgets/public/budgets.api';
 import { CatalogApi } from '../../catalog/public/catalog.api';
+import type { LicenseLotView } from '../../catalog/public/license-lot.types';
 import { FinanceApi } from '../../finance/public/finance.api';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { LicensingOpenGrantsApi } from '../../licensing/public/licensing-open-grants.api';
@@ -18,11 +19,8 @@ import {
 import type { PoolInvoiceExpectationSource } from './pool-expectation/purchase-invoice-pool-expectation.policy';
 import { PurchaseInvoicePoolService } from './pool-expectation/purchase-invoice-pool-expectation.service';
 import {
-  bearsByHolder,
   chargedCostCenterOf,
-  heldByPerson,
   holderDayOf,
-  isFailedAfterPurchaseState,
   isOverApprovedInvoice,
   pricingOf,
   takesInvoice,
@@ -42,6 +40,7 @@ import {
   collectSegmentDepartments,
   resolveK1AnnualMonthAllocations,
 } from './confirmation/k1-annual-confirmation.policy';
+import { assembleRequestLinkFacts } from './purchase-invoice-lot.policy';
 
 export type { PoolExpectationFacts };
 
@@ -61,6 +60,31 @@ export class PurchaseInvoicePlanService {
     private readonly finance: FinanceApi,
   ) {}
 
+  /** Resolves license-lot allocation month & active beneficiary count when Finance confirms a lot invoice (`W3-25`). */
+  async lotConfirmationContextOf(
+    row: { linkKind: string; licenseLotId: string | null; requestId: string | null },
+    now: Date,
+    tx: DbTx,
+  ): Promise<{ licenseLotId: string; allocationMonth: BusinessDate; lotBeneficiaryCount: number } | null> {
+    if (typeof this.pool.findLot !== 'function') return null;
+    const lot =
+      row.linkKind === 'LICENSE_LOT' && row.licenseLotId
+        ? await this.pool.findLot(row.licenseLotId, tx)
+        : row.linkKind === 'REQUEST' && row.requestId
+          ? await this.pool.findLotOfRequest(row.requestId, tx)
+          : null;
+    if (!lot) return null;
+
+    const tz = (await this.organizationReads.getOrganization(tx))?.timeZone ?? 'Asia/Ho_Chi_Minh';
+    const allocationMonth = firstOfMonth(businessDateAt(now, tz));
+    const lotBeneficiaryCount =
+      lot.purpose === 'REQUEST' && lot.requestId !== null
+        ? await this.invoices.activeBeneficiaryCount(lot.requestId, tx)
+        : 0;
+
+    return { licenseLotId: lot.id, allocationMonth, lotBeneficiaryCount };
+  }
+
   /** Throws PurchaseInvoiceRefusedError and the money errors of `core/money`. */
   async plan(actor: AuthenticatedPrincipal, form: PurchaseInvoiceFormInput, tx?: DbTx): Promise<PurchaseInvoicePlan> {
     const facts = await this.factsOf(actor, form, tx);
@@ -74,6 +98,17 @@ export class PurchaseInvoicePlanService {
       tx,
     );
     const serviceMonth = `${form.servicePeriodMonth}-01`;
+
+    if (form.link.licenseLotId !== undefined) {
+      return this.pool.buildLicenseLotLinkFacts({
+        licenseLotId: form.link.licenseLotId,
+        serviceMonth,
+        scope,
+        invoices: this.invoices,
+        catalog: this.catalog,
+        tx,
+      });
+    }
 
     return form.link.requestId !== undefined
       ? this.requestFacts(form.link.requestId, form.link.provisioningTaskId ?? null, scope, serviceMonth, tx)
@@ -102,29 +137,30 @@ export class PurchaseInvoicePlanService {
     if (vendorId === null) throw new PurchaseInvoiceRefusedError('NO_VENDOR');
     const [target] = await this.catalog.findPlanSeatTargets([request.planId], tx);
     await this.ensureNoK2SeatPurchase(requestId, target?.provisioningType, tx);
+    const requestLot = await this.loadUninvoicedRequestLot(requestId, tx);
     const pool = await this.poolOf(target?.provisioningType, request.planId, tx);
+    const expectedUnitPrice = await this.catalog.getPlanOriginalPrice(request.planId, tx, serviceMonth);
 
-    return {
-      organizationId: request.organizationId,
-      link: { kind: 'REQUEST', requestId, provisioningTaskId },
+    return assembleRequestLinkFacts({
+      request,
+      provisioningTaskId,
+      provisioningType: target?.provisioningType,
+      requestLot,
       vendorId,
-      continuation: request.type === 'RENEWAL',
+      expectedUnitPrice,
+      pool,
       startMonth: await this.startMonthOf(request, tx),
-      termMonths: request.termMonths,
-      expectedQuantity: request.beneficiaryCount,
-      expectedUnitPrice: await this.catalog.getPlanOriginalPrice(request.planId, tx, serviceMonth),
-      requestCostCenterId: request.costCenterId,
-      requestId,
-      holderBound: heldByPerson(request.state, target?.provisioningType),
-      failedGrantDepartmentId:
-        isFailedAfterPurchaseState(request.state) && bearsByHolder(target?.provisioningType)
-          ? request.departmentId
-          : null,
-      poolSubscriptionId: pool.id,
-      seatPricing: pool.pricing,
-      poolSource: pool.poolSource,
-      renewedAssignmentId: request.renewedAssignmentId,
-    };
+    });
+  }
+
+  private async loadUninvoicedRequestLot(requestId: string, tx?: DbTx): Promise<LicenseLotView | null> {
+    if (typeof this.pool.findLotOfRequest !== 'function') return null;
+    const requestLot = await this.pool.findLotOfRequest(requestId, tx);
+    if (requestLot && requestLot.invoiceActualMinor !== null) {
+      throw new PurchaseInvoiceRefusedError('LOT_ALREADY_INVOICED');
+    }
+
+    return requestLot;
   }
 
   private async ensureNoK2SeatPurchase(
@@ -229,6 +265,7 @@ export class PurchaseInvoicePlanService {
       seatPricing: pricingOf(period),
       poolSource,
       renewedAssignmentId: null,
+      licenseLotId: null,
     };
   }
 
@@ -350,7 +387,9 @@ export class PurchaseInvoicePlanService {
     const linkScope =
       facts.link.kind === 'REQUEST'
         ? { requestId: facts.link.requestId }
-        : { subscriptionId: facts.link.subscriptionId };
+        : facts.link.kind === 'LICENSE_LOT'
+          ? { licenseLotId: facts.link.licenseLotId }
+          : { subscriptionId: facts.link.subscriptionId };
     const earlier = await this.invoices.earlierOf(linkScope, tx);
     const period = labelOfPurchaseInvoice({
       link: facts.link.kind,

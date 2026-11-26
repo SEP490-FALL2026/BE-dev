@@ -35,7 +35,11 @@ const link = z
     subscriptionId: z
       .uuid()
       .optional()
-      .meta({ description: 'The subscription the invoice renews; instead of a request.' }),
+      .meta({ description: 'The subscription the invoice renews; instead of a request or a license lot.' }),
+    licenseLotId: z
+      .uuid()
+      .optional()
+      .meta({ description: 'The license lot the invoice pays for; instead of a request or a subscription.' }),
     seatPurchaseId: z
       .uuid()
       .optional()
@@ -53,14 +57,14 @@ const link = z
   })
   .refine(
     (value) =>
-      (value.requestId !== undefined) !== (value.subscriptionId !== undefined) &&
+      [value.requestId, value.subscriptionId, value.licenseLotId].filter((v) => v !== undefined).length === 1 &&
       (value.provisioningTaskId === undefined || value.requestId !== undefined) &&
       (value.seatPurchaseId === undefined || value.subscriptionId !== undefined) &&
       (value.subscriptionLineIds === undefined || value.subscriptionId !== undefined) &&
       !(value.seatPurchaseId !== undefined && value.subscriptionLineIds !== undefined),
     {
       message:
-        'Name a request (with optional task) or a subscription (with optional seatPurchaseId or subscriptionLineIds), not both.',
+        'Name exactly one of a request (with optional task), a subscription (with optional seatPurchaseId or subscriptionLineIds), or a license lot.',
     },
   );
 
@@ -157,6 +161,7 @@ const summarySchema = planView.extend({
 const detailSchema = summarySchema.extend({
   provisioningTaskId: z.uuid().nullable(),
   seatPurchaseId: z.uuid().nullable(),
+  licenseLotId: z.uuid().nullable(),
   unitPriceOriginal: moneyView,
   deductibleTax: moneyView,
   nonDeductibleTax: moneyView,

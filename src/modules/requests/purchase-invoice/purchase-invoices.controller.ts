@@ -54,26 +54,33 @@ const NO_PLACE =
   'the plan of the request has no subscription of the pool that can be taken from today, so there is nowhere to book the invoice (PURCHASE_INVOICE.NO_PLACE)';
 const NOT_PURCHASABLE_OR_NO_PLACE = {
   status: HttpStatus.CONFLICT,
-  description: `${REFUSED_STATE}, seat purchase already invoiced (PURCHASE_INVOICE.SEAT_PURCHASE_INVOICED), or ${NO_PLACE}.`,
-  examples: [EXAMPLES.REQUEST_NOT_PURCHASABLE, EXAMPLES.SEAT_PURCHASE_INVOICED, EXAMPLES.NO_PLACE],
+  description: `${REFUSED_STATE}, seat purchase already invoiced (PURCHASE_INVOICE.SEAT_PURCHASE_INVOICED), license lot already invoiced (PURCHASE_INVOICE.LOT_ALREADY_INVOICED), or ${NO_PLACE}.`,
+  examples: [
+    EXAMPLES.REQUEST_NOT_PURCHASABLE,
+    EXAMPLES.SEAT_PURCHASE_INVOICED,
+    EXAMPLES.LOT_ALREADY_INVOICED,
+    EXAMPLES.NO_PLACE,
+  ],
 } as const;
 const NOT_PURCHASABLE_TAKEN_OR_NO_PLACE = {
   status: HttpStatus.CONFLICT,
-  description: `${REFUSED_STATE}, ${TAKEN_NUMBER}, seat purchase already invoiced (PURCHASE_INVOICE.SEAT_PURCHASE_INVOICED), or ${NO_PLACE}.`,
+  description: `${REFUSED_STATE}, ${TAKEN_NUMBER}, seat purchase already invoiced (PURCHASE_INVOICE.SEAT_PURCHASE_INVOICED), license lot already invoiced (PURCHASE_INVOICE.LOT_ALREADY_INVOICED), or ${NO_PLACE}.`,
   examples: [
     EXAMPLES.REQUEST_NOT_PURCHASABLE,
     EXAMPLES.NUMBER_TAKEN,
     EXAMPLES.SEAT_PURCHASE_INVOICED,
+    EXAMPLES.LOT_ALREADY_INVOICED,
     EXAMPLES.NO_PLACE,
   ],
 } as const;
 const NOT_PURCHASABLE_TAKEN_OR_NOT_RETURNED = {
   status: HttpStatus.CONFLICT,
-  description: `${REFUSED_STATE}, ${TAKEN_NUMBER}, ${NO_PLACE}, the invoice was not returned (PURCHASE_INVOICE.NOT_RETURNED) or was already submitted again (PURCHASE_INVOICE.ALREADY_RESUBMITTED).`,
+  description: `${REFUSED_STATE}, ${TAKEN_NUMBER}, ${NO_PLACE}, license lot already invoiced (PURCHASE_INVOICE.LOT_ALREADY_INVOICED), the invoice was not returned (PURCHASE_INVOICE.NOT_RETURNED) or was already submitted again (PURCHASE_INVOICE.ALREADY_RESUBMITTED).`,
   examples: [
     EXAMPLES.REQUEST_NOT_PURCHASABLE,
     EXAMPLES.NUMBER_TAKEN,
     EXAMPLES.SEAT_PURCHASE_INVOICED,
+    EXAMPLES.LOT_ALREADY_INVOICED,
     EXAMPLES.NO_PLACE,
     EXAMPLES.NOT_RETURNED,
     EXAMPLES.ALREADY_RESUBMITTED,

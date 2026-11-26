@@ -86,6 +86,11 @@ export interface GrantRequestGate {
     items: readonly { requestId: string; beneficiaryEmployeeId: string }[],
     expectedPlanId: string,
   ): Promise<Set<string>>;
+  /** Returns `(beneficiaries, chargedExcess)` per `REQUEST` lot id for `F11` seat reservation checks (`W3-24`). */
+  reservedForRequestLots?(
+    lotRequests: readonly { lotId: string; requestId: string }[],
+    tx?: DbTx,
+  ): Promise<Map<string, { beneficiaries: number; chargedExcess: number }>>;
 }
 
 /** The one gate of requests the provisioning asks (bound by requests; every graph that loads licensing loads it). */

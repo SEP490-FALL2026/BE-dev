@@ -1,5 +1,6 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { Client } from 'pg';
+import { Barrier } from '../../support/concurrency-harness';
 import {
   dropDisposableDatabase,
   provisionDisposableDatabase,
@@ -258,5 +259,133 @@ describe('the licenses of a lot (integration, real PostgreSQL)', () => {
       code: '23505',
       constraint: 'license_lots_request_key',
     });
+  });
+
+  it('barrier x20 grant || device activation on same lot enforces license_count with zero 40P01 deadlocks', async () => {
+    const { w, plan, lotId, keyIds } = await lotWorld('DEVICE_KEY', 8, 1);
+    const deviceIds: string[] = [];
+    for (let i = 0; i < 10; i += 1) {
+      const empId = await w.person(`DEVUSER-${i}`);
+      const devId = randomUUID();
+      await sql.query(
+        `INSERT INTO devices (id, organization_id, asset_code, name, kind, status, owner_employee_id)
+         VALUES ($1, $2, $3, $4, 'LAPTOP', 'ASSIGNED', $5)`,
+        [devId, w.organizationId, `ASSET-${i}-${randomUUID().slice(0, 6)}`, `Mac-${i}`, empId],
+      );
+      deviceIds.push(devId);
+    }
+
+    const workers = 20;
+    const barrier = new Barrier(workers);
+    const results = await Promise.all(
+      Array.from({ length: workers }, async (_, idx) => {
+        const client = new Client({ connectionString: database.url });
+        await client.connect();
+        try {
+          await barrier.wait();
+          await client.query('BEGIN');
+          // Strict lock order: tier 6a license_lots FOR UPDATE -> tier 7 plans FOR SHARE
+          await client.query(`SELECT id FROM license_lots WHERE id = $1 FOR UPDATE`, [lotId]);
+          await client.query(`SELECT id FROM plans WHERE id = $1 FOR SHARE`, [plan]);
+
+          if (idx % 2 === 0) {
+            const devId = deviceIds[Math.floor(idx / 2)];
+            await client.query(
+              `INSERT INTO device_activations (id, organization_id, device_id, license_key_id, activated_by_app_user_id)
+               VALUES ($1, $2, $3, $4, $5)`,
+              [randomUUID(), w.organizationId, devId, keyIds[0], randomUUID()],
+            );
+          } else {
+            const right = randomUUID();
+            const emp = await w.person(`GRANT-DEV-${idx}`);
+            await client.query(
+              `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id,
+                 account_identifier, normalized_account_identifier, valid_from, valid_from_basis, created_by_app_user_id)
+               VALUES ($1, $2, 'PERSONAL', 'REQUEST', $3, NULL, $4, $5, $5, '2026-09-02', 'ACTUAL', $6)`,
+              [right, w.organizationId, plan, emp, `gdev-${idx}@acme.vn`, randomUUID()],
+            );
+          }
+          await client.query('COMMIT');
+          return { ok: true as const };
+        } catch (err) {
+          await client.query('ROLLBACK').catch(() => undefined);
+          return { ok: false as const, code: (err as { code?: string }).code ?? 'UNKNOWN' };
+        } finally {
+          await client.end();
+        }
+      }),
+    );
+
+    const deadlocks = results.filter((r) => !r.ok && r.code === '40P01');
+    expect(deadlocks).toEqual([]);
+    const occupied = Number(
+      (await sql.query<{ n: string }>(`SELECT device_activation_occupied($1) AS n`, [lotId])).rows[0].n,
+    );
+    expect(occupied).toBeLessThanOrEqual(8);
+    expect(occupied).toBeGreaterThan(0);
+  });
+
+  it('barrier x20 grant || key withdrawal on same ACCOUNT lot serializes cleanly via lot -> plan -> key with zero 40P01 deadlocks', async () => {
+    const { w, plan, lotId, keyIds } = await lotWorld('ACCOUNT', 10, 10);
+    const workers = 20;
+    const barrier = new Barrier(workers);
+
+    const results = await Promise.all(
+      Array.from({ length: workers }, async (_, idx) => {
+        const client = new Client({ connectionString: database.url });
+        await client.connect();
+        try {
+          await barrier.wait();
+          await client.query('BEGIN');
+          // Both grants and withdrawals lock tier 6a lot -> tier 7 plan -> tier 7b key
+          await client.query(`SELECT id FROM license_lots WHERE id = $1 FOR UPDATE`, [lotId]);
+          await client.query(`SELECT id FROM plans WHERE id = $1 FOR SHARE`, [plan]);
+          const keyId = keyIds[idx % 10];
+          const { rows: locked } = await client.query<{ status: string }>(
+            `SELECT status FROM license_keys WHERE id = $1 FOR UPDATE`,
+            [keyId],
+          );
+          if (locked[0]?.status !== 'IN_STORE') {
+            await client.query('ROLLBACK');
+            return { ok: false as const, code: 'NOT_IN_STORE' };
+          }
+
+          if (idx < 10) {
+            const right = randomUUID();
+            const emp = await w.person(`ACC-${idx}`);
+            await client.query(
+              `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id,
+                 account_identifier, normalized_account_identifier, valid_from, valid_from_basis, created_by_app_user_id)
+               VALUES ($1, $2, 'PERSONAL', 'REQUEST', $3, NULL, $4, $5, $5, '2026-09-02', 'ACTUAL', $6)`,
+              [right, w.organizationId, plan, emp, `acc-${idx}@acme.vn`, randomUUID()],
+            );
+            await client.query(`UPDATE license_keys SET status = 'ASSIGNED', assignment_id = $2 WHERE id = $1`, [
+              keyId,
+              right,
+            ]);
+          } else {
+            await client.query(`UPDATE license_keys SET status = 'WITHDRAWN' WHERE id = $1`, [keyId]);
+          }
+          await client.query('COMMIT');
+          return { ok: true as const };
+        } catch (err) {
+          await client.query('ROLLBACK').catch(() => undefined);
+          return { ok: false as const, code: (err as { code?: string }).code ?? 'UNKNOWN' };
+        } finally {
+          await client.end();
+        }
+      }),
+    );
+
+    const deadlocks = results.filter((r) => !r.ok && r.code === '40P01');
+    expect(deadlocks).toEqual([]);
+    const { rows: statuses } = await sql.query<{ status: string; n: string }>(
+      `SELECT status, count(*)::text AS n FROM license_keys WHERE license_lot_id = $1 GROUP BY status`,
+      [lotId],
+    );
+    const totalHandled = statuses
+      .filter((s) => s.status === 'ASSIGNED' || s.status === 'WITHDRAWN')
+      .reduce((sum, s) => sum + Number(s.n), 0);
+    expect(totalHandled).toBe(10);
   });
 });

@@ -60,8 +60,14 @@ export class PurchaseInvoiceDecisionsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The invoice was decided already (PURCHASE_INVOICE.NOT_SUBMITTED), the person signing is the one who submitted it (PURCHASE_INVOICE.SAME_PERSON), the vendor already has an invoice with this number, whatever the case and the white space of either number (PURCHASE_INVOICE.NUMBER_TAKEN), or there is nowhere to book it (PURCHASE_INVOICE.NO_PLACE).',
-      examples: [EXAMPLES.NOT_SUBMITTED, EXAMPLES.SAME_PERSON, EXAMPLES.NUMBER_TAKEN, EXAMPLES.NO_PLACE],
+        'The invoice was decided already (PURCHASE_INVOICE.NOT_SUBMITTED), the person signing is the one who submitted it (PURCHASE_INVOICE.SAME_PERSON), the vendor already has an invoice with this number, whatever the case and the white space of either number (PURCHASE_INVOICE.NUMBER_TAKEN), the license lot already has a confirmed invoice (PURCHASE_INVOICE.LOT_ALREADY_INVOICED), or there is nowhere to book it (PURCHASE_INVOICE.NO_PLACE).',
+      examples: [
+        EXAMPLES.NOT_SUBMITTED,
+        EXAMPLES.SAME_PERSON,
+        EXAMPLES.NUMBER_TAKEN,
+        EXAMPLES.LOT_ALREADY_INVOICED,
+        EXAMPLES.NO_PLACE,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,

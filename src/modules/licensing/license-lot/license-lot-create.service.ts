@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
+import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { LicenseLotApi } from '../../catalog/public/license-lot.api';
 import type { CreateLicenseLotInput } from '../../catalog/public/license-lot.types';
@@ -11,8 +12,7 @@ const OVER = new Set(['COMPLETED', 'CANCELLED', 'CLOSED_FAILED']);
 
 /**
  * Makes a lot of licenses (W3-24): for a request, only for the IT Admin who acts for the department of the person the grant task of that request is for; for any
- * other purpose, any IT Admin. The catalog writes the lot and the IT Admin who makes it answers for it; what only licensing knows (the open grant task of a request
- * and its beneficiary) is judged here, before.
+ * other purpose, any IT Admin. For a REQUEST lot, task lookup and acting IT Admin check run in the same transaction (`runner.run`) as lot creation.
  */
 @Injectable()
 export class LicenseLotCreateService {
@@ -20,6 +20,7 @@ export class LicenseLotCreateService {
     private readonly lots: LicenseLotApi,
     private readonly tasks: ProvisioningTaskRepo,
     private readonly frame: ProvisioningTaskFrame,
+    @Optional() private readonly runner?: TransactionRunner,
   ) {}
 
   /**
@@ -27,17 +28,33 @@ export class LicenseLotCreateService {
    * caller does not act for the department of the beneficiary), and the `ApiException`s of the catalog (the plan, the purpose, the workspace, the contract, the money).
    */
   async create(actor: AuthenticatedPrincipal, input: CreateLicenseLotInput): Promise<{ id: string }> {
-    if (input.purpose === 'REQUEST') await this.assertRequestLot(actor, input);
+    if (input.purpose !== 'REQUEST') return this.lots.createLot(actor, input);
+    if (this.runner) {
+      return this.runner.run(async (tx) => {
+        await this.assertRequestLot(tx, actor, input);
+
+        return this.lots.createLot(actor, input, tx);
+      });
+    }
+    await this.assertRequestLot(undefined, actor, input);
 
     return this.lots.createLot(actor, input);
   }
 
-  private async assertRequestLot(actor: AuthenticatedPrincipal, input: CreateLicenseLotInput): Promise<void> {
-    const task = input.requestId ? await this.tasks.findGrantOf(input.requestId) : null;
+  private async assertRequestLot(
+    tx: DbTx | undefined,
+    actor: AuthenticatedPrincipal,
+    input: CreateLicenseLotInput,
+  ): Promise<void> {
+    const task = input.requestId
+      ? tx && typeof this.tasks.lockGrantOf === 'function'
+        ? await this.tasks.lockGrantOf(tx, input.requestId)
+        : await this.tasks.findGrantOf(input.requestId, undefined, tx)
+      : null;
     if (!task || OVER.has(task.status) || task.assignment.planId !== input.planId) {
       throw new LicenseKeyLotRequestNotOpenError();
     }
-    await this.frame.requireActingItAdmin(undefined, actor, {
+    await this.frame.requireActingItAdmin(tx, actor, {
       beneficiaryEmployeeId: task.assignment.employeeId,
       taskId: task.id,
     });

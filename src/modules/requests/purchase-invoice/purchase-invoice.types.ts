@@ -30,6 +30,7 @@ export interface LinkFacts {
   seatPricing: SeatPricing | null;
   poolSource: PoolInvoiceExpectationSource | null;
   renewedAssignmentId: string | null;
+  licenseLotId: string | null;
 }
 
 export type PoolExpectationFacts =
@@ -49,7 +50,8 @@ export type PurchaseInvoiceLink =
       subscriptionId: string;
       seatPurchaseId: string | null;
       subscriptionLineIds: readonly string[];
-    };
+    }
+  | { kind: 'LICENSE_LOT'; licenseLotId: string };
 
 /** What the invoice says in money: dong taken out, and the price of one in the currency it states. */
 export interface PurchaseInvoiceMoney {

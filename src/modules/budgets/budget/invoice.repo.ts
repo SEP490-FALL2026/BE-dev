@@ -253,6 +253,7 @@ export class InvoiceRepo {
       before === undefined ? Prisma.empty : Prisma.sql`AND COALESCE(i.service_month, i.issued_on) < ${before}::date`;
     const seatBound = before === undefined ? Prisma.empty : Prisma.sql`AND s.month < ${before}::date`;
     const lineBound = before === undefined ? Prisma.empty : Prisma.sql`AND l.month < ${before}::date`;
+    const lotBound = before === undefined ? Prisma.empty : Prisma.sql`AND c.month < ${before}::date`;
     const wanted = Prisma.join(pairs.map((pair) => Prisma.sql`(${pair.costCenterId}::uuid, ${pair.year}::int)`));
     const rows = await (tx ?? this.prisma).$queryRaw<{ cost_center_id: string; year: number; spent: string }[]>`
       SELECT cost_center_id, year, SUM(amount)::text AS spent
@@ -268,6 +269,10 @@ export class InvoiceRepo {
           SELECT l.cost_center_id, EXTRACT(YEAR FROM l.month)::int AS year, l.amount_minor AS amount
             FROM invoice_allocations l
            WHERE l.bucket = 'COST_CENTER' AND (l.cost_center_id, EXTRACT(YEAR FROM l.month)::int) IN (${wanted}) ${lineBound}
+          UNION ALL
+          SELECT c.cost_center_id, EXTRACT(YEAR FROM c.month)::int AS year, c.amount_minor AS amount
+            FROM license_lot_charges c
+           WHERE (c.cost_center_id, EXTRACT(YEAR FROM c.month)::int) IN (${wanted}) ${lotBound}
           UNION ALL
           SELECT s.cost_center_id, EXTRACT(YEAR FROM s.month)::int AS year, s.amount_minor AS amount
             FROM seat_month_charges s

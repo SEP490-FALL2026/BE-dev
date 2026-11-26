@@ -39,15 +39,19 @@ export class LicenseLotCreateService {
    * (contract, workspace), LicenseLotVendorAdminsRequiredError, the errors of the workspace of the vendor (WorkspaceRequiredError, WorkspaceVendorMismatchError,
    * WorkspaceNotFoundError) and of the money.
    */
-  async create(actor: AuthenticatedPrincipal, input: CreateLicenseLotInput): Promise<LicenseLotRecord> {
+  async create(
+    actor: AuthenticatedPrincipal,
+    input: CreateLicenseLotInput,
+    existingTx?: DbTx,
+  ): Promise<LicenseLotRecord> {
     const unitPrice = await this.pricing.readUnitPrice(input.unitPrice, 'unitPrice');
     const original = input.originalUnitPrice
       ? await this.pricing.readOriginal(input.originalUnitPrice, 'originalUnitPrice')
       : null;
-    const organization = await this.organizationReads.getOrganization();
+    const organization = await this.organizationReads.getOrganization(existingTx);
     if (!organization) throw new Error('A lot was made before installation');
 
-    return this.runner.run(async (tx) => {
+    const write = async (tx: DbTx): Promise<LicenseLotRecord> => {
       const workspaceId = await this.lockWorkspace(tx, actor, organization.id, input);
       const plan = await this.lockPlan(tx, input);
       await this.assertVendorAdmins(tx, plan, organization.id, workspaceId);
@@ -69,7 +73,9 @@ export class LicenseLotCreateService {
       await this.recordCreated(tx, actor, organization.id, created);
 
       return created;
-    });
+    };
+
+    return existingTx ? write(existingTx) : this.runner.run(write);
   }
 
   /** The plan is judged as it is read without a lock, to find the vendor and say early; the workspace is locked on that vendor (5b). */

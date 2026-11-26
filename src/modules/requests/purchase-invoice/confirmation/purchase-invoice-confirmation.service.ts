@@ -52,10 +52,12 @@ export class PurchaseInvoiceConfirmationService {
       const poolExpectation = await this.evaluatePoolExpectation(tx, row, poolFacts, now);
       const poolSubscriptionId = row.linkKind === 'REQUEST' && poolFacts.isK2 ? poolFacts.poolSubscriptionId : null;
       const k1Annual = await this.plans.k1AnnualAllocationFactsOf(row, tx);
+      const lotContext = await this.resolveLotContext(tx, row, now);
       const recorded = await this.record(tx, actor, row, now, {
         poolSubscriptionId,
         poolFigures: poolExpectation?.poolFigures ?? null,
         k1Annual,
+        lotContext,
       });
       if (!(await this.invoices.markConfirmed(tx, id, actor.employeeId, now, recorded.invoiceId))) {
         throw new PurchaseInvoiceRefusedError('NOT_SUBMITTED');
@@ -134,6 +136,7 @@ export class PurchaseInvoiceConfirmationService {
       poolSubscriptionId: string | null;
       poolFigures: PoolInvoiceExpectationResult['poolFigures'] | null;
       k1Annual: PurchaseInvoiceRecordInput['k1Annual'];
+      lotContext: { licenseLotId: string; allocationMonth: string; lotBeneficiaryCount: number } | null;
     },
   ) {
     const unallocated = await this.unallocatedOf(tx, row);
@@ -155,14 +158,37 @@ export class PurchaseInvoiceConfirmationService {
         unallocated,
         poolFigures: pool.poolFigures,
         ...(pool.k1Annual ? { k1Annual: pool.k1Annual } : {}),
+        ...(pool.lotContext
+          ? {
+              licenseLotId: pool.lotContext.licenseLotId,
+              allocationMonth: pool.lotContext.allocationMonth,
+              lotBeneficiaryCount: pool.lotContext.lotBeneficiaryCount,
+            }
+          : {}),
         now,
       });
     } catch (error) {
       if (error instanceof PurchaseInvoiceRecordRefusedError) {
-        throw new PurchaseInvoiceRefusedError(error.reason === 'DUPLICATE_NUMBER' ? 'NUMBER_TAKEN' : 'NO_PLACE');
+        const mapped =
+          error.reason === 'DUPLICATE_NUMBER'
+            ? 'NUMBER_TAKEN'
+            : error.reason === 'LOT_ALREADY_INVOICED'
+              ? 'LOT_ALREADY_INVOICED'
+              : 'NO_PLACE';
+        throw new PurchaseInvoiceRefusedError(mapped);
       }
       throw error;
     }
+  }
+
+  private async resolveLotContext(
+    tx: DbTx,
+    row: PurchaseInvoiceRow,
+    now: Date,
+  ): Promise<{ licenseLotId: string; allocationMonth: string; lotBeneficiaryCount: number } | null> {
+    if (typeof this.plans.lotConfirmationContextOf !== 'function') return null;
+
+    return this.plans.lotConfirmationContextOf(row, now, tx);
   }
 
   /** What the plan decided when the invoice was submitted: the line of the Cost Center not allocated, with the department of the user of the request. */

@@ -163,13 +163,77 @@ describe('ProvisioningGrantWriter.takeSeat (W3-18 K2 shortcut + K1 legacy)', () 
     );
   });
 
-  it('K4 purchase retains legacy incrementLegacyPoolSeat until P20', async () => {
-    const { writer, buyForItems, incrementLegacyPoolSeat } = makeWriter({
+  it('K4 uses license lots, skips incrementLegacyPoolSeat, and stores subscriptionId = null for new lots (W3-24)', async () => {
+    const buyForItems = jest.fn();
+    const incrementLegacyPoolSeat = jest.fn();
+    const createFromRequest = jest
+      .fn<
+        Promise<{ id: string }>,
+        [unknown, unknown, { target: { subscriptionId: string | null; licenseLotId?: string } }]
+      >()
+      .mockResolvedValue({ id: 'asg-1' });
+    const lockSeatTarget = jest.fn().mockResolvedValue({
+      kind: 'SUBSCRIPTION',
+      subscriptionId: null,
+      licenseLotId: 'lot-1',
+      subscriptionLineId: null,
+      planId: 'plan-1',
       provisioningType: 'K4',
-      purchased: true,
+      keyBinding: 'ACCOUNT',
+      referenceCommitmentMonths: null,
+      applicationStatus: 'APPROVED',
+      status: 'ACTIVE',
+      missing: [],
+      purchasedQuantity: 3,
+      allowsMidTermReduction: false,
     });
+    const chooseLine = jest.fn().mockResolvedValue('lot-1');
+    const writer = new ProvisioningGrantWriter(
+      { insertAndClaim: jest.fn().mockResolvedValue({ id: 'task-1' }) } as unknown as ProvisioningGrantTaskService,
+      {
+        lockPersonalEmployee: jest.fn(),
+        requireActingItAdmin: jest.fn().mockResolvedValue({ bySubstitute: false }),
+        personal: jest.fn().mockResolvedValue({ selfExecuted: null, kind: 'PERSONAL', employeeId: 'emp-1' }),
+        service: jest.fn(),
+      } as unknown as ProvisioningHolderService,
+      { assertSeatTargetUsable: jest.fn(), createFromRequest } as unknown as AssignmentService,
+      { lockSeatTarget, incrementLegacyPoolSeat } as unknown as CatalogApi,
+      {
+        get: () => ({
+          claimForGrant: jest.fn().mockResolvedValue({
+            status: 'GRANTABLE',
+            seat: 'PERSONAL',
+            employeeId: 'emp-1',
+            planId: 'plan-1',
+            departmentId: 'dept-1',
+            replacesAssignmentId: null,
+            expectedEndDate: null,
+            termBound: false,
+            termMonths: null,
+          }),
+        }),
+      } as unknown as GrantRequestGateHook,
+      {
+        chooseLine,
+        grantableOf: jest.fn().mockResolvedValue([]),
+        judgePurchase: jest.fn().mockResolvedValue({
+          decision: { purchased: false },
+          stock: {
+            free: 2,
+            inRevocation: 0,
+            freeSubscriptionIds: ['lot-1'],
+            freeBySubscription: new Map([['lot-1', 2]]),
+          },
+        }),
+      } as unknown as SharedPoolService,
+      {
+        lockLiveRevocation: jest.fn().mockResolvedValue(null),
+        endReplacedRight: jest.fn().mockResolvedValue(null),
+      } as unknown as ProvisioningReplacementService,
+      { buyForItems } as unknown as SeatLedgerApi,
+    );
 
-    await writer.write(tx, actor, { requestId: 'req-1', beneficiaryEmployeeId: 'emp-1', purchase: {} }, {
+    await writer.write(tx, actor, { requestId: 'req-1', beneficiaryEmployeeId: 'emp-1' }, {
       answer: { seat: 'PERSONAL', employeeId: 'emp-1', planId: 'plan-1', departmentId: 'dept-1' },
       plan: { planId: 'plan-1', provisioningType: 'K4', keyBinding: 'ACCOUNT' },
       serviceIdentifier: null,
@@ -181,7 +245,18 @@ describe('ProvisioningGrantWriter.takeSeat (W3-18 K2 shortcut + K1 legacy)', () 
       holderHasTerm: false,
     } as never);
 
-    expect(incrementLegacyPoolSeat).toHaveBeenCalledWith(tx, actor, 'sub-1', 'req-1');
+    expect(chooseLine).toHaveBeenCalledWith(tx, {
+      planId: 'plan-1',
+      provisioningType: 'K4',
+      today: '2026-11-21',
+      requestId: 'req-1',
+    });
+    expect(lockSeatTarget).toHaveBeenCalledWith(tx, { licenseLotId: 'lot-1', planId: 'plan-1' });
+    expect(incrementLegacyPoolSeat).not.toHaveBeenCalled();
     expect(buyForItems).not.toHaveBeenCalled();
+    expect(createFromRequest).toHaveBeenCalledTimes(1);
+    const createdArgs = createFromRequest.mock.calls[0]?.[2];
+    expect(createdArgs?.target.subscriptionId).toBeNull();
+    expect(createdArgs?.target.licenseLotId).toBe('lot-1');
   });
 });

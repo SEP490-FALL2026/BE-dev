@@ -155,4 +155,43 @@ describe('PurchaseInvoicePlanService acting scope (S2-2)', () => {
     expect(caught).toBeInstanceOf(PurchaseInvoiceRefusedError);
     expect((caught as PurchaseInvoiceRefusedError).reason).toBe('LINE_ALREADY_INVOICED');
   });
+
+  it('rejects LICENSE_LOT link with LOT_ALREADY_INVOICED when invoiceActualMinor is already set (F14a)', async () => {
+    const findLot = jest.fn<Promise<{ id: string; invoiceActualMinor: bigint | null }>, [string]>().mockResolvedValue({
+      id: 'lot-1',
+      invoiceActualMinor: 36_000_000n,
+    });
+    const service = new PurchaseInvoicePlanService(
+      {
+        requestFacts: jest.fn().mockResolvedValue({ departmentId: 'dept-1', costCenterId: 'cc-1' }),
+      } as never,
+      { getPlanVendorId: jest.fn().mockResolvedValue('vendor-1') } as never,
+      {
+        buildLicenseLotLinkFacts: async (deps: { licenseLotId: string; scope: readonly string[] }) => {
+          const lot = await findLot(deps.licenseLotId);
+          if (lot.invoiceActualMinor !== null) throw new PurchaseInvoiceRefusedError('LOT_ALREADY_INVOICED');
+          return {};
+        },
+      } as never,
+      {} as never,
+      {} as never,
+      { getItAdminActingScope: jest.fn().mockResolvedValue(['dept-1']) } as never,
+      { findUsableItAdminEmployeeIds: jest.fn().mockResolvedValue(new Set(['it-1'])) } as never,
+      {} as never,
+    );
+
+    await expect(
+      service.plan(
+        actor,
+        {
+          link: { licenseLotId: 'lot-1' },
+          servicePeriodMonth: '2027-04',
+        } as never,
+        tx,
+      ),
+    ).rejects.toMatchObject({
+      constructor: PurchaseInvoiceRefusedError,
+      reason: 'LOT_ALREADY_INVOICED',
+    });
+  });
 });

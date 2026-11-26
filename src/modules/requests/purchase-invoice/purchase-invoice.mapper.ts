@@ -61,6 +61,7 @@ export function toDetail(
     flags,
     provisioningTaskId: row.provisioningTaskId,
     seatPurchaseId: row.seatPurchaseId,
+    licenseLotId: row.licenseLotId,
     unitPriceOriginal: {
       amount: formatAmount(row.unitPriceOriginalMinor, extra.originalMinorUnits),
       currency: row.unitPriceOriginalCurrency,

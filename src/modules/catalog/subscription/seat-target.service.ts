@@ -1,7 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { LicenseLotRepo } from '../license-lot/license-lot.repo';
+import type { LicenseLotRecord } from '../license-lot/license-lot.types';
 import type { SeatTarget, SeatTargetRef } from '../public/catalog.types';
 import { PlanFactsService, type LockedPlan as PlanLookup } from '../plan/plan-facts.service';
 import { isLineServingOn } from '../subscription-line/subscription-line.policy';
@@ -60,10 +62,21 @@ const ofSubscription = (
   };
 };
 
+const ofLot = (lot: LicenseLotRecord, plan: PlanLookup): SeatTarget => ({
+  ...ofPlan(plan),
+  kind: 'SUBSCRIPTION',
+  subscriptionId: lot.legacySubscriptionId,
+  licenseLotId: lot.id,
+  status: 'ACTIVE',
+  missing: [],
+  purchasedQuantity: lot.licenseCount,
+  allowsMidTermReduction: false,
+});
+
 /**
  * What the assignments of seats read of the subscriptions and the plans (`US-02-05`): the target of a seat with its
  * kind of provisioning and the seats bought. `find` reads without a lock, for a preview; `lock` holds the period `FOR UPDATE`
- * (tier 6), for K2 the serving line `FOR UPDATE` (tier 6c), and the plan `FOR SHARE` (tier 7).
+ * (tier 6), for K4 the lot `FOR UPDATE` (tier 6a), for K2 the serving line `FOR UPDATE` (tier 6c), and the plan `FOR SHARE` (tier 7).
  */
 @Injectable()
 export class SeatTargetService {
@@ -73,9 +86,17 @@ export class SeatTargetService {
     private readonly lines: SubscriptionLineRepo,
     private readonly ledger: SubscriptionLineSeatsService,
     private readonly organizationReads: OrganizationReadApi,
+    @Optional() private readonly lots?: LicenseLotRepo,
   ) {}
 
   async find(ref: SeatTargetRef, tx?: DbTx): Promise<SeatTarget | null> {
+    if ('licenseLotId' in ref) {
+      const lot = await this.lots?.find(ref.licenseLotId, tx);
+      if (!lot) return null;
+      const [plan] = await this.plans.lookups([ref.planId ?? lot.planId], tx);
+
+      return plan ? ofLot(lot, plan) : null;
+    }
     if (!('subscriptionId' in ref)) {
       const plan = await this.plans.find(ref.planId);
 
@@ -93,6 +114,14 @@ export class SeatTargetService {
   }
 
   async lock(tx: DbTx, ref: SeatTargetRef): Promise<SeatTarget | null> {
+    if ('licenseLotId' in ref) {
+      // K4 lot lock (tier 6a) strictly precedes plan FOR SHARE lock (tier 7).
+      const lot = await this.lots?.lock(tx, ref.licenseLotId);
+      if (!lot) return null;
+      const plan = await this.plans.lockShared(tx, ref.planId ?? lot.planId);
+
+      return plan ? ofLot(lot, plan) : null;
+    }
     if (!('subscriptionId' in ref)) {
       const plan = await this.plans.lockShared(tx, ref.planId);
 
@@ -113,18 +142,40 @@ export class SeatTargetService {
   ): Promise<SeatTarget | null> {
     const targetPlanId = requestedPlanId ?? subscription.planId;
     if (subscription.planProvisioningType === 'K1') {
-      const plan = locked && tx ? await this.plans.lockShared(tx, targetPlanId) : await this.plans.find(targetPlanId);
+      const plan = await this.loadPlan(targetPlanId, locked, tx);
 
       return plan ? ofPlan(plan) : null;
+    }
+    if (subscription.planProvisioningType === 'K4' && this.lots) {
+      const target = await this.resolveK4LotTarget(subscription.id, targetPlanId, locked, tx);
+      if (target !== undefined) return target;
     }
     const lineFacts =
       subscription.planProvisioningType === 'K2'
         ? await this.resolveK2Line(subscription, targetPlanId, servingOn, locked, tx)
         : undefined;
-    // Plan lock (tier 7) always comes after period (tier 6) and line (tier 6c).
-    const plan = locked && tx ? await this.plans.lockShared(tx, targetPlanId) : await this.plans.find(targetPlanId);
+    // Plan lock (tier 7) always comes after period (tier 6), lot (tier 6a), and line (tier 6c).
+    const plan = await this.loadPlan(targetPlanId, locked, tx);
 
     return plan ? ofSubscription(subscription, plan, lineFacts) : null;
+  }
+
+  private loadPlan(planId: string, locked: boolean, tx?: DbTx) {
+    return locked && tx ? this.plans.lockShared(tx, planId) : this.plans.find(planId);
+  }
+
+  private async resolveK4LotTarget(
+    lotId: string,
+    targetPlanId: string,
+    locked: boolean,
+    tx?: DbTx,
+  ): Promise<SeatTarget | null | undefined> {
+    if (!this.lots) return undefined;
+    const lot = locked && tx ? await this.lots.lock(tx, lotId) : await this.lots.find(lotId, tx);
+    if (!lot) return undefined;
+    const plan = await this.loadPlan(targetPlanId, locked, tx);
+
+    return plan ? ofLot(lot, plan) : null;
   }
 
   private async resolveK2Line(

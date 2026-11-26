@@ -25,6 +25,7 @@ const linkPersistenceFields = (link: PurchaseInvoicePlan['link']) => ({
   subscriptionId: link.kind === 'SUBSCRIPTION' ? link.subscriptionId : null,
   seatPurchaseId: link.kind === 'SUBSCRIPTION' ? link.seatPurchaseId : null,
   subscriptionLineIds: link.kind === 'SUBSCRIPTION' ? [...link.subscriptionLineIds] : [],
+  licenseLotId: link.kind === 'LICENSE_LOT' ? link.licenseLotId : null,
 });
 
 @Injectable()
@@ -68,11 +69,13 @@ export class PurchaseInvoiceSubmissionService {
               requestId: old.requestId as string,
               ...(old.provisioningTaskId ? { provisioningTaskId: old.provisioningTaskId } : {}),
             }
-          : {
-              subscriptionId: old.subscriptionId as string,
-              ...(old.seatPurchaseId ? { seatPurchaseId: old.seatPurchaseId } : {}),
-              ...(old.subscriptionLineIds.length > 0 ? { subscriptionLineIds: old.subscriptionLineIds } : {}),
-            };
+          : old.linkKind === 'LICENSE_LOT'
+            ? { licenseLotId: old.licenseLotId as string }
+            : {
+                subscriptionId: old.subscriptionId as string,
+                ...(old.seatPurchaseId ? { seatPurchaseId: old.seatPurchaseId } : {}),
+                ...(old.subscriptionLineIds.length > 0 ? { subscriptionLineIds: old.subscriptionLineIds } : {}),
+              };
 
       return this.keep(tx, actor, { ...body, link }, old.id);
     });
@@ -138,6 +141,9 @@ export class PurchaseInvoiceSubmissionService {
         const target = JSON.stringify(error.meta?.target ?? '');
         if (target.includes('seat_purchase')) {
           throw new PurchaseInvoiceRefusedError('SEAT_PURCHASE_INVOICED');
+        }
+        if (target.includes('license_lot')) {
+          throw new PurchaseInvoiceRefusedError('LOT_ALREADY_INVOICED');
         }
         throw new PurchaseInvoiceRefusedError(target.includes('resubmission') ? 'ALREADY_RESUBMITTED' : 'NUMBER_TAKEN');
       }

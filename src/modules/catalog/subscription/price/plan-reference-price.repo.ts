@@ -45,6 +45,27 @@ export class PlanReferencePriceRepo {
     };
   }
 
+  /** Returns the provisioning type of `planId`, or null when the plan does not exist. */
+  async findPlanProvisioningType(planId: string, tx?: DbTx): Promise<string | null> {
+    const row = await (tx ?? this.prisma).plan.findUnique({
+      where: { id: planId },
+      select: { provisioningType: true },
+    });
+
+    return row?.provisioningType ?? null;
+  }
+
+  /** Returns the subset of `planIds` that are `K4` plans. */
+  async findK4PlanIds(planIds: readonly string[], tx?: DbTx): Promise<string[]> {
+    if (planIds.length === 0) return [];
+    const rows = await (tx ?? this.prisma).plan.findMany({
+      where: { id: { in: [...planIds] }, provisioningType: 'K4' },
+      select: { id: true },
+    });
+
+    return rows.map((r) => r.id);
+  }
+
   /** For each of these plans that has a reference price in dong, the cycle it is counted by (`referenceCycleOf`), in one read; the others are absent. */
   async findCyclesOfPlans(planIds: readonly string[], tx?: DbTx): Promise<Map<string, 'MONTHLY' | 'ONE_TIME'>> {
     const cycles = new Map<string, 'MONTHLY' | 'ONE_TIME'>();

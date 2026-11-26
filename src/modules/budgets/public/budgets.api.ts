@@ -1,21 +1,24 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { BudgetFactsRepo } from '../budget/budget-facts.repo';
-import { InvoiceRepo } from '../budget/invoice.repo';
 import { CommitmentService } from '../commitment/commitment.service';
 import { OutOfProcessSpendRecorderService } from '../invoice/out-of-process-spend-recorder.service';
 import { PurchaseInvoiceRecorderService } from '../invoice/purchase-invoice-recorder.service';
 import { InvoiceAllocationTransferService } from '../invoice/invoice-allocation-transfer.service';
 import { K1YearStartApplicationService } from '../invoice/k1-year-start-application.service';
 import { RunningUncommittedFactsService } from '../running-uncommitted/running-uncommitted-facts.service';
+import { LicenseLotCostService } from '../shared-pool-line/license-lot-cost.service';
 import type {
   CommittedAmount,
   CommitmentHoldInput,
   CommitmentReleaseInput,
+  ExcessLicenseGrantInput,
+  ExcessLicenseGrantRecorded,
   HeldAmount,
   HeldCommitment,
   K1TransferAllocationInput,
   K1YearStartApplyInput,
+  LotWithdrawalAfterInvoiceInput,
   OutOfProcessSpendInput,
   OutOfProcessSpendRecorded,
   PurchaseInvoiceRecorded,
@@ -42,10 +45,10 @@ export class BudgetsApi {
     private readonly commitments: CommitmentService,
     private readonly purchaseInvoices: PurchaseInvoiceRecorderService,
     private readonly outOfProcessSpends: OutOfProcessSpendRecorderService,
-    private readonly invoices: InvoiceRepo,
     private readonly runningUncommitted: RunningUncommittedFactsService,
     private readonly k1YearStart: K1YearStartApplicationService,
     private readonly k1Transfer: InvoiceAllocationTransferService,
+    private readonly lotCosts: LicenseLotCostService,
   ) {}
 
   /** The current budget of each of the years; a year without one is absent from the map, which is not a budget of nothing. */
@@ -157,27 +160,13 @@ export class BudgetsApi {
    * Marks the pool variance of `purchaseInvoiceId` as resolved once its discrepancy case closes, keeping `invoices` append-only.
    * Returns true when a `pool_variance_in_review` invoice was resolved, false otherwise.
    */
-  async markPoolVarianceResolved(tx: DbTx, purchaseInvoiceId: string, resolvedAt?: Date): Promise<boolean> {
-    return (await this.invoices.markPoolVarianceResolved(tx, purchaseInvoiceId, resolvedAt)) !== null;
+  markPoolVarianceResolved(tx: DbTx, purchaseInvoiceId: string, resolvedAt?: Date): Promise<boolean> {
+    return this.purchaseInvoices.markPoolVarianceResolved(tx, purchaseInvoiceId, resolvedAt);
   }
 
   /** Reads the recorded subscription id and pool variance figures (with current in-review status) of `purchaseInvoiceId`. */
-  async purchaseInvoiceInfo(purchaseInvoiceId: string, tx?: DbTx): Promise<RecordedPurchaseInvoiceInfo | null> {
-    const row = await this.invoices.findByPurchaseInvoiceId(purchaseInvoiceId, tx);
-    if (!row) return null;
-
-    return {
-      subscriptionId: row.subscriptionId,
-      poolFigures:
-        row.poolVarianceMinor !== null && row.poolVarianceMonth !== null
-          ? {
-              expectedMinor: row.poolExpectedMinor,
-              varianceMinor: row.poolVarianceMinor,
-              varianceMonth: row.poolVarianceMonth,
-              inReview: row.poolVarianceInReview,
-            }
-          : null,
-    };
+  purchaseInvoiceInfo(purchaseInvoiceId: string, tx?: DbTx): Promise<RecordedPurchaseInvoiceInfo | null> {
+    return this.purchaseInvoices.purchaseInvoiceInfo(purchaseInvoiceId, tx);
   }
 
   /** Acquires Tier 0 K1 allocation advisory locks (`k1-allocation:<key>:<year>`) ascending before commitment reads. */
@@ -193,5 +182,20 @@ export class BudgetsApi {
   /** Transfers remaining K1 annual allocation months on replacement (`F8`) with `TRANSFER_OUT`/`TRANSFER_IN` and `D-16` guard. */
   transferK1AnnualAllocations(tx: DbTx, input: K1TransferAllocationInput): Promise<{ transferredMinor: bigint }> {
     return this.k1Transfer.transfer(tx, input);
+  }
+
+  /** Number of excess license charges already recorded on each lot id (used for F11 reservation checks). */
+  chargedExcessCountsOfLots(lotIds: readonly string[], tx?: DbTx): Promise<Map<string, number>> {
+    return this.lotCosts.chargedExcessCountsOfLots(lotIds, tx);
+  }
+
+  /** Records excess-license charge or own-request hold (`F10`) when a K4 key from a lot is granted (`W3-25`). */
+  recordExcessLotLicenseGrant(tx: DbTx, input: ExcessLicenseGrantInput): Promise<ExcessLicenseGrantRecorded> {
+    return this.lotCosts.recordExcessLicenseGrant(tx, input);
+  }
+
+  /** Compensates a confirmed `REQUEST` lot invoice on group member withdrawal (`F13c`, `D-16`). */
+  recordLotWithdrawalAfterInvoice(tx: DbTx, input: LotWithdrawalAfterInvoiceInput): Promise<void> {
+    return this.purchaseInvoices.recordLotWithdrawalAfterInvoice(tx, input);
   }
 }

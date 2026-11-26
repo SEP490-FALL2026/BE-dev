@@ -181,6 +181,41 @@ export class DeviceActivationRepo {
     return result;
   }
 
+  /** Open `GRANT` tasks for K4 `planIds` that do not hold an assigned license key yet (`W3-24`). */
+  async openGrantTasksWithoutKeyOfPlans(
+    planIds: readonly string[],
+    client?: DbTx,
+  ): Promise<
+    Array<{ taskId: string; planId: string; requestId: string | null; subscriptionId: string | null; createdAt: Date }>
+  > {
+    if (planIds.length === 0) return [];
+    const rows = await (client ?? this.prisma).$queryRaw<
+      {
+        task_id: string;
+        plan_id: string;
+        request_id: string | null;
+        subscription_id: string | null;
+        created_at: Date;
+      }[]
+    >`
+      SELECT t."id" AS task_id, a."plan_id", t."request_id", a."subscription_id", t."created_at"
+        FROM "provisioning_tasks" t
+        JOIN "license_assignments" a ON a."id" = t."assignment_id"
+       WHERE a."plan_id" = ANY(${[...planIds]}::uuid[])
+         AND t."kind" = 'GRANT'
+         AND t."status" NOT IN ('COMPLETED', 'CLOSED_FAILED', 'CANCELLED')
+         AND NOT EXISTS (SELECT 1 FROM "license_keys" g WHERE g."assignment_id" = a."id")
+       ORDER BY t."created_at" ASC, t."id" ASC`;
+
+    return rows.map((row) => ({
+      taskId: row.task_id,
+      planId: row.plan_id,
+      requestId: row.request_id,
+      subscriptionId: row.subscription_id,
+      createdAt: row.created_at,
+    }));
+  }
+
   async occupiedBySubscriptions(subscriptionIds: readonly string[], client?: DbTx): Promise<Map<string, number>> {
     const result = new Map<string, number>();
     if (subscriptionIds.length === 0) return result;

@@ -1,3 +1,4 @@
+import type { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { LicenseLotApi } from '../../catalog/public/license-lot.api';
 import type { CreateLicenseLotInput } from '../../catalog/public/license-lot.types';
@@ -83,5 +84,34 @@ describe('LicenseLotCreateService (a lot for a request is judged against its gra
       ProvisioningNotInChargeError,
     );
     expect(createLot).not.toHaveBeenCalled();
+  });
+
+  it('locks and validates REQUEST grant task inside the same TransactionRunner tx when runner is provided (FIX-W3 P20)', async () => {
+    const tx = { kind: 'tx' } as unknown as DbTx;
+    const createLot = jest.fn().mockResolvedValue({ id: 'lot-1' });
+    const lockGrantOf = jest.fn().mockResolvedValue({
+      id: 'task-1',
+      status: 'IN_PROGRESS',
+      assignment: { planId: 'plan-1', employeeId: 'emp-ben' },
+    });
+    const requireActingItAdmin = jest.fn().mockResolvedValue({ bySubstitute: false });
+    const run = jest.fn().mockImplementation((fn: (t: DbTx) => Promise<unknown>) => fn(tx));
+    const service = new LicenseLotCreateService(
+      { createLot } as unknown as LicenseLotApi,
+      { lockGrantOf, findGrantOf: jest.fn() } as unknown as ProvisioningTaskRepo,
+      { requireActingItAdmin } as unknown as ProvisioningTaskFrame,
+      { run } as unknown as TransactionRunner,
+    );
+    const input = { ...base, purpose: 'REQUEST' as const, requestId: 'req-1' };
+
+    await expect(service.create(actor, input)).resolves.toEqual({ id: 'lot-1' });
+
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(lockGrantOf).toHaveBeenCalledWith(tx, 'req-1');
+    expect(requireActingItAdmin).toHaveBeenCalledWith(tx, actor, {
+      beneficiaryEmployeeId: 'emp-ben',
+      taskId: 'task-1',
+    });
+    expect(createLot).toHaveBeenCalledWith(actor, input, tx);
   });
 });

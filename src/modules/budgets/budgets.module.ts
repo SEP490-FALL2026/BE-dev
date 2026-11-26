@@ -45,6 +45,9 @@ import { SharedPoolLineAlertService } from './shared-pool-line/shared-pool-line-
 import { SharedPoolLineFactsService } from './shared-pool-line/shared-pool-line-facts.service';
 import { SharedPoolLineRepo } from './shared-pool-line/shared-pool-line.repo';
 import { LicenseLotChargeRepo } from './shared-pool-line/license-lot-charge.repo';
+import { LicenseLotCostService } from './shared-pool-line/license-lot-cost.service';
+import { LicenseLotInvoiceLedgerService } from './invoice/license-lot-invoice-ledger.service';
+import { LicenseLotInvoiceService } from './invoice/license-lot-invoice.service';
 import { InvoiceAllocationRepo } from './invoice/invoice-allocation.repo';
 import { InvoiceAllocationTransferService } from './invoice/invoice-allocation-transfer.service';
 import { InvoiceYearApplicationRepo } from './invoice/invoice-year-application.repo';
@@ -270,6 +273,9 @@ import { BudgetProposalTemplateListener } from './proposal/budget-proposal-templ
     CommitmentMonthSettlementService,
     SharedPoolLineRepo,
     LicenseLotChargeRepo,
+    LicenseLotInvoiceLedgerService,
+    LicenseLotInvoiceService,
+    LicenseLotCostService,
     InvoiceAllocationRepo,
     InvoiceAllocationTransferService,
     InvoiceYearApplicationRepo,

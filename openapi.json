@@ -40081,6 +40081,18 @@
                       }
                     }
                   },
+                  "LICENSE_LOT.RESERVED_FOR_REQUEST": {
+                    "summary": "The remaining free licenses of this lot are reserved for its owning request.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "LICENSE_LOT.RESERVED_FOR_REQUEST",
+                        "message": "The remaining free licenses of this lot are reserved for its owning request.",
+                        "details": { "lotId": "<license-lot-id>" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
                   "EMPLOYEE.NOT_STARTED": {
                     "summary": "The employee has not started working in a department yet.",
                     "value": {
@@ -61854,7 +61866,7 @@
             }
           },
           "409": {
-            "description": "The request is not one whose purchase was approved to be spent (PURCHASE_INVOICE.REQUEST_NOT_PURCHASABLE), seat purchase already invoiced (PURCHASE_INVOICE.SEAT_PURCHASE_INVOICED), or the plan of the request has no subscription of the pool that can be taken from today, so there is nowhere to book the invoice (PURCHASE_INVOICE.NO_PLACE).",
+            "description": "The request is not one whose purchase was approved to be spent (PURCHASE_INVOICE.REQUEST_NOT_PURCHASABLE), seat purchase already invoiced (PURCHASE_INVOICE.SEAT_PURCHASE_INVOICED), license lot already invoiced (PURCHASE_INVOICE.LOT_ALREADY_INVOICED), or the plan of the request has no subscription of the pool that can be taken from today, so there is nowhere to book the invoice (PURCHASE_INVOICE.NO_PLACE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -61878,6 +61890,17 @@
                       "error": {
                         "code": "PURCHASE_INVOICE.SEAT_PURCHASE_INVOICED",
                         "message": "The purchase invoice was refused: SEAT_PURCHASE_INVOICED.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PURCHASE_INVOICE.LOT_ALREADY_INVOICED": {
+                    "summary": "The purchase invoice was refused: LOT_ALREADY_INVOICED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.LOT_ALREADY_INVOICED",
+                        "message": "The purchase invoice was refused: LOT_ALREADY_INVOICED.",
                         "requestId": "req_example"
                       }
                     }
@@ -62222,7 +62245,7 @@
             }
           },
           "409": {
-            "description": "The request is not one whose purchase was approved to be spent (PURCHASE_INVOICE.REQUEST_NOT_PURCHASABLE), the vendor has an invoice with this number that was not returned, whatever the case and the white space of either number (PURCHASE_INVOICE.NUMBER_TAKEN), seat purchase already invoiced (PURCHASE_INVOICE.SEAT_PURCHASE_INVOICED), or the plan of the request has no subscription of the pool that can be taken from today, so there is nowhere to book the invoice (PURCHASE_INVOICE.NO_PLACE).",
+            "description": "The request is not one whose purchase was approved to be spent (PURCHASE_INVOICE.REQUEST_NOT_PURCHASABLE), the vendor has an invoice with this number that was not returned, whatever the case and the white space of either number (PURCHASE_INVOICE.NUMBER_TAKEN), seat purchase already invoiced (PURCHASE_INVOICE.SEAT_PURCHASE_INVOICED), license lot already invoiced (PURCHASE_INVOICE.LOT_ALREADY_INVOICED), or the plan of the request has no subscription of the pool that can be taken from today, so there is nowhere to book the invoice (PURCHASE_INVOICE.NO_PLACE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -62257,6 +62280,17 @@
                       "error": {
                         "code": "PURCHASE_INVOICE.SEAT_PURCHASE_INVOICED",
                         "message": "The purchase invoice was refused: SEAT_PURCHASE_INVOICED.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PURCHASE_INVOICE.LOT_ALREADY_INVOICED": {
+                    "summary": "The purchase invoice was refused: LOT_ALREADY_INVOICED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.LOT_ALREADY_INVOICED",
+                        "message": "The purchase invoice was refused: LOT_ALREADY_INVOICED.",
                         "requestId": "req_example"
                       }
                     }
@@ -62822,7 +62856,7 @@
             }
           },
           "409": {
-            "description": "The request is not one whose purchase was approved to be spent (PURCHASE_INVOICE.REQUEST_NOT_PURCHASABLE), the vendor has an invoice with this number that was not returned, whatever the case and the white space of either number (PURCHASE_INVOICE.NUMBER_TAKEN), the plan of the request has no subscription of the pool that can be taken from today, so there is nowhere to book the invoice (PURCHASE_INVOICE.NO_PLACE), the invoice was not returned (PURCHASE_INVOICE.NOT_RETURNED) or was already submitted again (PURCHASE_INVOICE.ALREADY_RESUBMITTED).",
+            "description": "The request is not one whose purchase was approved to be spent (PURCHASE_INVOICE.REQUEST_NOT_PURCHASABLE), the vendor has an invoice with this number that was not returned, whatever the case and the white space of either number (PURCHASE_INVOICE.NUMBER_TAKEN), the plan of the request has no subscription of the pool that can be taken from today, so there is nowhere to book the invoice (PURCHASE_INVOICE.NO_PLACE), license lot already invoiced (PURCHASE_INVOICE.LOT_ALREADY_INVOICED), the invoice was not returned (PURCHASE_INVOICE.NOT_RETURNED) or was already submitted again (PURCHASE_INVOICE.ALREADY_RESUBMITTED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -62857,6 +62891,17 @@
                       "error": {
                         "code": "PURCHASE_INVOICE.SEAT_PURCHASE_INVOICED",
                         "message": "The purchase invoice was refused: SEAT_PURCHASE_INVOICED.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PURCHASE_INVOICE.LOT_ALREADY_INVOICED": {
+                    "summary": "The purchase invoice was refused: LOT_ALREADY_INVOICED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.LOT_ALREADY_INVOICED",
+                        "message": "The purchase invoice was refused: LOT_ALREADY_INVOICED.",
                         "requestId": "req_example"
                       }
                     }
@@ -63556,7 +63601,7 @@
             }
           },
           "409": {
-            "description": "The invoice was decided already (PURCHASE_INVOICE.NOT_SUBMITTED), the person signing is the one who submitted it (PURCHASE_INVOICE.SAME_PERSON), the vendor already has an invoice with this number, whatever the case and the white space of either number (PURCHASE_INVOICE.NUMBER_TAKEN), or there is nowhere to book it (PURCHASE_INVOICE.NO_PLACE).",
+            "description": "The invoice was decided already (PURCHASE_INVOICE.NOT_SUBMITTED), the person signing is the one who submitted it (PURCHASE_INVOICE.SAME_PERSON), the vendor already has an invoice with this number, whatever the case and the white space of either number (PURCHASE_INVOICE.NUMBER_TAKEN), the license lot already has a confirmed invoice (PURCHASE_INVOICE.LOT_ALREADY_INVOICED), or there is nowhere to book it (PURCHASE_INVOICE.NO_PLACE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -63590,6 +63635,17 @@
                       "error": {
                         "code": "PURCHASE_INVOICE.NUMBER_TAKEN",
                         "message": "The purchase invoice was refused: NUMBER_TAKEN.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PURCHASE_INVOICE.LOT_ALREADY_INVOICED": {
+                    "summary": "The purchase invoice was refused: LOT_ALREADY_INVOICED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.LOT_ALREADY_INVOICED",
+                        "message": "The purchase invoice was refused: LOT_ALREADY_INVOICED.",
                         "requestId": "req_example"
                       }
                     }
@@ -137125,7 +137181,12 @@
                 "format": "uuid"
               },
               "subscriptionId": {
-                "description": "The subscription the invoice renews; instead of a request.",
+                "description": "The subscription the invoice renews; instead of a request or a license lot.",
+                "type": "string",
+                "format": "uuid"
+              },
+              "licenseLotId": {
+                "description": "The license lot the invoice pays for; instead of a request or a subscription.",
                 "type": "string",
                 "format": "uuid"
               },
@@ -137298,7 +137359,12 @@
                 "format": "uuid"
               },
               "subscriptionId": {
-                "description": "The subscription the invoice renews; instead of a request.",
+                "description": "The subscription the invoice renews; instead of a request or a license lot.",
+                "type": "string",
+                "format": "uuid"
+              },
+              "licenseLotId": {
+                "description": "The license lot the invoice pays for; instead of a request or a subscription.",
                 "type": "string",
                 "format": "uuid"
               },
@@ -137447,6 +137513,7 @@
               "decidedAt": { "type": "string", "format": "date-time", "nullable": true },
               "provisioningTaskId": { "type": "string", "format": "uuid", "nullable": true },
               "seatPurchaseId": { "type": "string", "format": "uuid", "nullable": true },
+              "licenseLotId": { "type": "string", "format": "uuid", "nullable": true },
               "unitPriceOriginal": {
                 "type": "object",
                 "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
@@ -137540,6 +137607,7 @@
               "decidedAt",
               "provisioningTaskId",
               "seatPurchaseId",
+              "licenseLotId",
               "unitPriceOriginal",
               "deductibleTax",
               "nonDeductibleTax",

@@ -18,6 +18,8 @@ export interface LicenseLotView {
   purpose: LicenseLotPurpose;
   /** The request a lot of purpose REQUEST was bought for. */
   requestId: string | null;
+  /** What Finance confirmed the invoice of this lot at, in dong; null before confirmation. */
+  invoiceActualMinor: bigint | null;
   workspaceId: string | null;
   contractId: string | null;
   responsibleItAdminEmployeeId: string | null;

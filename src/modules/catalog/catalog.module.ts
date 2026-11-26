@@ -12,6 +12,7 @@ import { CatalogApi } from './public/catalog.api';
 import { CatalogContractApi } from './public/catalog-contract.api';
 import { CatalogPlanTermsApi } from './public/catalog-plan-terms.api';
 import { CatalogResponsibilityApi } from './public/catalog-responsibility.api';
+import { LicenseLotStockApi } from './public/license-lot-stock.api';
 import { SeatBaselinePhaseHook, SeatOccupancyHook } from './public/catalog.extension-points';
 import { ApplicationIntakeController } from './application-intake/application-intake.controller';
 import { ApplicationIntakeService } from './application-intake/application-intake.service';
@@ -77,6 +78,7 @@ import { SubscriptionPoolService } from './subscription/pool/subscription-pool.s
 import { SubscriptionPricingService } from './subscription/subscription-pricing.service';
 import { SubscriptionViewService } from './subscription/subscription-view.service';
 import { SubscriptionWindowsService } from './subscription/subscription-windows.service';
+import { LicenseLotStockService } from './license-lot/license-lot-stock.service';
 import { SubscriptionsController } from './subscription/subscriptions.controller';
 import { SubscriptionResponsibleController } from './subscription/responsible/subscription-responsible.controller';
 import { SubscriptionResponsibleService } from './subscription/responsible/subscription-responsible.service';
@@ -215,8 +217,10 @@ import { WorkspacesController } from './workspace/workspaces.controller';
     LicenseLotCreateService,
     LicenseLotPriceService,
     LicenseLotViewService,
+    LicenseLotStockService,
     LicenseLotResponsibleService,
     LicenseLotApi,
+    LicenseLotStockApi,
     SeatLedgerRepo,
     SeatLedgerService,
     SeatPurchaseRepo,
@@ -281,6 +285,7 @@ import { WorkspacesController } from './workspace/workspaces.controller';
     CatalogContractApi,
     CatalogResponsibilityApi,
     LicenseLotApi,
+    LicenseLotStockApi,
     SeatLedgerApi,
     SubscriptionPeriodApi,
     SeatOccupancyHook,

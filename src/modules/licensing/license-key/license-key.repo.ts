@@ -52,6 +52,8 @@ export interface LicenseKeyActivationCounts {
 export interface LicenseKeyHeld {
   id: string;
   subscriptionId: string;
+  licenseLotId: string | null;
+  costBorne: boolean;
   status: LicenseKeyStatus;
   assignmentId: string | null;
   withdrawnAt: Date | null;
@@ -305,7 +307,8 @@ export class LicenseKeyRepo {
   /** The key, locked for the transaction (`FOR UPDATE`): two IT Admins who give or withdraw the same key are served one after the other. */
   async lock(tx: DbTx, id: string): Promise<LicenseKeyHeld | null> {
     const rows = await tx.$queryRaw<LicenseKeyHeldRow[]>`
-      SELECT "id", COALESCE("license_lot_id", "subscription_id") AS "subscription_id", "status"::text AS "status", "assignment_id", "withdrawn_at", "max_activations", "updated_at"
+      SELECT "id", COALESCE("license_lot_id", "subscription_id") AS "subscription_id", "license_lot_id", "cost_borne",
+             "status"::text AS "status", "assignment_id", "withdrawn_at", "max_activations", "updated_at"
         FROM "license_keys" WHERE "id" = ${id}::uuid FOR UPDATE`;
 
     return rows[0] ? held(rows[0]) : null;
@@ -314,7 +317,8 @@ export class LicenseKeyRepo {
   /** The key given to the assignment, locked for the transaction; null when the seat holds none (one granted before the key pool). */
   async lockOfAssignment(tx: DbTx, assignmentId: string): Promise<LicenseKeyHeld | null> {
     const rows = await tx.$queryRaw<LicenseKeyHeldRow[]>`
-      SELECT "id", COALESCE("license_lot_id", "subscription_id") AS "subscription_id", "status"::text AS "status", "assignment_id", "withdrawn_at", "max_activations", "updated_at"
+      SELECT "id", COALESCE("license_lot_id", "subscription_id") AS "subscription_id", "license_lot_id", "cost_borne",
+             "status"::text AS "status", "assignment_id", "withdrawn_at", "max_activations", "updated_at"
         FROM "license_keys" WHERE "assignment_id" = ${assignmentId}::uuid FOR UPDATE`;
 
     return rows[0] ? held(rows[0]) : null;
@@ -323,6 +327,14 @@ export class LicenseKeyRepo {
   /** Gives the key to the assignment. */
   async assign(tx: DbTx, id: string, assignmentId: string): Promise<void> {
     await tx.licenseKey.update({ where: { id }, data: { status: 'ASSIGNED', assignmentId } });
+  }
+
+  /** Marks the key's cost as borne (`false -> true` one-way transition enforced by trigger). */
+  async markCostBorne(tx: DbTx, id: string): Promise<void> {
+    await tx.licenseKey.updateMany({
+      where: { id, costBorne: false },
+      data: { costBorne: true },
+    });
   }
 
   /** Puts the key back in the store, withdrawn from it at once when a withdrawal is given: one write, so it is never free in between. */
@@ -354,6 +366,8 @@ export class LicenseKeyRepo {
 interface LicenseKeyHeldRow {
   id: string;
   subscription_id: string;
+  license_lot_id: string | null;
+  cost_borne: boolean;
   status: LicenseKeyStatus;
   assignment_id: string | null;
   withdrawn_at: Date | null;
@@ -380,6 +394,8 @@ const listed = (row: Prisma.LicenseKeyGetPayload<{ select: typeof LISTED }>): Li
 const held = (row: LicenseKeyHeldRow): LicenseKeyHeld => ({
   id: row.id,
   subscriptionId: row.subscription_id,
+  licenseLotId: row.license_lot_id,
+  costBorne: row.cost_borne,
   status: row.status,
   assignmentId: row.assignment_id,
   withdrawnAt: row.withdrawn_at,

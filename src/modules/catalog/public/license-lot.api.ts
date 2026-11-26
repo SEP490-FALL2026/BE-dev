@@ -21,9 +21,9 @@ export class LicenseLotApi {
    * Makes a lot for the IT Admin who calls: they answer for it. The facts of other modules a purpose needs (a lot for a request needs an open grant task of that request)
    * are the caller's to check before. Returns the id of the lot. Refusals come as `ApiException`s with the codes of the lot routes (LICENSE_LOT.*).
    */
-  async createLot(actor: AuthenticatedPrincipal, input: CreateLicenseLotInput): Promise<{ id: string }> {
+  async createLot(actor: AuthenticatedPrincipal, input: CreateLicenseLotInput, tx?: DbTx): Promise<{ id: string }> {
     try {
-      return { id: (await this.creator.create(actor, input)).id };
+      return { id: (await this.creator.create(actor, input, tx)).id };
     } catch (error) {
       // The route that calls is another module's: it gets the answer of the lot routes, not the errors of the catalog.
       throw toLicenseLotApiException(error);
@@ -46,5 +46,20 @@ export class LicenseLotApi {
   /** The lot with its plan and application, without a lock; null when it does not exist. */
   findLot(lotId: string, tx?: DbTx): Promise<LicenseLotView | null> {
     return this.locks.find(lotId, tx);
+  }
+
+  /** The lot bought specifically for a request (purpose = REQUEST), without a lock; null when none exists. */
+  findLotOfRequest(requestId: string, tx?: DbTx): Promise<LicenseLotView | null> {
+    return this.locks.findOfRequest(requestId, tx);
+  }
+
+  /** Multiple lots with their plans, without locks; missing ids are omitted. */
+  findLotsByIds(lotIds: readonly string[], tx?: DbTx): Promise<Map<string, LicenseLotView>> {
+    return this.locks.findMany(lotIds, tx);
+  }
+
+  /** Records Finance's confirmed invoice amount (`A`) on the lot once; throws LicenseLotAlreadyInvoicedError if already set. */
+  setInvoiceActual(tx: DbTx, lotId: string, actualMinor: bigint): Promise<void> {
+    return this.locks.setInvoiceActual(tx, lotId, actualMinor);
   }
 }

@@ -1,10 +1,17 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { SeatTargetNotFoundError } from '../public/licensing.errors';
 import { CatalogApi } from '../../catalog/public/catalog.api';
+import { LicenseLotReservedForRequestError } from '../../catalog/public/catalog.errors';
+import {
+  LicenseLotStockApi,
+  type LicenseLotStockItem,
+  type RequestLotReservation,
+} from '../../catalog/public/license-lot-stock.api';
 import type { PoolSubscription } from '../../catalog/public/catalog.types';
 import { SeatLedgerApi } from '../../catalog/public/seat-ledger.api';
+import { GrantRequestGateHook } from '../public/licensing.extension-points';
 import type { PlanStock } from '../public/licensing.types';
 import type { SubscriptionOccupancy } from './shared-pool-capacity.repo';
 import { SharedPoolAvoidedCostRepo } from './shared-pool-avoided-cost.repo';
@@ -55,6 +62,25 @@ function stockFrom(
   return { free, inRevocation, freeSubscriptionIds, freeBySubscription };
 }
 
+function lotStockFrom(candidates: readonly LicenseLotStockItem[], requestId: string | null): PoolStock {
+  const ownLot = requestId ? candidates.find((l) => l.purpose === 'REQUEST' && l.requestId === requestId) : undefined;
+  const scope = ownLot ? [ownLot] : candidates;
+  let free = 0;
+  const freeSubscriptionIds: string[] = [];
+  const freeBySubscription = new Map<string, number>();
+  for (const lot of scope) {
+    const available =
+      lot.purpose === 'REQUEST' && lot.requestId !== requestId
+        ? Math.min(lot.grantable, lot.excessGrantable)
+        : lot.grantable;
+    free += available;
+    freeBySubscription.set(lot.id, available);
+    if (available > 0) freeSubscriptionIds.push(lot.id);
+  }
+
+  return { free, inRevocation: 0, freeSubscriptionIds, freeBySubscription };
+}
+
 function planOccupancySlice(
   planId: string,
   subscriptions: readonly PoolSubscription[],
@@ -81,6 +107,8 @@ export class SharedPoolService {
     private readonly capacityRepo: SharedPoolCapacityRepo,
     private readonly avoidedCosts: SharedPoolAvoidedCostRepo,
     private readonly seatLedger: SeatLedgerApi,
+    @Optional() private readonly lotStock?: LicenseLotStockApi,
+    @Optional() private readonly gate?: GrantRequestGateHook,
   ) {}
 
   /**
@@ -107,13 +135,43 @@ export class SharedPoolService {
     planId: string,
     today: BusinessDate,
     provisioningType?: ProvisioningType,
+    options?: { requestId?: string | null },
   ): Promise<PoolStock> {
     if (provisioningType === 'K1') {
       return { free: 0, inRevocation: 0, freeSubscriptionIds: [], freeBySubscription: new Map() };
     }
+    if (provisioningType === 'K4' && this.lotStock) {
+      return this.stockOfLots(tx, planId, options?.requestId ?? null);
+    }
     const subscriptions = await this.grantableOf(tx, planId, today);
 
     return this.stockOfSubscriptions(tx, planId, subscriptions, today, provisioningType === 'K4');
+  }
+
+  /** Stock of a K4 `ACCOUNT` plan derived from its license lots and F11 reservation state (`W3-24`). */
+  async stockOfLots(tx: DbTx, planId: string, requestId: string | null): Promise<PoolStock> {
+    if (!this.lotStock) {
+      return { free: 0, inRevocation: 0, freeSubscriptionIds: [], freeBySubscription: new Map() };
+    }
+    const raw = await this.lotStock.accountLotCandidates(planId, undefined, tx);
+    const reservations = await this.lotReservationsOf(raw, tx);
+    const candidates =
+      reservations.size > 0 ? await this.lotStock.accountLotCandidates(planId, { reservations }, tx) : raw;
+
+    return lotStockFrom(candidates, requestId);
+  }
+
+  /** Reads F11 `(beneficiaries, chargedExcess)` for all `REQUEST` lots via `GrantRequestGateHook`. */
+  async lotReservationsOf(
+    candidates: readonly LicenseLotStockItem[],
+    tx?: DbTx,
+  ): Promise<Map<string, RequestLotReservation>> {
+    const reqLots = candidates
+      .filter((l) => l.purpose === 'REQUEST' && l.requestId !== null)
+      .map((l) => ({ lotId: l.id, requestId: l.requestId as string }));
+    if (reqLots.length === 0 || !this.gate?.isBound()) return new Map();
+
+    return (await this.gate.get().reservedForRequestLots?.(reqLots, tx)) ?? new Map();
   }
 
   /** The stock of these subscriptions under the transaction; a K4 plan counts its free keys too (`QĐ-103d`). */
@@ -185,6 +243,11 @@ export class SharedPoolService {
         stocks.set(target.planId, { kind: 'NONE', free: 0, inRevocation: 0 });
         continue;
       }
+      if (keyPlans.has(target.planId) && this.lotStock) {
+        const k4Stock = await this.stockOfLotsWithoutTx(target.planId);
+        stocks.set(target.planId, { kind: 'KEYS', free: k4Stock.free, inRevocation: k4Stock.inRevocation });
+        continue;
+      }
       const subs = grantable.get(target.planId) ?? [];
       const occupancy = planOccupancySlice(target.planId, subs, pairOccupancy);
       const { free, inRevocation } = stockFrom(
@@ -200,15 +263,35 @@ export class SharedPoolService {
     return stocks;
   }
 
+  private async stockOfLotsWithoutTx(planId: string): Promise<PoolStock> {
+    if (!this.lotStock) {
+      return { free: 0, inRevocation: 0, freeSubscriptionIds: [], freeBySubscription: new Map() };
+    }
+    const raw = await this.lotStock.accountLotCandidates(planId);
+    const reservations = await this.lotReservationsOf(raw);
+    const candidates = reservations.size > 0 ? await this.lotStock.accountLotCandidates(planId, { reservations }) : raw;
+
+    return lotStockFrom(candidates, null);
+  }
+
   /**
    * The subscription/line a grant takes its seat from when the IT Admin names none (`P0-05`): for K2/K4, prefers
    * candidates that still have free seats ordered deterministically by `lineCreatedAt ASC`, `subscriptionLineId ASC`.
    */
   async chooseLine(
     tx: DbTx,
-    input: { planId: string; provisioningType: ProvisioningType; today: BusinessDate },
+    input: {
+      planId: string;
+      provisioningType: ProvisioningType;
+      today: BusinessDate;
+      requestId?: string | null;
+      excludeTaskId?: string;
+    },
   ): Promise<string | null> {
     if (input.provisioningType === 'K1') return null;
+    if (input.provisioningType === 'K4' && this.lotStock) {
+      return this.chooseK4AccountLot(tx, input);
+    }
     const subscriptions = await this.grantableOf(tx, input.planId, input.today);
     if (input.provisioningType !== 'K2' && input.provisioningType !== 'K4') {
       return subscriptions[0]?.subscriptionId ?? null;
@@ -222,6 +305,30 @@ export class SharedPoolService {
     );
 
     return choosePoolLine(subscriptions, stock)?.subscriptionId ?? null;
+  }
+
+  private async chooseK4AccountLot(
+    tx: DbTx,
+    input: { planId: string; requestId?: string | null; excludeTaskId?: string },
+  ): Promise<string | null> {
+    if (!this.lotStock) return null;
+    const raw = await this.lotStock.accountLotCandidates(input.planId, { excludeTaskId: input.excludeTaskId }, tx);
+    if (raw.length === 0) return null;
+    const reservations = await this.lotReservationsOf(raw, tx);
+    const result = await this.lotStock.chooseAccountLot(
+      {
+        planId: input.planId,
+        ownRequestId: input.requestId ?? null,
+        reservations,
+        excludeTaskId: input.excludeTaskId,
+      },
+      tx,
+    );
+    if (result.kind === 'RESERVED_FOR_REQUEST') {
+      throw new LicenseLotReservedForRequestError(result.lot.id);
+    }
+
+    return result.kind === 'SELECTED' ? result.lot.id : (result.lot?.id ?? null);
   }
 
   /** Batch `chooseLine` resolution per K2 planId (`W3-21`): which subscription/line receives the next seat grant for that plan. */
@@ -333,10 +440,13 @@ export class SharedPoolService {
       provisioningType: ProvisioningType;
       today: BusinessDate;
       purchase: { reason?: string } | undefined;
+      requestId?: string | null;
     },
   ): Promise<{ decision: PurchaseDecision; stock: PoolStock | null }> {
     const pooled = input.provisioningType === 'K2' || input.provisioningType === 'K4';
-    const stock = pooled ? await this.stockOf(tx, input.planId, input.today, input.provisioningType) : null;
+    const stock = pooled
+      ? await this.stockOf(tx, input.planId, input.today, input.provisioningType, { requestId: input.requestId })
+      : null;
 
     return {
       decision: judgePurchase({ provisioningType: input.provisioningType, purchase: input.purchase, stock }),

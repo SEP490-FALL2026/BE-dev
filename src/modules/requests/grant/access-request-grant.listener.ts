@@ -1,6 +1,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { GrantRequestGateHook, type GrantRequestGate } from '../../licensing/public/licensing.extension-points';
 import type {
@@ -9,16 +10,14 @@ import type {
   GrantRequestAnswer,
   ProvisioningKind,
 } from '../../licensing/public/licensing.types';
-import { GroupGrantService } from '../group-request/group-grant.service';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
-import { grantAnswerFor } from './grant.policy';
-import { GrantSettlementService } from './grant-settlement.service';
-import { releasesAllOnPoolGrant } from './pool-grant-release.policy';
+import { GroupGrantService } from '../group-request/group-grant.service';
 import { RequestOutcomeService } from '../outcome/request-outcome.service';
-import { SeatReleaseService } from './seat-release.service';
 import { RenewalApplyService } from '../renewal-apply/renewal-apply.service';
-import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { GrantSettlementService } from './grant-settlement.service';
+import { grantAnswerFor } from './grant.policy';
+import { SeatReleaseService } from './seat-release.service';
 
 /**
  * What the grant of a seat asks of the module of requests (`GrantRequestGate`, bound to licensing's `GrantRequestGateHook` when the
@@ -135,25 +134,17 @@ export class AccessRequestGrantGate implements GrantRequestGate, OnModuleInit {
         requestId: request.id,
         from: 'EXECUTING',
         to: outcome,
-        // Whether the seat came from the stock of the pool: what the cost avoided is read by (`BR-MF1-09c`).
         ...(facts ? { fromPool: facts.fromPool } : {}),
       },
     );
-    // A grant the IT Admin closed as failed spends nothing: what was held goes back to the budget in the same transaction
-    // (US-06-06 AC-3). A grant that is only retrying is not reported here, so its commitment stays held (AC-7).
+    // Failed grants release commitment; completed K4/pool grants settle lot charges / avoided cost.
     if (outcome === 'FAILED') {
       await this.settlement.release(tx, { requestId: request.id, reason: 'GRANT_FAILED', now });
     }
-    // A K4 key taken from the pool spends nothing: all that was held for its price goes back (`QĐ-106d`).
-    if (releasesAllOnPoolGrant(outcome, facts)) {
-      await this.settlement.release(tx, { requestId: request.id, reason: 'GRANTED_FROM_POOL', now });
-    }
-    // A K2 seat granted after its commitment began gives back the days before the grant, in the same transaction (`M-10`).
     if (outcome === 'COMPLETED' && facts) {
       await this.seats.afterGrant(tx, request.id, facts, now);
-      await this.settlement.recordPoolGrantAvoidedCost(tx, request, facts);
     }
-    // The seat is real, or the request ended without one: the contexts that follow what became of it hear it here.
+    await this.settlement.settleOutcomeEffects(tx, request, outcome, employeeId, facts, now);
     if (outcome === 'COMPLETED') await this.outcomes.granted(tx, request, request.beneficiaryEmployeeIds, now);
     else await this.outcomes.ended(tx, request, request.beneficiaryEmployeeIds, now);
   }
@@ -168,10 +159,19 @@ export class AccessRequestGrantGate implements GrantRequestGate, OnModuleInit {
   ): Promise<void> {
     if (employeeId === undefined) return;
     await this.group.report(tx, request, outcome, employeeId);
+    const now = new Date();
     if (outcome === 'COMPLETED' && facts) {
-      await this.seats.afterGrant(tx, request.id, facts, new Date());
-      await this.settlement.recordPoolGrantAvoidedCost(tx, request, facts);
+      await this.seats.afterGrant(tx, request.id, facts, now);
     }
+    await this.settlement.settleOutcomeEffects(tx, request, outcome, employeeId, facts, now);
+  }
+
+  /** Active beneficiary count (`m`) and charged excess count per `REQUEST` lot (`F11`, `W3-24`). */
+  reservedForRequestLots(
+    lotRequests: readonly { lotId: string; requestId: string }[],
+    tx?: DbTx,
+  ): Promise<Map<string, { beneficiaries: number; chargedExcess: number }>> {
+    return this.settlement.reservedForRequestLots(lotRequests, tx);
   }
 
   async isWithdrawing(tx: DbTx, requestId: string, employeeId?: string): Promise<boolean> {

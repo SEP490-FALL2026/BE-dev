@@ -1,6 +1,9 @@
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { CatalogApi } from '../../catalog/public/catalog.api';
+import { LicenseLotReservedForRequestError } from '../../catalog/public/catalog.errors';
+import type { LicenseLotStockApi } from '../../catalog/public/license-lot-stock.api';
 import type { SeatLedgerApi } from '../../catalog/public/seat-ledger.api';
+import type { GrantRequestGateHook } from '../public/licensing.extension-points';
 import type { SharedPoolAvoidedCostRepo } from './shared-pool-avoided-cost.repo';
 import type { SharedPoolCapacityRepo } from './shared-pool-capacity.repo';
 import { SharedPoolService } from './shared-pool.service';
@@ -164,5 +167,56 @@ describe('SharedPoolService (ledger seats & chooseLine)', () => {
     const chosen = await service.chosenLinesOfPlans(['plan-1'], '2026-11-21', tx);
 
     expect(chosen.get('plan-1')).toEqual({ subscriptionId: 'sub-free', subscriptionLineId: 'line-free' });
+  });
+
+  it('W3-24: K4 chooseLine selects lot via LicenseLotStockApi and throws LicenseLotReservedForRequestError on F11', async () => {
+    const lotStock = {
+      accountLotCandidates: jest.fn().mockResolvedValue([
+        {
+          id: 'lot-duc',
+          purchasedOn: '2027-04-01',
+          licenseCount: 3,
+          unitPriceMinor: 12_000_000n,
+          purpose: 'REQUEST',
+          requestId: 'req-duc',
+          legacySubscriptionId: null,
+          free: 1,
+          keysInStore: 1,
+          openTasksWithoutKey: 0,
+          grantable: 1,
+          excessGrantable: 0,
+        },
+      ]),
+      chooseAccountLot: jest.fn().mockResolvedValue({
+        kind: 'RESERVED_FOR_REQUEST',
+        lot: { id: 'lot-duc' },
+      }),
+    } as unknown as LicenseLotStockApi;
+    const gate = {
+      isBound: () => true,
+      get: () => ({
+        reservedForRequestLots: jest
+          .fn()
+          .mockResolvedValue(new Map([['lot-duc', { beneficiaries: 1, chargedExcess: 2 }]])),
+      }),
+    } as unknown as GrantRequestGateHook;
+
+    const service = new SharedPoolService(
+      {} as unknown as CatalogApi,
+      {} as unknown as SharedPoolCapacityRepo,
+      {} as unknown as SharedPoolAvoidedCostRepo,
+      {} as unknown as SeatLedgerApi,
+      lotStock,
+      gate,
+    );
+
+    await expect(
+      service.chooseLine(tx, {
+        planId: 'plan-cad',
+        provisioningType: 'K4',
+        today: '2027-04-10',
+        requestId: 'req-minh',
+      }),
+    ).rejects.toBeInstanceOf(LicenseLotReservedForRequestError);
   });
 });

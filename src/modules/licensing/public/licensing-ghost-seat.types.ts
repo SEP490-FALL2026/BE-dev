@@ -7,8 +7,12 @@ export interface SharedPoolVacancy {
   planId: string;
   applicationId: string;
   provisioningType: ProvisioningKind;
-  /** Null while the plan has no pricing model; the rule takes only `PER_SEAT`. */
+  /** Null while the plan has no pricing model; `K4` `ACCOUNT` allows `PER_SEAT` or `null`. */
   pricingModel: 'PER_SEAT' | 'FLAT_RATE' | 'CONCURRENT' | 'CONSUMPTION' | 'PER_HOST' | null;
+  /** Whether this vacancy represents a subscription or a K4 license lot (`W3-26`). Defaults to `'SUBSCRIPTION'`. */
+  subjectKind?: 'SUBSCRIPTION' | 'LICENSE_LOT';
+  /** Key binding for `K4` (`ACCOUNT` only for ghost seats). */
+  keyBinding?: 'ACCOUNT' | 'DEVICE_KEY' | 'DEVICE_BUNDLED' | null;
   /** The seats bought; null when the subscription has none. */
   purchased: number | null;
   /** The seats taken on the day (`INV-01`): every assignment not ended and not failed, the invitations and tasks waiting included. */
@@ -38,6 +42,7 @@ export interface RuleSeat {
   owningDepartmentId: string | null;
   provisioningType: ProvisioningKind;
   pricingModel: 'PER_SEAT' | 'FLAT_RATE' | 'CONCURRENT' | 'CONSUMPTION' | 'PER_HOST' | null;
+  keyBinding?: 'ACCOUNT' | 'DEVICE_KEY' | 'DEVICE_BUNDLED' | null;
   employeeId: string;
   expectedEndDate: BusinessDate | null;
   /** Personal commitment months (`1 | 12`) for subscription-free K1 rights; null/undefined otherwise. */

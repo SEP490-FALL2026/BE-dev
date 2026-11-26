@@ -7,6 +7,14 @@ import type { OpenSeatHoldings } from './catalog.types';
 // The points the catalog opens for the modules above it (`core/extension`): they bind them from a `*.listener.ts` when their
 // module starts, so the catalog never imports them. One instance of each per application.
 
+export interface OpenK4GrantTask {
+  taskId: string;
+  planId: string;
+  requestId: string | null;
+  subscriptionId: string | null;
+  createdAt: Date;
+}
+
 /**
  * What the catalog needs to know of the seats that licensing holds, without importing it (ADR-0013 item 4). An assignment holds
  * a seat from the day it is made until it ends or fails; one that has not ended counts, a future start included.
@@ -55,6 +63,7 @@ export interface SeatOccupancyReader {
     lotIds: readonly string[],
     tx?: DbTx,
   ): Promise<ReadonlyMap<string, { inStore: number; assigned: number; withdrawn: number }>>;
+  openGrantTasksWithoutKeyOfPlans?(planIds: readonly string[], tx?: DbTx): Promise<OpenK4GrantTask[]>;
 }
 
 /**

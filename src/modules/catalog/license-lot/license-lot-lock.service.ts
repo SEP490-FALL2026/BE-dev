@@ -14,6 +14,7 @@ export const viewOfLot = (lot: LicenseLotRecord, plan: LockedPlan): LicenseLotVi
   unitPriceMinor: lot.unitPriceMinor,
   purpose: lot.purpose,
   requestId: lot.requestId,
+  invoiceActualMinor: lot.invoiceActualMinor,
   workspaceId: lot.workspaceId,
   contractId: lot.contractId,
   responsibleItAdminEmployeeId: lot.responsibleItAdminEmployeeId,
@@ -61,5 +62,34 @@ export class LicenseLotLockService {
     const [plan] = await this.plans.lookups([lot.planId], tx);
 
     return plan ? viewOfLot(lot, plan) : null;
+  }
+
+  /** The lot bought for a request (purpose = REQUEST), without a lock; null when none exists. */
+  async findOfRequest(requestId: string, tx?: DbTx): Promise<LicenseLotView | null> {
+    const lot = await this.lots.findOfRequest(requestId, tx);
+    if (!lot) return null;
+    const [plan] = await this.plans.lookups([lot.planId], tx);
+
+    return plan ? viewOfLot(lot, plan) : null;
+  }
+
+  /** Multiple lots with their plans in two reads; missing lots are absent. */
+  async findMany(lotIds: readonly string[], tx?: DbTx): Promise<Map<string, LicenseLotView>> {
+    const byId = await this.lots.findMany(lotIds, tx);
+    if (byId.size === 0) return new Map();
+    const planIds = [...new Set([...byId.values()].map((lot) => lot.planId))];
+    const plans = new Map((await this.plans.lookups(planIds, tx)).map((plan) => [plan.id, plan]));
+    const views = new Map<string, LicenseLotView>();
+    for (const lot of byId.values()) {
+      const plan = plans.get(lot.planId);
+      if (plan) views.set(lot.id, viewOfLot(lot, plan));
+    }
+
+    return views;
+  }
+
+  /** Records Finance's confirmed invoice total on a lot; throws LicenseLotAlreadyInvoicedError on overwrite. */
+  async setInvoiceActual(tx: DbTx, lotId: string, actualMinor: bigint): Promise<void> {
+    await this.lots.setInvoiceActual(tx, lotId, actualMinor);
   }
 }

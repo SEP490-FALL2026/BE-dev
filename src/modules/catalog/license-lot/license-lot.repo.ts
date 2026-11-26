@@ -4,6 +4,7 @@ import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { isCheckViolation, isUniqueViolation } from '../../../infrastructure/database/unique-violation';
+import { LicenseLotAlreadyInvoicedError } from '../public/catalog.errors';
 import { LicenseLotMismatchError, LicenseLotRequestTakenError } from './license-lot.errors';
 import type { LicenseLotChanges, LicenseLotPurpose, LicenseLotRecord, NewLicenseLot } from './license-lot.types';
 
@@ -79,11 +80,37 @@ export class LicenseLotRepo {
     return row ? toRecord(row) : null;
   }
 
-  /** The lots of a plan, oldest purchase first. */
+  /** The lots of a plan, oldest purchase first (`purchasedOn ASC, id ASC`). */
   async ofPlan(planId: string, tx?: DbTx): Promise<LicenseLotRecord[]> {
     const rows = await (tx ?? this.prisma).licenseLot.findMany({
       where: { planId },
-      orderBy: [{ purchasedOn: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+      orderBy: [{ purchasedOn: 'asc' }, { id: 'asc' }],
+    });
+
+    return rows.map(toRecord);
+  }
+
+  /** Lots of many plans grouped by `planId`, each list ordered `(purchasedOn ASC, id ASC)`. */
+  async ofPlans(planIds: readonly string[], tx?: DbTx): Promise<Map<string, LicenseLotRecord[]>> {
+    const byPlan = new Map<string, LicenseLotRecord[]>();
+    if (planIds.length === 0) return byPlan;
+    const rows = await (tx ?? this.prisma).licenseLot.findMany({
+      where: { planId: { in: [...planIds] } },
+      orderBy: [{ purchasedOn: 'asc' }, { id: 'asc' }],
+    });
+    for (const row of rows) {
+      const record = toRecord(row);
+      byPlan.set(record.planId, [...(byPlan.get(record.planId) ?? []), record]);
+    }
+
+    return byPlan;
+  }
+
+  /** All lots belonging to K4 plans with `keyBinding = 'ACCOUNT'`, ordered `(purchasedOn ASC, id ASC)`. */
+  async allAccountLots(tx?: DbTx): Promise<LicenseLotRecord[]> {
+    const rows = await (tx ?? this.prisma).licenseLot.findMany({
+      where: { plan: { provisioningType: 'K4', keyBinding: 'ACCOUNT' } },
+      orderBy: [{ purchasedOn: 'asc' }, { id: 'asc' }],
     });
 
     return rows.map(toRecord);
@@ -192,8 +219,12 @@ export class LicenseLotRepo {
     return ids;
   }
 
-  /** Records what Finance confirmed the invoice of the lot at. */
+  /** Records what Finance confirmed the invoice of the lot at; refuses overwriting an already-invoiced lot (`F14a`). */
   async setInvoiceActual(tx: DbTx, id: string, actualMinor: bigint): Promise<void> {
-    await tx.licenseLot.update({ where: { id }, data: { invoiceActualMinor: actualMinor, updatedAt: new Date() } });
+    const { count } = await tx.licenseLot.updateMany({
+      where: { id, invoiceActualMinor: null },
+      data: { invoiceActualMinor: actualMinor, updatedAt: new Date() },
+    });
+    if (count === 0) throw new LicenseLotAlreadyInvoicedError();
   }
 }

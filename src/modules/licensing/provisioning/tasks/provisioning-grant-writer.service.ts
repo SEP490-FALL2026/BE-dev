@@ -55,15 +55,15 @@ export class ProvisioningGrantWriter {
   ): Promise<ProvisioningTaskRecord> {
     const { answer, plan, organization, today, inCharge, maxAttempts } = planned;
     const { bySubstitute, lockedRevocation } = await this.lockAndAuthorize(tx, actor, answer);
-    // The request is locked and moved to "being carried out" here, in the transaction of the grant: a second grant of
-    // the same request finds it no longer grantable, and a request that changed since the read above is refused.
-    const claimed = await this.gate.get().claimForGrant(tx, input.requestId, input.beneficiaryEmployeeId);
-    if (claimed.status !== 'GRANTABLE') throw new GrantRequestRefusedError(claimed.status);
-    if (!claimMatchesAnswer(claimed, answer)) throw new GrantRequestRefusedError('NOT_APPROVED');
-    if (plan.keyBinding === 'DEVICE_KEY' || plan.keyBinding === 'DEVICE_BUNDLED') {
-      throw new ProvisioningPlanBoundToDeviceError();
-    }
-    const subscriptionId = await this.subscriptionOf(tx, plan, input.subscriptionId, today);
+    const claimed = await this.claimGrantableRequest(tx, input, answer, plan);
+    const subscriptionId = await this.subscriptionOf(
+      tx,
+      plan,
+      input.subscriptionId,
+      today,
+      input.requestId,
+      input.purchase !== undefined,
+    );
     await this.requireGrantable(tx, plan, input.subscriptionId, today);
     const target = await this.lockTarget(tx, plan, subscriptionId, today);
     const replaced = await this.replacements.endReplacedRight(tx, actor, {
@@ -91,7 +91,7 @@ export class ProvisioningGrantWriter {
       replaced,
     });
 
-    return this.grantTasks.insertAndClaim(tx, actor, {
+    return this.claimInsertedTask(tx, actor, {
       organizationId: organization.id,
       assignmentId: assignment.id,
       requestId: input.requestId,
@@ -103,6 +103,27 @@ export class ProvisioningGrantWriter {
       selfExecuted: holder.selfExecuted,
       bySubstitute,
     });
+  }
+
+  private async claimGrantableRequest(tx: DbTx, input: GrantInput, answer: Planned['answer'], plan: Planned['plan']) {
+    // The request is locked and moved to "being carried out" here, in the transaction of the grant: a second grant of
+    // the same request finds it no longer grantable, and a request that changed since the read above is refused.
+    const claimed = await this.gate.get().claimForGrant(tx, input.requestId, input.beneficiaryEmployeeId);
+    if (claimed.status !== 'GRANTABLE') throw new GrantRequestRefusedError(claimed.status);
+    if (!claimMatchesAnswer(claimed, answer)) throw new GrantRequestRefusedError('NOT_APPROVED');
+    if (plan.keyBinding === 'DEVICE_KEY' || plan.keyBinding === 'DEVICE_BUNDLED') {
+      throw new ProvisioningPlanBoundToDeviceError();
+    }
+
+    return claimed;
+  }
+
+  private claimInsertedTask(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    params: Parameters<ProvisioningGrantTaskService['insertAndClaim']>[2],
+  ): Promise<ProvisioningTaskRecord> {
+    return this.grantTasks.insertAndClaim(tx, actor, params);
   }
 
   private async createGrantAssignment(
@@ -188,6 +209,7 @@ export class ProvisioningGrantWriter {
       provisioningType: plan.provisioningType,
       today,
       purchase: facts.requested,
+      requestId: facts.requestId,
     });
     await this.takeSeat(tx, actor, {
       plan,
@@ -213,6 +235,8 @@ export class ProvisioningGrantWriter {
     plan: SeatTarget,
     named: string | undefined,
     today: string,
+    requestId: string,
+    hasPurchase: boolean,
   ): Promise<string | undefined> {
     if (plan.provisioningType === 'K1') return undefined;
     if (named !== undefined || plan.provisioningType === 'K5') return named;
@@ -220,8 +244,12 @@ export class ProvisioningGrantWriter {
       planId: plan.planId,
       provisioningType: plan.provisioningType,
       today,
+      requestId,
     });
-    if (chosen === null) throw new SeatTargetNotFoundError('SUBSCRIPTION');
+    if (chosen === null) {
+      if (plan.provisioningType === 'K4' && hasPurchase) return undefined;
+      throw new SeatTargetNotFoundError('SUBSCRIPTION');
+    }
 
     return chosen;
   }
@@ -233,6 +261,7 @@ export class ProvisioningGrantWriter {
    */
   private async requireGrantable(tx: DbTx, plan: SeatTarget, named: string | undefined, today: string): Promise<void> {
     if (named === undefined || plan.provisioningType === 'K5' || plan.provisioningType === 'K1') return;
+    if (plan.provisioningType === 'K4') return;
     const grantable = await this.sharedPool.grantableOf(tx, plan.planId, today);
     if (grantable.some((subscription) => subscription.subscriptionId === named)) return;
     const target = await this.catalog.findSeatTarget({ subscriptionId: named }, tx);
@@ -256,26 +285,51 @@ export class ProvisioningGrantWriter {
     },
   ): Promise<void> {
     const { plan, target, purchased, stock } = facts;
-    if (target.subscriptionId === null || plan.provisioningType === 'K1') return;
-    if (purchased) {
-      if (plan.provisioningType === 'K2' && target.subscriptionLineId) {
-        await this.seatLedger.buyForItems(
-          tx,
-          target.subscriptionLineId,
-          [{ requestId: facts.requestId, beneficiaryEmployeeId: facts.beneficiaryEmployeeId }],
-          facts.today,
-          { actor, alreadyLocked: true, today: facts.today },
-        );
+    if (plan.provisioningType === 'K1') return;
+    if (plan.provisioningType === 'K4') {
+      this.ensureK4LotCapacity(target, purchased, stock);
 
-        return;
-      }
-      await this.catalog.incrementLegacyPoolSeat(tx, actor, target.subscriptionId, facts.requestId);
+      return;
+    }
+    if (target.subscriptionId === null) return;
+    if (purchased) {
+      await this.buySubscriptionSeat(tx, actor, target, plan.provisioningType, facts);
 
       return;
     }
     if (stock !== null && stock.freeBySubscription.get(target.subscriptionId) === 0) {
       throw new AssignmentConflictError('SEAT_CAPACITY', 0, stock.free);
     }
+  }
+
+  private ensureK4LotCapacity(target: SeatTarget, purchased: boolean, stock: PoolStock | null): void {
+    // K4 capacity lives in license_lots; never increment legacy subscriptions for K4 (P20).
+    const targetId = target.licenseLotId ?? target.subscriptionId;
+    if (!purchased && targetId !== null && stock !== null && stock.freeBySubscription.get(targetId) === 0) {
+      throw new AssignmentConflictError('SEAT_CAPACITY', 0, stock.free);
+    }
+  }
+
+  private async buySubscriptionSeat(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    target: SeatTarget,
+    provisioningType: string,
+    facts: { requestId: string; beneficiaryEmployeeId: string; today: string },
+  ): Promise<void> {
+    if (target.subscriptionId === null) return;
+    if (provisioningType === 'K2' && target.subscriptionLineId) {
+      await this.seatLedger.buyForItems(
+        tx,
+        target.subscriptionLineId,
+        [{ requestId: facts.requestId, beneficiaryEmployeeId: facts.beneficiaryEmployeeId }],
+        facts.today,
+        { actor, alreadyLocked: true, today: facts.today },
+      );
+
+      return;
+    }
+    await this.catalog.incrementLegacyPoolSeat(tx, actor, target.subscriptionId, facts.requestId);
   }
 
   private async k1GrantFields(
@@ -360,17 +414,19 @@ export class ProvisioningGrantWriter {
     return termRunOf({ start: today, months: claimed.termMonths, contractEndDate: holder.contractEnd }).end;
   }
 
-  /** K5: the plan itself (no seat); K1 and K2: the subscription, which must be of the plan and have a quantity. */
+  /** K5: the plan itself; K4: the license lot (`tier 6a` -> `tier 7`), or plan when purchasing a new lot; K1/K2: subscription -> plan. */
   private async lockTarget(
     tx: DbTx,
     plan: SeatTarget,
     subscriptionId: string | undefined,
     servingOn: string,
   ): Promise<SeatTarget> {
-    const target = await this.catalog.lockSeatTarget(
-      tx,
-      subscriptionId ? { subscriptionId, planId: plan.planId, servingOn } : { planId: plan.planId },
-    );
+    const ref = subscriptionId
+      ? plan.provisioningType === 'K4'
+        ? { licenseLotId: subscriptionId, planId: plan.planId }
+        : { subscriptionId, planId: plan.planId, servingOn }
+      : { planId: plan.planId };
+    const target = await this.catalog.lockSeatTarget(tx, ref);
     if (!target) throw new SeatTargetNotFoundError(subscriptionId ? 'SUBSCRIPTION' : 'PLAN');
     if (target.planId !== plan.planId) throw new ProvisioningSubscriptionError('PLAN_MISMATCH');
     if (target.keyBinding === 'DEVICE_KEY' || target.keyBinding === 'DEVICE_BUNDLED') {

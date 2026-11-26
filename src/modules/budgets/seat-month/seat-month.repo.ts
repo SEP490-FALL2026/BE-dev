@@ -241,7 +241,15 @@ export class SeatMonthRepo {
   async yearTotals(year: number): Promise<{ companyMinor: bigint; withoutCostCenterMinor: bigint }> {
     const rows = await this.prisma.$queryRaw<{ company: string; without_cost_center: string }[]>`
       SELECT (COALESCE(SUM(i.actual_cost_minor) FILTER (WHERE NOT EXISTS (SELECT 1 FROM invoice_allocations a WHERE a.invoice_id = i.id)), 0)
-              + (SELECT COALESCE(SUM(l.amount_minor), 0) FROM invoice_allocations l WHERE EXTRACT(YEAR FROM l.month)::int = ${year}::int))::text AS company,
+              + (SELECT COALESCE(SUM(l.amount_minor), 0) FROM invoice_allocations l WHERE EXTRACT(YEAR FROM l.month)::int = ${year}::int)
+              + (SELECT COALESCE(SUM(c.amount_minor), 0) FROM license_lot_charges c
+                  WHERE EXTRACT(YEAR FROM c.month)::int = ${year}::int
+                    AND NOT EXISTS (
+                      SELECT 1 FROM invoices i2
+                       JOIN invoice_allocations a2 ON a2.invoice_id = i2.id
+                      WHERE i2.subscription_id = c.license_lot_id
+                        AND c.created_at > i2.recorded_at
+                    )))::text AS company,
              (SELECT COALESCE(SUM(s.amount_minor), 0)::text FROM seat_month_charges s
                WHERE EXTRACT(YEAR FROM s.month)::int = ${year}::int AND s.cost_center_id IS NULL) AS without_cost_center
         FROM invoices i LEFT JOIN budget_commitments c ON c.id = i.commitment_id

@@ -1,4 +1,5 @@
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
+import type { LicenseLotStockService } from '../../license-lot/license-lot-stock.service';
 import type { SubscriptionRepo } from '../subscription.repo';
 import type { PlanReferencePriceRepo } from './plan-reference-price.repo';
 import { SubscriptionPriceService } from './subscription-price.service';
@@ -143,5 +144,45 @@ describe('QĐ-113a: the "can be priced" cycles of plans count the reference pric
       ['a', 'ANNUAL'],
       ['b', 'MONTHLY'],
     ]);
+  });
+
+  it('prices K4 via reference price first, then newest free lot unit price (K-A5), else null', async () => {
+    const refService = new SubscriptionPriceService(
+      { findPricedOfPlan: jest.fn() } as unknown as SubscriptionRepo,
+      {
+        findPlanProvisioningType: jest.fn().mockResolvedValue('K4'),
+        findOfPlan: jest.fn().mockResolvedValue({ provisioningType: 'K4', amountMinor: 12_000_000n, currency: 'VND' }),
+      } as unknown as PlanReferencePriceRepo,
+      { newestFreeLotUnitPrice: jest.fn().mockResolvedValue(11_000_000n) } as unknown as LicenseLotStockService,
+    );
+    expect(await refService.priceOfPlan('k4-plan')).toMatchObject({
+      kind: 'ONE_TIME',
+      unitPrice: { amountMinor: 12_000_000n, currency: 'VND' },
+      source: 'PLAN_REFERENCE',
+    });
+
+    const lotFallbackService = new SubscriptionPriceService(
+      { findPricedOfPlan: jest.fn().mockResolvedValue(null) } as unknown as SubscriptionRepo,
+      {
+        findPlanProvisioningType: jest.fn().mockResolvedValue('K4'),
+        findOfPlan: jest.fn().mockResolvedValue(null),
+      } as unknown as PlanReferencePriceRepo,
+      { newestFreeLotUnitPrice: jest.fn().mockResolvedValue(11_000_000n) } as unknown as LicenseLotStockService,
+    );
+    expect(await lotFallbackService.priceOfPlan('k4-plan')).toMatchObject({
+      kind: 'ONE_TIME',
+      unitPrice: { amountMinor: 11_000_000n, currency: 'VND' },
+      source: 'SUBSCRIPTION',
+    });
+
+    const missingService = new SubscriptionPriceService(
+      { findPricedOfPlan: jest.fn().mockResolvedValue(null) } as unknown as SubscriptionRepo,
+      {
+        findPlanProvisioningType: jest.fn().mockResolvedValue('K4'),
+        findOfPlan: jest.fn().mockResolvedValue(null),
+      } as unknown as PlanReferencePriceRepo,
+      { newestFreeLotUnitPrice: jest.fn().mockResolvedValue(null) } as unknown as LicenseLotStockService,
+    );
+    expect(await missingService.priceOfPlan('k4-plan')).toBeNull();
   });
 });

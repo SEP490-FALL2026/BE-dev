@@ -160,6 +160,18 @@ export class ProvisioningTaskRepo {
     return row ? toRecord(row) : null;
   }
 
+  /** Locks the latest non-void grant task of `requestId` (`FOR UPDATE`, tier 3a) inside `tx` (`FIX-W3` W-7 / P20). */
+  async lockGrantOf(tx: DbTx, requestId: string): Promise<ProvisioningTaskRecord | null> {
+    await tx.$queryRaw<{ id: string }[]>`
+      SELECT id FROM provisioning_tasks
+       WHERE kind = 'GRANT' AND request_id = ${requestId}::uuid AND status NOT IN ('CANCELLED', 'CLOSED_FAILED')
+       ORDER BY created_at DESC, id DESC
+       LIMIT 1
+       FOR UPDATE`;
+
+    return this.findGrantOf(requestId, undefined, tx);
+  }
+
   async find(id: string, tx?: DbTx): Promise<ProvisioningTaskRecord | null> {
     const row = await (tx ?? this.prisma).provisioningTask.findUnique({ where: { id }, include: WITH_ASSIGNMENT });
 

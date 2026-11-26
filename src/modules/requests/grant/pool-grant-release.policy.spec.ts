@@ -35,6 +35,10 @@ describe('BR-MF1-09: the commitment of a K4 request granted from the pool goes b
     expect(releasesAllOnPoolGrant('FAILED', facts())).toBe(false);
     expect(releasesAllOnPoolGrant('COMPLETED', undefined)).toBe(false);
   });
+
+  it('defers lot-backed K4 pool grants to license-lot settlement (W3-25 / F10)', () => {
+    expect(releasesAllOnPoolGrant('COMPLETED', facts({ licenseLotId: 'lot-1' }))).toBe(false);
+  });
 });
 
 describe('W3-09 (B1-R8, Q-G): per-person avoided cost for a pool grant', () => {

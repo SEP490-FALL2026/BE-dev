@@ -7,6 +7,7 @@ import type { PoolAdjustmentWindows, SubscriptionPurchaseFacts } from '../../cat
 import { LicensingSeatMonthApi } from '../../licensing/public/licensing-seat-month.api';
 import type { PriorLineLockedTarget, SeatOfMonth } from '../../licensing/public/licensing-seat-month.types';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { LicenseLotCostService } from './license-lot-cost.service';
 import {
   aggregateIdleClassifications,
   classifyIdleSeatCosts,
@@ -223,6 +224,7 @@ export class SharedPoolLineFactsService {
     private readonly licensing: LicensingSeatMonthApi,
     private readonly organizationReads: OrganizationReadApi,
     @Optional() private readonly seatLedger?: SeatLedgerApi,
+    @Optional() private readonly lotCosts?: LicenseLotCostService,
   ) {}
 
   /** Shared-pool lines for `month`, sorted by subscription id, up to `limit`. */
@@ -330,36 +332,24 @@ export class SharedPoolLineFactsService {
   async yearFigures(year: number, throughMonth = 12, only?: string, tx?: DbTx): Promise<YearSharedPoolFigures> {
     const todayStart = monthBoundsOf(await this.organizationReads.businessToday(new Date(), tx)).start;
     const endedMonths = this.endedMonthsInYear(year, throughMonth, todayStart);
-    if (endedMonths.length === 0) {
-      return {
-        idleCostMinor: 0n,
-        invoiceVarianceMinor: 0n,
-        invoiceVarianceInReviewMinor: 0n,
-        deviceLotPurchasesMinor: 0n,
-        replacementKeysMinor: 0n,
-        unallocatedMinor: 0n,
-      };
-    }
+    if (endedMonths.length === 0) return emptyYearFigures();
 
     let idleCostMinor = 0n;
     let onlyVarianceMinor = 0n;
     let onlyVarianceInReviewMinor = 0n;
     for (const month of endedMonths) {
-      const lines = await this.linesOfMonth(month, only, MAX_YEAR_SUBSCRIPTIONS, tx);
-      for (const line of lines) {
+      for (const line of await this.linesOfMonth(month, only, MAX_YEAR_SUBSCRIPTIONS, tx)) {
         idleCostMinor += line.idleCostMinor ?? 0n;
         onlyVarianceMinor += line.invoiceVarianceMinor;
         onlyVarianceInReviewMinor += line.invoiceVarianceInReviewMinor;
       }
     }
-
     if (only !== undefined) {
       return {
+        ...emptyYearFigures(),
         idleCostMinor,
         invoiceVarianceMinor: onlyVarianceMinor,
         invoiceVarianceInReviewMinor: onlyVarianceInReviewMinor,
-        deviceLotPurchasesMinor: 0n,
-        replacementKeysMinor: 0n,
         unallocatedMinor: idleCostMinor + onlyVarianceMinor + onlyVarianceInReviewMinor,
       };
     }
@@ -372,14 +362,24 @@ export class SharedPoolLineFactsService {
           tx,
         )
       : { varianceMinor: 0n, varianceInReviewMinor: 0n };
+    const lotPool =
+      org && this.lotCosts
+        ? await this.lotCosts.poolTotalsInRange(org.id, `${year}-01-01`, nextStart, tx)
+        : { lotIdleNetMinor: 0n, deviceLotPurchasesMinor: 0n, replacementKeysMinor: 0n };
+    const totalIdleMinor = idleCostMinor + lotPool.lotIdleNetMinor;
 
     return {
-      idleCostMinor,
+      idleCostMinor: totalIdleMinor,
       invoiceVarianceMinor: totals.varianceMinor,
       invoiceVarianceInReviewMinor: totals.varianceInReviewMinor,
-      deviceLotPurchasesMinor: 0n,
-      replacementKeysMinor: 0n,
-      unallocatedMinor: idleCostMinor + totals.varianceMinor + totals.varianceInReviewMinor,
+      deviceLotPurchasesMinor: lotPool.deviceLotPurchasesMinor,
+      replacementKeysMinor: lotPool.replacementKeysMinor,
+      unallocatedMinor:
+        totalIdleMinor +
+        totals.varianceMinor +
+        totals.varianceInReviewMinor +
+        lotPool.deviceLotPurchasesMinor +
+        lotPool.replacementKeysMinor,
     };
   }
 
@@ -393,4 +393,15 @@ export class SharedPoolLineFactsService {
 
     return months;
   }
+}
+
+function emptyYearFigures(): YearSharedPoolFigures {
+  return {
+    idleCostMinor: 0n,
+    invoiceVarianceMinor: 0n,
+    invoiceVarianceInReviewMinor: 0n,
+    deviceLotPurchasesMinor: 0n,
+    replacementKeysMinor: 0n,
+    unallocatedMinor: 0n,
+  };
 }

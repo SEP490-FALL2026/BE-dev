@@ -1,14 +1,18 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { businessDateAt, type BusinessDate } from '../../../../core/business-date';
 import { addMonths } from '../../../../core/fiscal-year';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
+import type { CatalogApi } from '../../../catalog/public/catalog.api';
+import { LicenseLotApi } from '../../../catalog/public/license-lot.api';
 import { SeatLedgerApi } from '../../../catalog/public/seat-ledger.api';
-import { SubscriptionPeriodApi } from '../../../catalog/public/subscription-period.api';
 import type { SubscriptionPurchaseFacts } from '../../../catalog/public/subscription-period.types';
+import { SubscriptionPeriodApi } from '../../../catalog/public/subscription-period.api';
 import { LicensingOpenGrantsApi } from '../../../licensing/public/licensing-open-grants.api';
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
+import { PurchaseInvoiceRefusedError } from '../purchase-invoice.errors';
+import type { PurchaseInvoiceRepo } from '../purchase-invoice.repo';
+import type { LinkFacts, PoolExpectationFacts } from '../purchase-invoice.types';
 import { expectedPoolAmountOf, type PoolInvoiceExpectationSource } from './purchase-invoice-pool-expectation.policy';
-import type { PoolExpectationFacts } from '../purchase-invoice.types';
 
 /**
  * Aggregates subscription-line, seat-purchase, and prior-month `NONE` purchase facts from `catalog` and `licensing`
@@ -21,7 +25,20 @@ export class PurchaseInvoicePoolService {
     private readonly seatLedger: SeatLedgerApi,
     private readonly grants: LicensingOpenGrantsApi,
     private readonly organizationReads: OrganizationReadApi,
+    @Optional() private readonly lots?: LicenseLotApi,
   ) {}
+
+  findLot(lotId: string, tx?: DbTx) {
+    return this.lots ? this.lots.findLot(lotId, tx) : Promise.resolve(null);
+  }
+
+  findLotOfRequest(requestId: string, tx?: DbTx) {
+    return this.lots ? this.lots.findLotOfRequest(requestId, tx) : Promise.resolve(null);
+  }
+
+  get lotApi(): LicenseLotApi | undefined {
+    return this.lots;
+  }
 
   getPurchaseFacts(subscriptionIds: readonly string[], tx?: DbTx): Promise<SubscriptionPurchaseFacts[]> {
     return this.periods.getPurchaseFacts(subscriptionIds, tx);
@@ -221,5 +238,55 @@ export class PurchaseInvoicePoolService {
 
   async timeZone(tx?: DbTx): Promise<string> {
     return ((await this.organizationReads.getOrganization(tx)) as { timeZone: string }).timeZone;
+  }
+
+  /** Builds link facts for a `LICENSE_LOT` purchase invoice, checking acting scope and `F14a` double-invoicing. */
+  async buildLicenseLotLinkFacts(deps: {
+    licenseLotId: string;
+    serviceMonth: BusinessDate;
+    scope: readonly string[];
+    invoices: PurchaseInvoiceRepo;
+    catalog: CatalogApi;
+    tx?: DbTx;
+  }): Promise<LinkFacts> {
+    const lot = await this.findLot(deps.licenseLotId, deps.tx);
+    if (!lot) throw new PurchaseInvoiceRefusedError('LINK_NOT_FOUND');
+
+    const request =
+      lot.purpose === 'REQUEST' && lot.requestId !== null
+        ? await deps.invoices.requestFacts(lot.requestId, deps.tx)
+        : null;
+    if (lot.purpose === 'REQUEST' && (!request || !deps.scope.includes(request.departmentId))) {
+      throw new PurchaseInvoiceRefusedError('LINK_NOT_FOUND');
+    }
+    if (lot.invoiceActualMinor !== null) throw new PurchaseInvoiceRefusedError('LOT_ALREADY_INVOICED');
+
+    const vendorId = await deps.catalog.getPlanVendorId(lot.planId, deps.tx);
+    if (vendorId === null) throw new PurchaseInvoiceRefusedError('NO_VENDOR');
+
+    const expectedUnitPrice = (await deps.catalog.getPlanOriginalPrice(lot.planId, deps.tx, deps.serviceMonth)) ?? {
+      amountMinor: lot.unitPriceMinor,
+      currency: 'VND',
+    };
+
+    return {
+      organizationId: lot.organizationId,
+      link: { kind: 'LICENSE_LOT', licenseLotId: deps.licenseLotId },
+      vendorId,
+      continuation: false,
+      startMonth: null,
+      termMonths: null,
+      expectedQuantity: lot.licenseCount,
+      expectedUnitPrice,
+      requestCostCenterId: request?.costCenterId ?? null,
+      requestId: lot.requestId,
+      holderBound: false,
+      failedGrantDepartmentId: null,
+      poolSubscriptionId: null,
+      seatPricing: null,
+      poolSource: null,
+      renewedAssignmentId: null,
+      licenseLotId: lot.id,
+    };
   }
 }

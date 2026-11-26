@@ -243,6 +243,16 @@ export const SUBSCRIPTION_TEXTS = {
       message: 'The idle seat cost of {subscriptionId:name} in {month} is {ratioPercent} %, exceeding 10 %.',
     },
   },
+  LICENSE_LOT_IDLE_COST_HIGH: {
+    vi: {
+      title: 'Chi phí license trống vượt ngưỡng 10 %',
+      message: 'Chi phí license trống của lô {lotId:name} tháng {month} là {ratioPercent} %, vượt 10 %.',
+    },
+    en: {
+      title: 'Idle license cost exceeds 10 %',
+      message: 'The idle license cost of lot {lotId:name} in {month} is {ratioPercent} %, exceeding 10 %.',
+    },
+  },
   SUBSCRIPTION_PRICE_REVIEW: {
     vi: {
       title: 'Cần cập nhật giá tháng thuê bao',

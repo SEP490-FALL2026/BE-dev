@@ -13,6 +13,7 @@ import {
   WorkspaceRequiredError,
   WorkspaceVendorMismatchError,
 } from '../workspace/workspace.errors';
+import { LicenseLotAlreadyInvoicedError, LicenseLotReservedForRequestError } from '../public/catalog.errors';
 import {
   LicenseLotContractReasonRequiredError,
   LicenseLotKeysExceedLicensesError,
@@ -65,6 +66,10 @@ export function toLicenseLotApiException(error: unknown): unknown {
   }
   if (error instanceof LicenseLotPriceLockedError)
     return refuse(HttpStatus.CONFLICT, 'LICENSE_LOT.PRICE_LOCKED', error.message);
+  if (error instanceof LicenseLotAlreadyInvoicedError)
+    return refuse(HttpStatus.CONFLICT, 'LICENSE_LOT.ALREADY_INVOICED', error.message);
+  if (error instanceof LicenseLotReservedForRequestError)
+    return refuse(HttpStatus.CONFLICT, 'LICENSE_LOT.RESERVED_FOR_REQUEST', error.message, { lotId: error.lotId });
   if (error instanceof LicenseLotRequestTakenError) {
     return refuse(HttpStatus.CONFLICT, 'LICENSE_LOT.REQUEST_HAS_LOT', error.message);
   }

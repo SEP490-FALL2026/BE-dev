@@ -33,6 +33,7 @@ const factsOf = (seat: RuleSeat, holderLeft: boolean): SeatFacts => ({
   isMachineAccount: seat.isMachineAccount,
   provisioningType: seat.provisioningType,
   pricingModel: seat.pricingModel,
+  keyBinding: seat.keyBinding,
   holderLeft,
   liveRevocation: seat.liveRevocation ? { taskId: seat.liveRevocation.taskId } : null,
   terminatingUntil: seat.terminatingUntil,

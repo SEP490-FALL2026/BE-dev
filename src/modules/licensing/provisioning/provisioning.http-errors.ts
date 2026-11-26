@@ -2,6 +2,7 @@ import { HttpStatus } from '@nestjs/common';
 import { FORBIDDEN_ERROR } from '../../../infrastructure/http/errors/access-errors';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
+import { LicenseLotReservedForRequestError } from '../../catalog/public/catalog.errors';
 import {
   RequestPartyIneligibleError,
   requestPartyRefusalBody,
@@ -206,6 +207,9 @@ export function toProvisioningApiException(error: unknown): unknown {
   if (error instanceof ProvisioningPlanBoundToDeviceError) {
     return refuse(CONFLICT, 'PROVISIONING.PLAN_BOUND_TO_DEVICE', error.message);
   }
+  if (error instanceof LicenseLotReservedForRequestError) {
+    return refuse(CONFLICT, 'LICENSE_LOT.RESERVED_FOR_REQUEST', error.message, { lotId: error.lotId });
+  }
 
   return toLicensingApiException(error);
 }
@@ -302,6 +306,7 @@ export const PROVISIONING_GRANT_EXAMPLES = {
     example(new AssignmentConflictError('SEAT_CAPACITY', 0, 2)),
     example(new PurchaseNotAllowedError(2, ['<subscription-id>'])),
     example(new ProvisioningPlanBoundToDeviceError()),
+    example(new LicenseLotReservedForRequestError('<license-lot-id>')),
     example(new EmployeeNotStartedError()),
   ],
   UNPROCESSABLE: [

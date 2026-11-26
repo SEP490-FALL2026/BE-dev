@@ -485,6 +485,12 @@ export interface GrantOutcomeFacts {
   /** The day the seat began and the day it ends, as they stand once granted; the end is null when the seat has none (see `RevocationCompletedFacts.grantedStartDate`). */
   effectiveFrom: BusinessDate;
   expectedEndDate: BusinessDate | null;
+  /** The lot id of the assigned license key (`W3-25`); null/undefined when not a K4 key grant. */
+  licenseLotId?: string | null;
+  /** The license key id assigned on grant completion (`W3-25`). */
+  licenseKeyId?: string | null;
+  /** Whether the key's cost was already borne before this grant (`cost_borne` before transition). */
+  keyCostBorneBeforeGrant?: boolean | null;
 }
 
 /**

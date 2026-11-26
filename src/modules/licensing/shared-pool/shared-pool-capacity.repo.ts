@@ -201,7 +201,9 @@ export class SharedPoolCapacityRepo {
       SELECT s."id" AS subscription_id,
              GREATEST(0,
                (SELECT count(*) FROM "license_keys" k
-                 WHERE k."subscription_id" = s."id" AND k."status" = 'IN_STORE' AND k."withdrawn_at" IS NULL)
+                 WHERE COALESCE(k."license_lot_id", k."subscription_id") = s."id"
+                   AND k."status" = 'IN_STORE'
+                   AND k."withdrawn_at" IS NULL)
                - (SELECT count(*) FROM "provisioning_tasks" t
                     JOIN "license_assignments" a ON a."id" = t."assignment_id"
                    WHERE a."subscription_id" = s."id"

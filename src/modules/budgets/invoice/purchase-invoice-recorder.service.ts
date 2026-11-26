@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { DONG } from '../../../core/money/money';
 import { Prisma } from '../../../generated/prisma/client';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
@@ -10,7 +10,13 @@ import { CommitmentRepo, type LockedCommitmentOfRequest } from '../budget/commit
 import { bookPurchaseInvoice, planInvoice, type PurchaseBooking } from '../budget/invoice.policy';
 import { InvoiceRepo } from '../budget/invoice.repo';
 import { PurchaseInvoiceRecordRefusedError } from '../public/budgets.errors';
-import type { PurchaseInvoiceRecordInput, PurchaseInvoiceRecorded } from '../public/budgets.types';
+import { LicenseLotInvoiceService } from './license-lot-invoice.service';
+import type {
+  LotWithdrawalAfterInvoiceInput,
+  PurchaseInvoiceRecordInput,
+  PurchaseInvoiceRecorded,
+  RecordedPurchaseInvoiceInfo,
+} from '../public/budgets.types';
 import { ThresholdAlertService, type ThresholdWatch } from '../threshold/threshold-alert.service';
 import { applyPairYearAllocations, splitK1AnnualInvoice, type K1AllocationLinePlan } from './invoice-allocation.policy';
 import { InvoiceAllocationRepo } from './invoice-allocation.repo';
@@ -37,6 +43,7 @@ export class PurchaseInvoiceRecorderService {
     private readonly thresholds: ThresholdAlertService,
     private readonly allocations: InvoiceAllocationRepo,
     private readonly yearApplications: InvoiceYearApplicationRepo,
+    @Optional() private readonly lotInvoices?: LicenseLotInvoiceService,
   ) {}
 
   /** Throws PurchaseInvoiceRecordRefusedError. */
@@ -46,23 +53,11 @@ export class PurchaseInvoiceRecorderService {
     input: PurchaseInvoiceRecordInput,
   ): Promise<PurchaseInvoiceRecorded> {
     this.assertPositiveAmounts(input);
+    const lotRecorded = await this.recordLotIfPresent(tx, actor, input);
+    if (lotRecorded) return lotRecorded;
     if (this.isK1Annual(input)) return this.recordK1Annual(tx, actor, input);
     const serviceYear = Number(input.serviceMonth.slice(0, 4));
-    const rows =
-      input.requestId !== null && input.subscriptionId === null && input.unallocated === null
-        ? await this.commitments.lockOfRequest(tx, input.requestId)
-        : [];
-    const booking = bookPurchaseInvoice({
-      commitments: rows,
-      serviceYear,
-      chargedCostCenterId: input.chargedCostCenterId,
-      subscriptionId: input.subscriptionId,
-      unallocated: input.unallocated !== null,
-    });
-    if (booking.kind === 'UNPLACED') throw new PurchaseInvoiceRecordRefusedError('NO_PLACE');
-    if (await this.invoices.exists(tx, input.organizationId, input.vendorId, input.number)) {
-      throw new PurchaseInvoiceRecordRefusedError('DUPLICATE_NUMBER');
-    }
+    const { rows, booking } = await this.lockAndBookInvoice(tx, input, serviceYear);
 
     const watch = await this.watchUse(tx, rows, booking, serviceYear);
     const placed = await this.place(tx, input, rows, booking, serviceYear);
@@ -95,6 +90,65 @@ export class PurchaseInvoiceRecorderService {
     await this.log(tx, actor, input, invoice.id, booking.kind, placed, actualCostMinor);
 
     return { invoiceId: invoice.id, booking: booking.kind, subscriptionId, actualCostMinor, ...placed };
+  }
+
+  /** Resolves an in-review pool variance on the invoice linked to `purchaseInvoiceId`. */
+  async markPoolVarianceResolved(tx: DbTx, purchaseInvoiceId: string, resolvedAt?: Date): Promise<boolean> {
+    return (await this.invoices.markPoolVarianceResolved(tx, purchaseInvoiceId, resolvedAt)) !== null;
+  }
+
+  /** Reads recorded subscription/lot placement and pool-variance details of `purchaseInvoiceId`. */
+  async purchaseInvoiceInfo(purchaseInvoiceId: string, tx?: DbTx): Promise<RecordedPurchaseInvoiceInfo | null> {
+    const row = await this.invoices.findByPurchaseInvoiceId(purchaseInvoiceId, tx);
+    if (!row) return null;
+
+    return {
+      subscriptionId: row.subscriptionId,
+      poolFigures:
+        row.poolVarianceMinor !== null && row.poolVarianceMonth !== null
+          ? {
+              expectedMinor: row.poolExpectedMinor,
+              varianceMinor: row.poolVarianceMinor,
+              varianceMonth: row.poolVarianceMonth,
+              inReview: row.poolVarianceInReview,
+            }
+          : null,
+    };
+  }
+
+  /** Compensates a confirmed `REQUEST` lot invoice on group member withdrawal (`F13c`, `D-16`). */
+  recordLotWithdrawalAfterInvoice(tx: DbTx, input: LotWithdrawalAfterInvoiceInput): Promise<void> {
+    return this.lotInvoices ? this.lotInvoices.recordLotWithdrawalAfterInvoice(tx, input) : Promise.resolve();
+  }
+
+  private async recordLotIfPresent(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    input: PurchaseInvoiceRecordInput,
+  ): Promise<PurchaseInvoiceRecorded | null> {
+    if (!input.licenseLotId || !this.lotInvoices) return null;
+
+    return this.lotInvoices.recordLotInvoiceConfirmation(tx, actor, input);
+  }
+
+  private async lockAndBookInvoice(tx: DbTx, input: PurchaseInvoiceRecordInput, serviceYear: number) {
+    const rows =
+      input.requestId !== null && input.subscriptionId === null && input.unallocated === null
+        ? await this.commitments.lockOfRequest(tx, input.requestId)
+        : [];
+    const booking = bookPurchaseInvoice({
+      commitments: rows,
+      serviceYear,
+      chargedCostCenterId: input.chargedCostCenterId,
+      subscriptionId: input.subscriptionId,
+      unallocated: input.unallocated !== null,
+    });
+    if (booking.kind === 'UNPLACED') throw new PurchaseInvoiceRecordRefusedError('NO_PLACE');
+    if (await this.invoices.exists(tx, input.organizationId, input.vendorId, input.number)) {
+      throw new PurchaseInvoiceRecordRefusedError('DUPLICATE_NUMBER');
+    }
+
+    return { rows, booking };
   }
 
   private assertPositiveAmounts(input: PurchaseInvoiceRecordInput): void {

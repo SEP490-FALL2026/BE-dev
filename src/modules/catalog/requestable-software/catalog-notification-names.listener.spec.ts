@@ -1,6 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { NotificationNameContributions } from '../../notifications/public/notifications.extension-points';
 import { ApplicationRepo } from '../catalog-entry/application.repo';
+import { LicenseLotRepo } from '../license-lot/license-lot.repo';
 import { PlanRepo } from '../plan/plan.repo';
 import { SubscriptionRepo } from '../subscription/subscription.repo';
 import { WorkspaceRepo } from '../workspace/workspace.repo';
@@ -19,6 +20,7 @@ describe('CatalogNotificationNamesListener', () => {
   const plans = { namesOf: jest.fn() };
   const subscriptions = { labelsOf: jest.fn() };
   const workspaces = { namesOf: jest.fn() };
+  const lots = { findMany: jest.fn() };
   let contributions: NotificationNameContributions;
 
   async function listener(): Promise<CatalogNotificationNamesListener> {
@@ -30,6 +32,7 @@ describe('CatalogNotificationNamesListener', () => {
         { provide: PlanRepo, useValue: plans },
         { provide: SubscriptionRepo, useValue: subscriptions },
         { provide: WorkspaceRepo, useValue: workspaces },
+        { provide: LicenseLotRepo, useValue: lots },
         { provide: NotificationNameContributions, useValue: contributions },
       ],
     }).compile();
@@ -53,6 +56,7 @@ describe('CatalogNotificationNamesListener', () => {
     plans.namesOf.mockImplementation(table('Figma – Professional', 'Slack – Pro'));
     subscriptions.labelsOf.mockImplementation(table('Figma – Professional', 'Slack – Business'));
     workspaces.namesOf.mockImplementation(table('Anthropic', 'Anthropic EU'));
+    lots.findMany.mockResolvedValue(new Map());
   });
 
   it('binds the notification name registry and adds itself to it when the module starts', async () => {
@@ -65,8 +69,23 @@ describe('CatalogNotificationNamesListener', () => {
     expect(contributions.all()).toEqual([instance]);
   });
 
-  it('names applications, plans, subscriptions and workspaces', async () => {
-    expect([...(await listener()).kinds].sort()).toEqual(['APPLICATION', 'PLAN', 'SUBSCRIPTION', 'WORKSPACE']);
+  it('names applications, plans, subscriptions, workspaces and license lots', async () => {
+    expect([...(await listener()).kinds].sort()).toEqual([
+      'APPLICATION',
+      'LICENSE_LOT',
+      'PLAN',
+      'SUBSCRIPTION',
+      'WORKSPACE',
+    ]);
+  });
+
+  it('formats license lot names as "application – plan (purchasedOn)"', async () => {
+    lots.findMany.mockResolvedValue(new Map([[FIRST, { id: FIRST, planId: SECOND, purchasedOn: '2026-10-15' }]]));
+    const instance = await listener();
+
+    const names = await instance.names('LICENSE_LOT', [FIRST, MISSING]);
+    expect([...names]).toEqual([[FIRST, 'Slack – Pro (2026-10-15)']]);
+    expect(plans.namesOf).toHaveBeenCalledWith([SECOND]);
   });
 
   it.each([

@@ -5,6 +5,7 @@ import type { RuleSeat } from '../../licensing/public/licensing-ghost-seat.types
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { RulePass } from '../internal-rules/internal-rules.types';
+import { isUsageRuleEligibleSeat } from '../internal-rules/internal-rules.policy';
 import type { RuleRunRecord } from '../rule-run/rule-run.repo';
 import { periodKeyOf, scheduleOf } from '../rule-run/rule-run.policy';
 import { RuleRunService, type RunTally } from '../rule-run/rule-run.service';
@@ -63,9 +64,7 @@ export class UsageRulesService {
   }
 
   private async pass(pass: RulePass): Promise<void> {
-    const seats = (await this.licensing.listSeatsForRules({ asOf: pass.today })).filter(
-      (seat) => seat.pricingModel === 'PER_SEAT' && seat.provisioningType !== 'K5' && seat.provisioningType !== 'K4',
-    );
+    const seats = (await this.licensing.listSeatsForRules({ asOf: pass.today })).filter(isUsageRuleEligibleSeat);
     const run = await this.context.runContextOf(pass, seats);
     const byApplication = new Map<string, RuleSeat[]>();
     for (const seat of seats) {

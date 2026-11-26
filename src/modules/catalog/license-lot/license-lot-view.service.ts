@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { ContractRepo } from '../contract/contract.repo';
@@ -6,6 +6,7 @@ import { PlanFactsService } from '../plan/plan-facts.service';
 import { SeatOccupancyHook } from '../public/catalog.extension-points';
 import { WorkspaceRepo } from '../workspace/workspace.repo';
 import { freeOf, grantableOf } from './license-lot.policy';
+import { LicenseLotStockService } from './license-lot-stock.service';
 import type { LicenseLotDetail, LicenseLotRecord } from './license-lot.types';
 
 interface LotFacts {
@@ -14,6 +15,7 @@ interface LotFacts {
   contract: { id: string; name: string } | undefined;
   assigned: number;
   keysInStore: number;
+  openTasksWithoutKey: number;
 }
 
 const originalPriceOf = (record: LicenseLotRecord): LicenseLotDetail['originalUnitPrice'] =>
@@ -34,7 +36,11 @@ function detailOf(record: LicenseLotRecord, facts: LotFacts): LicenseLotDetail {
     assigned: facts.assigned,
     free,
     keysInStore: facts.keysInStore,
-    grantable: grantableOf({ keyBinding, free, keysInStore: facts.keysInStore }),
+    grantable: grantableOf({
+      keyBinding,
+      free,
+      keysInStore: Math.max(0, facts.keysInStore - facts.openTasksWithoutKey),
+    }),
     unitPriceMinor: record.unitPriceMinor,
     freeValueMinor,
     purpose: record.purpose,
@@ -61,6 +67,7 @@ export class LicenseLotViewService {
     private readonly contracts: ContractRepo,
     private readonly occupancy: SeatOccupancyHook,
     private readonly organizationReads: OrganizationReadApi,
+    @Optional() private readonly stock?: LicenseLotStockService,
   ) {}
 
   async viewAll(records: readonly LicenseLotRecord[], tx?: DbTx): Promise<LicenseLotDetail[]> {
@@ -76,6 +83,9 @@ export class LicenseLotViewService {
     );
     const taken = await reader.seatsOfSubscriptions(ids, today, tx);
     const keys = await reader.keyCountsOfLots(ids, tx);
+    const openTasks = this.stock
+      ? await this.stock.openTasksByLot(records, taken, keys, tx)
+      : new Map<string, number>();
     const planById = new Map(plans.map((plan) => [plan.id, plan]));
     const workspaceById = new Map(workspaces.map((workspace) => [workspace.id, workspace]));
     const contractIds = [...new Set(records.flatMap((record) => (record.contractId ? [record.contractId] : [])))];
@@ -92,6 +102,7 @@ export class LicenseLotViewService {
         contract: record.contractId ? contractById.get(record.contractId) : undefined,
         assigned: taken.get(record.id)?.occupied ?? 0,
         keysInStore: keys.get(record.id)?.inStore ?? 0,
+        openTasksWithoutKey: openTasks.get(record.id) ?? 0,
       }),
     );
   }

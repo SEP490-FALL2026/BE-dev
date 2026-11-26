@@ -46,6 +46,7 @@ export interface NewPurchaseInvoice {
   subscriptionId: string | null;
   seatPurchaseId?: string | null;
   subscriptionLineIds?: readonly string[];
+  licenseLotId?: string | null;
   vendorId: string;
   number: string;
   issuedOn: BusinessDate;
@@ -136,9 +137,28 @@ export class PurchaseInvoiceRepo {
     );
   }
 
-  /** How many submissions of the request or subscription were not returned, and the month the earliest of them pays for. */
+  /** Active non-withdrawn/non-cancelled beneficiary count (`m`) for `requestId` (`GROUP_GRANT` active lines or beneficiaries). */
+  async activeBeneficiaryCount(requestId: string, tx?: DbTx): Promise<number> {
+    const req = await (tx ?? this.prisma).accessRequest.findUnique({
+      where: { id: requestId },
+      select: {
+        type: true,
+        state: true,
+        lines: { select: { state: true } },
+        _count: { select: { beneficiaries: true } },
+      },
+    });
+    if (!req) return 0;
+    if (req.type === 'GROUP_GRANT') {
+      return req.lines.filter((line) => line.state !== 'WITHDRAWN' && line.state !== 'CANCELLED').length;
+    }
+
+    return req.state === 'WITHDRAWN' || req.state === 'CANCELLED' ? 0 : Math.max(1, req._count.beneficiaries);
+  }
+
+  /** How many submissions of the request, subscription, or lot were not returned, and the month the earliest of them pays for. */
   async earlierOf(
-    link: { requestId: string } | { subscriptionId: string },
+    link: { requestId: string } | { subscriptionId: string } | { licenseLotId: string },
     tx?: DbTx,
   ): Promise<{ count: number; earliestServiceMonth: BusinessDate | null }> {
     const aggregate = await (tx ?? this.prisma).purchaseInvoice.aggregate({
@@ -220,6 +240,7 @@ export class PurchaseInvoiceRepo {
         subscriptionId: input.subscriptionId,
         seatPurchaseId: input.seatPurchaseId ?? null,
         subscriptionLineIds: input.subscriptionLineIds ? [...input.subscriptionLineIds] : [],
+        licenseLotId: input.licenseLotId ?? null,
         vendorId: input.vendorId,
         number: input.number,
         issuedOn: toDateColumn(input.issuedOn),
