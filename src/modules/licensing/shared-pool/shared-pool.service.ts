@@ -286,6 +286,7 @@ export class SharedPoolService {
       today: BusinessDate;
       requestId?: string | null;
       excludeTaskId?: string;
+      allowPurchase?: boolean;
     },
   ): Promise<string | null> {
     if (input.provisioningType === 'K1') return null;
@@ -307,9 +308,31 @@ export class SharedPoolService {
     return choosePoolLine(subscriptions, stock)?.subscriptionId ?? null;
   }
 
+  /**
+   * Enforces F11 when an IT Admin explicitly names a K4 license lot (`subscriptionId`): refuses with
+   * `LicenseLotReservedForRequestError` when `lotId` belongs to another `REQUEST` and its remaining grantable keys
+   * are reserved for that request's beneficiaries.
+   */
+  async assertK4LotGrantable(
+    tx: DbTx,
+    input: { planId: string; lotId: string; requestId?: string | null },
+  ): Promise<void> {
+    if (!this.lotStock) return;
+    const raw = await this.lotStock.accountLotCandidates(input.planId, undefined, tx);
+    const match = raw.find((l) => l.id === input.lotId || l.legacySubscriptionId === input.lotId);
+    if (!match || match.purpose !== 'REQUEST' || match.requestId === (input.requestId ?? null)) return;
+    const reservations = await this.lotReservationsOf([match], tx);
+    const candidates =
+      reservations.size > 0 ? await this.lotStock.accountLotCandidates(input.planId, { reservations }, tx) : raw;
+    const checked = candidates.find((l) => l.id === match.id);
+    if (checked && checked.grantable > 0 && checked.excessGrantable <= 0) {
+      throw new LicenseLotReservedForRequestError(checked.id);
+    }
+  }
+
   private async chooseK4AccountLot(
     tx: DbTx,
-    input: { planId: string; requestId?: string | null; excludeTaskId?: string },
+    input: { planId: string; requestId?: string | null; excludeTaskId?: string; allowPurchase?: boolean },
   ): Promise<string | null> {
     if (!this.lotStock) return null;
     const raw = await this.lotStock.accountLotCandidates(input.planId, { excludeTaskId: input.excludeTaskId }, tx);
@@ -325,6 +348,7 @@ export class SharedPoolService {
       tx,
     );
     if (result.kind === 'RESERVED_FOR_REQUEST') {
+      if (input.allowPurchase) return null;
       throw new LicenseLotReservedForRequestError(result.lot.id);
     }
 

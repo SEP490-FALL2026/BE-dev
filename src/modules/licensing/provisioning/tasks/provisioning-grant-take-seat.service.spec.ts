@@ -3,7 +3,9 @@ import type { AuthenticatedPrincipal } from '../../../../infrastructure/security
 import type { CatalogApi } from '../../../catalog/public/catalog.api';
 import type { SeatLedgerApi } from '../../../catalog/public/seat-ledger.api';
 import type { AssignmentService } from '../../assignment/assignment.service';
+import { LicenseLotReservedForRequestError } from '../../../catalog/public/catalog.errors';
 import { SeatTargetNotFoundError } from '../../public/licensing.errors';
+import { toProvisioningApiException } from '../provisioning.http-errors';
 import type { GrantRequestGateHook } from '../../public/licensing.extension-points';
 import type { SharedPoolService } from '../../shared-pool/shared-pool.service';
 import type { ProvisioningGrantTaskService } from './provisioning-grant-task.service';
@@ -292,5 +294,67 @@ describe('ProvisioningGrantWriter.takeSeat (W3-18 K2 shortcut + K1 legacy)', () 
       } as never),
     ).rejects.toThrow(SeatTargetNotFoundError);
     expect(buyForItems).not.toHaveBeenCalled();
+  });
+
+  it('F-17: refuses named K4 lot reserved for another request with 409 LICENSE_LOT.RESERVED_FOR_REQUEST', async () => {
+    const { writer, createFromRequest } = makeWriter({ provisioningType: 'K4' });
+    const pool = (writer as unknown as { sharedPool: Record<string, jest.Mock> }).sharedPool;
+    pool.assertK4LotGrantable = jest.fn().mockRejectedValue(new LicenseLotReservedForRequestError('lot-duc'));
+
+    const err = await writer
+      .write(tx, actor, { requestId: 'req-minh', subscriptionId: 'lot-duc', beneficiaryEmployeeId: 'emp-1' }, {
+        answer: { seat: 'PERSONAL', employeeId: 'emp-1', planId: 'plan-1', departmentId: 'dept-1' },
+        plan: { planId: 'plan-1', provisioningType: 'K4', keyBinding: 'ACCOUNT' },
+        serviceIdentifier: null,
+        organization: { id: 'org-1' },
+        today: '2026-11-21',
+        inCharge: null,
+        maxAttempts: 3,
+        holderContractEnd: null,
+        holderHasTerm: false,
+      } as never)
+      .catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(LicenseLotReservedForRequestError);
+    expect((toProvisioningApiException(err) as { getResponse?: () => unknown }).getResponse?.()).toMatchObject({
+      code: 'LICENSE_LOT.RESERVED_FOR_REQUEST',
+    });
+    expect(pool.assertK4LotGrantable).toHaveBeenCalledWith(tx, {
+      planId: 'plan-1',
+      lotId: 'lot-duc',
+      requestId: 'req-minh',
+    });
+    expect(createFromRequest).not.toHaveBeenCalled();
+  });
+
+  it('F-17: K4 grant with purchase forwards allowPurchase=true to chooseLine and proceeds when chooseLine returns null', async () => {
+    const { writer } = makeWriter({ provisioningType: 'K4', purchased: true });
+    const pool = (writer as unknown as { sharedPool: Record<string, jest.Mock> }).sharedPool;
+    pool.chooseLine = jest.fn().mockResolvedValue(null);
+
+    await writer.write(
+      tx,
+      actor,
+      { requestId: 'req-minh', beneficiaryEmployeeId: 'emp-1', purchase: { reason: 'Reserved for Duc' } },
+      {
+        answer: { seat: 'PERSONAL', employeeId: 'emp-1', planId: 'plan-1', departmentId: 'dept-1' },
+        plan: { planId: 'plan-1', provisioningType: 'K4', keyBinding: 'ACCOUNT' },
+        serviceIdentifier: null,
+        organization: { id: 'org-1' },
+        today: '2026-11-21',
+        inCharge: null,
+        maxAttempts: 3,
+        holderContractEnd: null,
+        holderHasTerm: false,
+      } as never,
+    );
+
+    expect(pool.chooseLine).toHaveBeenCalledWith(tx, {
+      planId: 'plan-1',
+      provisioningType: 'K4',
+      today: '2026-11-21',
+      requestId: 'req-minh',
+      allowPurchase: true,
+    });
   });
 });

@@ -64,7 +64,7 @@ export class ProvisioningGrantWriter {
       input.requestId,
       input.purchase !== undefined,
     );
-    await this.requireGrantable(tx, plan, input.subscriptionId, today);
+    await this.requireGrantable(tx, plan, input.subscriptionId, today, input.requestId);
     const target = await this.lockTarget(tx, plan, subscriptionId, today);
     const replaced = await this.replacements.endReplacedRight(tx, actor, {
       claimed,
@@ -245,6 +245,7 @@ export class ProvisioningGrantWriter {
       provisioningType: plan.provisioningType,
       today,
       requestId,
+      ...(hasPurchase ? { allowPurchase: true } : {}),
     });
     if (chosen === null) {
       if (plan.provisioningType === 'K4' && hasPurchase) return undefined;
@@ -257,11 +258,21 @@ export class ProvisioningGrantWriter {
   /**
    * A subscription the IT Admin names must be one a seat can be taken from today: of the plan, active, its period not over
    * and not taken over by a next period that runs, and not recorded as cancelled. Read before the subscription is locked, like the choice of one.
-   * Throws ProvisioningSubscriptionError (`NOT_GRANTABLE`).
+   * For K4 (`F11`), a named `REQUEST` lot is refused when its remaining free licenses are reserved for another request.
+   * Throws ProvisioningSubscriptionError (`NOT_GRANTABLE`) and LicenseLotReservedForRequestError.
    */
-  private async requireGrantable(tx: DbTx, plan: SeatTarget, named: string | undefined, today: string): Promise<void> {
+  private async requireGrantable(
+    tx: DbTx,
+    plan: SeatTarget,
+    named: string | undefined,
+    today: string,
+    requestId: string,
+  ): Promise<void> {
     if (named === undefined || plan.provisioningType === 'K5' || plan.provisioningType === 'K1') return;
-    if (plan.provisioningType === 'K4') return;
+    if (plan.provisioningType === 'K4') {
+      await this.sharedPool.assertK4LotGrantable(tx, { planId: plan.planId, lotId: named, requestId });
+      return;
+    }
     const grantable = await this.sharedPool.grantableOf(tx, plan.planId, today);
     if (grantable.some((subscription) => subscription.subscriptionId === named)) return;
     const target = await this.catalog.findSeatTarget({ subscriptionId: named }, tx);

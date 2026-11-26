@@ -130,4 +130,55 @@ describe('BR-MF1-09: the commitment of a K4 request granted from the key pool (i
 
     expect((await releasesOf(id)).filter((row) => row.reason === 'GRANTED_FROM_POOL')).toEqual([]);
   });
+
+  it('F-17: refuses named K4 REQUEST lot reserved for another request (409 LICENSE_LOT.RESERVED_FOR_REQUEST) and lets grant with purchase proceed (201)', async () => {
+    const { planId } = await k4Pool(1, 0);
+    counter += 1;
+    const u = await h.departmentWithHead(`P-K4C${counter}`);
+    await h.budgetFor(u, { total: 200 * M, held: 0, spent: 0 });
+    const p2 = await h.staff(u.department, `K4C-P2-${counter}`);
+
+    const reqDuc = await h.sentForPeople(planId, [u.member, p2], u.head.account, { termMonths: undefined });
+    await h.setPayments(reqDuc, { amount: 24 * M });
+    await h.sendOn([reqDuc], u.head.account).expect(201);
+    await h.decideSpend(reqDuc, { decision: 'APPROVE' }, h.boss.account).expect(200);
+
+    await h
+      .grant({ requestId: reqDuc, beneficiaryEmployeeId: u.member.employeeId, purchase: { reason: 'Buy Duc lot' } })
+      .expect(201);
+
+    const lotDucId = h.dataOf<{ id: string }>(
+      await request(h.server())
+        .post('/api/v1/license-lots')
+        .set(h.as(h.it1))
+        .send({
+          planId,
+          purchasedOn: h.today(),
+          licenseCount: 2,
+          unitPrice: { amount: '12000000', currency: 'VND' },
+          purpose: 'REQUEST',
+          requestId: reqDuc,
+        })
+        .expect(201),
+    ).id;
+    batch += 1;
+    await request(h.server())
+      .post(`/api/v1/license-lots/${lotDucId}/keys`)
+      .set(h.as(h.it1))
+      .send({
+        keys: [`K4C-${batch}-001-ABCDE-12345`, `K4C-${batch}-002-ABCDE-12345`],
+      })
+      .expect(201);
+
+    const reqMinh = await approved(planId, 12 * M);
+    const namedRefused = await h.grant({ requestId: reqMinh, subscriptionId: lotDucId }).expect(409);
+    expect(h.codeOf(namedRefused)).toBe('LICENSE_LOT.RESERVED_FOR_REQUEST');
+
+    const withPurchase = await h
+      .grant({ requestId: reqMinh, purchase: { reason: 'Reserved for Duc request lot' } })
+      .expect(201);
+    expect(h.dataOf<{ task: { purchase: { kind: string } | null } }>(withPurchase).task.purchase).toMatchObject({
+      kind: 'KEY_PURCHASE',
+    });
+  });
 });
