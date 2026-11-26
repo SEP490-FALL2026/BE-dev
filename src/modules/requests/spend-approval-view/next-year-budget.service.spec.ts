@@ -5,7 +5,7 @@ import { BudgetsReadApi } from '../../budgets/public/budgets-read.api';
 import { RunningUncommittedFactsService } from '../../budgets/running-uncommitted/running-uncommitted-facts.service';
 import type { RunningUncommittedRepo } from '../../budgets/running-uncommitted/running-uncommitted.repo';
 import type { SharedPoolLineRepo } from '../../budgets/shared-pool-line/shared-pool-line.repo';
-import type { SubscriptionPeriodApi } from '../../catalog/public/subscription-period.api';
+import type { CatalogPricingApi } from '../../catalog/public/catalog-pricing.api';
 import type { LicensingSeatMonthApi } from '../../licensing/public/licensing-seat-month.api';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { SpendWireViewService } from '../spend/spend-wire-view.service';
@@ -60,7 +60,7 @@ describe('NextYearBudgetService (FIX-B1 F7 / D-10)', () => {
             startDate: '2027-01-01',
           },
         ]),
-      } as unknown as SubscriptionPeriodApi,
+      } as unknown as CatalogPricingApi,
       organizationReads,
       {
         commitmentsOfRequestsInYear: jest.fn().mockResolvedValue(new Map()),
@@ -80,8 +80,7 @@ describe('NextYearBudgetService (FIX-B1 F7 / D-10)', () => {
           ]),
         ),
     } as unknown as BudgetFactsRepo;
-    const budgetsRead = new BudgetsReadApi(factsRepo);
-    budgetsRead.registerRunningUncommitted(runningFacts);
+    const budgetsRead = new BudgetsReadApi(factsRepo, runningFacts);
 
     const repo = {
       keptByCostCenter: jest.fn().mockResolvedValue({ totals: new Map([['cc-1', 1_000_000n]]), requestIds: [] }),
@@ -159,7 +158,7 @@ describe('NextYearBudgetService (FIX-B1 F7 / D-10)', () => {
             startDate: '2027-01-01',
           },
         ]),
-      } as unknown as SubscriptionPeriodApi,
+      } as unknown as CatalogPricingApi,
       organizationReads,
       {
         commitmentsOfRequestsInYear: jest.fn().mockResolvedValue(new Map()),
@@ -177,8 +176,7 @@ describe('NextYearBudgetService (FIX-B1 F7 / D-10)', () => {
           new Map([['cc-1', { versionId: 'v-2028', baseMinor: 10_000_000n, reserveMinor: 0n, currency: 'VND' }]]),
         ),
     } as unknown as BudgetFactsRepo;
-    const budgetsRead = new BudgetsReadApi(factsRepo);
-    budgetsRead.registerRunningUncommitted(runningFacts);
+    const budgetsRead = new BudgetsReadApi(factsRepo, runningFacts);
 
     const prisma = {
       accessRequest: {

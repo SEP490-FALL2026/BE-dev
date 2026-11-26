@@ -1,8 +1,7 @@
 import { Injectable, Optional } from '@nestjs/common';
 import { addDays, monthBoundsOf, type BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { CatalogApi } from '../../catalog/public/catalog.api';
-import { SubscriptionPeriodApi } from '../../catalog/public/subscription-period.api';
+import { CatalogPricingApi } from '../../catalog/public/catalog-pricing.api';
 import { AssignmentSeatMonthRepo } from '../assignment/assignment-seat-month.repo';
 import { SubscriptionLineTargetRepo } from '../subscription-renewal/lines/subscription-line-target.repo';
 import { SubscriptionRenewalRepo } from '../subscription-renewal/subscription-renewal.repo';
@@ -22,9 +21,8 @@ import type {
 export class LicensingSeatMonthApi {
   constructor(
     private readonly seats: AssignmentSeatMonthRepo,
-    private readonly catalog: CatalogApi,
+    private readonly catalogPricing: CatalogPricingApi,
     private readonly renewals: SubscriptionRenewalRepo,
-    private readonly periods: SubscriptionPeriodApi,
     @Optional() private readonly lineTargets?: SubscriptionLineTargetRepo,
   ) {}
 
@@ -65,7 +63,7 @@ export class LicensingSeatMonthApi {
   async getUnrequestedK1SeatsInForceOn(day: BusinessDate, tx?: DbTx): Promise<UnrequestedK1SeatInForce[]> {
     const planIds = await this.seats.standalonePlanIdsOn(day, tx);
     if (planIds.length === 0) return [];
-    const k1Targets = (await this.catalog.findPlanSeatTargets(planIds, tx)).filter(
+    const k1Targets = (await this.catalogPricing.findPlanSeatTargets(planIds, tx)).filter(
       (target) => target.provisioningType === 'K1',
     );
     if (k1Targets.length === 0) return [];
@@ -89,7 +87,7 @@ export class LicensingSeatMonthApi {
     subscriptionId?: string,
   ): Promise<string[]> {
     const planIds = await this.seats.planIdsTouching(start, nextStart, tx, subscriptionId);
-    const pools = (await this.catalog.findPlanSeatTargets(planIds, tx))
+    const pools = (await this.catalogPricing.findPlanSeatTargets(planIds, tx))
       .filter((target) => target.provisioningType === 'K2')
       .map((target) => target.planId);
 
@@ -119,7 +117,7 @@ export class LicensingSeatMonthApi {
 
     if (nextIds.length > 0) {
       const qtyByNextId = new Map(
-        (await this.periods.getPurchaseFacts([...new Set(nextIds)], tx))
+        (await this.catalogPricing.getPurchaseFacts([...new Set(nextIds)], tx))
           .filter((fact) => fact.purchasedQuantity !== null)
           .map((fact) => [fact.subscriptionId, fact.purchasedQuantity as number]),
       );

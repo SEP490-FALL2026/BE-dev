@@ -66,7 +66,6 @@ import { OnboardingFactsService } from './subscription/onboarding-facts.service'
 import { SeatTargetService } from './subscription/seat-target.service';
 import { SubscriptionFactsService } from './subscription/subscription-facts.service';
 import { SubscriptionNoticeService } from './subscription/subscription-notice.service';
-import { SubscriptionPeriodRepo } from './subscription/period/subscription-period.repo';
 import { SubscriptionPeriodService } from './subscription/period/subscription-period.service';
 import { SubscriptionPeriodApi } from './public/subscription-period.api';
 import { SubscriptionSeatIncreaseService } from './subscription/seat-increase/subscription-seat-increase.service';
@@ -249,7 +248,6 @@ import { WorkspacesController } from './workspace/workspaces.controller';
     SubscriptionViewService,
     SubscriptionNoticeService,
     SubscriptionWindowsService,
-    SubscriptionPeriodRepo,
     SubscriptionPeriodService,
     SeatTargetService,
     OnboardingFactsService,

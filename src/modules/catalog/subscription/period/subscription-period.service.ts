@@ -26,7 +26,7 @@ import {
 import { assertPoolTerms } from '../pool/subscription-pool.policy';
 import { SubscriptionPoolService } from '../pool/subscription-pool.service';
 import { snapshotOf } from '../subscription.mapper';
-import { monthlyCostOf } from '../price/subscription-price.policy';
+import { toSubscriptionPurchaseFacts } from './subscription-purchase-facts.mapper';
 import {
   assertSubscriptionShape,
   declaredStateOf,
@@ -173,34 +173,7 @@ export class SubscriptionPeriodService {
       tx,
     );
 
-    return records.map((record) => {
-      const successor = successors.get(record.id);
-      const endExclusive = successor?.startDate ?? (record.endDate !== null ? addDays(record.endDate, 1) : null);
-
-      return {
-        subscriptionId: record.id,
-        planId: record.planId,
-        responsibleItAdminEmployeeId: record.responsibleItAdminEmployeeId,
-        kind: record.kind,
-        status: record.status,
-        provisioningType: record.planProvisioningType,
-        commitmentTermMonths: record.commitmentTermMonths,
-        billingCycle: record.billingCycle,
-        purchasedQuantity: record.purchasedQuantity,
-        ...monthlyCostOf(record),
-        startDate: record.startDate,
-        endDate: record.endDate,
-        endExclusive,
-        renewalDate: record.renewalDate,
-        noticeDeadline: record.noticeDeadline,
-        noticePeriodDays: record.noticePeriodDays,
-        autoRenew: record.autoRenew,
-        invoicedLater: record.invoicedLater,
-        seatCounting: record.seatCounting,
-        vendorMinimumSeats: record.vendorMinimumSeats,
-        nextPeriodPurchasedQuantity: successor?.purchasedQuantity ?? null,
-      };
-    });
+    return records.map((record) => toSubscriptionPurchaseFacts(record, successors.get(record.id)));
   }
 
   /** Adjustment windows active for each subscription's period running on `referenceDay`. */

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { BudgetFactsRepo } from '../budget/budget-facts.repo';
+import { RunningUncommittedFactsService } from '../running-uncommitted/running-uncommitted-facts.service';
 import type { YearBudgetFacts } from './budgets.types';
 
 export interface RunningUncommittedReader {
@@ -17,18 +18,14 @@ export interface RunningUncommittedReader {
 /** Read-only budget figures for the shared three-outcome check; never grants or releases a commitment. */
 @Injectable()
 export class BudgetsReadApi {
-  private runningUncommitted: RunningUncommittedReader | null = null;
-
-  constructor(private readonly facts: BudgetFactsRepo) {}
-
-  /** Registers the live running-uncommitted reader when `BudgetsModule` initializes in the API graph. */
-  registerRunningUncommitted(reader: RunningUncommittedReader): void {
-    this.runningUncommitted = reader;
-  }
+  constructor(
+    private readonly facts: BudgetFactsRepo,
+    private readonly runningUncommitted: RunningUncommittedFactsService,
+  ) {}
 
   async yearFacts(costCenterId: string, years: readonly number[], tx?: DbTx): Promise<Map<number, YearBudgetFacts>> {
     const facts = await this.facts.yearFacts(costCenterId, years, tx);
-    if (facts.size === 0 || this.runningUncommitted === null) return facts;
+    if (facts.size === 0) return facts;
     const running = await this.runningUncommitted.ofCostCenterYears(costCenterId, [...facts.keys()], tx);
     for (const [year, entry] of facts) {
       facts.set(year, { ...entry, runningUncommittedMinor: running.get(year) ?? 0n });
@@ -53,7 +50,7 @@ export class BudgetsReadApi {
     tx?: DbTx,
   ): Promise<Map<string, bigint>> {
     const result = new Map<string, bigint>();
-    if (costCenterIds.length === 0 || this.runningUncommitted === null) return result;
+    if (costCenterIds.length === 0) return result;
     const byCostCenter = await this.runningUncommitted.ofYear(year, undefined, tx, options);
     for (const costCenterId of new Set(costCenterIds)) {
       const amount = byCostCenter.get(costCenterId) ?? 0n;

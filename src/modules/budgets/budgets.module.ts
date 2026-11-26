@@ -1,8 +1,5 @@
 import { BudgetsReadFacadeModule } from './budgets-read-facade.module';
-import { Module, type OnModuleInit } from '@nestjs/common';
-import { BudgetsReadApi } from './public/budgets-read.api';
-import { RunningUncommittedFactsService } from './running-uncommitted/running-uncommitted-facts.service';
-import { RunningUncommittedRepo } from './running-uncommitted/running-uncommitted.repo';
+import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { ObjectStorageModule } from '../../infrastructure/object-storage/object-storage.module';
 import { AuditModule } from '../audit/audit.module';
@@ -43,7 +40,6 @@ import { CommitmentMonthFacadeService } from './commitment/commitment-month-faca
 import { CommitmentService } from './commitment/commitment.service';
 import { SharedPoolLineAlertService } from './shared-pool-line/shared-pool-line-alert.service';
 import { SharedPoolLineFactsService } from './shared-pool-line/shared-pool-line-facts.service';
-import { SharedPoolLineRepo } from './shared-pool-line/shared-pool-line.repo';
 import { LicenseLotChargeRepo } from './shared-pool-line/license-lot-charge.repo';
 import { LicenseLotCostService } from './shared-pool-line/license-lot-cost.service';
 import { LicenseLotInvoiceLedgerService } from './invoice/license-lot-invoice-ledger.service';
@@ -271,7 +267,6 @@ import { BudgetProposalTemplateListener } from './proposal/budget-proposal-templ
     CommitmentMonthService,
     CommitmentMonthFacadeService,
     CommitmentMonthSettlementService,
-    SharedPoolLineRepo,
     LicenseLotChargeRepo,
     LicenseLotInvoiceLedgerService,
     LicenseLotInvoiceService,
@@ -282,8 +277,6 @@ import { BudgetProposalTemplateListener } from './proposal/budget-proposal-templ
     K1YearStartApplicationService,
     SharedPoolLineFactsService,
     SharedPoolLineAlertService,
-    RunningUncommittedRepo,
-    RunningUncommittedFactsService,
     InvoiceService,
     PurchaseInvoiceRecorderService,
     OutOfProcessSpendRecorderService,
@@ -298,13 +291,4 @@ import { BudgetProposalTemplateListener } from './proposal/budget-proposal-templ
     PurchaseInvoiceFactsHook,
   ],
 })
-export class BudgetsModule implements OnModuleInit {
-  constructor(
-    private readonly budgetsRead: BudgetsReadApi,
-    private readonly runningUncommitted: RunningUncommittedFactsService,
-  ) {}
-
-  onModuleInit(): void {
-    this.budgetsRead.registerRunningUncommitted(this.runningUncommitted);
-  }
-}
+export class BudgetsModule {}

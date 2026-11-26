@@ -1,5 +1,5 @@
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { SubscriptionPeriodApi } from '../../catalog/public/subscription-period.api';
+import type { CatalogPricingApi } from '../../catalog/public/catalog-pricing.api';
 import type { LicensingSeatMonthApi } from '../../licensing/public/licensing-seat-month.api';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { BudgetFactsRepo } from '../budget/budget-facts.repo';
@@ -73,7 +73,7 @@ function buildW308Service() {
           startDate: '2027-01-01',
         },
       ]),
-    } as unknown as SubscriptionPeriodApi,
+    } as unknown as CatalogPricingApi,
     organizationReads,
     { commitmentsOfRequestsInYear: jest.fn().mockResolvedValue(new Map()) } as unknown as RunningUncommittedRepo,
     {

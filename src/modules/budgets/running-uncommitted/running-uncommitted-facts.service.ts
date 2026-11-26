@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { SubscriptionPeriodApi } from '../../catalog/public/subscription-period.api';
+import { CatalogPricingApi } from '../../catalog/public/catalog-pricing.api';
 import { LicensingSeatMonthApi } from '../../licensing/public/licensing-seat-month.api';
 import type { SeatInForce, UnrequestedK1SeatInForce } from '../../licensing/public/licensing-seat-month.types';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
@@ -22,7 +22,7 @@ import {
 export class RunningUncommittedFactsService {
   constructor(
     private readonly licensing: LicensingSeatMonthApi,
-    private readonly periods: SubscriptionPeriodApi,
+    private readonly periods: CatalogPricingApi,
     private readonly organizationReads: OrganizationReadApi,
     private readonly commitments: RunningUncommittedRepo,
     private readonly poolRepo: SharedPoolLineRepo,

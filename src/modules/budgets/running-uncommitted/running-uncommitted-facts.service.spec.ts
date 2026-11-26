@@ -1,5 +1,5 @@
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { SubscriptionPeriodApi } from '../../catalog/public/subscription-period.api';
+import type { CatalogPricingApi } from '../../catalog/public/catalog-pricing.api';
 import type { LicensingSeatMonthApi } from '../../licensing/public/licensing-seat-month.api';
 import type { SeatInForce, UnrequestedK1SeatInForce } from '../../licensing/public/licensing-seat-month.types';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
@@ -52,7 +52,7 @@ function buildService() {
 
   const service = new RunningUncommittedFactsService(
     licensing as unknown as LicensingSeatMonthApi,
-    periods as unknown as SubscriptionPeriodApi,
+    periods as unknown as CatalogPricingApi,
     organizationReads as unknown as OrganizationReadApi,
     commitments as unknown as RunningUncommittedRepo,
     poolRepo as unknown as SharedPoolLineRepo,

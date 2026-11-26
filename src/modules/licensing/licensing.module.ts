@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { LicensingSeatMonthFacadeModule } from './licensing-seat-month-facade.module';
 import { ConfigService } from '@nestjs/config';
 import { EnvironmentVariables } from '../../infrastructure/config/env-schema';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
@@ -15,7 +16,6 @@ import { AssignmentFactsRepo } from './assignment/renewal/assignment-facts.repo'
 import { AssignmentRenewalService } from './assignment/renewal/assignment-renewal.service';
 import { AssignmentDepartmentRepo } from './assignment/assignment-department.repo';
 import { RevocationCompletedFactsReader } from './provisioning/revocation-completion/revocation-completed-facts.service';
-import { AssignmentChainRepo } from './assignment/assignment-chain.repo';
 import { AssignmentRepo } from './assignment/assignment.repo';
 import { AssignmentRevocationRepo } from './assignment/assignment-revocation.repo';
 import { UsageFactsRepo } from './assignment/usage-facts.repo';
@@ -88,8 +88,6 @@ import { LicensingUsageApi } from './public/licensing-usage.api';
 import { LicensingDepartmentToolsApi } from './public/licensing-department-tools.api';
 import { LicensingOpenGrantsApi } from './public/licensing-open-grants.api';
 import { LicensingPoolStockApi } from './public/licensing-pool-stock.api';
-import { LicensingSeatMonthApi } from './public/licensing-seat-month.api';
-import { AssignmentSeatMonthRepo } from './assignment/assignment-seat-month.repo';
 import { LicensingRenewalApi } from './public/licensing-renewal.api';
 import { LicensingSeatBaselineApi } from './public/licensing-seat-baseline.api';
 import { LicensingDeviceActivationApi } from './public/licensing-device-activation.api';
@@ -166,8 +164,6 @@ import { SubscriptionRenewalSeatRepo } from './subscription-renewal/subscription
 import { SubscriptionRenewalSweepService } from './subscription-renewal/subscription-renewal-sweep.service';
 import { RenewalViewService } from './subscription-renewal/subscription-renewal-view.service';
 import { SubscriptionRenewalSweeper } from './subscription-renewal/subscription-renewal.job';
-import { SubscriptionRenewalRepo } from './subscription-renewal/subscription-renewal.repo';
-import { SubscriptionLineTargetRepo } from './subscription-renewal/lines/subscription-line-target.repo';
 import { SubscriptionRenewalAutoService } from './subscription-renewal/lines/subscription-renewal-auto.service';
 import { SubscriptionRenewalLinesFactsService } from './subscription-renewal/lines/subscription-renewal-lines-facts.service';
 import { SubscriptionRenewalLinesService } from './subscription-renewal/lines/subscription-renewal-lines.service';
@@ -191,6 +187,7 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
 @Module({
   imports: [
     PoliciesTemplateFacadeModule,
+    LicensingSeatMonthFacadeModule,
     DatabaseModule,
     AuditModule,
     OrganizationModule,
@@ -225,7 +222,6 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     LicensingAlerts,
     AssignmentRepo,
     AssignmentRevocationRepo,
-    AssignmentChainRepo,
     RevocationCompletedFactsReader,
     AssignmentDepartmentRepo,
     AssignmentSeatOccupancy,
@@ -314,8 +310,6 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     SaasIssueSweeper,
     MySoftwareRepo,
     MySoftwareService,
-    SubscriptionRenewalRepo,
-    SubscriptionLineTargetRepo,
     SubscriptionRenewalLinesFactsService,
     SubscriptionRenewalAutoService,
     SubscriptionRenewalLinesService,
@@ -377,8 +371,6 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     SharedPoolVacancyService,
     LicensingOpenGrantsApi,
     LicensingPoolStockApi,
-    AssignmentSeatMonthRepo,
-    LicensingSeatMonthApi,
     LicensingDepartmentToolsApi,
     LicensingRenewalApi,
     LicensingSeatBaselineApi,
@@ -396,7 +388,7 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     LicensingUsageApi,
     LicensingOpenGrantsApi,
     LicensingPoolStockApi,
-    LicensingSeatMonthApi,
+    LicensingSeatMonthFacadeModule,
     LicensingDepartmentToolsApi,
     LicensingRenewalApi,
     LicensingSeatBaselineApi,

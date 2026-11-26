@@ -81,4 +81,28 @@ export class PlanReferencePriceRepo {
 
     return cycles;
   }
+
+  /** Returns provisioning type and VND monthly reference price for each plan id in one read. */
+  async findPlanSeatTargets(
+    planIds: readonly string[],
+    tx?: DbTx,
+  ): Promise<
+    Array<{
+      planId: string;
+      provisioningType: 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
+      monthlyUnitPriceMinor: bigint | null;
+    }>
+  > {
+    if (planIds.length === 0) return [];
+    const rows = await (tx ?? this.prisma).plan.findMany({
+      where: { id: { in: [...planIds] } },
+      select: { id: true, provisioningType: true, referencePriceMinor: true },
+    });
+
+    return rows.map((row) => ({
+      planId: row.id,
+      provisioningType: row.provisioningType,
+      monthlyUnitPriceMinor: row.referencePriceMinor ?? null,
+    }));
+  }
 }
