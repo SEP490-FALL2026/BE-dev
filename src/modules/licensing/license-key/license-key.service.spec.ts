@@ -42,6 +42,7 @@ function setup(held: LicenseLotView | null = lotOf()) {
     countUsable: jest.fn().mockResolvedValue(0),
     countAssigned: jest.fn().mockResolvedValue(0),
     deviceOccupiedOf: jest.fn().mockResolvedValue(0),
+    existingFingerprints: jest.fn().mockResolvedValue(new Set<string>()),
     insertManyIfNew: jest.fn((_tx: unknown, rows: { id: string }[]) => Promise.resolve(new Set(rows.map((r) => r.id)))),
   };
   const cipher = {

@@ -133,6 +133,17 @@ export class LicenseKeyRepo {
     return new Set(kept.map((row) => row.id));
   }
 
+  /** Which of these key fingerprints already exist in the organization's vault. */
+  async existingFingerprints(tx: DbTx, organizationId: string, fingerprints: readonly string[]): Promise<Set<string>> {
+    if (fingerprints.length === 0) return new Set();
+    const rows = await tx.licenseKey.findMany({
+      where: { organizationId, fingerprint: { in: [...fingerprints] } },
+      select: { fingerprint: true },
+    });
+
+    return new Set(rows.map((row) => row.fingerprint));
+  }
+
   /** The keys of the purchase that are in use or can still be given out: assigned, or in the store and not withdrawn. */
   countUsable(subscriptionId: string, tx?: DbTx): Promise<number> {
     return (tx ?? this.prisma).licenseKey.count({ where: { ...ofPurchase(subscriptionId), withdrawnAt: null } });

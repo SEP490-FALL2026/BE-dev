@@ -89,7 +89,10 @@ export class LicenseLotKeyImportService {
     const stored = await this.runner.run(async (tx) => {
       const initialActivationsUsed = await this.importSettings.initialActivationsUsed(tx, input.initialActivationsUsed);
       const held = this.requireMatchingLot(await this.lots.lockLot(tx, lotId), lotId, options);
-      await this.assertImportable(tx, held, actor, options, sealed.length);
+      await this.assertImportable(tx, held, actor, options, {
+        organizationId: organization.id,
+        fingerprints: sealed.map((row) => row.fingerprint),
+      });
       const maxActivations = await this.importSettings.maxActivations(tx, held.planId, input.maxActivations);
       assertInitialActivationsAllowed({ initial: initialActivationsUsed, maxActivations, keyBinding: held.keyBinding });
 
@@ -182,7 +185,7 @@ export class LicenseLotKeyImportService {
     held: LicenseLotView,
     actor: AuthenticatedPrincipal,
     options: { responsibleOnly: boolean },
-    adding: number,
+    batch: { organizationId: string; fingerprints: readonly string[] },
   ): Promise<void> {
     if (options.responsibleOnly && held.responsibleItAdminEmployeeId !== actor.employeeId) {
       throw new LicenseKeyLotNotResponsibleError();
@@ -190,6 +193,8 @@ export class LicenseLotKeyImportService {
     if (held.keyBinding === 'DEVICE_BUNDLED') throw new LicenseKeyPlanHasNoKeysError();
     if (held.applicationStatus === 'RETIRED') throw new LicenseKeyApplicationRetiredError();
     if (held.keyBinding !== 'DEVICE_KEY') {
+      const existing = await this.repo.existingFingerprints(tx, batch.organizationId, batch.fingerprints);
+      const adding = batch.fingerprints.filter((fp) => !existing.has(fp)).length;
       const usable = await this.repo.countUsable(held.id, tx);
       if (usable + adding > held.licenseCount)
         throw new LicenseKeyLotKeysExceedLicensesError(held.licenseCount, usable);

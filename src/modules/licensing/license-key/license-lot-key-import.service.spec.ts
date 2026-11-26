@@ -47,8 +47,10 @@ function setup(held: LicenseLotView | null = lotOf(), usable = 0) {
     countUsable: jest.fn().mockResolvedValue(usable),
     countAssigned: jest.fn().mockResolvedValue(0),
     deviceOccupiedOf: jest.fn().mockResolvedValue(0),
-    insertManyIfNew: jest.fn((_tx: unknown, rows: { id: string; licenseLotId: string; costBorne: boolean }[]) =>
-      Promise.resolve(new Set(rows.map((r) => r.id))),
+    existingFingerprints: jest.fn().mockResolvedValue(new Set<string>()),
+    insertManyIfNew: jest.fn(
+      (_tx: unknown, rows: { id: string; licenseLotId: string; costBorne: boolean; fingerprint: string }[]) =>
+        Promise.resolve(new Set(rows.map((r) => r.id))),
     ),
   };
   const cipher = {
@@ -163,6 +165,48 @@ describe('LicenseLotKeyImportService (the keys of a lot of licenses)', () => {
       service.import(actor, 'lot-1', { keys: ['AAAA-0001', 'BBBB-0002'] }, { responsibleOnly: true }),
     ).rejects.toThrow(LicenseKeyLotKeysExceedLicensesError);
     expect(repo.insertManyIfNew).not.toHaveBeenCalled();
+  });
+
+  it('excludes keys already in store (ALREADY_IN_STORE) from the K-A6 capacity check when re-importing into a full lot (T-6)', async () => {
+    const { service, repo } = setup(lotOf({ licenseCount: 3 }), 3);
+    const fp1 = 'AAAA-0001'.padEnd(64, '0');
+    const fp2 = 'BBBB-0002'.padEnd(64, '0');
+    repo.existingFingerprints.mockResolvedValue(new Set([fp1, fp2]));
+    repo.insertManyIfNew.mockResolvedValue(new Set());
+
+    const result = await service.import(
+      actor,
+      'lot-1',
+      { keys: ['AAAA-0001', 'BBBB-0002'] },
+      { responsibleOnly: true },
+    );
+
+    expect(result.imported).toBe(0);
+    expect(result.errors).toEqual([
+      { line: 1, code: 'ALREADY_IN_STORE' },
+      { line: 2, code: 'ALREADY_IN_STORE' },
+    ]);
+  });
+
+  it('counts only truly new keys against remaining lot capacity in a mixed batch (T-6)', async () => {
+    const { service, repo } = setup(lotOf({ licenseCount: 3 }), 2);
+    const fpExisting = 'AAAA-0001'.padEnd(64, '0');
+    repo.existingFingerprints.mockResolvedValue(new Set([fpExisting]));
+    repo.insertManyIfNew.mockImplementation((_tx: unknown, rows: { id: string; fingerprint: string }[]) =>
+      Promise.resolve(new Set(rows.filter((r) => r.fingerprint !== fpExisting).map((r) => r.id))),
+    );
+
+    const ok = await service.import(actor, 'lot-1', { keys: ['AAAA-0001', 'BBBB-0002'] }, { responsibleOnly: true });
+    expect(ok.imported).toBe(1);
+    expect(ok.errors).toEqual([{ line: 1, code: 'ALREADY_IN_STORE' }]);
+
+    const err = await service
+      .import(actor, 'lot-1', { keys: ['AAAA-0001', 'BBBB-0002', 'CCCC-0003'] }, { responsibleOnly: true })
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(LicenseKeyLotKeysExceedLicensesError);
+    expect((toLicenseKeyApiException(err) as { getResponse?: () => { code?: string } }).getResponse?.().code).toBe(
+      'LICENSE_LOT.KEYS_EXCEED_LICENSES',
+    );
   });
 
   it('puts no limit on keys of a plan bound to a machine, and refuses a plan bundled with it or an application that is retired', async () => {
