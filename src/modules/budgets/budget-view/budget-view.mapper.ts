@@ -28,8 +28,9 @@ function effectiveOf(budget: VersionBudget) {
  * Shared arithmetic of mine, table and summary; a missing budget never becomes a zero budget. What is left is worked out on the EFFECTIVE budget (`AD-1`, `QĐ-111bh`): the
  * base of the version with the adjustments approved for it, the reserve as it is; `base`, `reserve` and `total` stay the figures of the version.
  */
-export type BudgetViewNumbersInput = Omit<BudgetViewNumbers, 'runningUncommitted'> & {
+export type BudgetViewNumbersInput = Omit<BudgetViewNumbers, 'runningUncommitted' | 'noPriceRightCount'> & {
   runningUncommitted?: bigint;
+  noPriceRightCount?: number;
 };
 
 export function budgetNumbers(

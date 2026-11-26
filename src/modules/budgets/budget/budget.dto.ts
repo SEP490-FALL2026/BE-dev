@@ -342,6 +342,10 @@ const tableRowSchema = z.strictObject({
   ...budgetNumbersSchema,
   remaining: moneyView.nullable(),
   overCommitted: z.boolean(),
+  noPriceRightCount: z.number().int().nonnegative().meta({
+    description:
+      'Direct-license rights in force without an associated request or plan reference price, excluded from running uncommitted cost.',
+  }),
   priorPeriodAdjustment: moneyView.meta({
     description: 'Invoices of the commitment year recorded on or after local midnight on 1 January of the next year.',
   }),
@@ -362,6 +366,10 @@ const summaryTotalSchema = z.strictObject({
   costCenterCount: z.number().int().nonnegative(),
   /** The Cost Centers whose budget is less than what is held and spent against it. */
   overBudgetCount: z.number().int().nonnegative(),
+  noPriceRightCount: z.number().int().nonnegative().meta({
+    description:
+      'Direct-license rights in force without an associated request or plan reference price, excluded from running uncommitted cost.',
+  }),
 });
 const sharedPoolLinesSummarySchema = z.strictObject({
   idleCost: moneyView,

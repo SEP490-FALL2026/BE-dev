@@ -12,6 +12,7 @@ export interface BudgetViewNumbers {
   spent: bigint;
   pendingSpend: bigint;
   runningUncommitted: bigint;
+  noPriceRightCount: number;
   priorPeriodAdjustment: bigint;
 }
 
@@ -41,7 +42,7 @@ export class BudgetViewNumbersService {
       this.commitments.totals(pairs, undefined, true),
       this.pending.totals(pairs),
       this.invoices.priorPeriodAdjustments(pairs, organization.timeZone),
-      this.runningUncommitted.totals(pairs),
+      this.runningUncommitted.totalsWithFlags(pairs),
     ]);
     return new Map(
       pairs.map(({ costCenterId, year }) => {
@@ -52,7 +53,8 @@ export class BudgetViewNumbersService {
             committed: held.get(key)?.held ?? 0n,
             spent: held.get(key)?.spent ?? 0n,
             pendingSpend: pending.get(key) ?? 0n,
-            runningUncommitted: running.get(key) ?? 0n,
+            runningUncommitted: running.totals.get(key) ?? 0n,
+            noPriceRightCount: running.noPriceRightCounts.get(key) ?? 0,
             priorPeriodAdjustment: prior.get(key) ?? 0n,
           },
         ];

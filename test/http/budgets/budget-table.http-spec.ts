@@ -24,6 +24,7 @@ const ROW = {
   remaining: null,
   overBudget: false,
   overCommitted: false,
+  noPriceRightCount: 0,
   priorPeriodAdjustment: money('10'),
 };
 

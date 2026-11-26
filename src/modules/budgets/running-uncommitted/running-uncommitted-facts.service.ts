@@ -120,19 +120,34 @@ export class RunningUncommittedFactsService {
     tx?: DbTx,
     today?: BusinessDate,
   ): Promise<Map<string, bigint>> {
-    const result = new Map<string, bigint>();
-    if (pairs.length === 0) return result;
+    return (await this.totalsWithFlags(pairs, tx, today)).totals;
+  }
+
+  /** Batched running uncommitted minor and no-price right counts keyed by `${costCenterId}:${year}`. */
+  async totalsWithFlags(
+    pairs: readonly { costCenterId: string; year: number }[],
+    tx?: DbTx,
+    today?: BusinessDate,
+  ): Promise<{ totals: Map<string, bigint>; noPriceRightCounts: Map<string, number> }> {
+    const totals = new Map<string, bigint>();
+    const noPriceRightCounts = new Map<string, number>();
+    if (pairs.length === 0) return { totals, noPriceRightCounts };
     const resolvedToday = today ?? (await this.organizationReads.businessToday(new Date(), tx));
     const uniqueYears = [...new Set(pairs.map((pair) => pair.year))];
     for (const year of uniqueYears) {
-      const byCostCenter = await this.ofYear(year, resolvedToday, tx);
+      const { totals: byCostCenter, flagsByCostCenter } = await this.ofYearWithFlags(year, resolvedToday, tx);
       for (const pair of pairs) {
         if (pair.year !== year) continue;
-        result.set(`${pair.costCenterId}:${year}`, byCostCenter.get(pair.costCenterId) ?? 0n);
+        const key = `${pair.costCenterId}:${year}`;
+        totals.set(key, byCostCenter.get(pair.costCenterId) ?? 0n);
+        const noPriceCount = (flagsByCostCenter.get(pair.costCenterId) ?? []).filter(
+          (flag) => flag.code === 'NO_PRICE',
+        ).length;
+        noPriceRightCounts.set(key, noPriceCount);
       }
     }
 
-    return result;
+    return { totals, noPriceRightCounts };
   }
 
   private async resolveSeatCostCenters(

@@ -141880,7 +141880,13 @@
                       "additionalProperties": false
                     },
                     "costCenterCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-                    "overBudgetCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                    "overBudgetCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                    "noPriceRightCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991,
+                      "description": "Direct-license rights in force without an associated request or plan reference price, excluded from running uncommitted cost."
+                    }
                   },
                   "required": [
                     "currency",
@@ -141896,7 +141902,8 @@
                     "remainingBase",
                     "remainingWithReserve",
                     "costCenterCount",
-                    "overBudgetCount"
+                    "overBudgetCount",
+                    "noPriceRightCount"
                   ],
                   "additionalProperties": false
                 }
@@ -142145,6 +142152,12 @@
                       "nullable": true
                     },
                     "overCommitted": { "type": "boolean" },
+                    "noPriceRightCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991,
+                      "description": "Direct-license rights in force without an associated request or plan reference price, excluded from running uncommitted cost."
+                    },
                     "priorPeriodAdjustment": {
                       "type": "object",
                       "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
@@ -142172,6 +142185,7 @@
                     "overBudget",
                     "remaining",
                     "overCommitted",
+                    "noPriceRightCount",
                     "priorPeriodAdjustment"
                   ],
                   "additionalProperties": false

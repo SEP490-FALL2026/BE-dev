@@ -30,6 +30,7 @@ const SUMMARY = {
       remainingWithReserve: { amount: '500', currency: 'VND' },
       costCenterCount: 2,
       overBudgetCount: 0,
+      noPriceRightCount: 0,
     },
   },
   lastInvoiceRecordedAt: null,

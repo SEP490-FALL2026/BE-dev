@@ -19,6 +19,7 @@ interface SummarySums {
   runningUncommitted: bigint;
   costCenterCount: number;
   overBudgetCount: number;
+  noPriceRightCount: number;
 }
 
 /** Finance and the spending approver read the same table and totals, including commitment-only years. */
@@ -58,6 +59,7 @@ export class BudgetTableViewService {
         ...figures,
         remaining: figures.remainingWithReserve,
         overCommitted: figures.overBudget,
+        noPriceRightCount: numbers.noPriceRightCount,
         priorPeriodAdjustment: money(numbers.priorPeriodAdjustment),
       };
     });
@@ -150,6 +152,7 @@ export class BudgetTableViewService {
       remainingWithReserve: money(sum.total + sum.adjustment - used),
       costCenterCount: sum.costCenterCount,
       overBudgetCount: sum.overBudgetCount,
+      noPriceRightCount: sum.noPriceRightCount,
     };
   }
 
@@ -174,6 +177,7 @@ const emptySums = (): SummarySums => ({
   runningUncommitted: 0n,
   costCenterCount: 0,
   overBudgetCount: 0,
+  noPriceRightCount: 0,
 });
 
 function addToSummary(sum: SummarySums, row: BudgetViewFigures, numbers: BudgetViewNumbers): void {
@@ -185,6 +189,7 @@ function addToSummary(sum: SummarySums, row: BudgetViewFigures, numbers: BudgetV
   sum.spent += numbers.spent;
   sum.pendingSpend += numbers.pendingSpend;
   sum.runningUncommitted += numbers.runningUncommitted;
+  sum.noPriceRightCount += numbers.noPriceRightCount;
   sum.costCenterCount += 1;
   const used = numbers.committed + numbers.spent + numbers.pendingSpend + numbers.runningUncommitted;
   if (row.totalMinor !== null && row.totalMinor + (row.adjustmentMinor ?? 0n) < used) sum.overBudgetCount += 1;
