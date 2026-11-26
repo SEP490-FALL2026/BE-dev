@@ -241,6 +241,7 @@ export class SubscriptionPeriodService {
     if (!organization) throw new Error('A renewal was recorded before installation');
 
     const status = subscriptionStatusOf(plan, 'TERM', linePricing.statusState(state));
+    const priced = status === 'ACTIVE' ? linePricing.activePriced : linePricing.priced;
     const takesPrimary = status === 'ACTIVE' && previous.isPrimaryForPlan;
     if (takesPrimary) await this.pool.releasePrimary(tx, actor, organization.id, previous.id);
     if (oldLines.length > 0)
@@ -253,7 +254,7 @@ export class SubscriptionPeriodService {
       renewedFromId: previous.id,
       ...state,
       minimumSeatsTotal: previous.minimumSeatsTotal,
-      ...linePricing.priced,
+      ...priced,
       monthlyUnitPriceMinor: linePricing.monthlyUnitPriceMinor,
       originalPrice: null,
       isPrimaryForPlan: takesPrimary,
@@ -360,15 +361,19 @@ export class SubscriptionPeriodService {
       reportingCurrency: 'VND' as const,
       exchangeRateId: null,
     };
+    const activePriced = {
+      unitPrice: priced.unitPrice ?? fallbackUnit,
+      priceSnapshot: priced.priceSnapshot ?? fallbackSnap,
+    };
 
     return {
       priced,
+      activePriced,
       monthlyUnitPriceMinor: single.monthlyUnitPriceMinor,
       resolved,
       statusState: <T extends Record<string, unknown>>(s: T) => ({
         ...s,
-        unitPrice: priced.unitPrice ?? fallbackUnit,
-        priceSnapshot: priced.priceSnapshot ?? fallbackSnap,
+        ...activePriced,
       }),
     };
   }
@@ -393,6 +398,7 @@ export class SubscriptionPeriodService {
         : [];
     return {
       priced,
+      activePriced: priced,
       monthlyUnitPriceMinor,
       resolved,
       statusState: <T extends Record<string, unknown>>(s: T) => ({ ...s, ...priced }),

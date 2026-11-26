@@ -258,4 +258,24 @@ describe('the pass over the points of adjustment (SBF-20 §4.5)', () => {
     expect(await sweep(service)).toEqual({ told: 2, deadlineEvents: 0, failed: 0 });
     expect(workspaceAdminSweep).toHaveBeenCalledWith('org');
   });
+
+  it('closes live lines ENDED on renewalDate - 1 when autoRenew=false, endDate=null, renewalDate<today and adjustment=null (F-11)', async () => {
+    TODAY.value = '2027-07-02';
+    const noEndExpired: RenewalPeriodFacts = {
+      ...periodOf('sub-no-end', null),
+      autoRenew: false,
+      endDate: null,
+      renewalDate: '2027-07-01',
+      renewedById: null,
+    };
+    const { service, closeExpiredPeriod } = build([noEndExpired]);
+
+    await sweep(service);
+
+    expect(closeExpiredPeriod).toHaveBeenCalledTimes(1);
+    expect(closeExpiredPeriod.mock.calls[0][0]).toMatchObject({
+      period: noEndExpired,
+      adjustment: { end: '2027-07-01', kind: 'RENEWAL_DATE' },
+    });
+  });
 });

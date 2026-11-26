@@ -135,9 +135,31 @@ export class SubscriptionRenewalSweepService {
     world.shared ??= await this.parties.sharedPeople();
     const people = await this.parties.peopleOf(period, world.shared);
     done.told += await this.sendDataQualityWarnings(problems, world, period, people.itAdmin);
-    if (adjustment === null || candidates.length === 0) return done;
+    if (adjustment === null) {
+      await this.closeUnanchoredExpiredPeriod(period, world.today);
+
+      return done;
+    }
+    if (candidates.length === 0) return done;
 
     return this.sweepNotices(period, adjustment, world, people, { hasCase, eventRecorded, toldSoFar: done.told });
+  }
+
+  private async closeUnanchoredExpiredPeriod(period: RenewalPeriodFacts, today: BusinessDate): Promise<void> {
+    if (period.autoRenew || period.renewedById !== null) return;
+    const fallbackEnd = period.endDate ?? period.renewalDate;
+    if (fallbackEnd === null || fallbackEnd >= today) return;
+    await this.deadlines.closeExpiredPeriod({
+      period,
+      adjustment: {
+        kind: period.endDate ? 'END_DATE' : 'RENEWAL_DATE',
+        deadline: fallbackEnd,
+        point: fallbackEnd,
+        end: fallbackEnd,
+        redAlertOn: null,
+        commitment: 'ANNUAL',
+      },
+    });
   }
 
   private async closeEndingPastRenewal(period: RenewalPeriodFacts, today: BusinessDate): Promise<void> {
