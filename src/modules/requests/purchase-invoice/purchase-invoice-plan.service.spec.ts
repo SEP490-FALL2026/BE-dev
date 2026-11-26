@@ -340,4 +340,44 @@ describe('PurchaseInvoicePlanService acting scope (S2-2)', () => {
       reason: 'LOT_ALREADY_INVOICED',
     });
   });
+
+  it('F-18: lotConfirmationContextOf locks lot (tier 6a) BEFORE reading activeBeneficiaryCount (m)', async () => {
+    const order: string[] = [];
+    const lot = { id: 'lot-1', purpose: 'REQUEST', requestId: 'req-1' };
+    const findLot = jest.fn().mockImplementation(() => {
+      order.push('findLot');
+      return Promise.resolve(lot);
+    });
+    const lockLot = jest.fn().mockImplementation(() => {
+      order.push('lockLot');
+      return Promise.resolve(lot);
+    });
+    const activeBeneficiaryCount = jest.fn().mockImplementation(() => {
+      order.push('activeBeneficiaryCount');
+      return Promise.resolve(2);
+    });
+
+    const service = new PurchaseInvoicePlanService(
+      { activeBeneficiaryCount } as never,
+      {} as never,
+      { findLot, findLotOfRequest: jest.fn(), lockLot } as never,
+      {} as never,
+      {} as never,
+      { getOrganization: jest.fn().mockResolvedValue({ timeZone: 'Asia/Ho_Chi_Minh' }) } as never,
+      {} as never,
+      {} as never,
+    );
+
+    const ctx = await service.lotConfirmationContextOf(
+      { linkKind: 'LICENSE_LOT', licenseLotId: 'lot-1', requestId: null },
+      new Date('2027-04-15T00:00:00Z'),
+      tx,
+    );
+
+    expect(lockLot).toHaveBeenCalledWith('lot-1', tx);
+    expect(activeBeneficiaryCount).toHaveBeenCalledWith('req-1', tx);
+    expect(order.indexOf('lockLot')).toBeGreaterThanOrEqual(0);
+    expect(order.indexOf('lockLot')).toBeLessThan(order.indexOf('activeBeneficiaryCount'));
+    expect(ctx).toEqual({ licenseLotId: 'lot-1', allocationMonth: '2027-04-01', lotBeneficiaryCount: 2 });
+  });
 });

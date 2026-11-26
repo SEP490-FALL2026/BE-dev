@@ -66,13 +66,12 @@ export class PurchaseInvoicePlanService {
     now: Date,
     tx: DbTx,
   ): Promise<{ licenseLotId: string; allocationMonth: BusinessDate; lotBeneficiaryCount: number } | null> {
-    if (typeof this.pool.findLot !== 'function') return null;
-    const lot =
-      row.linkKind === 'LICENSE_LOT' && row.licenseLotId
-        ? await this.pool.findLot(row.licenseLotId, tx)
-        : row.linkKind === 'REQUEST' && row.requestId
-          ? await this.pool.findLotOfRequest(row.requestId, tx)
-          : null;
+    if (typeof this.pool.lockLot !== 'function') return null;
+    const lotId = await this.resolveConfirmationLotId(row, tx);
+    if (!lotId) return null;
+
+    // F-18: lock the lot at tier 6a BEFORE reading active beneficiary count (`m`) so confirmation and group-line withdrawal serialize.
+    const lot = await this.pool.lockLot(lotId, tx);
     if (!lot) return null;
 
     const tz = (await this.organizationReads.getOrganization(tx))?.timeZone ?? 'Asia/Ho_Chi_Minh';
@@ -83,6 +82,18 @@ export class PurchaseInvoicePlanService {
         : 0;
 
     return { licenseLotId: lot.id, allocationMonth, lotBeneficiaryCount };
+  }
+
+  private async resolveConfirmationLotId(
+    row: { linkKind: string; licenseLotId: string | null; requestId: string | null },
+    tx: DbTx,
+  ): Promise<string | null> {
+    if (row.linkKind === 'LICENSE_LOT' && row.licenseLotId) return row.licenseLotId;
+    if (row.linkKind === 'REQUEST' && row.requestId && typeof this.pool.findLotOfRequest === 'function') {
+      return (await this.pool.findLotOfRequest(row.requestId, tx))?.id ?? null;
+    }
+
+    return null;
   }
 
   /** Throws PurchaseInvoiceRefusedError and the money errors of `core/money`. */

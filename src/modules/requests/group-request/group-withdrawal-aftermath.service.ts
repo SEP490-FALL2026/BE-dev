@@ -44,8 +44,8 @@ export class GroupWithdrawalAftermath {
   ): Promise<void> {
     const { now } = why;
     const toRelease = withdrawn.filter((entry) => entry.done.kind === 'ENDED' && entry.done.released);
-    const invoicedLot = this.lots && request.planId ? await this.lots.findLotOfRequest(request.id, tx) : null;
-    if (invoicedLot && invoicedLot.invoiceActualMinor !== null && toRelease.length > 0) {
+    const invoicedLot = toRelease.length > 0 ? await this.lockInvoicedLot(tx, request) : null;
+    if (invoicedLot) {
       await this.adjustInvoicedLotWithdrawals(tx, request, invoicedLot.id, toRelease, now);
     } else {
       const shares: { year: number; amountMinor: bigint }[][] = [];
@@ -79,6 +79,16 @@ export class GroupWithdrawalAftermath {
       if (done.kind === 'ENDED') await this.outcomes.ended(tx, request, [line.employeeId], now);
     }
     await this.resolution.resolve(tx, actor, request.id, now);
+  }
+
+  /** F-18: lock the lot at tier 6a BEFORE checking `invoiceActualMinor` so a concurrent invoice confirmation settles first. */
+  private async lockInvoicedLot(tx: DbTx, request: AccessRequestRecord) {
+    if (!this.lots || !request.planId) return null;
+    const found = await this.lots.findLotOfRequest(request.id, tx);
+    if (!found) return null;
+    const locked = await this.lots.lockLot(tx, found.id);
+
+    return locked && locked.invoiceActualMinor !== null ? locked : null;
   }
 
   private async adjustInvoicedLotWithdrawals(

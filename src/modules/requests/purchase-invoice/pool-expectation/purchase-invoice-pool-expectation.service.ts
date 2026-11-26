@@ -36,6 +36,10 @@ export class PurchaseInvoicePoolService {
     return this.lots ? this.lots.findLotOfRequest(requestId, tx) : Promise.resolve(null);
   }
 
+  lockLot(lotId: string, tx: DbTx) {
+    return this.lots ? this.lots.lockLot(tx, lotId) : Promise.resolve(null);
+  }
+
   get lotApi(): LicenseLotApi | undefined {
     return this.lots;
   }
