@@ -159,7 +159,7 @@ export class InvoiceAllocationTransferService {
       perMonth,
       split.retainedCount,
     );
-    await this.releaseOldCommitmentIfHeld(tx, oldCommitment, releaseTarget, input);
+    await this.releaseOldCommitment(tx, oldCommitment, releaseTarget, input);
   }
 
   private async recordOldCostCenterDelta(
@@ -202,27 +202,45 @@ export class InvoiceAllocationTransferService {
     });
   }
 
-  private async releaseOldCommitmentIfHeld(
+  private async releaseOldCommitment(
     tx: DbTx,
     oldCommitment: LockedCommitmentOfRequest | null,
     releaseTarget: bigint,
     input: K1TransferAllocationInput,
   ): Promise<void> {
-    // D-16: budget_commitments_guard() blocks updating EXPENSED commitments or decreasing applied_minor without a migration.
-    // Only release TRANSFER_EFFECTIVE when oldCommitment is still HELD with heldMinor > 0n; skip UPDATE when EXPENSED.
-    if (!oldCommitment || oldCommitment.state !== 'HELD') return;
-    const heldMinor = oldCommitment.amountMinor - oldCommitment.releasedMinor - oldCommitment.appliedMinor;
-    const takeMinor = heldMinor < releaseTarget ? heldMinor : releaseTarget;
-    if (takeMinor <= 0n) return;
+    if (!oldCommitment) return;
+    if (oldCommitment.state === 'HELD') {
+      const heldMinor = oldCommitment.amountMinor - oldCommitment.releasedMinor - oldCommitment.appliedMinor;
+      const takeMinor = heldMinor < releaseTarget ? heldMinor : releaseTarget;
+      if (takeMinor <= 0n) return;
 
-    await this.commitments.release(tx, oldCommitment, {
-      takeMinor,
-      reason: 'TRANSFER_EFFECTIVE',
-      reasonText: input.reference,
-      releasedByEmployeeId: null,
+      await this.commitments.release(tx, oldCommitment, {
+        takeMinor,
+        reason: 'TRANSFER_EFFECTIVE',
+        reasonText: input.reference,
+        releasedByEmployeeId: null,
+        now: input.now,
+      });
+      oldCommitment.releasedMinor += takeMinor;
+
+      return;
+    }
+    if (oldCommitment.state !== 'EXPENSED') return;
+
+    // D-16: after negative TRANSFER rows are written to invoice_year_applications, reflect unreturned sum d onto EXPENSED commitment.
+    const totalNegated = await this.yearApplications.sumTransferNegativeOfCommitment(tx, oldCommitment.id);
+    const alreadyReturned = oldCommitment.transferReturnedMinor ?? 0n;
+    const delta = totalNegated - alreadyReturned;
+    if (delta <= 0n || delta > oldCommitment.appliedMinor) return;
+
+    await this.commitments.releaseExpensedTransfer(tx, oldCommitment, {
+      transferMinor: delta,
+      reference: input.reference,
       now: input.now,
     });
-    oldCommitment.releasedMinor += takeMinor;
+    oldCommitment.appliedMinor -= delta;
+    oldCommitment.releasedMinor += delta;
+    oldCommitment.transferReturnedMinor = alreadyReturned + delta;
   }
 
   private async applyNewCostCenter(

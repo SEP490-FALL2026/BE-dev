@@ -156,6 +156,7 @@ export class RevocationViewService {
         grantedStartDate: grant?.startDate ?? null,
         grantedEndDate: grant?.endDate ?? null,
         chainAssignmentIds: await this.chains.chainOf(tx, assignmentId),
+        k1RootAssignmentId: await this.chains.k1RootOf(tx, assignmentId),
         personalCommitmentMonths: k1Terms?.personalCommitmentMonths ?? null,
         billingAnchorOn: k1Terms?.billingAnchorOn ?? null,
       });

@@ -105,6 +105,8 @@ export interface AttachedCommitment {
 export interface CommitmentOfRequest extends CommitmentRow {
   organizationId: string;
   costCenterId: string;
+  /** How much of `applied_minor` has already been reflected back via D-16 transfer returns. */
+  transferReturnedMinor?: bigint;
 }
 
 /** A commitment of a request as `lockOfRequest` reads it: with where it came from and what one seat costs a month in it. */
@@ -131,3 +133,101 @@ export interface CommitmentTotals {
 }
 
 export const heldKey = (costCenterId: string, year: number): string => `${costCenterId}:${year}`;
+
+export interface CommitmentSnapshotRow {
+  id: string;
+  requestId: string;
+  year: number;
+  amountMinor: bigint;
+  releasedMinor: bigint;
+  appliedMinor: bigint;
+  state: 'HELD' | 'RELEASED' | 'EXPENSED';
+  organizationId: string;
+  costCenterId: string;
+  origin: 'APPROVAL' | 'YEAR_START';
+  seatMonthlyMinor: bigint | null;
+  attachedVersionId: string | null;
+  currency: string;
+  transferReturnedMinor: bigint;
+}
+
+/** Maps a `budget_commitments` row into `LockedCommitmentOfRequest`. */
+export const toLockedCommitment = (row: CommitmentSnapshotRow): LockedCommitmentOfRequest => ({
+  id: row.id,
+  year: row.year,
+  amountMinor: row.amountMinor,
+  releasedMinor: row.releasedMinor,
+  appliedMinor: row.appliedMinor,
+  state: row.state,
+  organizationId: row.organizationId,
+  costCenterId: row.costCenterId,
+  origin: row.origin,
+  seatMonthlyMinor: row.seatMonthlyMinor,
+  attachedVersionId: row.attachedVersionId,
+  transferReturnedMinor: row.transferReturnedMinor,
+});
+
+/** Computes next commitment state and released total when returning `takeMinor` from a `HELD` commitment. */
+export function buildReleaseMutation(
+  row: CommitmentRow,
+  takeMinor: bigint,
+  now: Date,
+): { released: boolean; heldMinor: bigint; releasedMinor: bigint; state?: 'RELEASED' | 'EXPENSED'; releasedAt?: Date } {
+  const releasedMinor = row.releasedMinor + takeMinor;
+  const heldMinor = row.amountMinor - releasedMinor - row.appliedMinor;
+  const released = heldMinor === 0n;
+  if (released && row.appliedMinor === 0n)
+    return { released, heldMinor, releasedMinor, state: 'RELEASED', releasedAt: now };
+  if (released) return { released, heldMinor, releasedMinor, state: 'EXPENSED' };
+
+  return { released, heldMinor, releasedMinor };
+}
+
+/** Builds Prisma `where` clause for `CommitmentRepo.page`. */
+export function commitmentPageWhere(filter: {
+  id?: string;
+  attached?: boolean;
+  year?: number;
+  costCenterId?: string;
+  costCenterIds?: readonly string[];
+  requestId?: string;
+  state?: 'HELD' | 'RELEASED' | 'EXPENSED';
+}) {
+  return {
+    ...(filter.state ? { state: filter.state } : {}),
+    ...(filter.attached === undefined ? {} : { attachedVersionId: filter.attached ? { not: null } : null }),
+    ...(filter.year ? { year: filter.year } : {}),
+    ...(filter.costCenterId ? { costCenterId: filter.costCenterId } : {}),
+    ...(filter.requestId ? { requestId: filter.requestId } : {}),
+    ...(filter.id ? { id: filter.id } : {}),
+    ...(filter.costCenterIds ? { AND: [{ costCenterId: { in: [...filter.costCenterIds] } }] } : {}),
+  };
+}
+
+/** Filters commitments to positive held amounts with monthly seat pricing (`heldWithSeatPrice`). */
+export function mapHeldWithSeatPrices(
+  rows: readonly {
+    costCenterId: string;
+    year: number;
+    requestId: string;
+    amountMinor: bigint;
+    releasedMinor: bigint;
+    appliedMinor: bigint;
+    seatMonthlyMinor: bigint | null;
+  }[],
+): HeldWithSeatPrice[] {
+  return rows.flatMap((row) => {
+    const heldMinor = row.amountMinor - row.releasedMinor - row.appliedMinor;
+    return heldMinor > 0n && row.seatMonthlyMinor !== null
+      ? [
+          {
+            costCenterId: row.costCenterId,
+            year: row.year,
+            requestId: row.requestId,
+            heldMinor,
+            seatMonthlyMinor: row.seatMonthlyMinor,
+          },
+        ]
+      : [];
+  });
+}

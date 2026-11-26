@@ -15,7 +15,9 @@ import {
   YEAR_START_PLAN_KINDS,
   approvalMonthlyFromSaved,
   bearingDepartmentOf,
+  buildK1ChainMapping,
   judgeYearStart,
+  k1AnnualPlanIdsOf,
   yearStartMonthsOf,
   type YearStartPrice,
   type YearStartSeat,
@@ -123,13 +125,7 @@ export class YearStartCommitmentsBatchService {
   async commitBatch(tx: DbTx, pass: YearStartPassContext, afterId: string | null): Promise<YearStartBatchResult> {
     const locked = await this.repo.lockBatch(tx, pass.organizationId, afterId, YEAR_START_BATCH_SIZE);
     const lastId = locked.length === 0 ? null : locked[locked.length - 1].id;
-    await this.lockK1AnnualAllocations(tx, locked, pass.year);
-    const confirmedInvoices = this.repo.confirmedInvoiceIdsByRequests
-      ? await this.repo.confirmedInvoiceIdsByRequests(
-          tx,
-          locked.map((row) => row.id),
-        )
-      : new Map<string, string[]>();
+    const confirmedInvoices = await this.lockAndResolveK1Invoices(tx, locked, pass.year);
     const judged = await this.judgeBatch(tx, pass, locked, confirmedInvoices);
     if (judged === null) return { lastId, created: 0, skipped: 0 };
 
@@ -186,28 +182,51 @@ export class YearStartCommitmentsBatchService {
     return candidates.length === 0 ? null : this.judgeAll(tx, pass, candidates, kindsByPlan, confirmedInvoices);
   }
 
-  private async lockK1AnnualAllocations(tx: DbTx, rows: readonly YearStartCandidate[], year: number): Promise<void> {
-    if (rows.length === 0 || !this.catalog.findPlanSeatTargets || !this.budgets.lockK1AllocationYears) return;
-    const planIds = [...new Set(rows.map((row) => row.planId))];
-    const targets = await this.catalog.findPlanSeatTargets(planIds, tx);
-    const k1AnnualPlans = new Set(
-      targets
-        .filter((target) => target.provisioningType === 'K1' && target.referenceCommitmentMonths === 12)
-        .map((target) => target.planId),
-    );
-    const k1Candidates = rows.filter((row) => k1AnnualPlans.has(row.planId));
-    if (k1Candidates.length === 0) return;
+  private async lockAndResolveK1Invoices(
+    tx: DbTx,
+    rows: readonly YearStartCandidate[],
+    year: number,
+  ): Promise<Map<string, string[]>> {
+    const chainMap = await this.lockK1ChainAllocations(tx, rows, year);
+    const queryIds = [...new Set([...rows.map((row) => row.id), ...chainMap.values()].flat())];
+    const direct = await this.repo.confirmedInvoiceIdsByRequests(tx, queryIds);
+    const resolved = new Map<string, string[]>();
+    for (const row of rows) {
+      const reqIds = chainMap.get(row.id) ?? [row.id];
+      const invoiceIds = [...new Set(reqIds.flatMap((id) => direct.get(id) ?? []))];
+      if (invoiceIds.length > 0) resolved.set(row.id, invoiceIds);
+    }
 
-    const namedRoots = await this.repo.renewalSuccessors(tx, k1Candidates);
-    const rootByRequest = await this.grants.listK1AnnualRootsOfRequests(
-      {
-        grantRequestIds: k1Candidates.filter((c) => c.type !== 'RENEWAL').map((c) => c.id),
-        namedRoots,
-      },
-      tx,
-    );
-    const subjectKeys = k1Candidates.map((c) => rootByRequest.get(c.id) ?? `req:${c.id}`);
+    return resolved;
+  }
+
+  private async lockK1ChainAllocations(
+    tx: DbTx,
+    rows: readonly YearStartCandidate[],
+    year: number,
+  ): Promise<Map<string, string[]>> {
+    if (rows.length === 0) return new Map();
+    const targets = await this.catalog.findPlanSeatTargets([...new Set(rows.map((r) => r.planId))], tx);
+    const k1PlanIds = k1AnnualPlanIdsOf(targets);
+    const k1Candidates = rows.filter((r) => k1PlanIds.has(r.planId));
+    if (k1Candidates.length === 0) return new Map();
+
+    const namedRoots = [
+      ...(await this.repo.renewalSuccessors(tx, k1Candidates)),
+      ...(await this.repo.replacedAssignments(tx, k1Candidates)),
+    ];
+    const seatRoots = {
+      grantRequestIds: k1Candidates.filter((c) => c.type !== 'RENEWAL').map((c) => c.id),
+      namedRoots,
+    };
+    const details = await this.grants.listK1AnnualChainDetails(seatRoots, tx);
+    const renewals = await this.repo.renewalRequestIdsByAssignments(tx, [
+      ...new Set([...details.values()].flatMap((d) => d.chainAssignmentIds)),
+    ]);
+    const { subjectKeys, chainMap } = buildK1ChainMapping(k1Candidates, details, renewals);
     await this.budgets.lockK1AllocationYears(tx, subjectKeys, [year]);
+
+    return chainMap;
   }
 
   /** What each candidate holds, in dong and the Cost Center of the department that bears it, or why it is left out. */

@@ -197,7 +197,8 @@ export class SeatReleaseService {
     if (!ccPair) return false;
 
     await this.budgets.transferK1AnnualAllocations(tx, {
-      lockSubjectKey: chain.chainAssignmentIds[chain.chainAssignmentIds.length - 1] ?? input.assignmentId,
+      lockSubjectKey:
+        chain.k1RootAssignmentId ?? chain.chainAssignmentIds[chain.chainAssignmentIds.length - 1] ?? input.assignmentId,
       invoiceIds,
       billingAnchorOn: chain.billingAnchorOn,
       endedOn: input.endedOn,

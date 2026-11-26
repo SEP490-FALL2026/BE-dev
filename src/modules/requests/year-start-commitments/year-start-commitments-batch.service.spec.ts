@@ -55,6 +55,7 @@ function setup(input: {
     foreignKeptNextYearOfLines: jest.fn().mockResolvedValue([]),
     renewalSuccessors: jest.fn().mockResolvedValue(input.renewals ?? []),
     renewalsThatBegan: jest.fn().mockResolvedValue(input.renewalsThatBegan ?? new Map()),
+    confirmedInvoiceIdsByRequests: jest.fn().mockResolvedValue(new Map()),
   };
   const budgets = {
     listRequestsHoldingYear: jest.fn().mockResolvedValue(new Set()),
@@ -68,6 +69,7 @@ function setup(input: {
   };
   const catalog = {
     getPlanRevocationInfo: jest.fn().mockResolvedValue([{ planId: 'plan-1', provisioningType: 'K2' }]),
+    findPlanSeatTargets: jest.fn().mockResolvedValue([]),
     getPlanPrice: jest.fn().mockResolvedValue(input.price === undefined ? VND_PRICE : input.price),
   };
   const grants = { listHeldSeatsOfRequests: jest.fn().mockResolvedValue(input.seats ?? []) };

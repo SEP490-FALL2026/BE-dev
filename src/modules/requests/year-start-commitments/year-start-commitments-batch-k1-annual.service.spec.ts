@@ -35,12 +35,16 @@ const heldSeat = (patch: Partial<GrantedSeatOfRequest> & { requestId: string }):
 function setup(candidates: YearStartCandidate[], seats: GrantedSeatOfRequest[] = []) {
   const order: string[] = [];
   const confirmedInvoiceIdsByRequests = jest.fn().mockResolvedValue(new Map());
+  const replacedAssignments = jest.fn().mockResolvedValue([]);
+  const renewalRequestIdsByAssignments = jest.fn().mockResolvedValue([]);
   const repo = {
     lockBatch: jest.fn().mockResolvedValue(candidates),
     unclaimedSeats: jest.fn().mockResolvedValue(new Map()),
     keptNextYearOfLines: jest.fn().mockResolvedValue(new Map()),
     foreignKeptNextYearOfLines: jest.fn().mockResolvedValue([]),
     renewalSuccessors: jest.fn().mockResolvedValue([]),
+    replacedAssignments,
+    renewalRequestIdsByAssignments,
     renewalsThatBegan: jest.fn().mockResolvedValue(new Map()),
     confirmedInvoiceIdsByRequests,
   };
@@ -78,9 +82,11 @@ function setup(candidates: YearStartCandidate[], seats: GrantedSeatOfRequest[] =
       billingCycle: 'MONTHLY',
     }),
   };
+  const listK1AnnualChainDetails = jest.fn().mockResolvedValue(new Map());
   const grants = {
     listHeldSeatsOfRequests: jest.fn().mockResolvedValue(seats),
     listK1AnnualRootsOfRequests: jest.fn().mockResolvedValue(new Map()),
+    listK1AnnualChainDetails,
     listK1AnnualPaidSeatsOn: jest.fn().mockResolvedValue([]),
   };
   const service = new YearStartCommitmentsBatchService(
@@ -102,6 +108,7 @@ function setup(candidates: YearStartCandidate[], seats: GrantedSeatOfRequest[] =
     lockK1AllocationYears,
     applyK1YearStartAllocations,
     grants,
+    repo,
     held,
   };
 }
@@ -112,7 +119,9 @@ describe('YearStartCommitmentsBatchService W3-23 K1 annual (K-A1, F9(a), F9(c))'
       [candidate({ id: 'r-k1' })],
       [heldSeat({ requestId: 'r-k1', rootAssignmentId: 'asg-k1', assignmentId: 'asg-k1' })],
     );
-    built.grants.listK1AnnualRootsOfRequests.mockResolvedValue(new Map([['r-k1', 'asg-k1']]));
+    built.grants.listK1AnnualChainDetails.mockResolvedValue(
+      new Map([['r-k1', { rootAssignmentId: 'asg-k1', chainAssignmentIds: ['asg-k1'], chainRequestIds: ['r-k1'] }]]),
+    );
     built.confirmedInvoiceIdsByRequests.mockResolvedValue(new Map([['r-k1', ['inv-1']]]));
 
     await built.service.commitBatch(tx as never, PASS, null);
@@ -127,7 +136,11 @@ describe('YearStartCommitmentsBatchService W3-23 K1 annual (K-A1, F9(a), F9(c))'
 
   it('F9(c): still commits and applies paid next-year share on 01/01 when K1 annual seat was revoked after invoice confirmation', async () => {
     const built = setup([candidate({ id: 'r-revoked', expectedEndDate: '2027-11-04' })], []);
-    built.grants.listK1AnnualRootsOfRequests.mockResolvedValue(new Map([['r-revoked', 'asg-rev']]));
+    built.grants.listK1AnnualChainDetails.mockResolvedValue(
+      new Map([
+        ['r-revoked', { rootAssignmentId: 'asg-rev', chainAssignmentIds: ['asg-rev'], chainRequestIds: ['r-revoked'] }],
+      ]),
+    );
     built.grants.listK1AnnualPaidSeatsOn.mockResolvedValue([
       {
         requestId: 'r-revoked',
@@ -154,6 +167,44 @@ describe('YearStartCommitmentsBatchService W3-23 K1 annual (K-A1, F9(a), F9(c))'
       items: [
         { requestId: 'r-revoked', commitmentId: 'c-r-revoked', costCenterId: 'cc-dep-request', invoiceIds: ['inv-1'] },
       ],
+    });
+  });
+
+  it('F-7: after K1 annual transfer on 20/12/2026, 01/01/2027 locks root asg-old and resolves inv-1 via chain request r-old even though purchase_invoices.requestId is r-old', async () => {
+    const built = setup(
+      [candidate({ id: 'r-new', departmentId: 'dep-new' })],
+      [
+        heldSeat({
+          requestId: 'r-new',
+          rootAssignmentId: 'asg-new',
+          assignmentId: 'asg-new',
+          owningDepartmentId: 'dep-new',
+        }),
+      ],
+    );
+    built.grants.listK1AnnualChainDetails.mockResolvedValue(
+      new Map([
+        [
+          'r-new',
+          {
+            rootAssignmentId: 'asg-old',
+            chainAssignmentIds: ['asg-old', 'asg-new'],
+            chainRequestIds: ['r-old', 'r-new'],
+          },
+        ],
+      ]),
+    );
+    built.confirmedInvoiceIdsByRequests.mockImplementation((_tx: unknown, ids: string[]) =>
+      Promise.resolve(ids.includes('r-old') ? new Map([['r-old', ['inv-1']]]) : new Map()),
+    );
+
+    await built.service.commitBatch(tx as never, PASS, null);
+
+    expect(built.lockK1AllocationYears).toHaveBeenCalledWith(tx, ['asg-old'], [2027]);
+    expect(built.confirmedInvoiceIdsByRequests).toHaveBeenCalledWith(tx, expect.arrayContaining(['r-old', 'r-new']));
+    expect(built.applyK1YearStartAllocations).toHaveBeenCalledWith(tx, {
+      year: 2027,
+      items: [{ requestId: 'r-new', commitmentId: 'c-r-new', costCenterId: 'cc-dep-new', invoiceIds: ['inv-1'] }],
     });
   });
 });

@@ -51,6 +51,7 @@ async function held(
     foreignKeptPerpetualLines: jest.fn().mockResolvedValue([]),
     renewalSuccessors: jest.fn().mockResolvedValue([]),
     renewalsThatBegan: jest.fn().mockResolvedValue(new Map()),
+    confirmedInvoiceIdsByRequests: jest.fn().mockResolvedValue(new Map()),
   };
   const budgets = {
     listRequestsHoldingYear: jest.fn().mockResolvedValue(new Set()),
@@ -60,6 +61,7 @@ async function held(
   };
   const catalog = {
     getPlanRevocationInfo: jest.fn().mockResolvedValue([{ planId: 'plan-1', provisioningType: 'K2' }]),
+    findPlanSeatTargets: jest.fn().mockResolvedValue([]),
     getPlanPrice: jest.fn().mockResolvedValue(PRICE),
   };
   const baseSeat = {

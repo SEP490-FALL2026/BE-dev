@@ -414,4 +414,39 @@ export class YearStartCommitmentsRepo {
 
     return byRequest;
   }
+
+  /** Transfer replacement links (`access_requests.replaces_assignment_id`) for K1 annual chain resolution (`F-7`). */
+  async replacedAssignments(
+    tx: DbTx,
+    candidates: readonly YearStartCandidate[],
+  ): Promise<{ requestId: string; assignmentId: string }[]> {
+    const ids = candidates.filter((candidate) => candidate.type !== 'RENEWAL').map((candidate) => candidate.id);
+    if (ids.length === 0) return [];
+    const rows = await tx.accessRequest.findMany({
+      where: { id: { in: ids }, replacesAssignmentId: { not: null } },
+      select: { id: true, replacesAssignmentId: true },
+      orderBy: { id: 'asc' },
+    });
+
+    return rows.flatMap((row) =>
+      row.replacesAssignmentId === null ? [] : [{ requestId: row.id, assignmentId: row.replacesAssignmentId }],
+    );
+  }
+
+  /** Renewal request ids whose `successorAssignmentId` is among `assignmentIds`, for K1 invoice lookup along chains. */
+  async renewalRequestIdsByAssignments(
+    tx: DbTx,
+    assignmentIds: readonly string[],
+  ): Promise<{ requestId: string; assignmentId: string }[]> {
+    if (assignmentIds.length === 0) return [];
+    const rows = await tx.accessRequestRenewal.findMany({
+      where: { successorAssignmentId: { in: [...new Set(assignmentIds)] } },
+      select: { requestId: true, successorAssignmentId: true },
+      orderBy: { requestId: 'asc' },
+    });
+
+    return rows.flatMap((row) =>
+      row.successorAssignmentId === null ? [] : [{ requestId: row.requestId, assignmentId: row.successorAssignmentId }],
+    );
+  }
 }

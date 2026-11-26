@@ -15,7 +15,11 @@ import { BudgetCommitmentNotHoldableError } from '../public/budgets.errors';
 import { BudgetYearLockRepo } from './budget-year-lock.repo';
 import { InvoiceRepo } from './invoice.repo';
 import {
+  buildReleaseMutation,
+  commitmentPageWhere,
   heldKey,
+  mapHeldWithSeatPrices,
+  toLockedCommitment,
   type AttachedCommitment,
   type CommitmentOfRequest,
   type CommitmentRow,
@@ -140,19 +144,7 @@ export class CommitmentRepo {
     await tx.$queryRaw`SELECT id FROM budget_commitments WHERE request_id = ${requestId}::uuid ORDER BY year FOR UPDATE`;
     const rows = await tx.budgetCommitment.findMany({ where: { requestId }, orderBy: { year: 'asc' } });
 
-    return rows.map((row) => ({
-      id: row.id,
-      year: row.year,
-      amountMinor: row.amountMinor,
-      releasedMinor: row.releasedMinor,
-      appliedMinor: row.appliedMinor,
-      state: row.state,
-      organizationId: row.organizationId,
-      costCenterId: row.costCenterId,
-      origin: row.origin,
-      seatMonthlyMinor: row.seatMonthlyMinor,
-      attachedVersionId: row.attachedVersionId,
-    }));
+    return rows.map(toLockedCommitment);
   }
 
   /**
@@ -298,19 +290,7 @@ export class CommitmentRepo {
     const row = await tx.budgetCommitment.findUnique({ where: { id } });
     if (!row) return null;
 
-    return {
-      id: row.id,
-      requestId: row.requestId,
-      year: row.year,
-      amountMinor: row.amountMinor,
-      releasedMinor: row.releasedMinor,
-      appliedMinor: row.appliedMinor,
-      currency: row.currency,
-      state: row.state,
-      organizationId: row.organizationId,
-      costCenterId: row.costCenterId,
-      attachedVersionId: row.attachedVersionId,
-    };
+    return { ...toLockedCommitment(row), requestId: row.requestId, currency: row.currency };
   }
 
   /**
@@ -328,18 +308,16 @@ export class CommitmentRepo {
       now: Date;
     },
   ): Promise<{ released: boolean; heldMinor: bigint }> {
-    const releasedMinor = row.releasedMinor + input.takeMinor;
-    const heldMinor = row.amountMinor - releasedMinor - row.appliedMinor;
-    // Nothing is left to hold: the commitment is released when none of it became an expense, and an expense when some of it did.
-    const released = heldMinor === 0n;
-    const data: Prisma.BudgetCommitmentUpdateManyMutationInput = { releasedMinor };
-    if (released && row.appliedMinor === 0n) {
-      data.state = 'RELEASED';
-      data.releasedAt = input.now;
-    } else if (released) {
-      data.state = 'EXPENSED';
-    }
-    // The row is changed only if it is still as it was read, in what went back and in what became an expense.
+    const { released, heldMinor, releasedMinor, state, releasedAt } = buildReleaseMutation(
+      row,
+      input.takeMinor,
+      input.now,
+    );
+    const data: Prisma.BudgetCommitmentUpdateManyMutationInput = {
+      releasedMinor,
+      ...(state ? { state } : {}),
+      ...(releasedAt ? { releasedAt } : {}),
+    };
     const changed = await tx.budgetCommitment.updateMany({
       where: { id: row.id, state: 'HELD', releasedMinor: row.releasedMinor, appliedMinor: row.appliedMinor },
       data,
@@ -395,6 +373,47 @@ export class CommitmentRepo {
       },
     });
     if (changed.count !== 1) throw new Error(`The commitment ${row.id} changed while a seat-month gave back to it.`);
+  }
+
+  /**
+   * Reflects an unreflected K1 transfer return on an `EXPENSED` commitment (`D-16`): shifts `transferMinor` from
+   * `applied_minor` to `released_minor` and increments `transfer_returned_minor` while keeping `state = 'EXPENSED'`,
+   * then records a `TRANSFER_EFFECTIVE` release ledger entry. `budget_commitments_guard()` rejects any mismatched sum.
+   */
+  async releaseExpensedTransfer(
+    tx: DbTx,
+    row: CommitmentRow & { transferReturnedMinor?: bigint },
+    input: { transferMinor: bigint; reference: string; now: Date },
+  ): Promise<void> {
+    if (input.transferMinor <= 0n) return;
+    const prevReturned = row.transferReturnedMinor ?? 0n;
+    const changed = await tx.budgetCommitment.updateMany({
+      where: {
+        id: row.id,
+        state: 'EXPENSED',
+        appliedMinor: row.appliedMinor,
+        releasedMinor: row.releasedMinor,
+        transferReturnedMinor: prevReturned,
+      },
+      data: {
+        appliedMinor: row.appliedMinor - input.transferMinor,
+        releasedMinor: row.releasedMinor + input.transferMinor,
+        transferReturnedMinor: prevReturned + input.transferMinor,
+      },
+    });
+    if (changed.count !== 1) {
+      throw new Error(`The EXPENSED commitment ${row.id} changed while recording a D-16 transfer return.`);
+    }
+    await tx.budgetCommitmentRelease.create({
+      data: {
+        commitmentId: row.id,
+        amountMinor: input.transferMinor,
+        reason: 'TRANSFER_EFFECTIVE',
+        reasonText: input.reference,
+        releasedByEmployeeId: null,
+        releasedAt: input.now,
+      },
+    });
   }
 
   /** The commitments of the request, the oldest year first, with what is left of each to be invoiced against; locks nothing. */
@@ -497,24 +516,15 @@ export class CommitmentRepo {
     skip: number;
     take: number;
   }) {
-    const where = {
-      ...(filter.state ? { state: filter.state } : {}),
-      ...(filter.attached === undefined ? {} : { attachedVersionId: filter.attached ? { not: null } : null }),
-      ...(filter.year ? { year: filter.year } : {}),
-      ...(filter.costCenterId ? { costCenterId: filter.costCenterId } : {}),
-      ...(filter.requestId ? { requestId: filter.requestId } : {}),
-      ...(filter.id ? { id: filter.id } : {}),
-      ...(filter.costCenterIds ? { AND: [{ costCenterId: { in: [...filter.costCenterIds] } }] } : {}),
-    };
-    const longTerm = filter.heldOnly ? { state: 'HELD' as const } : {};
+    const where = { AND: [commitmentPageWhere(filter), filter.heldOnly ? { state: 'HELD' as const } : {}] };
     const [rows, total] = await this.prisma.$transaction([
       this.prisma.budgetCommitment.findMany({
-        where: { AND: [where, longTerm] },
+        where,
         orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
         skip: filter.skip,
         take: filter.take,
       }),
-      this.prisma.budgetCommitment.count({ where: { AND: [where, longTerm] } }),
+      this.prisma.budgetCommitment.count({ where }),
     ]);
 
     return { rows, total };
@@ -585,20 +595,7 @@ export class CommitmentRepo {
       orderBy: { id: 'asc' },
     });
 
-    return rows.flatMap((row) => {
-      const heldMinor = row.amountMinor - row.releasedMinor - row.appliedMinor;
-      return heldMinor > 0n && row.seatMonthlyMinor !== null
-        ? [
-            {
-              costCenterId: row.costCenterId,
-              year: row.year,
-              requestId: row.requestId,
-              heldMinor,
-              seatMonthlyMinor: row.seatMonthlyMinor,
-            },
-          ]
-        : [];
-    });
+    return mapHeldWithSeatPrices(rows);
   }
 
   /**

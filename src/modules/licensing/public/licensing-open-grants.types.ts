@@ -98,6 +98,13 @@ export interface K1AnnualHolderTimeline {
   segments: K1AnnualHolderSegment[];
 }
 
+/** Root assignment and lineage assignments/requests for a K1 annual request, for Tier 0 locking and 01/01 pairing. */
+export interface K1AnnualChainDetail {
+  rootAssignmentId: string;
+  chainAssignmentIds: string[];
+  chainRequestIds: string[];
+}
+
 /** Closed non-replaced K1 annual seat that may still have an active paid 12-month cycle crossing `onDate` (`F9(c)`). */
 export interface K1AnnualPaidSeat extends GrantedSeatOfRequest {
   personalCommitmentMonths: 12;

@@ -501,6 +501,8 @@ export interface RightChain {
   assignmentId: string;
   grantRequestId: string | null;
   chainAssignmentIds: string[];
+  /** Top-most ancestor across `predecessor_id` and `replaces_assignment_id`, used for Tier 0 `k1-allocation` locking. */
+  k1RootAssignmentId?: string;
   /** The start and the end of the seat the request's grant made, as in {@link RevocationCompletedFacts.grantedStartDate}. */
   grantedStartDate: BusinessDate | null;
   grantedEndDate: BusinessDate | null;

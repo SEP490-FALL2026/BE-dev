@@ -320,3 +320,34 @@ export function yearStartMonthsOf(input: {
       seatCount,
     }));
 }
+
+/** Extracts `planId`s for K1 annual (`12`-month commitment) plans from seat targets. */
+export function k1AnnualPlanIdsOf(
+  targets: readonly { planId: string; provisioningType: string; referenceCommitmentMonths?: number | null }[],
+): Set<string> {
+  return new Set(
+    targets.filter((t) => t.provisioningType === 'K1' && t.referenceCommitmentMonths === 12).map((t) => t.planId),
+  );
+}
+
+/** Builds Tier 0 lock subject keys and per-candidate chain request IDs for K1 annual `01/01` pairing (`F-7`). */
+export function buildK1ChainMapping(
+  k1Candidates: readonly { id: string }[],
+  details: ReadonlyMap<string, { rootAssignmentId: string; chainAssignmentIds: string[]; chainRequestIds: string[] }>,
+  renewals: readonly { requestId: string; assignmentId: string }[],
+): { subjectKeys: string[]; chainMap: Map<string, string[]> } {
+  const chainMap = new Map<string, string[]>();
+  const renByAsg = new Map<string, string[]>();
+  for (const r of renewals) renByAsg.set(r.assignmentId, [...(renByAsg.get(r.assignmentId) ?? []), r.requestId]);
+  const subjectKeys = k1Candidates.map((c) => {
+    const detail = details.get(c.id);
+    const reqIds = detail
+      ? [c.id, ...detail.chainRequestIds, ...detail.chainAssignmentIds.flatMap((id) => renByAsg.get(id) ?? [])]
+      : [c.id];
+    chainMap.set(c.id, [...new Set(reqIds)]);
+
+    return detail?.rootAssignmentId ?? `req:${c.id}`;
+  });
+
+  return { subjectKeys, chainMap };
+}

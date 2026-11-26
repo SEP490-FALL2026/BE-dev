@@ -97,4 +97,15 @@ export class InvoiceYearApplicationRepo {
 
     return sum._sum.appliedMinor ?? 0n;
   }
+
+  /** Total negated `applied_minor` across negative `TRANSFER` rows linked to `commitmentId` (`D-16`). */
+  async sumTransferNegativeOfCommitment(tx: DbTx, commitmentId: string): Promise<bigint> {
+    const sum = await tx.invoiceYearApplication.aggregate({
+      where: { commitmentId, source: 'TRANSFER', appliedMinor: { lt: 0n } },
+      _sum: { appliedMinor: true },
+    });
+    const raw = sum._sum.appliedMinor ?? 0n;
+
+    return raw < 0n ? -raw : 0n;
+  }
 }

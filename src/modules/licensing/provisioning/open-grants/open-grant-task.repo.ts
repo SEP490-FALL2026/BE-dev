@@ -7,6 +7,7 @@ import {
   type GrantCompletion,
   type GrantExecution,
   type GrantedSeatOfRequest,
+  type K1AnnualChainDetail,
   type K1AnnualHolderSegment,
   type K1AnnualHolderTimeline,
   type K1AnnualPaidSeat,
@@ -237,7 +238,7 @@ export class OpenGrantTaskRepo {
     renewedAssignmentId: string | null,
     tx?: DbTx,
   ): Promise<K1AnnualHolderTimeline | null> {
-    const rows = await (tx ?? this.prisma).$queryRaw<TimelineRow[]>`
+    const rows = await (tx ?? this.prisma).$queryRaw<(TimelineRow & { true_root_id: string | null })[]>`
       WITH RECURSIVE "start" AS (
         SELECT a."id"
           FROM "license_assignments" a
@@ -248,6 +249,18 @@ export class OpenGrantTaskRepo {
            AND (t."request_id" = ${requestId}::uuid
                 OR (${renewedAssignmentId}::uuid IS NOT NULL AND a."predecessor_id" = ${renewedAssignmentId}::uuid))
          ORDER BY a."valid_from" ASC, a."id" ASC LIMIT 1
+      ),
+      "anc" AS (
+        SELECT a."id", a."predecessor_id", a."replaces_assignment_id", 0 AS "depth"
+          FROM "license_assignments" a JOIN "start" s ON s."id" = a."id"
+        UNION
+        SELECT p."id", p."predecessor_id", p."replaces_assignment_id", anc."depth" + 1
+          FROM "license_assignments" p
+          JOIN "anc" ON p."id" = anc."predecessor_id" OR p."id" = anc."replaces_assignment_id"
+         WHERE anc."depth" < ${MAX_CHAIN_DEPTH}
+      ),
+      "true_root" AS (
+        SELECT "id" FROM "anc" ORDER BY "depth" DESC, "id" ASC LIMIT 1
       ),
       "chain" AS (
         SELECT a."id", a."predecessor_id", a."replaces_assignment_id", a."owning_department_id",
@@ -261,12 +274,14 @@ export class OpenGrantTaskRepo {
          WHERE n."failed_at" IS NULL AND n."cancelled_at" IS NULL AND c."depth" < ${MAX_CHAIN_DEPTH}
       )
       SELECT DISTINCT ON (c."depth", c."id")
+             tr."id"::text AS "true_root_id",
              c."id"::text AS "assignment_id", t."request_id"::text AS "request_id",
              c."owning_department_id"::text AS "owning_department_id",
              to_char(c."billing_anchor_on", 'YYYY-MM-DD') AS "billing_anchor_on",
              to_char(c."valid_until", 'YYYY-MM-DD') AS "ended_on",
              c."replaces_assignment_id"::text AS "replaced_from_assignment_id"
         FROM "chain" c
+        CROSS JOIN "true_root" tr
         LEFT JOIN "provisioning_tasks" t
                ON t."assignment_id" = c."id" AND t."kind" = 'GRANT'
               AND t."status" NOT IN ('CANCELLED', 'CLOSED_FAILED')
@@ -274,34 +289,89 @@ export class OpenGrantTaskRepo {
     if (rows.length === 0) return null;
     const segments = rows.map(toHolderSegment);
 
-    return { rootAssignmentId: segments[0].assignmentId, segments };
+    return { rootAssignmentId: rows[0].true_root_id ?? segments[0].assignmentId, segments };
   }
 
-  /** Maps each request id to its root assignment id (including closed/revoked assignments) for K1 Tier 0 locking. */
+  /** Maps each request id to its top-most ancestor assignment id for K1 Tier 0 locking. */
   async k1AnnualRootsOfRequests(roots: SeatRootsOfRequests, tx?: DbTx): Promise<Map<string, string>> {
+    const details = await this.k1AnnualChainDetails(roots, tx);
+
+    return new Map([...details].map(([reqId, detail]) => [reqId, detail.rootAssignmentId]));
+  }
+
+  /** Resolves root assignment id plus lineage assignments and GRANT request ids for K1 annual requests (`F-7`). */
+  async k1AnnualChainDetails(roots: SeatRootsOfRequests, tx?: DbTx): Promise<Map<string, K1AnnualChainDetail>> {
     if (roots.grantRequestIds.length === 0 && roots.namedRoots.length === 0) return new Map();
+    const rows = await this.queryK1ChainDetailRows(roots, tx);
+
+    return new Map(
+      rows.map((row) => [
+        row.request_id,
+        {
+          rootAssignmentId: row.root_id,
+          chainAssignmentIds: row.assignment_ids,
+          chainRequestIds: [...new Set([row.request_id, ...row.grant_request_ids])],
+        },
+      ]),
+    );
+  }
+
+  private queryK1ChainDetailRows(roots: SeatRootsOfRequests, tx?: DbTx) {
     const grantIds = [...roots.grantRequestIds];
     const namedRequests = roots.namedRoots.map((root) => root.requestId);
     const namedAssignments = roots.namedRoots.map((root) => root.assignmentId);
-    const rows = await (tx ?? this.prisma).$queryRaw<{ request_id: string; assignment_id: string }[]>`
-      SELECT DISTINCT ON (src."request_id")
-             src."request_id"::text AS "request_id",
-             src."assignment_id"::text AS "assignment_id"
-        FROM (
-          SELECT t."request_id", t."assignment_id"
-            FROM "provisioning_tasks" t
-           WHERE t."kind" = 'GRANT'
-             AND t."request_id" = ANY(${grantIds}::uuid[])
-             AND t."status" NOT IN ('CANCELLED', 'CLOSED_FAILED')
-          UNION ALL
-          SELECT n."request_id", n."assignment_id"
-            FROM unnest(${namedRequests}::uuid[], ${namedAssignments}::uuid[]) AS n("request_id", "assignment_id")
-        ) src
-        JOIN "license_assignments" a ON a."id" = src."assignment_id"
-       WHERE a."failed_at" IS NULL AND a."cancelled_at" IS NULL
-       ORDER BY src."request_id", a."valid_from" ASC, a."id" ASC`;
 
-    return new Map(rows.map((row) => [row.request_id, row.assignment_id]));
+    return (tx ?? this.prisma).$queryRaw<
+      { request_id: string; root_id: string; assignment_ids: string[]; grant_request_ids: string[] }[]
+    >`
+      WITH RECURSIVE "seed" AS (
+        SELECT t."request_id", t."assignment_id"
+          FROM "provisioning_tasks" t
+          JOIN "license_assignments" a ON a."id" = t."assignment_id"
+         WHERE t."kind" = 'GRANT' AND t."request_id" = ANY(${grantIds}::uuid[])
+           AND t."status" NOT IN ('CANCELLED', 'CLOSED_FAILED')
+           AND a."failed_at" IS NULL AND a."cancelled_at" IS NULL
+        UNION ALL
+        SELECT n."request_id", n."assignment_id"
+          FROM unnest(${namedRequests}::uuid[], ${namedAssignments}::uuid[]) AS n("request_id", "assignment_id")
+          JOIN "license_assignments" a ON a."id" = n."assignment_id"
+         WHERE a."failed_at" IS NULL AND a."cancelled_at" IS NULL
+      ),
+      "anc" AS (
+        SELECT s."request_id", a."id", a."predecessor_id", a."replaces_assignment_id", a."valid_from", 0 AS "depth"
+          FROM "seed" s JOIN "license_assignments" a ON a."id" = s."assignment_id"
+        UNION
+        SELECT c."request_id", p."id", p."predecessor_id", p."replaces_assignment_id", p."valid_from", c."depth" + 1
+          FROM "anc" c
+          JOIN "license_assignments" p ON p."id" = c."predecessor_id" OR p."id" = c."replaces_assignment_id"
+         WHERE c."depth" < ${MAX_CHAIN_DEPTH}
+      ),
+      "roots" AS (
+        SELECT DISTINCT ON ("request_id") "request_id", "id" AS "root_id"
+          FROM "anc"
+         ORDER BY "request_id", "depth" DESC, "valid_from" ASC, "id" ASC
+      ),
+      "down" AS (
+        SELECT r."request_id", r."root_id", r."root_id" AS "id", 0 AS "depth"
+          FROM "roots" r
+        UNION
+        SELECT d."request_id", d."root_id", n."id", d."depth" + 1
+          FROM "down" d
+          JOIN "license_assignments" n ON n."predecessor_id" = d."id" OR n."replaces_assignment_id" = d."id"
+         WHERE n."failed_at" IS NULL AND n."cancelled_at" IS NULL AND d."depth" < ${MAX_CHAIN_DEPTH}
+      )
+      SELECT d."request_id"::text AS "request_id",
+             d."root_id"::text AS "root_id",
+             ARRAY_AGG(DISTINCT d."id"::text) AS "assignment_ids",
+             COALESCE(
+               ARRAY_AGG(DISTINCT pt."request_id"::text) FILTER (WHERE pt."request_id" IS NOT NULL),
+               ARRAY[]::text[]
+             ) AS "grant_request_ids"
+        FROM "down" d
+        LEFT JOIN "provisioning_tasks" pt
+               ON pt."assignment_id" = d."id" AND pt."kind" = 'GRANT'
+              AND pt."status" NOT IN ('CANCELLED', 'CLOSED_FAILED')
+       GROUP BY d."request_id", d."root_id"`;
   }
 
   /** Closed (not transfer-replaced) 12-month K1 seats whose `valid_until <= onDate`, for F9(c) year-start inclusion. */

@@ -46,6 +46,7 @@ describe('YearStartCommitmentsBatchService W3-07: monthlyPriceMinor pass-through
       foreignKeptNextYearOfLines: jest.fn().mockResolvedValue([]),
       renewalSuccessors: jest.fn().mockResolvedValue([]),
       renewalsThatBegan: jest.fn().mockResolvedValue(new Map()),
+      confirmedInvoiceIdsByRequests: jest.fn().mockResolvedValue(new Map()),
     };
     const budgets = {
       listRequestsHoldingYear: jest.fn().mockResolvedValue(new Set()),
@@ -66,6 +67,7 @@ describe('YearStartCommitmentsBatchService W3-07: monthlyPriceMinor pass-through
         { planId: 'plan-k2', provisioningType: 'K2' },
         { planId: 'plan-k1', provisioningType: 'K1' },
       ]),
+      findPlanSeatTargets: jest.fn().mockResolvedValue([]),
       getPlanPrice: jest.fn().mockResolvedValue({
         kind: 'RECURRING',
         unitPrice: { amountMinor: 5_999_999n, currency: 'VND' },
