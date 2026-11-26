@@ -488,13 +488,22 @@ export class AssignmentService {
       servingOn: input.carrying.startDate,
     });
     if (nextTarget?.subscriptionLineId) {
-      await this.seatLedger.buyForItems(
+      const { purchase } = await this.seatLedger.buyForItems(
         tx,
         nextTarget.subscriptionLineId,
         [{ requestId: input.requestId, beneficiaryEmployeeId: input.beneficiaryEmployeeId }],
         input.carrying.startDate,
         { actor, today: input.today, alreadyLocked: true, checkClosedMonth: false },
       );
+      await this.seatLedger.notifySeatsBought(tx, {
+        organizationId: purchase.organizationId,
+        subscriptionId,
+        subscriptionLineId: nextTarget.subscriptionLineId,
+        seatPurchaseId: purchase.id,
+        quantity: purchase.quantity,
+        responsibleItAdminEmployeeId: nextTarget.responsibleItAdminEmployeeId ?? null,
+        actor,
+      });
     } else {
       await this.catalog.incrementLegacyPoolSeat(tx, actor, subscriptionId, input.requestId);
     }

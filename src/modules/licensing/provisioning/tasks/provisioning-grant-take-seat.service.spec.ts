@@ -21,11 +21,16 @@ const actor = {
 function makeWriter(overrides: {
   provisioningType: 'K1' | 'K2' | 'K4';
   subscriptionLineId?: string | null;
+  responsibleItAdminEmployeeId?: string | null;
   referenceCommitmentMonths?: 1 | 12 | null;
   purchased?: boolean;
   replacesAssignmentId?: string | null;
 }) {
-  const buyForItems = jest.fn().mockResolvedValue({ purchase: { id: 'pur-1', code: 'MUA-000001' }, changes: [] });
+  const buyForItems = jest.fn().mockResolvedValue({
+    purchase: { id: 'pur-1', organizationId: 'org-1', code: 'MUA-000001', quantity: 1 },
+    changes: [],
+  });
+  const notifySeatsBought = jest.fn().mockResolvedValue(1);
   const incrementLegacyPoolSeat = jest.fn().mockResolvedValue(6);
   const createFromRequest = jest.fn().mockResolvedValue({ id: 'asg-1' });
   const isPlanTarget = overrides.provisioningType === 'K1';
@@ -33,6 +38,7 @@ function makeWriter(overrides: {
     kind: isPlanTarget ? 'PLAN' : 'SUBSCRIPTION',
     subscriptionId: isPlanTarget ? null : 'sub-1',
     subscriptionLineId: overrides.subscriptionLineId ?? null,
+    responsibleItAdminEmployeeId: overrides.responsibleItAdminEmployeeId ?? 'emp-owner',
     planId: 'plan-1',
     provisioningType: overrides.provisioningType,
     keyBinding: null,
@@ -90,17 +96,18 @@ function makeWriter(overrides: {
       lockLiveRevocation: jest.fn().mockResolvedValue(null),
       endReplacedRight: jest.fn().mockResolvedValue(overrides.replacesAssignmentId ?? null),
     } as unknown as ProvisioningReplacementService,
-    { buyForItems } as unknown as SeatLedgerApi,
+    { buyForItems, notifySeatsBought } as unknown as SeatLedgerApi,
   );
 
-  return { writer, buyForItems, incrementLegacyPoolSeat, lockSeatTarget, createFromRequest };
+  return { writer, buyForItems, notifySeatsBought, incrementLegacyPoolSeat, lockSeatTarget, createFromRequest };
 }
 
 describe('ProvisioningGrantWriter.takeSeat (W3-18 K2 shortcut + K1 legacy)', () => {
-  it('K2 purchase with subscriptionLineId calls SeatLedgerApi.buyForItems(tx, lineId, [item], today) and never incrementLegacyPoolSeat', async () => {
-    const { writer, buyForItems, incrementLegacyPoolSeat, lockSeatTarget } = makeWriter({
+  it('K2 purchase with subscriptionLineId calls SeatLedgerApi.buyForItems(tx, lineId, [item], today) and notifySeatsBought (F-5)', async () => {
+    const { writer, buyForItems, notifySeatsBought, incrementLegacyPoolSeat, lockSeatTarget } = makeWriter({
       provisioningType: 'K2',
       subscriptionLineId: 'line-1',
+      responsibleItAdminEmployeeId: 'emp-owner',
       purchased: true,
     });
 
@@ -128,6 +135,15 @@ describe('ProvisioningGrantWriter.takeSeat (W3-18 K2 shortcut + K1 legacy)', () 
       '2026-11-21',
       expect.objectContaining({ actor, alreadyLocked: true, today: '2026-11-21' }),
     );
+    expect(notifySeatsBought).toHaveBeenCalledWith(tx, {
+      organizationId: 'org-1',
+      subscriptionId: 'sub-1',
+      subscriptionLineId: 'line-1',
+      seatPurchaseId: 'pur-1',
+      quantity: 1,
+      responsibleItAdminEmployeeId: 'emp-owner',
+      actor,
+    });
     expect(incrementLegacyPoolSeat).not.toHaveBeenCalled();
   });
 

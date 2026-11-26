@@ -93,12 +93,14 @@ describe('AssignmentService.carryOrBuy (Q-B next-period ledger purchase)', () =>
       kind: 'SUBSCRIPTION',
       subscriptionId: 'sub-next',
       subscriptionLineId: 'line-next',
+      responsibleItAdminEmployeeId: 'emp-owner',
       planId: 'plan-1',
     });
     const buyForItems = jest.fn().mockResolvedValue({
-      purchase: { id: 'pur-2', code: 'MUA-000002' },
+      purchase: { id: 'pur-2', organizationId: 'org-1', code: 'MUA-000002', quantity: 1 },
       changes: [],
     });
+    const notifySeatsBought = jest.fn().mockResolvedValue(1);
     const incrementLegacyPoolSeat = jest.fn();
 
     const service = new AssignmentService(
@@ -122,7 +124,7 @@ describe('AssignmentService.carryOrBuy (Q-B next-period ledger purchase)', () =>
       {} as unknown as OrganizationReadApi,
       { lockSeatTarget, incrementLegacyPoolSeat } as unknown as CatalogApi,
       { record: jest.fn().mockResolvedValue(undefined) } as unknown as AuditApi,
-      { buyForItems } as unknown as SeatLedgerApi,
+      { buyForItems, notifySeatsBought } as unknown as SeatLedgerApi,
       {
         getPeriods: jest
           .fn()
@@ -168,6 +170,15 @@ describe('AssignmentService.carryOrBuy (Q-B next-period ledger purchase)', () =>
       '2027-07-01',
       expect.objectContaining({ actor: carryActor, alreadyLocked: true, checkClosedMonth: false }),
     );
+    expect(notifySeatsBought).toHaveBeenCalledWith(tx, {
+      organizationId: 'org-1',
+      subscriptionId: 'sub-next',
+      subscriptionLineId: 'line-next',
+      seatPurchaseId: 'pur-2',
+      quantity: 1,
+      responsibleItAdminEmployeeId: 'emp-owner',
+      actor: carryActor,
+    });
     expect(carrying.carry).toHaveBeenCalledWith(tx, {
       assignmentIds: ['asg-1'],
       nextSubscriptionId: 'sub-next',

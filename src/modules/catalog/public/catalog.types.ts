@@ -29,6 +29,8 @@ export interface SeatTarget {
   licenseLotId?: string | null;
   /** The subscription line serving `servingOn` for K2 targets; null for PLAN, K1, K4, or when no line serves that day. */
   subscriptionLineId?: string | null;
+  /** The IT Admin responsible for the subscription (when kind === 'SUBSCRIPTION'), used for R1 notifications. */
+  responsibleItAdminEmployeeId?: string | null;
   planId: string;
   planName: string;
   applicationId: string;

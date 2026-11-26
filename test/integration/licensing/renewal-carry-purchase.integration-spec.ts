@@ -367,4 +367,41 @@ describe('Renewal carry purchase on ledger and grant shortcut (integration, real
     expect(purchaseRows.rows[0].code).toMatch(/^MUA-\d{6}$/);
     expect(purchaseRows.rows[0]).toMatchObject({ kind: 'TOP_UP', quantity: 1 });
   });
+
+  it('F-5: IT Admin other than subscription responsible granting with purchase emits SUBSCRIPTION_SEATS_BOUGHT to R1', async () => {
+    const subId = await h.subscription(1, 'K2');
+    const planId = await h.planOf(subId);
+    const openedOn = h.inDays(-10);
+    await h.ctx.sql.query(`UPDATE subscriptions SET start_date = $2::date WHERE id = $1`, [subId, openedOn]);
+    await ensureOpenedLine({
+      subscriptionId: subId,
+      effectiveOn: openedOn,
+      quantity: 1,
+      monthlyUnitPriceMinor: 1000000,
+      kind: 'INITIAL',
+    });
+    await h.seat({ subscriptionId: subId }, code());
+
+    const it2Emp = await h.person('E-IT2-F5');
+    const it2 = await h.account('E-IT2-F5', it2Emp, 'IT_ADMIN');
+    const dept = await h.department('D-F5', it2Emp);
+    const beneficiaryId = await h.member(dept.code, 'M-F5', 'Designer');
+    const requestId = h.gate.grantable(beneficiaryId, planId, dept.id);
+
+    await h.grant({ requestId, purchase: {} }, it2).expect(201);
+
+    const { rows } = await h.ctx.sql.query<{ recipient_employee_id: string; code: string; subject_id: string }>(
+      `SELECT recipient_employee_id, code::text, subject_id
+         FROM notifications
+        WHERE subject_id = $1 AND code = 'SUBSCRIPTION_SEATS_BOUGHT'`,
+      [subId],
+    );
+    expect(rows).toEqual([
+      {
+        recipient_employee_id: h.it1.employeeId,
+        code: 'SUBSCRIPTION_SEATS_BOUGHT',
+        subject_id: subId,
+      },
+    ]);
+  });
 });

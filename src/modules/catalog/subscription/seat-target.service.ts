@@ -47,6 +47,7 @@ const ofSubscription = (
     kind: 'SUBSCRIPTION',
     subscriptionId: subscription.id,
     subscriptionLineId: lineFacts?.subscriptionLineId ?? null,
+    responsibleItAdminEmployeeId: subscription.responsibleItAdminEmployeeId,
     status: subscription.status,
     missing: missingData({
       kind: subscription.kind,
