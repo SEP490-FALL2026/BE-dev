@@ -9,6 +9,8 @@ export interface PoolPeriodSpec {
   monthlyPriceMinor: bigint | null;
   startDate: BusinessDate | null;
   endExclusive: BusinessDate | null;
+  /** Optional per-day seat counts from the line ledger (`W3-22`); falls back to `purchasedQuantity` when absent. */
+  dailySeats?: ReadonlyMap<BusinessDate, number | null>;
 }
 
 export interface HeldSeatInterval {
@@ -107,8 +109,25 @@ export function activeMonthDates(
   return dates;
 }
 
+function resolvePaidSeatDays(
+  period: PoolPeriodSpec,
+  activeDates: readonly BusinessDate[],
+): { paidSeatDays: bigint; missingQuantity: boolean } {
+  if (activeDates.length === 0) {
+    return { paidSeatDays: 0n, missingQuantity: period.purchasedQuantity === null && period.dailySeats === undefined };
+  }
+  let paidSeatDays = 0n;
+  for (const day of activeDates) {
+    const qty = period.dailySeats ? (period.dailySeats.get(day) ?? period.purchasedQuantity) : period.purchasedQuantity;
+    if (qty === null) return { paidSeatDays: 0n, missingQuantity: true };
+    paidSeatDays += BigInt(qty);
+  }
+
+  return { paidSeatDays, missingQuantity: false };
+}
+
 /**
- * Paid seat cost, held seat-days, idle seat cost and data-quality flags for one pool period in one month (`W3-04`).
+ * Paid seat cost, held seat-days, idle seat cost and data-quality flags for one pool period or line in one month (`W3-04`, `W3-22`).
  * Uses round-half-away-from-zero (`roundHalfAway`) and clamps negative idle seat-days at `0n`. Pure.
  */
 export function poolPeriodMonthCost(
@@ -117,11 +136,13 @@ export function poolPeriodMonthCost(
   month: BusinessDate,
 ): PoolPeriodMonthCost {
   const daysInMonth = daysInCalendarMonth(month);
-  const daysPaid = daysPaidOf(period.startDate, period.endExclusive, month);
+  const activeDates = activeMonthDates(month, period.startDate, period.endExclusive);
+  const daysPaid = activeDates.length;
   const heldSeatDays = heldSeatDaysOf(seats, month, period);
+  const { paidSeatDays, missingQuantity } = resolvePaidSeatDays(period, activeDates);
   const flags: PoolLineFlag[] = [];
   if (period.monthlyPriceMinor === null) flags.push('NO_PRICE');
-  if (period.purchasedQuantity === null) flags.push('NO_QUANTITY');
+  if (missingQuantity) flags.push('NO_QUANTITY');
 
   if (flags.length > 0) {
     return {
@@ -137,7 +158,6 @@ export function poolPeriodMonthCost(
   }
 
   const monthly = period.monthlyPriceMinor as bigint;
-  const paidSeatDays = BigInt(period.purchasedQuantity as number) * BigInt(daysPaid);
   const idleSeatDays = paidSeatDays > heldSeatDays ? paidSeatDays - heldSeatDays : 0n;
 
   return {

@@ -71,6 +71,17 @@ export class SubscriptionLineTargetRepo {
     return new Map(rows.map((row) => [row.subscriptionLineId, toRecord(row)]));
   }
 
+  /** All target records for `lineIds`, newest `renewalOn` first. */
+  async ofLines(lineIds: readonly string[], tx?: DbTx): Promise<SubscriptionLineTargetRecord[]> {
+    if (lineIds.length === 0) return [];
+    const rows = await (tx ?? this.prisma).subscriptionLineTarget.findMany({
+      where: { subscriptionLineId: { in: [...lineIds] } },
+      orderBy: [{ renewalOn: 'desc' }, { subscriptionLineId: 'asc' }],
+    });
+
+    return rows.map(toRecord);
+  }
+
   /** The targets a renewal case recorded. */
   async ofRenewal(renewalId: string, tx?: DbTx): Promise<SubscriptionLineTargetRecord[]> {
     const rows = await (tx ?? this.prisma).subscriptionLineTarget.findMany({

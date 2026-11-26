@@ -218,6 +218,33 @@ describe('the plan of a month of a subscription (SM-1.4; T-SM1)', () => {
     expect(rows).toMatchObject([{ departmentId: B, days: 31, amountMinor: 400_000n }]);
   });
 
+  it('B2-R7: charges each seat at its own line monthlyPriceMinor when subscription header price is null', () => {
+    const { rows } = plan({
+      subscriptionMonthlyPriceMinor: null,
+      seats: [
+        seat({
+          assignmentId: 'seat-std',
+          planId: 'plan-std',
+          monthlyPriceMinor: 500_000n,
+          held: { from: '2026-10-01', until: null },
+          placements: [{ departmentId: A, from: '2026-10-01', to: null }],
+        }),
+        seat({
+          assignmentId: 'seat-prm',
+          planId: 'plan-prm',
+          monthlyPriceMinor: 2_500_000n,
+          held: { from: '2026-10-01', until: null },
+          placements: [{ departmentId: A, from: '2026-10-01', to: null }],
+        }),
+      ],
+    });
+
+    expect(rows.map((row) => [row.assignmentId, row.monthlyPriceMinor, row.amountMinor])).toEqual([
+      ['seat-std', 500_000n, 500_000n],
+      ['seat-prm', 2_500_000n, 2_500_000n],
+    ]);
+  });
+
   describe('W3-07 monthly slice capping', () => {
     it('Ca E: caps appliedMinor at remaining monthly slice (500k) even when commitment total holds 6.000.000', () => {
       const commitment = { id: 'c-1', costCenterId: 'cc-a' };

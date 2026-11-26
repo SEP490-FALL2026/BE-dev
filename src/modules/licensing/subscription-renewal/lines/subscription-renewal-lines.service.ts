@@ -56,4 +56,8 @@ export class SubscriptionRenewalLinesService {
   handlePassedRenewalDay(subject: AutoPassedRenewalSubject): Promise<boolean> {
     return this.auto.handlePassedRenewalDay(subject);
   }
+
+  targetsOfLines(lineIds: readonly string[], tx?: DbTx) {
+    return this.reader.targetsOfLines(lineIds, tx);
+  }
 }

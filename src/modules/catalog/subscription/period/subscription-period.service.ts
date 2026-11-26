@@ -196,6 +196,7 @@ export class SubscriptionPeriodService {
         noticePeriodDays: record.noticePeriodDays,
         autoRenew: record.autoRenew,
         invoicedLater: record.invoicedLater,
+        seatCounting: record.seatCounting,
         vendorMinimumSeats: record.vendorMinimumSeats,
         nextPeriodPurchasedQuantity: successor?.purchasedQuantity ?? null,
       };

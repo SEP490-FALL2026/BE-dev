@@ -163,4 +163,87 @@ describe('shared-pool-line-label.policy: W3-06 idle cost labels, R-LATE split & 
     expect(res.ratioPercent).toBe(ratioPercent);
     expect(res.exceedsIdleRatioThreshold).toBe(exceeds);
   });
+
+  it.each<{
+    name: string;
+    month: string;
+    input: LabelClassificationInput;
+    held: Array<{ heldFrom: string; heldUntil: string | null }>;
+    missedAdjustment: bigint;
+    reducible: bigint;
+    lockedUntil: Record<string, bigint>;
+  }>([
+    {
+      name: 'W3-22 label (1) wins over (3) LOCKED_UNTIL: Ca B 2A July 2027 (missed 1, 1 idle) -> 500.000 in missedAdjustment, 0 in lockedUntil',
+      month: '2027-07-01',
+      input: annual({
+        purchasedQuantity: 12,
+        startDate: '2027-07-01',
+        endExclusive: '2028-07-01',
+        renewalDate: '2028-07-01',
+        endDate: '2028-06-30',
+        missedSeats: 1,
+      }),
+      held: fullSeats(11, '2027-07-01'),
+      missedAdjustment: 500_000n,
+      reducible: 0n,
+      lockedUntil: {},
+    },
+    {
+      name: 'W3-22 label (1) wins over (2) REDUCIBLE & splits remainder: May 2028 (missed 1, 2 idle) -> 500.000 missed + 483.871 reducible + 16.129 locked',
+      month: '2028-05-01',
+      input: annual({
+        purchasedQuantity: 12,
+        startDate: '2027-07-01',
+        endExclusive: '2028-07-01',
+        renewalDate: '2028-07-01',
+        endDate: '2028-07-01',
+        missedSeats: 1,
+      }),
+      held: fullSeats(10, '2027-07-01'),
+      missedAdjustment: 500_000n,
+      reducible: 483_871n,
+      lockedUntil: { '2028-07-01': 16_129n },
+    },
+    {
+      name: 'W3-22 Ca B 2A Sep 2027: missed 1, re-granted 16/09/2027 -> 250.000 missedAdjustment',
+      month: '2027-09-01',
+      input: annual({
+        purchasedQuantity: 12,
+        startDate: '2027-07-01',
+        endExclusive: '2028-07-01',
+        renewalDate: '2028-07-01',
+        endDate: '2028-06-30',
+        missedSeats: 1,
+      }),
+      held: [...fullSeats(11, '2027-07-01'), ...fullSeats(1, '2027-09-16')],
+      missedAdjustment: 250_000n,
+      reducible: 0n,
+      lockedUntil: {},
+    },
+    {
+      name: 'W3-22 MEMBERS: missedSeats = 0 -> never populates missedAdjustmentMinor',
+      month: '2027-07-01',
+      input: annual({
+        purchasedQuantity: 12,
+        startDate: '2027-07-01',
+        endExclusive: '2028-07-01',
+        commitmentTermMonths: 1,
+        billingCycle: 'MONTHLY',
+        renewalDate: '2027-08-01',
+        endDate: '2027-07-31',
+        missedSeats: 0,
+      }),
+      held: fullSeats(10, '2027-07-01'),
+      missedAdjustment: 0n,
+      reducible: 225_806n,
+      lockedUntil: { '2027-08-01': 774_194n },
+    },
+  ])('$name', ({ month, input, held, missedAdjustment, reducible, lockedUntil }) => {
+    const res = classifyIdleSeatCosts(input, held, month);
+
+    expect(res.byLabel.missedAdjustmentMinor).toBe(missedAdjustment);
+    expect(res.byLabel.reducibleMinor).toBe(reducible);
+    expect(res.byLabel.lockedUntil).toEqual(lockedUntil);
+  });
 });

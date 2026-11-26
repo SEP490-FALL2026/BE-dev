@@ -171,6 +171,8 @@ import { SubscriptionLineTargetRepo } from './subscription-renewal/lines/subscri
 import { SubscriptionRenewalAutoService } from './subscription-renewal/lines/subscription-renewal-auto.service';
 import { SubscriptionRenewalLinesFactsService } from './subscription-renewal/lines/subscription-renewal-lines-facts.service';
 import { SubscriptionRenewalLinesService } from './subscription-renewal/lines/subscription-renewal-lines.service';
+import { KpiMissedAdjustmentService } from './subscription-renewal/kpi/kpi-missed-adjustment.service';
+import { SubscriptionRenewalKpiService } from './subscription-renewal/kpi/subscription-renewal-kpi.service';
 import { SubscriptionRenewalAutoRepo } from './subscription-renewal/subscription-renewal-auto.repo';
 import { SubscriptionRenewalsController } from './subscription-renewal/subscription-renewals.controller';
 import { SeatPurchaseInvoiceDueService } from './shared-pool/seat-purchase-invoice-due.service';
@@ -317,6 +319,8 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     SubscriptionRenewalLinesFactsService,
     SubscriptionRenewalAutoService,
     SubscriptionRenewalLinesService,
+    KpiMissedAdjustmentService,
+    SubscriptionRenewalKpiService,
     SubscriptionRenewalAutoRepo,
     SubscriptionRenewalSeatRepo,
     RenewalSavingsRepo,

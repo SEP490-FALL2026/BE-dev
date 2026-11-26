@@ -6,6 +6,10 @@ import type { HeldRange, PlacementPeriod } from './seat-month.types';
 export interface SeatToCharge {
   assignmentId: string;
   employeeId: string;
+  /** Plan id of the seat, used to match line-level pricing (`B2-R7`). */
+  planId?: string;
+  /** Per-line monthly price when resolved from `subscription_lines`; falls back to period price when undefined. */
+  monthlyPriceMinor?: bigint | null;
   /** A service account answers to one department whoever holds it; null for a personal seat. */
   fixedDepartmentId: string | null;
   held: HeldRange;
@@ -79,10 +83,12 @@ export function planSeatMonth(input: {
     if (row.commitmentId !== null && row.appliedMinor > 0n)
       held.set(row.commitmentId, (held.get(row.commitmentId) ?? 0n) + row.appliedMinor);
   }
-  const rows =
-    input.subscriptionMonthlyPriceMinor === null
-      ? []
-      : input.seats.flatMap((seat) => rowsOfSeat(seat, input.subscriptionMonthlyPriceMinor as bigint, input, held));
+  const rows = input.seats.flatMap((seat) => {
+    const monthlyPrice =
+      seat.monthlyPriceMinor !== undefined ? seat.monthlyPriceMinor : input.subscriptionMonthlyPriceMinor;
+
+    return monthlyPrice === null ? [] : rowsOfSeat(seat, monthlyPrice, input, held);
+  });
 
   return { rows, takenByCommitment: takenOf(input.prior, rows), returned: returnedOf(input.prior, rows) };
 }

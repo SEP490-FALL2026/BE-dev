@@ -6,7 +6,8 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { SubscriptionPeriodApi } from '../../catalog/public/subscription-period.api';
 import type { RenewalPeriodFacts } from '../../catalog/public/subscription-period.types';
 import { FinanceApi } from '../../finance/public/finance.api';
-import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { SubscriptionRenewalKpiService } from './kpi/subscription-renewal-kpi.service';
+import type { SubscriptionKpi4Summary } from './kpi/subscription-renewal-kpi.types';
 import { SubscriptionRenewalLinesService } from './lines/subscription-renewal-lines.service';
 import type {
   DeadlineEventWire,
@@ -47,9 +48,9 @@ export class RenewalViewService {
     private readonly parties: RenewalPartiesService,
     private readonly ranking: RenewalRankingService,
     private readonly seatsNeeded: RenewalSeatsNeededService,
-    private readonly organizationReads: OrganizationReadApi,
     private readonly finance: FinanceApi,
     @Optional() private readonly lines?: SubscriptionRenewalLinesService,
+    @Optional() private readonly kpi?: SubscriptionRenewalKpiService,
   ) {}
 
   /** Throws RenewalError (`READ_FORBIDDEN`). */
@@ -117,7 +118,7 @@ export class RenewalViewService {
     if ('refusal' in found) throw new RenewalError(found.refusal.problem, found.refusal.details);
     if (decidedCancel) throw new RenewalError('ALREADY_PROPOSED', { renewalId: decidedCancel.id });
     const { adjustment } = found;
-    const today = await this.organizationReads.businessToday();
+    const today = await this.ranking.businessToday();
     const counts = await this.seatsNeeded.countFor({
       subscriptionId,
       planId: period.planId,
@@ -146,7 +147,7 @@ export class RenewalViewService {
   async detailOf(record: RenewalRecord, actor: AuthenticatedPrincipal): Promise<RenewalDetailWire> {
     const period = (await this.periodsOf([record.subscriptionId])).get(record.subscriptionId);
     if (!period) throw new RenewalError('NOT_FOUND');
-    const today = await this.organizationReads.businessToday();
+    const today = await this.ranking.businessToday();
     const [seats, lineInfo] = await Promise.all([
       this.ranking.seatsOf(record.subscriptionId, today),
       this.lineInfoOf(period, today),
@@ -160,7 +161,7 @@ export class RenewalViewService {
       released: await this.repo.releasedOf(record.id),
       savings: await this.savingsOf(record),
       lateRenewal: record.outcome
-        ? lateRenewalOf(record, period, await this.organizationReads.businessToday(record.outcome.recordedAt))
+        ? lateRenewalOf(record, period, await this.ranking.businessToday(record.outcome.recordedAt))
         : false,
       showSnapshot: !actor.roles.includes('IT_ADMIN'),
       lines: lineInfo.lines,
@@ -185,7 +186,7 @@ export class RenewalViewService {
       shortfall: number;
     }
   > {
-    const today = await this.organizationReads.businessToday();
+    const today = await this.ranking.businessToday();
     const scope = this.scopeOf(actor);
     if (!scope.itAdmin) throw new RenewalError('READ_FORBIDDEN');
     const record = await this.repo.find(id);
@@ -201,10 +202,7 @@ export class RenewalViewService {
       query.proposedOnly === true ? seats.ranked.filter((seat) => proposed.has(seat.assignmentId)) : seats.ranked;
     const slice = shown.slice((query.page - 1) * query.pageSize, query.page * query.pageSize);
     const people = new Map(
-      (await this.organizationReads.getEmployees(slice.map((seat) => seat.employeeId))).map((person) => [
-        person.id,
-        person,
-      ]),
+      (await this.ranking.getEmployees(slice.map((seat) => seat.employeeId))).map((person) => [person.id, person]),
     );
     const items = slice.flatMap((seat): RankedSeatWire[] => {
       const person = people.get(seat.employeeId);
@@ -232,6 +230,20 @@ export class RenewalViewService {
       minimumSeatsTotal: period.minimumSeatsTotal ?? null,
       shortfall: lineInfo.shortfall,
     };
+  }
+
+  /** Incremental monthly `KPI-4` (`missedAdjustment`) for `subscriptionId` across `months`, read-only (`W3-22`). */
+  async missedAdjustmentKpiOf(
+    actor: AuthenticatedPrincipal,
+    subscriptionId: string,
+    months: readonly BusinessDate[],
+  ): Promise<SubscriptionKpi4Summary> {
+    this.scopeOf(actor);
+    if (!this.kpi) {
+      return { subscriptionId, totalSeatMonths: 0, totalAmountMinor: 0n, lines: [] };
+    }
+
+    return this.kpi.kpi4ForSubscription(subscriptionId, months);
   }
 
   /** The events of renewal days passed with no result recorded, newest first: the incidents counted by `KPI-4` and the marks of an end. */
@@ -272,7 +284,7 @@ export class RenewalViewService {
         periods.flatMap((period) => (period.responsibleItAdminEmployeeId ? [period.responsibleItAdminEmployeeId] : [])),
       ),
     ];
-    const people = await this.organizationReads.getEmployees(ids);
+    const people = await this.ranking.getEmployees(ids);
 
     return new Map(
       people.map((person) => [

@@ -288,4 +288,70 @@ describe('SeatMonthSubscriptionService.charge', () => {
     expect(commitmentMonths.reverseApplied).toHaveBeenCalledWith(tx, 'c-2', MONTH, 3_000_000n);
     expect(commitments.giveBackApplied).toHaveBeenCalledWith(tx, expect.objectContaining({ id: 'c-2' }), 3_000_000n);
   });
+
+  it('B2-R7: reads per-line monthlyUnitPriceMinor from subscription lines when lines exist instead of subscription.monthlyPriceMinor', async () => {
+    const calls: string[] = [];
+    const repo = {
+      lockMonthOf: jest.fn().mockResolvedValue(undefined),
+      isCharged: jest.fn().mockResolvedValue(false),
+      ofSubscriptionMonth: jest.fn().mockResolvedValue([]),
+      deleteRows: jest.fn().mockResolvedValue(undefined),
+      insertMany: jest.fn().mockResolvedValue(undefined),
+      insertReversals: jest.fn().mockResolvedValue(undefined),
+      markCharged: jest.fn().mockResolvedValue(undefined),
+    };
+    const licensing = {
+      getSeatsOfMonth: jest.fn().mockResolvedValue([
+        { ...seat, assignmentId: 'a-std', planId: 'plan-std', requestId: null },
+        { ...seat, assignmentId: 'a-prm', planId: 'plan-prm', employeeId: 'e-2', requestId: null },
+      ]),
+    };
+    const periods = {
+      linesOfSubscription: jest.fn().mockResolvedValue([
+        { id: 'l-1', planId: 'plan-std', monthlyUnitPriceMinor: 500_000n, closedReason: null },
+        { id: 'l-2', planId: 'plan-prm', monthlyUnitPriceMinor: 2_500_000n, closedReason: null },
+      ]),
+      getPurchaseFacts: jest.fn().mockResolvedValue([{ monthlyPriceMinor: null }]),
+    };
+    const service = new SeatMonthSubscriptionService(
+      repo as unknown as SeatMonthRepo,
+      new SeatMonthSeatFactsService(
+        licensing as unknown as LicensingSeatMonthApi,
+        {
+          getPlacementsBetween: () =>
+            Promise.resolve([
+              { employeeId: 'e-1', departmentId: 'd-1', validFrom: '2025-01-01', validTo: null },
+              { employeeId: 'e-2', departmentId: 'd-1', validFrom: '2025-01-01', validTo: null },
+            ]),
+        } as unknown as OrganizationHistoryApi,
+      ),
+      {
+        getOrganization: () => Promise.resolve({ id: 'org' }),
+        getUnitCostCenterIds: () => Promise.resolve(new Map([['d-1', 'cc-1']])),
+      } as unknown as OrganizationReadApi,
+      periods as unknown as SubscriptionPeriodApi,
+      { lockOfRequest: jest.fn().mockResolvedValue([]), lockById: jest.fn() } as unknown as CommitmentRepo,
+      { lockOfCommitment: jest.fn().mockResolvedValue([]) } as unknown as CommitmentMonthFacadeService,
+      { record: () => Promise.resolve() } as unknown as AuditApi,
+      {
+        watch: jest.fn().mockResolvedValue({}),
+        settle: jest.fn().mockResolvedValue(0),
+      } as unknown as ThresholdAlertService,
+    );
+
+    const rows = await service.charge(tx, SUBSCRIPTION, MONTH, new Date('2026-02-01T00:00:00Z'));
+    void calls;
+
+    expect(rows).toBe(2);
+    expect(periods.getPurchaseFacts).not.toHaveBeenCalled();
+    const written = (repo.insertMany.mock.calls as unknown[][])[0][1] as Array<{
+      assignmentId: string;
+      monthlyPriceMinor: bigint;
+      amountMinor: bigint;
+    }>;
+    expect(written.map((r) => [r.assignmentId, r.monthlyPriceMinor, r.amountMinor])).toEqual([
+      ['a-std', 500_000n, 500_000n],
+      ['a-prm', 2_500_000n, 2_500_000n],
+    ]);
+  });
 });

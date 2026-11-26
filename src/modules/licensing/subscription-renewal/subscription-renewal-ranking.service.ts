@@ -30,6 +30,14 @@ export class RenewalRankingService {
     @Optional() private readonly seatLedger?: SeatLedgerApi,
   ) {}
 
+  businessToday(now?: Date): Promise<BusinessDate> {
+    return this.organizationReads.businessToday(now);
+  }
+
+  getEmployees(ids: readonly string[], tx?: DbTx) {
+    return this.organizationReads.getEmployees([...ids], tx);
+  }
+
   async seatsOf(
     subscriptionId: string,
     today: BusinessDate,

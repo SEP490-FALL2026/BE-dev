@@ -53,3 +53,10 @@ export interface UnrequestedK1SeatInForce {
   billingAnchorOn: BusinessDate | null;
   referenceMonthlyPriceMinor: bigint | null;
 }
+
+/** Locked renewal target snapshot of a prior subscription line (`W3-22`). */
+export interface PriorLineLockedTarget {
+  subscriptionLineId: string;
+  renewalOn: BusinessDate;
+  target: number;
+}

@@ -140,13 +140,23 @@ export class SeatMonthSubscriptionService {
       slicesByCommitment: ReadonlyMap<string, CommitmentMonthRecord[]>;
     },
   ) {
-    const toCharge = await this.seats.toCharge(tx, input.month, input.seats, input.commitmentOf);
+    const lines = this.periods.linesOfSubscription
+      ? (await this.periods.linesOfSubscription(input.subscriptionId, tx)).filter(
+          (line) => line.closedReason !== 'REMOVED',
+        )
+      : [];
+    const linePriceByPlan =
+      lines.length > 0 ? new Map(lines.map((line) => [line.planId, line.monthlyUnitPriceMinor])) : undefined;
+    const toCharge = await this.seats.toCharge(tx, input.month, input.seats, input.commitmentOf, linePriceByPlan);
     const departmentIds = [...new Set([...toCharge.flatMap((seat) => this.departmentsOf(seat))])];
     const costCenterOfDepartment = await this.organizationReads.getUnitCostCenterIds(departmentIds, tx);
-    const [facts] = await this.periods.getPurchaseFacts([input.subscriptionId], tx);
+    const subscriptionMonthlyPriceMinor =
+      lines.length === 0
+        ? ((await this.periods.getPurchaseFacts([input.subscriptionId], tx))[0]?.monthlyPriceMinor ?? null)
+        : null;
     return planSeatMonth({
       month: input.month,
-      subscriptionMonthlyPriceMinor: facts?.monthlyPriceMinor ?? null,
+      subscriptionMonthlyPriceMinor,
       seats: toCharge,
       costCenterOfDepartment,
       heldByCommitment: new Map(

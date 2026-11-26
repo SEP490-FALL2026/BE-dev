@@ -166,6 +166,7 @@ export interface SubscriptionPurchaseFacts {
   noticePeriodDays: number | null;
   autoRenew: boolean;
   invoicedLater?: boolean;
+  seatCounting?: 'FIXED' | 'MEMBERS';
   vendorMinimumSeats: number | null;
   /** Purchased quantity recorded on a direct successor subscription, if one already exists. */
   nextPeriodPurchasedQuantity: number | null;

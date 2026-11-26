@@ -19,6 +19,10 @@ export interface LabelClassificationInput extends AdjustmentInput {
   /** Purchased quantity recorded for the following period, if already confirmed; defaults to `purchasedQuantity`. */
   qNext: number | null;
   windows: AdjustmentWindows;
+  /** Optional per-day seat counts from the line ledger (`W3-22`); falls back to `purchasedQuantity`. */
+  dailySeats?: ReadonlyMap<BusinessDate, number | null>;
+  /** Missed-adjustment seats carried from the prior period (`0` for `MEMBERS` or when target met). */
+  missedSeats?: number;
 }
 
 export interface IdleCostByLabel {
@@ -33,12 +37,14 @@ export interface IdleCostClassification {
   byLabel: IdleCostByLabel;
   idleAtMinimumCostMinor: bigint;
   excessIdleCostMinor: bigint;
+  excessIdleSeatDays: bigint;
+  paidSeatDays: bigint;
   ratioPercent: string;
   exceedsIdleRatioThreshold: boolean;
 }
 
 interface Segment {
-  kind: 'REDUCIBLE' | 'LOCKED_UNTIL';
+  kind: 'MISSED_ADJUSTMENT' | 'REDUCIBLE' | 'LOCKED_UNTIL';
   until: BusinessDate | null;
   seatDays: number;
 }
@@ -50,6 +56,8 @@ function emptyResult(idleCostMinor: bigint | null, paidMinor: bigint | null): Id
     byLabel: { missedAdjustmentMinor: 0n, reducibleMinor: 0n, lockedUntil: {} },
     idleAtMinimumCostMinor: 0n,
     excessIdleCostMinor: 0n,
+    excessIdleSeatDays: 0n,
+    paidSeatDays: 0n,
     ratioPercent: '0.00',
     exceedsIdleRatioThreshold: false,
   };
@@ -85,34 +93,67 @@ function formatRatioPercent(numerator: bigint, denominator: bigint): string {
   return `${whole.toString()}.${frac}`;
 }
 
-function classifyDay(input: LabelClassificationInput, day: BusinessDate, idleToday: number, segments: Segment[]): void {
-  const q = input.purchasedQuantity as number;
+function classifyDay(
+  input: LabelClassificationInput,
+  day: BusinessDate,
+  idleCount: number,
+  seatsToday: number,
+  segments: Segment[],
+): void {
   const point = adjustmentPointOf(input, day, input.windows);
   if (point === null) {
-    pushSegment(segments, 'REDUCIBLE', null, idleToday);
+    pushSegment(segments, 'REDUCIBLE', null, idleCount);
     return;
   }
   if (day >= point.point && day <= point.deadline) {
-    pushSegment(segments, 'REDUCIBLE', null, idleToday);
+    pushSegment(segments, 'REDUCIBLE', null, idleCount);
     return;
   }
   const commitment = adjustmentCommitmentOf(input);
   if (commitment === 'ANNUAL' && day > point.deadline) {
-    const qNext = input.qNext ?? q;
-    const reducedShare = Math.max(0, Math.min(idleToday, q - qNext));
-    const keptShare = idleToday - reducedShare;
+    const qNext = input.qNext ?? seatsToday;
+    const reducedShare = Math.max(0, Math.min(idleCount, seatsToday - qNext));
+    const keptShare = idleCount - reducedShare;
     pushSegment(segments, 'LOCKED_UNTIL', point.end, reducedShare);
     pushSegment(segments, 'LOCKED_UNTIL', earliestReducibleOn(input, day) ?? point.end, keptShare);
     return;
   }
 
-  pushSegment(segments, 'LOCKED_UNTIL', point.end, idleToday);
+  pushSegment(segments, 'LOCKED_UNTIL', point.end, idleCount);
+}
+
+function collectIdleSegments(
+  input: LabelClassificationInput,
+  seats: readonly HeldSeatInterval[],
+  month: BusinessDate,
+): { segments: Segment[]; idleAtMinSeatDays: number } {
+  const missedCap = Math.max(0, input.missedSeats ?? 0);
+  const segments: Segment[] = [];
+  let idleAtMinSeatDays = 0;
+
+  for (const day of activeMonthDates(month, input.startDate, input.endExclusive)) {
+    const seatsToday =
+      (input.dailySeats ? input.dailySeats.get(day) : input.purchasedQuantity) ?? input.purchasedQuantity;
+    if (seatsToday === null) continue;
+    const minFloor = Math.min(input.vendorMinimumSeats ?? 0, seatsToday);
+    const heldToday = countHeldOnDay(seats, day);
+    idleAtMinSeatDays += Math.max(0, minFloor - heldToday);
+    const idleToday = Math.max(0, seatsToday - heldToday);
+    if (idleToday <= 0) continue;
+
+    const missedToday = Math.min(idleToday, missedCap);
+    if (missedToday > 0) pushSegment(segments, 'MISSED_ADJUSTMENT', null, missedToday);
+    const remainingIdle = idleToday - missedToday;
+    if (remainingIdle > 0) classifyDay(input, day, remainingIdle, seatsToday, segments);
+  }
+
+  return { segments, idleAtMinSeatDays };
 }
 
 /**
- * Splits a period's monthly idle seat cost into adjustment-window buckets (`W3-06` + Q-F R-LATE split) with remainder
- * assigned to the final segment so bucket totals sum exactly to `idleCostMinor`, and computes the 10% excess-idle alert check
- * excluding vendor minimum seat commitments. Pure.
+ * Splits a period's or line's monthly idle seat cost into adjustment-window buckets (`W3-06` + `W3-22` label `(1)` winning
+ * over `(2)`/`(3)` + Q-F R-LATE split) with remainder assigned to the final segment so bucket totals sum exactly to `idleCostMinor`,
+ * and computes the 10% excess-idle alert check excluding vendor minimum seat commitments. Pure.
  */
 export function classifyIdleSeatCosts(
   input: LabelClassificationInput,
@@ -120,43 +161,13 @@ export function classifyIdleSeatCosts(
   month: BusinessDate,
 ): IdleCostClassification {
   const cost = poolPeriodMonthCost(input, seats, month);
-  if (cost.idleCostMinor === null || cost.paidMinor === null) {
-    return emptyResult(cost.idleCostMinor, cost.paidMinor);
-  }
-  if (cost.idleCostMinor === 0n || cost.paidMinor === 0n) {
+  if (cost.idleCostMinor === null || cost.paidMinor === null || cost.idleCostMinor === 0n || cost.paidMinor === 0n) {
     return emptyResult(cost.idleCostMinor, cost.paidMinor);
   }
 
-  const q = input.purchasedQuantity as number;
   const monthly = input.monthlyPriceMinor as bigint;
-  const minFloor = Math.min(input.vendorMinimumSeats ?? 0, q);
-  const segments: Segment[] = [];
-  let idleAtMinSeatDays = 0;
-
-  for (const day of activeMonthDates(month, input.startDate, input.endExclusive)) {
-    const heldToday = countHeldOnDay(seats, day);
-    idleAtMinSeatDays += Math.max(0, minFloor - heldToday);
-    const idleToday = Math.max(0, q - heldToday);
-    if (idleToday > 0) classifyDay(input, day, idleToday, segments);
-  }
-
-  const byLabel: IdleCostByLabel = { missedAdjustmentMinor: 0n, reducibleMinor: 0n, lockedUntil: {} };
-  let allocated = 0n;
-  segments.forEach((seg, index) => {
-    const amount =
-      index === segments.length - 1
-        ? cost.idleCostMinor! > allocated
-          ? cost.idleCostMinor! - allocated
-          : 0n
-        : roundHalfAway(BigInt(seg.seatDays) * monthly, BigInt(cost.daysInMonth));
-    allocated += amount;
-    if (seg.kind === 'REDUCIBLE') {
-      byLabel.reducibleMinor += amount;
-    } else if (seg.until !== null) {
-      byLabel.lockedUntil[seg.until] = (byLabel.lockedUntil[seg.until] ?? 0n) + amount;
-    }
-  });
-
+  const { segments, idleAtMinSeatDays } = collectIdleSegments(input, seats, month);
+  const byLabel = allocateSegments(segments, cost.idleCostMinor, monthly, cost.daysInMonth);
   const rawMinCost = roundHalfAway(BigInt(idleAtMinSeatDays) * monthly, BigInt(cost.daysInMonth));
   const idleAtMinimumCostMinor = rawMinCost > cost.idleCostMinor ? cost.idleCostMinor : rawMinCost;
   const excessIdleCostMinor = cost.idleCostMinor - idleAtMinimumCostMinor;
@@ -169,7 +180,98 @@ export function classifyIdleSeatCosts(
     byLabel,
     idleAtMinimumCostMinor,
     excessIdleCostMinor,
+    excessIdleSeatDays,
+    paidSeatDays: cost.paidSeatDays,
     ratioPercent: formatRatioPercent(excessIdleCostMinor, cost.paidMinor),
     exceedsIdleRatioThreshold: excessIdleSeatDays * 10n > cost.paidSeatDays,
+  };
+}
+
+function allocateSegments(
+  segments: readonly Segment[],
+  idleCostMinor: bigint,
+  monthly: bigint,
+  daysInMonth: number,
+): IdleCostByLabel {
+  const byLabel: IdleCostByLabel = { missedAdjustmentMinor: 0n, reducibleMinor: 0n, lockedUntil: {} };
+  let allocated = 0n;
+  segments.forEach((seg, index) => {
+    const amount =
+      index === segments.length - 1
+        ? idleCostMinor > allocated
+          ? idleCostMinor - allocated
+          : 0n
+        : roundHalfAway(BigInt(seg.seatDays) * monthly, BigInt(daysInMonth));
+    allocated += amount;
+    if (seg.kind === 'MISSED_ADJUSTMENT') {
+      byLabel.missedAdjustmentMinor += amount;
+    } else if (seg.kind === 'REDUCIBLE') {
+      byLabel.reducibleMinor += amount;
+    } else if (seg.until !== null) {
+      byLabel.lockedUntil[seg.until] = (byLabel.lockedUntil[seg.until] ?? 0n) + amount;
+    }
+  });
+
+  return byLabel;
+}
+
+/**
+ * Resolves `missed(L) = max(0, seats(L, startDate) - lockedTargetOfPriorLine)` for `FIXED` subscriptions;
+ * `MEMBERS` subscriptions always yield `0` (`W3-22`).
+ */
+export function resolveLineMissedSeats(input: {
+  seatCounting: 'FIXED' | 'MEMBERS';
+  seatsAtPeriodStart: number | null;
+  priorLineId: string | null;
+  periodStartDate: BusinessDate | null;
+  priorTargets: ReadonlyArray<{ subscriptionLineId: string; renewalOn: BusinessDate; target: number }>;
+}): number {
+  if (input.seatCounting !== 'FIXED' || input.seatsAtPeriodStart === null) return 0;
+  if (input.priorLineId === null || input.periodStartDate === null) return 0;
+  let best: { renewalOn: BusinessDate; target: number } | null = null;
+  for (const row of input.priorTargets) {
+    if (row.subscriptionLineId !== input.priorLineId || row.renewalOn > input.periodStartDate) continue;
+    if (best === null || row.renewalOn > best.renewalOn) best = row;
+  }
+  if (!best) return 0;
+
+  return Math.max(0, input.seatsAtPeriodStart - best.target);
+}
+
+/** Aggregates per-line idle classifications within one subscription period (`W3-22`). */
+export function aggregateIdleClassifications(items: readonly IdleCostClassification[]): IdleCostClassification {
+  if (items.length === 1) return items[0];
+  let idleCostMinor: bigint | null = 0n;
+  let paidMinor: bigint | null = 0n;
+  let idleAtMinimumCostMinor = 0n;
+  let excessIdleCostMinor = 0n;
+  let excessIdleSeatDays = 0n;
+  let paidSeatDays = 0n;
+  const byLabel: IdleCostByLabel = { missedAdjustmentMinor: 0n, reducibleMinor: 0n, lockedUntil: {} };
+
+  for (const item of items) {
+    idleCostMinor = idleCostMinor === null || item.idleCostMinor === null ? null : idleCostMinor + item.idleCostMinor;
+    paidMinor = paidMinor === null || item.paidMinor === null ? null : paidMinor + item.paidMinor;
+    idleAtMinimumCostMinor += item.idleAtMinimumCostMinor;
+    excessIdleCostMinor += item.excessIdleCostMinor;
+    excessIdleSeatDays += item.excessIdleSeatDays;
+    paidSeatDays += item.paidSeatDays;
+    byLabel.missedAdjustmentMinor += item.byLabel.missedAdjustmentMinor;
+    byLabel.reducibleMinor += item.byLabel.reducibleMinor;
+    for (const [date, minor] of Object.entries(item.byLabel.lockedUntil)) {
+      byLabel.lockedUntil[date] = (byLabel.lockedUntil[date] ?? 0n) + minor;
+    }
+  }
+
+  return {
+    idleCostMinor,
+    paidMinor,
+    byLabel,
+    idleAtMinimumCostMinor,
+    excessIdleCostMinor,
+    excessIdleSeatDays,
+    paidSeatDays,
+    ratioPercent: paidMinor === null ? '0.00' : formatRatioPercent(excessIdleCostMinor, paidMinor),
+    exceedsIdleRatioThreshold: excessIdleSeatDays * 10n > paidSeatDays,
   };
 }

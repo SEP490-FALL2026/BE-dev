@@ -150,6 +150,26 @@ export function kpi3Percent(activeSeats: number, purchasedSeats: number): number
 }
 
 /**
+ * Sums period-end seat counts across live lines (`seats(L, cuối kỳ)` when ledger is open, falling back to
+ * legacy `purchasedQuantity` when the ledger has not opened) as the `KPI-3` denominator (`W3-22`).
+ */
+export function kpi3DenominatorOfLines(
+  lines: ReadonlyArray<{
+    ledgerOpenedOn: string | null;
+    seatsAtPeriodEnd: number | null;
+    fallbackQuantity: number | null;
+  }>,
+): number {
+  let total = 0;
+  for (const line of lines) {
+    const count = line.ledgerOpenedOn !== null ? (line.seatsAtPeriodEnd ?? 0) : (line.fallbackQuantity ?? 0);
+    if (count > 0) total += count;
+  }
+
+  return total;
+}
+
+/**
  * The reference price of a plan (`QĐ-113a`): none is always fine; one is for a plan that is paid for (K1, K2, K4), in dong, and above zero (the
  * amount is read in the service). The kind is judged first. Throws PlanReferencePriceNotApplicableError, PlanReferencePriceNotVndError.
  */

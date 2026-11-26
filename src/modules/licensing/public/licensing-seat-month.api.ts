@@ -1,11 +1,17 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { addDays, monthBoundsOf, type BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { SubscriptionPeriodApi } from '../../catalog/public/subscription-period.api';
 import { AssignmentSeatMonthRepo } from '../assignment/assignment-seat-month.repo';
+import { SubscriptionLineTargetRepo } from '../subscription-renewal/lines/subscription-line-target.repo';
 import { SubscriptionRenewalRepo } from '../subscription-renewal/subscription-renewal.repo';
-import type { SeatInForce, SeatOfMonth, UnrequestedK1SeatInForce } from './licensing-seat-month.types';
+import type {
+  PriorLineLockedTarget,
+  SeatInForce,
+  SeatOfMonth,
+  UnrequestedK1SeatInForce,
+} from './licensing-seat-month.types';
 
 /**
  * The licensing facade for the cost of a month of the seats of the shared pool (`SM-1`, `QĐ-103k`): which seats of a `K2` plan were in force on
@@ -19,7 +25,20 @@ export class LicensingSeatMonthApi {
     private readonly catalog: CatalogApi,
     private readonly renewals: SubscriptionRenewalRepo,
     private readonly periods: SubscriptionPeriodApi,
+    @Optional() private readonly lineTargets?: SubscriptionLineTargetRepo,
   ) {}
+
+  /** Locked target snapshots of prior lines (`subscription_line_targets`, `W3-22`). */
+  async getPriorLineTargets(priorLineIds: readonly string[], tx?: DbTx): Promise<PriorLineLockedTarget[]> {
+    if (!this.lineTargets || priorLineIds.length === 0) return [];
+    const rows = await this.lineTargets.ofLines(priorLineIds, tx);
+
+    return rows.map((row) => ({
+      subscriptionLineId: row.subscriptionLineId,
+      renewalOn: row.renewalOn,
+      target: row.target,
+    }));
+  }
 
   /**
    * The seats of the plans of the shared pool of seats (`K2`) on a subscription that are in force on at least one day of the month of `month`

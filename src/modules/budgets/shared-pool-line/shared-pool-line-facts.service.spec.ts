@@ -53,10 +53,12 @@ describe('SharedPoolLineFactsService', () => {
     const periods = {
       getPurchaseFacts: jest.fn().mockResolvedValue([]),
       adjustmentWindowsOf: jest.fn().mockResolvedValue(new Map()),
+      linesOfSubscriptions: jest.fn().mockResolvedValue(new Map()),
     };
     const licensing = {
       getSeatsOfMonth: jest.fn().mockResolvedValue([]),
       getNextPeriodQuantities: jest.fn().mockResolvedValue(new Map()),
+      getPriorLineTargets: jest.fn().mockResolvedValue([]),
     };
     const organizationReads = {
       getOrganization: jest.fn().mockResolvedValue({ id: 'org-1' }),

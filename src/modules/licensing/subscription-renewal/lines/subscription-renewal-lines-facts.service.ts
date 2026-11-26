@@ -70,6 +70,10 @@ export class SubscriptionRenewalLinesFactsService {
     };
   }
 
+  targetsOfLines(lineIds: readonly string[], tx?: DbTx) {
+    return this.targets.ofLines(lineIds, tx);
+  }
+
   async servingLinesOn(subscriptionId: string, day: BusinessDate, tx?: DbTx): Promise<SubscriptionLineRecord[]> {
     const all = await this.seatLedger.linesOfSubscription(subscriptionId, tx);
 

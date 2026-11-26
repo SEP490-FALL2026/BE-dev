@@ -30,6 +30,7 @@ import {
   derivedPricingModel,
   cleanRevocationNote,
   cleanWorkspaceText,
+  kpi3DenominatorOfLines,
   kpi3Percent,
   seatTrackingOf,
 } from './plan.policy';
@@ -275,6 +276,21 @@ describe('kpi3Percent (AF-08, QĐ-109d): the seats used over the seats bought', 
 
   it('gives none when nothing was bought', () => {
     expect(kpi3Percent(3, 0)).toBeNull();
+  });
+
+  it('W3-22: computes KPI-3 denominator from seats(L, period end) when ledger opened and fallback otherwise', () => {
+    expect(
+      kpi3DenominatorOfLines([
+        { ledgerOpenedOn: '2026-11-01', seatsAtPeriodEnd: 12, fallbackQuantity: 10 },
+        { ledgerOpenedOn: null, seatsAtPeriodEnd: null, fallbackQuantity: 5 },
+      ]),
+    ).toBe(17);
+    expect(
+      kpi3Percent(
+        10,
+        kpi3DenominatorOfLines([{ ledgerOpenedOn: '2026-11-01', seatsAtPeriodEnd: 12, fallbackQuantity: 10 }]),
+      ),
+    ).toBe(83.3);
   });
 });
 
