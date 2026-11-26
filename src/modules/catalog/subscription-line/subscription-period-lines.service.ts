@@ -4,7 +4,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { SeatLedgerService } from './ledger/seat-ledger.service';
 import { SubscriptionLineRepo } from './subscription-line.repo';
-import type { SubscriptionLineRecord } from './subscription-line.types';
+import type { SubscriptionLineClosedReason, SubscriptionLineRecord } from './subscription-line.types';
 
 export interface CreatePeriodLineInput {
   planId: string;
@@ -49,6 +49,77 @@ export class SubscriptionPeriodLinesService {
     const map = await this.lines.ofSubscriptions([subscriptionId], tx);
 
     return (map.get(subscriptionId)?.length ?? 0) > 0;
+  }
+
+  async linesOf(subscriptionId: string, tx?: DbTx): Promise<SubscriptionLineRecord[]> {
+    return (await this.lines.ofSubscriptions([subscriptionId], tx)).get(subscriptionId) ?? [];
+  }
+
+  linesOfMany(subscriptionIds: readonly string[], tx?: DbTx): Promise<Map<string, SubscriptionLineRecord[]>> {
+    return this.lines.ofSubscriptions(subscriptionIds, tx);
+  }
+
+  /** Locks lines of `subscriptionId` in id order and closes still-live ones with `reason` on `closedOn`. */
+  async closeLines(
+    tx: DbTx,
+    subscriptionId: string,
+    closedOn: BusinessDate,
+    reason: SubscriptionLineClosedReason,
+  ): Promise<SubscriptionLineRecord[]> {
+    const existing = await this.linesOf(subscriptionId, tx);
+    if (existing.length === 0) return [];
+    const locked = await this.lines.lockMany(
+      tx,
+      existing.map((line) => line.id),
+    );
+    for (const line of locked) {
+      if (line.closedReason === null) await this.lines.close(tx, line.id, closedOn, reason);
+    }
+
+    return locked;
+  }
+
+  /** Creates continuation lines (`quantity > 0`) for a renewed period and opens their ledger with `RENEWAL` entries. */
+  async createRenewedLines(
+    tx: DbTx,
+    input: {
+      organizationId: string;
+      nextSubscriptionId: string;
+      workspaceId: string | null;
+      startDate: BusinessDate;
+      renewalId: string | null;
+      autoRecorded: boolean;
+      recordedByEmployeeId: string | null;
+      resolved: readonly { oldLine: SubscriptionLineRecord; quantity: number; monthlyUnitPriceMinor: bigint }[];
+    },
+  ): Promise<void> {
+    if (!input.workspaceId || input.resolved.length === 0) return;
+    const kept = input.resolved.filter((entry) => entry.quantity > 0);
+    const created: { lineId: string; quantity: number }[] = [];
+    for (const entry of kept) {
+      const line = await this.lines.insert(tx, {
+        organizationId: input.organizationId,
+        subscriptionId: input.nextSubscriptionId,
+        workspaceId: input.workspaceId,
+        planId: entry.oldLine.planId,
+        monthlyUnitPriceMinor: entry.monthlyUnitPriceMinor,
+        minimumSeats: entry.oldLine.minimumSeats,
+        renewedFromLineId: entry.oldLine.id,
+      });
+      created.push({ lineId: line.id, quantity: entry.quantity });
+    }
+    if (created.length === 0) return;
+
+    await this.seatLedger.openNextPeriod(tx, {
+      lines: created.map((item) => ({
+        lineId: item.lineId,
+        quantity: item.quantity,
+        effectiveOn: input.startDate,
+        renewalId: input.renewalId,
+        autoRecorded: input.autoRecorded,
+        recordedByEmployeeId: input.autoRecorded ? null : input.recordedByEmployeeId,
+      })),
+    });
   }
 
   async createForPeriod(

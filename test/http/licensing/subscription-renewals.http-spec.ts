@@ -72,6 +72,9 @@ const ADJUSTMENT = {
   responsibleItAdminEmployeeId: null,
   callerIsResponsible: false,
   recordedRenewalId: null,
+  lines: [],
+  minimumSeatsTotal: null,
+  shortfall: 0,
 };
 
 /** What a stand-in service throws for each test; the HTTP mapping is what is proven here. */

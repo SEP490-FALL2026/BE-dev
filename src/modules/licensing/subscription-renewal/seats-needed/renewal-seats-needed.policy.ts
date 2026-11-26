@@ -36,6 +36,42 @@ export const seatsNeededOf = (parts: SeatsNeededParts): number =>
 export const targetOf = (seatsNeeded: number, vendorMinimumSeats: number | null): number =>
   seatsNeeded === 0 ? 0 : Math.max(seatsNeeded, vendorMinimumSeats ?? 0);
 
+/** Aggregates per-line seat-needed parts into period-level `SeatsNeededCounts` including workspace `shortfall`. */
+export function aggregateLineCountsToPeriod(
+  lines: readonly (SeatsNeededParts & { minimumSeats: number | null; activeSeatsToday: number })[],
+  input: { vendorMinimumSeats: number | null; minimumSeatsTotal: number | null; openRequests: number },
+): SeatsNeededCounts {
+  let heldPastRenewal = 0;
+  let pendingContinuations = 0;
+  let approvedAwaitingGrant = 0;
+  let activeSeatsToday = 0;
+  let sumLineTargets = 0;
+  for (const line of lines) {
+    heldPastRenewal += line.heldPastRenewal;
+    pendingContinuations += line.pendingContinuations;
+    approvedAwaitingGrant += line.approvedAwaitingGrant;
+    activeSeatsToday += line.activeSeatsToday;
+    const need = seatsNeededOf(line);
+    sumLineTargets += targetOf(need, line.minimumSeats);
+  }
+  const seatsNeeded = heldPastRenewal + pendingContinuations + approvedAwaitingGrant;
+  const shortfall =
+    sumLineTargets > 0 && input.minimumSeatsTotal !== null && input.minimumSeatsTotal > 0
+      ? Math.max(0, input.minimumSeatsTotal - sumLineTargets)
+      : 0;
+
+  return {
+    heldPastRenewal,
+    pendingContinuations,
+    approvedAwaitingGrant,
+    seatsNeeded,
+    vendorMinimumSeats: input.vendorMinimumSeats,
+    target: sumLineTargets + shortfall,
+    activeSeatsToday,
+    openRequests: input.openRequests,
+  };
+}
+
 /**
  * The choice the count points to, for the IT Admin to start from: nothing needed is a cancellation (whether it is allowed is `cancelProblem`),
  * the target the seats bought is a renewal, fewer a reduction, more an increase; null when the seats bought are not known.

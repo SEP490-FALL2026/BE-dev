@@ -11,7 +11,7 @@ import type { NoticeBasis, RenewalChoice, RenewalOutcomeKind, RenewalRecord } fr
 /** Why a result is not recorded: the problem the route answers with and what it says of it. */
 export interface RecordRefusal {
   problem: RenewalProblem;
-  details?: Record<string, string | number | boolean | null>;
+  details?: Record<string, unknown>;
 }
 
 /** Why a subscription has no renewal (`details.reason` of `NOT_RENEWABLE`). */

@@ -22,3 +22,30 @@ export function checkOutcome(input: {
 
   return expected === null || expected === input.nextQuantity ? null : 'OUTCOME_MISMATCH';
 }
+
+/** Checks per-line next-period quantities against proposed `recordedQuantity` values (`422 QUANTITY_INVALID`). */
+export function validateOutcomeLineQuantities(
+  proposedByLine: ReadonlyMap<string, number>,
+  outcomeLines: readonly { subscriptionLineId: string; quantity: number }[],
+): { subscriptionLineId: string; proposed: number | null; quantity: number }[] | null {
+  const seen = new Set<string>();
+  const mismatches: { subscriptionLineId: string; proposed: number | null; quantity: number }[] = [];
+  for (const item of outcomeLines) {
+    if (seen.has(item.subscriptionLineId) || !proposedByLine.has(item.subscriptionLineId)) {
+      mismatches.push({ subscriptionLineId: item.subscriptionLineId, proposed: null, quantity: item.quantity });
+      continue;
+    }
+    seen.add(item.subscriptionLineId);
+    const proposed = proposedByLine.get(item.subscriptionLineId)!;
+    if (item.quantity !== proposed) {
+      mismatches.push({ subscriptionLineId: item.subscriptionLineId, proposed, quantity: item.quantity });
+    }
+  }
+  for (const [lineId, proposed] of proposedByLine) {
+    if (!seen.has(lineId)) {
+      mismatches.push({ subscriptionLineId: lineId, proposed, quantity: 0 });
+    }
+  }
+
+  return mismatches.length > 0 ? mismatches : null;
+}

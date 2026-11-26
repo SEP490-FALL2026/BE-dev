@@ -1,9 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import type { BusinessDate } from '../../../../core/business-date';
 import { TransactionRunner } from '../../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../../audit/public/audit.api';
 import type { PeriodAdjustment, RenewalPeriodFacts } from '../../../catalog/public/subscription-period.types';
 import { noticeRecipients, type EndEventKind } from '../alerts/renewal-adjustment-alerts.policy';
+import { SubscriptionRenewalLinesService } from '../lines/subscription-renewal-lines.service';
 import { RenewalNotifier } from '../subscription-renewal-notifier.service';
 import type { RenewalPeople } from '../subscription-renewal-parties.service';
 import { SubscriptionRenewalRepo } from '../subscription-renewal.repo';
@@ -31,10 +32,23 @@ export class RenewalDeadlineService {
     private readonly notifier: RenewalNotifier,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
+    @Optional() private readonly lines?: SubscriptionRenewalLinesService,
   ) {}
 
-  /** Records the event of the renewal day passed, when the period has none; true when it was recorded now. */
+  /** Locks line targets as `SYSTEM` once `today > adjustment.deadline`; false when not due or already locked. */
+  lockCutoffIfDue(subject: {
+    period: RenewalPeriodFacts;
+    adjustment: PeriodAdjustment;
+    today: BusinessDate;
+  }): Promise<boolean> {
+    if (!this.lines) return Promise.resolve(false);
+
+    return this.lines.lockCutoffIfDue(subject);
+  }
+
+  /** Records the passed renewal day (`autoRenew` -> system renewal + incident, `!autoRenew` -> expiry + close lines `ENDED`). */
   async recordPassedRenewalDay(subject: DeadlineSubject): Promise<boolean> {
+    if (this.lines) return this.lines.handlePassedRenewalDay(subject);
     const { period, adjustment, kind } = subject;
     const renewalDay = adjustment.end;
 

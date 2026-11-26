@@ -65,6 +65,7 @@ import type {
   SeatPurchaseKind,
   SeatPurchaseRecord,
 } from '../subscription-line/purchase/seat-purchase.types';
+import type { SubscriptionLineRecord } from '../subscription-line/subscription-line.types';
 
 export type {
   BuyForItemsOptions,
@@ -86,6 +87,7 @@ export type {
   SeatPurchaseKind,
   SeatPurchaseRecord,
   SeatPurchaseRefItem,
+  SubscriptionLineRecord,
 };
 
 export const SEAT_PURCHASE_ERROR_EXAMPLES = {
@@ -205,6 +207,10 @@ export class SeatLedgerApi {
 
   linesOfSubscription(subscriptionId: string, tx?: DbTx) {
     return this.ledger.linesOfSubscription(subscriptionId, tx);
+  }
+
+  linesOfSubscriptions(subscriptionIds: readonly string[], tx?: DbTx) {
+    return this.ledger.linesOfSubscriptions(subscriptionIds, tx);
   }
 
   lockPeriodAndLine(tx: DbTx, subscriptionId: string, lineId: string) {

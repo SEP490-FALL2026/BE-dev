@@ -48377,7 +48377,7 @@
             }
           },
           "409": {
-            "description": "The subscription has no point of adjustment: a perpetual purchase, internal software, a term that is not a workspace of the shared pool, a draft, a period already continued or a subscription already recorded as cancelled (SUBSCRIPTION_RENEWAL.NOT_RENEWABLE, details.reason PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED or CANCELLED); no date gives its point and its contract data must be completed first (SUBSCRIPTION_RENEWAL.CONTRACT_DATA_INCOMPLETE); the point has not come (SUBSCRIPTION_RENEWAL.BEFORE_ADJUSTMENT_POINT, details.adjustmentPointOn, details.deadline); the quantity is not the seats the next period needs (SUBSCRIPTION_RENEWAL.QUANTITY_NOT_SEATS_NEEDED, details.seatsNeeded, vendorMinimumSeats, target, quantity); a cancellation while seats are needed, in effect or a request of the plan is open (SUBSCRIPTION_RENEWAL.CANCEL_NOT_ALLOWED, details.seatsNeeded, heldPastRenewal, pendingContinuations, approvedAwaitingGrant, activeSeatsToday, openRequests); the period already has its result, or a case of before (a cancellation decided before the rule too) still waits for its outcome (SUBSCRIPTION_RENEWAL.ALREADY_PROPOSED, details.renewalId); more seats are held than the new period buys (SUBSCRIPTION_RENEWAL.EXCESS_NOT_REVOKED); a seat to carry has an open task (SUBSCRIPTION_RENEWAL.SEATS_HAVE_OPEN_TASKS); the new period cannot be recorded as the continuation (SUBSCRIPTION_RENEWAL.PERIOD_REFUSED, details.reason NOT_ON_RENEWAL_DAY with details.renewalOn when nextPeriod.startDate is not the renewal day: renewalOn or the day after it for a plan by the year, the payment day for a plan by the month; or another reason such as ALREADY_RENEWED, PRICE_NOT_VND). Nothing is written.",
+            "description": "The subscription has no point of adjustment, missing contract dates, before adjustment point, quantity mismatch, cancel not allowed, already proposed, excess seats in use, open provisioning tasks, or next period refused.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -48543,7 +48543,7 @@
             }
           },
           "422": {
-            "description": "A field is invalid or one the route does not know (VALIDATION_ERROR), among them a note missing when the vendor refused or did otherwise and a closure not confirmed for a cancellation; the quantity does not fit the choice: a renewal names the seats bought, a reduction fewer, an increase more, a cancellation none (SUBSCRIPTION_RENEWAL.QUANTITY_INVALID); the seats are the vendor minimum above the need and note gives no evidence (SUBSCRIPTION_RENEWAL.VENDOR_MINIMUM_EVIDENCE_REQUIRED, details.seatsNeeded, vendorMinimumSeats); a renewal, a reduction or an increase with no nextPeriod, except a vendor that refused a plan by the month, and a cancellation the vendor refused or did otherwise with no nextPeriod (SUBSCRIPTION_RENEWAL.NEXT_PERIOD_REQUIRED); an outcome as decided whose new period does not have the seats recorded (SUBSCRIPTION_RENEWAL.OUTCOME_MISMATCH); the price of the new period has decimals, which dong does not have (MONEY_SCALE_EXCEEDED, details.allowedDecimals 0), or is below nothing or too large (MONEY_OUT_OF_RANGE), both with details.path nextPeriod.unitPrice.",
+            "description": "Validation or business rules failed on the proposal: invalid line quantities, reduction after deadline, missing lines[] on multi-line periods, missing vendor minimum evidence, missing nextPeriod, or invalid VND price.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -48601,6 +48601,42 @@
                       "error": {
                         "code": "SUBSCRIPTION_RENEWAL.OUTCOME_MISMATCH",
                         "message": "This outcome is not the decision: record what the vendor did as a different outcome.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION_RENEWAL.LINE_QUANTITY_NOT_TARGET": {
+                    "summary": "One or more line quantities do not match the computed renewal target for that line.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION_RENEWAL.LINE_QUANTITY_NOT_TARGET",
+                        "message": "One or more line quantities do not match the computed renewal target for that line.",
+                        "details": { "lines": [{ "subscriptionLineId": "<line-id>", "target": 11, "quantity": 12 }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION_RENEWAL.REDUCTION_AFTER_DEADLINE": {
+                    "summary": "Seat counts cannot be reduced below the deadline seat count after the annual deadline has passed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION_RENEWAL.REDUCTION_AFTER_DEADLINE",
+                        "message": "Seat counts cannot be reduced below the deadline seat count after the annual deadline has passed.",
+                        "details": { "lines": [{ "subscriptionLineId": "<line-id>", "minimum": 12 }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION_RENEWAL.LINES_REQUIRED": {
+                    "summary": "This subscription period has multiple lines: submit per-line quantities in `lines[]`.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION_RENEWAL.LINES_REQUIRED",
+                        "message": "This subscription period has multiple lines: submit per-line quantities in `lines[]`.",
+                        "details": { "lineCount": 2 },
                         "requestId": "req_example"
                       }
                     }
@@ -49104,6 +49140,12 @@
             "schema": { "type": "string", "enum": ["true", "false"] }
           },
           {
+            "name": "subscriptionLineId",
+            "required": false,
+            "in": "query",
+            "schema": { "format": "uuid", "type": "string" }
+          },
+          {
             "name": "page",
             "required": false,
             "in": "query",
@@ -49547,6 +49589,29 @@
                       "error": {
                         "code": "SUBSCRIPTION_RENEWAL.OUTCOME_MISMATCH",
                         "message": "This outcome is not the decision: record what the vendor did as a different outcome.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION_RENEWAL.QUANTITY_INVALID": {
+                    "summary": "The quantity does not fit the choice: a renewal names the seats bought, a reduction fewer, an increase more, and a cancellation none.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION_RENEWAL.QUANTITY_INVALID",
+                        "message": "The quantity does not fit the choice: a renewal names the seats bought, a reduction fewer, an increase more, and a cancellation none.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION_RENEWAL.LINES_REQUIRED": {
+                    "summary": "This subscription period has multiple lines: submit per-line quantities in `lines[]`.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION_RENEWAL.LINES_REQUIRED",
+                        "message": "This subscription period has multiple lines: submit per-line quantities in `lines[]`.",
+                        "details": { "lineCount": 2 },
                         "requestId": "req_example"
                       }
                     }
@@ -128722,6 +128787,7 @@
                     },
                     "lateFlagged": { "type": "boolean" },
                     "waitingReason": { "type": "string", "enum": ["NO_HEAD", null], "nullable": true },
+                    "lineCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                     "proposedAt": { "type": "string", "format": "date-time" }
                   },
                   "required": [
@@ -128736,6 +128802,7 @@
                     "outcome",
                     "lateFlagged",
                     "waitingReason",
+                    "lineCount",
                     "proposedAt"
                   ],
                   "additionalProperties": false
@@ -128821,7 +128888,36 @@
                   "openRequests": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                   "responsibleItAdminEmployeeId": { "type": "string", "format": "uuid", "nullable": true },
                   "callerIsResponsible": { "type": "boolean" },
-                  "recordedRenewalId": { "type": "string", "format": "uuid", "nullable": true }
+                  "recordedRenewalId": { "type": "string", "format": "uuid", "nullable": true },
+                  "lines": {
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "subscriptionLineId": { "type": "string", "format": "uuid" },
+                        "plan": {
+                          "type": "object",
+                          "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                          "required": ["id", "name"],
+                          "additionalProperties": false
+                        },
+                        "seatsToday": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                        "need": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                        "target": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                        "label": { "type": "string", "enum": ["REDUCIBLE", "LOCKED_UNTIL", null], "nullable": true }
+                      },
+                      "required": ["subscriptionLineId", "plan", "seatsToday", "need", "target", "label"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "minimumSeatsTotal": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991,
+                    "nullable": true
+                  },
+                  "shortfall": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
                 },
                 "required": [
                   "subscriptionId",
@@ -128841,7 +128937,10 @@
                   "openRequests",
                   "responsibleItAdminEmployeeId",
                   "callerIsResponsible",
-                  "recordedRenewalId"
+                  "recordedRenewalId",
+                  "lines",
+                  "minimumSeatsTotal",
+                  "shortfall"
                 ],
                 "additionalProperties": false
               }
@@ -128946,6 +129045,7 @@
                   },
                   "lateFlagged": { "type": "boolean" },
                   "waitingReason": { "type": "string", "enum": ["NO_HEAD", null], "nullable": true },
+                  "lineCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                   "proposedAt": { "type": "string", "format": "date-time" },
                   "period": {
                     "type": "object",
@@ -129027,7 +129127,8 @@
                           "OWNER_DEPARTMENT_HEAD",
                           "SPENDING_APPROVER",
                           "CONFLICT_SUBSTITUTE",
-                          "IT_ADMIN_IN_CHARGE"
+                          "IT_ADMIN_IN_CHARGE",
+                          "SYSTEM"
                         ]
                       },
                       "decidedAt": { "type": "string", "format": "date-time" },
@@ -129150,7 +129251,36 @@
                     ],
                     "additionalProperties": false,
                     "nullable": true
-                  }
+                  },
+                  "lines": {
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "subscriptionLineId": { "type": "string", "format": "uuid" },
+                        "plan": {
+                          "type": "object",
+                          "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                          "required": ["id", "name"],
+                          "additionalProperties": false
+                        },
+                        "seatsToday": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                        "need": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                        "target": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                        "label": { "type": "string", "enum": ["REDUCIBLE", "LOCKED_UNTIL", null], "nullable": true }
+                      },
+                      "required": ["subscriptionLineId", "plan", "seatsToday", "need", "target", "label"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "minimumSeatsTotal": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991,
+                    "nullable": true
+                  },
+                  "shortfall": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
                 },
                 "required": [
                   "id",
@@ -129164,13 +129294,17 @@
                   "outcome",
                   "lateFlagged",
                   "waitingReason",
+                  "lineCount",
                   "proposedAt",
                   "period",
                   "usage",
                   "proposal",
                   "decision",
                   "lateFlaggedAt",
-                  "outcomeDetail"
+                  "outcomeDetail",
+                  "lines",
+                  "minimumSeatsTotal",
+                  "shortfall"
                 ],
                 "additionalProperties": false
               }
@@ -129255,9 +129389,38 @@
                 },
                 "required": ["page", "pageSize", "totalItems", "totalPages"],
                 "additionalProperties": false
-              }
+              },
+              "lines": {
+                "maxItems": 20,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "subscriptionLineId": { "type": "string", "format": "uuid" },
+                    "plan": {
+                      "type": "object",
+                      "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                      "required": ["id", "name"],
+                      "additionalProperties": false
+                    },
+                    "seatsToday": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                    "need": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                    "target": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                    "label": { "type": "string", "enum": ["REDUCIBLE", "LOCKED_UNTIL", null], "nullable": true }
+                  },
+                  "required": ["subscriptionLineId", "plan", "seatsToday", "need", "target", "label"],
+                  "additionalProperties": false
+                }
+              },
+              "minimumSeatsTotal": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991,
+                "nullable": true
+              },
+              "shortfall": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
             },
-            "required": ["usage", "seatsInUse", "items", "pagination"],
+            "required": ["usage", "seatsInUse", "items", "pagination", "lines", "minimumSeatsTotal", "shortfall"],
             "additionalProperties": false,
             "nullable": true
           }
@@ -129271,6 +129434,22 @@
           "subscriptionId": { "type": "string", "format": "uuid" },
           "choice": { "type": "string", "enum": ["RENEW", "REDUCE", "CANCEL", "INCREASE"] },
           "proposedQuantity": { "type": "integer", "minimum": 0, "maximum": 1000000000 },
+          "lines": {
+            "minItems": 1,
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "subscriptionLineId": { "type": "string", "format": "uuid" },
+                "quantity": { "type": "integer", "minimum": 0, "maximum": 1000000000 }
+              },
+              "required": ["subscriptionLineId", "quantity"],
+              "additionalProperties": false
+            }
+          },
+          "minimumTotalHolderLineId": { "type": "string", "format": "uuid" },
+          "minimumTotalNote": { "type": "string", "minLength": 1, "maxLength": 2000 },
           "note": { "type": "string", "minLength": 1, "maxLength": 2000 },
           "outcome": { "type": "string", "enum": ["AS_DECIDED", "VENDOR_REFUSED", "DIFFERENT"] },
           "outcomeNote": { "type": "string", "minLength": 1, "maxLength": 2000 },
@@ -129286,6 +129465,29 @@
                 },
                 "required": ["amount", "currency"],
                 "additionalProperties": false
+              },
+              "lines": {
+                "minItems": 1,
+                "maxItems": 20,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "subscriptionLineId": { "type": "string", "format": "uuid" },
+                    "quantity": { "type": "integer", "minimum": 0, "maximum": 1000000000 },
+                    "monthlyUnitPrice": {
+                      "type": "object",
+                      "properties": {
+                        "amount": { "type": "string", "maxLength": 40 },
+                        "currency": { "type": "string", "pattern": "^[A-Z]{3}$" }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["subscriptionLineId", "quantity"],
+                  "additionalProperties": false
+                }
               },
               "billingCycle": { "type": "string", "enum": ["MONTHLY", "QUARTERLY", "ANNUAL", "OTHER"] },
               "startDate": {
@@ -129312,14 +129514,7 @@
               "autoRenew": { "type": "boolean" },
               "allowsMidTermReduction": { "type": "boolean" }
             },
-            "required": [
-              "purchasedQuantity",
-              "unitPrice",
-              "billingCycle",
-              "startDate",
-              "autoRenew",
-              "allowsMidTermReduction"
-            ],
+            "required": ["billingCycle", "startDate", "autoRenew", "allowsMidTermReduction"],
             "additionalProperties": false
           },
           "closure": {
@@ -129329,7 +129524,7 @@
             "additionalProperties": false
           }
         },
-        "required": ["subscriptionId", "choice", "outcome"],
+        "required": ["subscriptionId", "outcome"],
         "additionalProperties": false
       },
       "SubscriptionRenewalOutcomeBodyDto": {
@@ -129350,6 +129545,29 @@
                 "required": ["amount", "currency"],
                 "additionalProperties": false
               },
+              "lines": {
+                "minItems": 1,
+                "maxItems": 20,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "subscriptionLineId": { "type": "string", "format": "uuid" },
+                    "quantity": { "type": "integer", "minimum": 0, "maximum": 1000000000 },
+                    "monthlyUnitPrice": {
+                      "type": "object",
+                      "properties": {
+                        "amount": { "type": "string", "maxLength": 40 },
+                        "currency": { "type": "string", "pattern": "^[A-Z]{3}$" }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["subscriptionLineId", "quantity"],
+                  "additionalProperties": false
+                }
+              },
               "billingCycle": { "type": "string", "enum": ["MONTHLY", "QUARTERLY", "ANNUAL", "OTHER"] },
               "startDate": {
                 "type": "string",
@@ -129375,14 +129593,7 @@
               "autoRenew": { "type": "boolean" },
               "allowsMidTermReduction": { "type": "boolean" }
             },
-            "required": [
-              "purchasedQuantity",
-              "unitPrice",
-              "billingCycle",
-              "startDate",
-              "autoRenew",
-              "allowsMidTermReduction"
-            ],
+            "required": ["billingCycle", "startDate", "autoRenew", "allowsMidTermReduction"],
             "additionalProperties": false
           }
         },

@@ -333,6 +333,10 @@ export class SeatLedgerService {
     return (await this.lines.ofSubscriptions([subscriptionId], tx)).get(subscriptionId) ?? [];
   }
 
+  linesOfSubscriptions(subscriptionIds: readonly string[], tx?: DbTx): Promise<Map<string, SubscriptionLineRecord[]>> {
+    return this.lines.ofSubscriptions(subscriptionIds, tx);
+  }
+
   /** Locks parent subscription period (`FOR UPDATE`, tier 6) then the line (`FOR UPDATE`, tier 6c). */
   async lockPeriodAndLine(tx: DbTx, subscriptionId: string, lineId: string): Promise<SubscriptionLineRecord | null> {
     await this.lines.lockPeriod(tx, subscriptionId, 'UPDATE');

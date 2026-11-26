@@ -77,12 +77,13 @@ export class SharedPoolCapacityRepo {
   async occupancyOfPlanPairs(
     pairs: readonly { subscriptionId: string; planId: string }[],
     today: BusinessDate,
+    tx?: DbTx,
   ): Promise<Map<string, SubscriptionOccupancy>> {
     const result = new Map<string, SubscriptionOccupancy>();
     if (pairs.length === 0) return result;
     const subscriptionIds = [...new Set(pairs.map((pair) => pair.subscriptionId))];
     const planIds = [...new Set(pairs.map((pair) => pair.planId))];
-    const rows = await this.prisma.$queryRaw<
+    const rows = await (tx ?? this.prisma).$queryRaw<
       { subscription_id: string; plan_id: string; occupied: bigint; in_revocation: bigint }[]
     >`
       WITH "open" AS (

@@ -1,4 +1,7 @@
 import type { BusinessDate } from '../../../core/business-date';
+import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+
+export type PeriodAuditActor = AuthenticatedPrincipal | { systemCorrelationId: string };
 
 /** Days before payment/deadline that open adjustment points and the annual red alert. */
 export interface PoolAdjustmentWindows {
@@ -64,15 +67,35 @@ export interface RenewalPeriodFacts {
   renewedById: string | null;
   /** How the seats of the period are counted (`FIXED` vs `MEMBERS`, W3-11). */
   seatCounting?: 'FIXED' | 'MEMBERS';
+  /** Shared workspace id when the subscription sits in a vendor workspace (W3-11). */
+  workspaceId?: string | null;
+  /** Minimum total seats across all lines of the period (W3-21); null when unset. */
+  minimumSeatsTotal?: number | null;
+  /** Notice period days before expiry/renewal when inferred by days. */
+  noticePeriodDays?: number | null;
+  /** Monthly unit price in minor units on single-line/header periods. */
+  monthlyUnitPriceMinor?: bigint | null;
 }
 
-/** The new period the IT Admin records from what the vendor confirmed (`US-11-05` AC-11): a term of the same plan and owner. */
+/** One line of the renewed period (W3-21). */
+export interface NextPeriodLineInput {
+  previousLineId: string;
+  quantity: number;
+  monthlyUnitPrice?: { amount: string; currency: string };
+  monthlyUnitPricePath?: string;
+}
+
+/** The new period the IT Admin or system records from what the vendor confirmed (`US-11-05` AC-11): a term of the same plan and owner. */
 export interface NextPeriodInput {
   previousSubscriptionId: string;
-  purchasedQuantity: number;
-  unitPrice: { amount: string; currency: string };
+  purchasedQuantity?: number;
+  unitPrice?: { amount: string; currency: string };
   /** Where the price sits in the body of the request the caller answers (`nextPeriod.unitPrice`), so a money error points at that field; `unitPrice` when absent. */
   unitPricePath?: string;
+  lines?: readonly NextPeriodLineInput[];
+  renewalId?: string;
+  autoRecorded?: boolean;
+  recordedByEmployeeId?: string | null;
   billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER';
   startDate: BusinessDate;
   endDate?: BusinessDate;

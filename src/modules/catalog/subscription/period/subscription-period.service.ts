@@ -1,9 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { addDays, fromDateColumn, type BusinessDate } from '../../../../core/business-date';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
-import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../../audit/public/audit.api';
-import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { catalogAuditEvent } from '../../catalog-audit-event.mapper';
 import { PlanFactsService } from '../../plan/plan-facts.service';
 import { SubscriptionPeriodRefusedError } from '../../public/subscription-period.errors';
@@ -11,10 +9,13 @@ import type {
   NextPeriodInput,
   PaymentScheduleFacts,
   PeriodAdjustment,
+  PeriodAuditActor,
   PoolAdjustmentWindows,
   RenewalPeriodFacts,
   SubscriptionPurchaseFacts,
 } from '../../public/subscription-period.types';
+import { SubscriptionPeriodLinesService } from '../../subscription-line/subscription-period-lines.service';
+import type { SubscriptionLineRecord } from '../../subscription-line/subscription-line.types';
 import {
   adjustmentCommitmentOf,
   adjustmentPointOf,
@@ -29,8 +30,10 @@ import { monthlyCostOf } from '../price/subscription-price.policy';
 import {
   assertSubscriptionShape,
   declaredStateOf,
+  derivedMonthlyUnitPriceMinor,
   deriveNotice,
   noticeInputOf,
+  resolveSubscriptionPrices,
   subscriptionStatusOf,
 } from '../subscription.policy';
 import { SubscriptionPriceNotVndError } from '../subscription.errors';
@@ -99,6 +102,10 @@ function factsOf(
     renewedFromId: record.renewedFromId,
     renewedById,
     seatCounting: record.seatCounting,
+    workspaceId: record.workspace?.id ?? null,
+    minimumSeatsTotal: record.minimumSeatsTotal,
+    noticePeriodDays: record.noticePeriodDays,
+    monthlyUnitPriceMinor: record.monthlyUnitPriceMinor,
   };
 }
 
@@ -132,11 +139,19 @@ export class SubscriptionPeriodService {
     private readonly periods: SubscriptionPeriodRepo,
     private readonly plans: PlanFactsService,
     private readonly pricing: SubscriptionPricingService,
-    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly pool: SubscriptionPoolService,
     private readonly windows: SubscriptionWindowsService,
+    private readonly periodLines: SubscriptionPeriodLinesService,
   ) {}
+
+  linesOfSubscription(subscriptionId: string, tx?: DbTx): Promise<SubscriptionLineRecord[]> {
+    return this.periodLines.linesOf(subscriptionId, tx);
+  }
+
+  linesOfSubscriptions(subscriptionIds: readonly string[], tx?: DbTx): Promise<Map<string, SubscriptionLineRecord[]>> {
+    return this.periodLines.linesOfMany(subscriptionIds, tx);
+  }
 
   /** The periods with these ids, by id; an id that does not exist is absent. */
   async facts(ids: readonly string[], tx?: DbTx): Promise<RenewalPeriodFacts[]> {
@@ -238,7 +253,94 @@ export class SubscriptionPeriodService {
    * period that is already continued, one that is not a term, a retired application or a start that is not later is refused
    * with nothing written. Throws SubscriptionPeriodRefusedError.
    */
-  async recordNext(tx: DbTx, actor: AuthenticatedPrincipal, input: NextPeriodInput): Promise<RenewalPeriodFacts> {
+  async recordNext(tx: DbTx, actor: PeriodAuditActor, input: NextPeriodInput): Promise<RenewalPeriodFacts> {
+    const previous = await this.requireRenewablePrevious(tx, input);
+    const plan = await this.plans.lockShared(tx, previous.planId);
+    if (!plan || plan.applicationStatus === 'RETIRED') throw new SubscriptionPeriodRefusedError('APPLICATION_RETIRED');
+
+    const oldLines = await this.periodLines.linesOf(previous.id, tx);
+    const state = this.buildNextState(previous, input);
+    this.assertNextPeriod(plan, state, input.billingCycle, previous);
+
+    const linePricing = await this.resolveNextPricing(tx, previous, oldLines, state.purchasedQuantity ?? 0, input);
+    const organization = await this.pricing.getOrganization(tx);
+    if (!organization) throw new Error('A renewal was recorded before installation');
+
+    const status = subscriptionStatusOf(plan, 'TERM', linePricing.statusState(state));
+    const takesPrimary = status === 'ACTIVE' && previous.isPrimaryForPlan;
+    if (takesPrimary) await this.pool.releasePrimary(tx, actor, organization.id, previous.id);
+    if (oldLines.length > 0)
+      await this.periodLines.closeLines(tx, previous.id, addDays(input.startDate, -1), 'RENEWED');
+
+    const created = await this.subscriptions.insert(tx, {
+      organizationId: organization.id,
+      planId: previous.planId,
+      kind: 'TERM',
+      renewedFromId: previous.id,
+      ...state,
+      minimumSeatsTotal: previous.minimumSeatsTotal,
+      ...linePricing.priced,
+      monthlyUnitPriceMinor: linePricing.monthlyUnitPriceMinor,
+      originalPrice: null,
+      isPrimaryForPlan: takesPrimary,
+      status,
+    });
+    await this.recordNextLinesAndAudit(tx, organization.id, created, previous, linePricing.resolved, input, actor);
+
+    return (await this.withSuccessors([created], tx))[0];
+  }
+
+  private buildNextState(previous: SubscriptionRecord, input: NextPeriodInput) {
+    const totalQuantity = input.lines
+      ? input.lines.reduce((sum, item) => sum + item.quantity, 0)
+      : (input.purchasedQuantity ?? 0);
+
+    return {
+      ...declaredStateOf({ ...input, purchasedQuantity: totalQuantity }),
+      commitmentTermMonths: previous.commitmentTermMonths,
+      responsibleItAdminEmployeeId: previous.responsibleItAdminEmployeeId,
+      vendorMinimumSeats: previous.vendorMinimumSeats,
+      workspaceId: previous.workspace?.id ?? null,
+      seatCounting: previous.seatCounting,
+      invoicedLater: previous.invoicedLater,
+    };
+  }
+
+  private async recordNextLinesAndAudit(
+    tx: DbTx,
+    organizationId: string,
+    created: SubscriptionRecord,
+    previous: SubscriptionRecord,
+    resolved: readonly { oldLine: SubscriptionLineRecord; quantity: number; monthlyUnitPriceMinor: bigint }[],
+    input: NextPeriodInput,
+    actor: PeriodAuditActor,
+  ): Promise<void> {
+    const recordedByEmployeeId = input.recordedByEmployeeId ?? ('employeeId' in actor ? actor.employeeId : null);
+    await this.periodLines.createRenewedLines(tx, {
+      organizationId,
+      nextSubscriptionId: created.id,
+      workspaceId: previous.workspace?.id ?? null,
+      startDate: input.startDate,
+      renewalId: input.renewalId ?? null,
+      autoRecorded: input.autoRecorded ?? false,
+      recordedByEmployeeId,
+      resolved,
+    });
+    await this.audit.record(
+      tx,
+      catalogAuditEvent(actor, organizationId, 'SUBSCRIPTION.RENEWED', 'Subscription', created.id, null, {
+        ...snapshotOf(created),
+        renewedFromId: previous.id,
+      }),
+    );
+  }
+
+  /** Closes all live lines of `subscriptionId` with `closedReason = 'ENDED'` on `closedOn` when an unrenewed period expires. */
+  async closeExpiredLines(tx: DbTx, subscriptionId: string, closedOn: BusinessDate): Promise<void> {
+    await this.periodLines.closeLines(tx, subscriptionId, closedOn, 'ENDED');
+  }
+
+  private async requireRenewablePrevious(tx: DbTx, input: NextPeriodInput): Promise<SubscriptionRecord> {
     const previous = await this.subscriptions.find(input.previousSubscriptionId, tx);
     if (!previous) throw new SubscriptionPeriodRefusedError('NOT_FOUND');
     if (previous.kind !== 'TERM') throw new SubscriptionPeriodRefusedError('NOT_TERM');
@@ -248,66 +350,111 @@ export class SubscriptionPeriodService {
     if (previous.startDate !== null && input.startDate <= previous.startDate) {
       throw new SubscriptionPeriodRefusedError('STARTS_TOO_EARLY');
     }
-    const plan = await this.plans.lockShared(tx, previous.planId);
-    if (!plan || plan.applicationStatus === 'RETIRED') throw new SubscriptionPeriodRefusedError('APPLICATION_RETIRED');
 
-    // The new period carries what the rules of the shared pool made the old one hold: the commitment, the IT Admin who answers for
-    // it and the vendor's minimum; the flag that prices the plan moves to it (QĐ-103e).
-    const state = {
-      ...declaredStateOf(input),
-      commitmentTermMonths: previous.commitmentTermMonths,
-      responsibleItAdminEmployeeId: previous.responsibleItAdminEmployeeId,
-      vendorMinimumSeats: previous.vendorMinimumSeats,
-    };
-    this.assertNextPeriod(plan, state, input.billingCycle, previous);
-    // A price is entered in dong only (`QĐ-111an`): the continuation of a period is refused for one in another currency, nothing written.
-    const money = await this.pricing.read(input.unitPrice, input.unitPricePath).catch((error: unknown) => {
+    return previous;
+  }
+
+  private async readVndPrice(unitPrice: { amount: string; currency: string }, path?: string) {
+    return this.pricing.read(unitPrice, path).catch((error: unknown) => {
       if (error instanceof SubscriptionPriceNotVndError) throw new SubscriptionPeriodRefusedError('PRICE_NOT_VND');
       throw error;
     });
-    const priced = await this.pricing.priceToday(tx, money);
-    const organization = await this.organizationReads.getOrganization(tx);
-    if (!organization) throw new Error('A renewal was recorded before installation');
-
-    // The flag that prices the plan moves to the new period only when it is written active; a draft period leaves it on the one it continues
-    // and `subscriptionComplete` hands it over (F-012).
-    const status = subscriptionStatusOf(plan, 'TERM', { ...state, ...priced });
-    const takesPrimary = status === 'ACTIVE' && previous.isPrimaryForPlan;
-    if (takesPrimary) await this.pool.releasePrimary(tx, actor, organization.id, previous.id);
-    const created = await this.subscriptions.insert(tx, {
-      organizationId: organization.id,
-      planId: previous.planId,
-      kind: 'TERM',
-      renewedFromId: previous.id,
-      ...state,
-      ...priced,
-      originalPrice: null,
-      isPrimaryForPlan: takesPrimary,
-      status,
-    });
-    await this.audit.record(
-      tx,
-      catalogAuditEvent(actor, organization.id, 'SUBSCRIPTION.RENEWED', 'Subscription', created.id, null, {
-        ...snapshotOf(created),
-        renewedFromId: previous.id,
-      }),
-    );
-
-    const today = await this.organizationReads.businessToday(new Date(), tx);
-
-    return factsOf(
-      created,
-      null,
-      today,
-      (await this.windows.of([created], today, tx)).get(created.id) as AdjustmentWindows,
-    );
   }
 
-  /**
-   * The shape of the new period, then the commitment it inherits against the cycle the vendor confirmed as a new write would meet it
-   * (R-G01, R-E01); a cycle of the old kind (QUARTERLY, OTHER) is kept as it is declared until the renewal of W5.
-   * Throws SubscriptionPeriodRefusedError.
-   */
+  private async resolveNextPricing(
+    tx: DbTx,
+    previous: SubscriptionRecord,
+    oldLines: readonly SubscriptionLineRecord[],
+    totalQuantity: number,
+    input: NextPeriodInput,
+  ) {
+    if (!input.lines) return this.resolveLegacyPricing(tx, oldLines, totalQuantity, input);
+
+    const resolved = await this.resolveInputLines(oldLines, input);
+    const kept = resolved.filter((entry) => entry.quantity > 0);
+    const single = this.singleLinePrice(kept, oldLines.length, input.billingCycle);
+    const priced = single.unitMoney
+      ? await this.pricing.priceToday(tx, single.unitMoney)
+      : { unitPrice: null, priceSnapshot: null };
+    const minor = kept[0]?.monthlyUnitPriceMinor ?? previous.monthlyUnitPriceMinor ?? 0n;
+    const fallbackUnit = { amountMinor: minor, currency: 'VND' as const, recordedOn: input.startDate };
+    const fallbackSnap = {
+      rate: 1n,
+      rateDate: input.startDate,
+      rateSource: 'SAME_CURRENCY' as const,
+      reportingMinor: minor,
+      reportingCurrency: 'VND' as const,
+      exchangeRateId: null,
+    };
+
+    return {
+      priced,
+      monthlyUnitPriceMinor: single.monthlyUnitPriceMinor,
+      resolved,
+      statusState: <T extends Record<string, unknown>>(s: T) => ({
+        ...s,
+        unitPrice: priced.unitPrice ?? fallbackUnit,
+        priceSnapshot: priced.priceSnapshot ?? fallbackSnap,
+      }),
+    };
+  }
+
+  private async resolveLegacyPricing(
+    tx: DbTx,
+    oldLines: readonly SubscriptionLineRecord[],
+    totalQuantity: number,
+    input: NextPeriodInput,
+  ) {
+    const priced = await this.pricing.priceToday(tx, await this.readVndPrice(input.unitPrice!, input.unitPricePath));
+    const monthlyUnitPriceMinor = derivedMonthlyUnitPriceMinor(priced.unitPrice, input.billingCycle);
+    const resolved =
+      oldLines.length === 1 && totalQuantity > 0
+        ? [
+            {
+              oldLine: oldLines[0],
+              quantity: totalQuantity,
+              monthlyUnitPriceMinor: monthlyUnitPriceMinor ?? oldLines[0].monthlyUnitPriceMinor,
+            },
+          ]
+        : [];
+    return {
+      priced,
+      monthlyUnitPriceMinor,
+      resolved,
+      statusState: <T extends Record<string, unknown>>(s: T) => ({ ...s, ...priced }),
+    };
+  }
+
+  private singleLinePrice(
+    kept: readonly { monthlyUnitPriceMinor: bigint }[],
+    oldLineCount: number,
+    billingCycle: BillingCycle,
+  ) {
+    if (kept.length !== 1 || oldLineCount !== 1) return { unitMoney: null, monthlyUnitPriceMinor: null };
+    return resolveSubscriptionPrices({
+      kind: 'TERM',
+      billingCycle,
+      cycleChanged: false,
+      sentMonthly: { amountMinor: kept[0].monthlyUnitPriceMinor, currency: 'VND' },
+      sentUnit: undefined,
+    });
+  }
+
+  private async resolveInputLines(oldLines: readonly SubscriptionLineRecord[], input: NextPeriodInput) {
+    const oldById = new Map(oldLines.map((line) => [line.id, line]));
+    const resolved: { oldLine: SubscriptionLineRecord; quantity: number; monthlyUnitPriceMinor: bigint }[] = [];
+    for (const item of input.lines ?? []) {
+      const oldLine = oldById.get(item.previousLineId);
+      if (!oldLine) throw new SubscriptionPeriodRefusedError('INVALID_TERMS');
+      const minor = item.monthlyUnitPrice
+        ? (await this.readVndPrice(item.monthlyUnitPrice, item.monthlyUnitPricePath ?? 'monthlyUnitPrice')).amountMinor
+        : oldLine.monthlyUnitPriceMinor;
+      resolved.push({ oldLine, quantity: item.quantity, monthlyUnitPriceMinor: minor });
+    }
+    return resolved;
+  }
+
+  /** Shape and commitment validation for the renewed period (R-G01, R-E01). Throws SubscriptionPeriodRefusedError. */
   private assertNextPeriod(
     plan: { applicationKind: ApplicationKind; provisioningType: ProvisioningType },
     state: ReturnType<typeof declaredStateOf> & { commitmentTermMonths: number | null },
@@ -337,15 +484,13 @@ export class SubscriptionPeriodService {
     }
   }
 
-  private async withSuccessors(records: SubscriptionRecord[], tx?: DbTx): Promise<RenewalPeriodFacts[]> {
+  private async withSuccessors(records: readonly SubscriptionRecord[], tx?: DbTx): Promise<RenewalPeriodFacts[]> {
     const successors = await this.subscriptions.successorsOf(
-      records.map((record) => record.id),
+      records.map((r) => r.id),
       tx,
     );
-
-    const today = await this.organizationReads.businessToday(new Date(), tx);
+    const today = await this.pricing.businessToday(new Date(), tx);
     const windows = await this.windows.of(records, today, tx);
-
     return records.map((record) =>
       factsOf(record, successors.get(record.id) ?? null, today, windows.get(record.id) as AdjustmentWindows),
     );

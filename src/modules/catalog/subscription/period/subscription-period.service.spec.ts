@@ -1,7 +1,6 @@
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { AuditApi } from '../../../audit/public/audit.api';
-import type { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import type { OperatingParametersApi } from '../../../operating-parameters/public/operating-parameters.api';
 import type { PlanFactsService } from '../../plan/plan-facts.service';
 import { SubscriptionPeriodRefusedError } from '../../public/subscription-period.errors';
@@ -11,6 +10,7 @@ import { SubscriptionPeriodService } from './subscription-period.service';
 import type { SubscriptionPricingService } from '../subscription-pricing.service';
 import type { SubscriptionRepo } from '../subscription.repo';
 import { SubscriptionWindowsService } from '../subscription-windows.service';
+import type { SubscriptionPeriodLinesService } from '../../subscription-line/subscription-period-lines.service';
 import type { SubscriptionRecord } from '../subscription.types';
 
 const TODAY = '2026-11-17';
@@ -69,8 +69,13 @@ describe('SubscriptionPeriodService: the periods the renewal reads, the shared p
   };
   const periodRepo = { listAdjustmentSubjectIds: jest.fn() };
   const plans = { lockShared: jest.fn() };
-  const pricing = { read: jest.fn(), priceToday: jest.fn() };
-  const organization = { businessToday: jest.fn(), getOrganization: jest.fn() };
+  const pricing = {
+    read: jest.fn(),
+    priceToday: jest.fn(),
+    businessToday: jest.fn(),
+    getOrganization: jest.fn(),
+  };
+  const organization = { businessToday: pricing.businessToday, getOrganization: pricing.getOrganization };
   const audit = { record: jest.fn() };
   const pool = { releasePrimary: jest.fn() };
   const STANDARD_DAYS: Record<string, number> = {
@@ -79,20 +84,26 @@ describe('SubscriptionPeriodService: the periods the renewal reads, the shared p
     SUBSCRIPTION_RED_ALERT_DAYS_ANNUAL: 7,
   };
   const parameters = { getValuesAt: jest.fn() };
+  const periodLines = {
+    linesOf: jest.fn(),
+    closeLines: jest.fn(),
+    createRenewedLines: jest.fn(),
+  };
   const service = new SubscriptionPeriodService(
     subscriptions as unknown as SubscriptionRepo,
     periodRepo as unknown as SubscriptionPeriodRepo,
     plans as unknown as PlanFactsService,
     pricing as unknown as SubscriptionPricingService,
-    organization as unknown as OrganizationReadApi,
     audit as unknown as AuditApi,
     pool as unknown as SubscriptionPoolService,
     new SubscriptionWindowsService(parameters as unknown as OperatingParametersApi),
+    periodLines as unknown as SubscriptionPeriodLinesService,
   );
 
   beforeEach(() => {
     jest.resetAllMocks();
     subscriptions.successorsOf.mockResolvedValue(new Map());
+    periodLines.linesOf.mockResolvedValue([]);
     organization.businessToday.mockResolvedValue(TODAY);
     parameters.getValuesAt.mockImplementation((key: string, instants: Date[]) =>
       Promise.resolve(instants.map(() => STANDARD_DAYS[key])),
@@ -275,6 +286,96 @@ describe('SubscriptionPeriodService: the periods the renewal reads, the shared p
       subscriptions.successorsOf.mockResolvedValue(new Map([['sub-1', 'sub-2']]));
 
       await expect(service.recordNext(tx, actor, input)).rejects.toThrow(SubscriptionPeriodRefusedError);
+    });
+
+    it('renews multi-line period: closes old lines RENEWED on startDate-1, creates only quantity > 0 lines, opens ledger, and copies workspace/minTotal', async () => {
+      const prev = record({
+        workspace: { id: 'ws-1', name: 'Slack WS' },
+        minimumSeatsTotal: 15,
+        isPrimaryForPlan: false,
+      });
+      subscriptions.find.mockResolvedValue(prev);
+      plans.lockShared.mockResolvedValue({
+        applicationKind: 'SAAS',
+        provisioningType: 'K2',
+        applicationStatus: 'ACTIVE',
+      });
+      organization.getOrganization.mockResolvedValue({ id: 'org-1' });
+      const oldLines = [
+        {
+          id: 'line-std',
+          subscriptionId: 'sub-1',
+          workspaceId: 'ws-1',
+          planId: 'plan-1',
+          monthlyUnitPriceMinor: 50000n,
+          minimumSeats: 5,
+          closedReason: null,
+        },
+        {
+          id: 'line-prm',
+          subscriptionId: 'sub-1',
+          workspaceId: 'ws-1',
+          planId: 'plan-2',
+          monthlyUnitPriceMinor: 100000n,
+          minimumSeats: null,
+          closedReason: null,
+        },
+      ];
+      periodLines.linesOf.mockResolvedValue(oldLines);
+      subscriptions.insert.mockImplementation((_tx: DbTx, created: Partial<SubscriptionRecord>) =>
+        Promise.resolve(record({ ...created, id: 'sub-2', workspace: { id: 'ws-1', name: 'Slack WS' } })),
+      );
+
+      await service.recordNext(
+        tx,
+        { systemCorrelationId: 'auto-sub-1' },
+        {
+          ...input,
+          renewalId: 'ren-1',
+          autoRecorded: true,
+          lines: [
+            { previousLineId: 'line-std', quantity: 15 },
+            { previousLineId: 'line-prm', quantity: 0 },
+          ],
+        },
+      );
+
+      expect(periodLines.closeLines).toHaveBeenCalledWith(tx, 'sub-1', '2026-12-31', 'RENEWED');
+      expect(subscriptions.insert).toHaveBeenCalledWith(
+        tx,
+        expect.objectContaining({
+          purchasedQuantity: 15,
+          workspaceId: 'ws-1',
+          minimumSeatsTotal: 15,
+          seatCounting: 'FIXED',
+          invoicedLater: false,
+        }),
+      );
+      expect(periodLines.createRenewedLines).toHaveBeenCalledWith(
+        tx,
+        expect.objectContaining({
+          nextSubscriptionId: 'sub-2',
+          workspaceId: 'ws-1',
+          startDate: '2027-01-01',
+          renewalId: 'ren-1',
+          autoRecorded: true,
+          recordedByEmployeeId: null,
+          resolved: [
+            { oldLine: oldLines[0], quantity: 15, monthlyUnitPriceMinor: 50000n },
+            { oldLine: oldLines[1], quantity: 0, monthlyUnitPriceMinor: 100000n },
+          ],
+        }),
+      );
+      expect(audit.record).toHaveBeenCalledWith(
+        tx,
+        expect.objectContaining({ actorKind: 'SYSTEM', actorAppUserId: null, correlationId: 'auto-sub-1' }),
+      );
+    });
+
+    it('closeExpiredLines delegates closing live lines as ENDED on endDate', async () => {
+      await service.closeExpiredLines(tx, 'sub-1', '2026-12-31');
+
+      expect(periodLines.closeLines).toHaveBeenCalledWith(tx, 'sub-1', '2026-12-31', 'ENDED');
     });
   });
 });

@@ -6,6 +6,7 @@ import type { HeldSeat, SeatsNeededFacts } from './subscription-renewal.types';
 
 interface RawSeat {
   assignment_id: string;
+  plan_id: string;
   employee_id: string;
   kind: 'PERSONAL' | 'SERVICE';
   valid_from: string;
@@ -35,7 +36,7 @@ export class SubscriptionRenewalSeatRepo {
    */
   async notEndedBy(subscriptionId: string, day: BusinessDate, tx?: DbTx): Promise<HeldSeat[]> {
     const rows = await (tx ?? this.prisma).$queryRaw<RawSeat[]>`
-      SELECT a.id AS assignment_id, a.employee_id, a.kind::text AS kind,
+      SELECT a.id AS assignment_id, a.plan_id::text AS plan_id, a.employee_id, a.kind::text AS kind,
              to_char(a.valid_from, 'YYYY-MM-DD') AS valid_from,
              to_char(a.valid_until, 'YYYY-MM-DD') AS valid_until,
              to_char(a.expected_end_date, 'YYYY-MM-DD') AS expected_end_date,
@@ -53,6 +54,7 @@ export class SubscriptionRenewalSeatRepo {
 
     return rows.map((row) => ({
       assignmentId: row.assignment_id,
+      planId: row.plan_id,
       employeeId: row.employee_id,
       kind: row.kind,
       validFrom: row.valid_from,
@@ -112,5 +114,44 @@ export class SubscriptionRenewalSeatRepo {
       endingAssignmentIds: row.ending_ids,
       activeSeatsToday: row.active_today,
     };
+  }
+
+  /** Same seat-needed facts broken down by `planId` across all lines of `subscriptionId` in one query (`W3-21`). */
+  async seatsNeededFactsByPlan(
+    subscriptionId: string,
+    days: { today: BusinessDate; renewalOn: BusinessDate },
+    tx?: DbTx,
+  ): Promise<Map<string, SeatsNeededFacts>> {
+    const rows = await (tx ?? this.prisma).$queryRaw<
+      { plan_id: string; held_past_renewal: number; ending_ids: string[]; active_today: number }[]
+    >`
+      WITH seats AS (
+        SELECT a.id, a.plan_id::text AS plan_id, a.valid_from, a.valid_until,
+               LEAST(a.valid_until - 1, a.expected_end_date) AS last_day,
+               EXISTS (SELECT 1 FROM provisioning_tasks t JOIN provisioning_task_reasons r ON r.task_id = t.id
+                        WHERE t.assignment_id = a.id AND t.kind = 'REVOKE' AND r.withdrawn_at IS NULL
+                          AND t.status::text = ANY(${LIVE_REVOCATION_STATES}::text[])) AS being_taken_back
+          FROM license_assignments a
+         WHERE a.subscription_id = ${subscriptionId}::uuid AND a.failed_at IS NULL AND a.cancelled_at IS NULL)
+      SELECT plan_id,
+             count(*) FILTER (WHERE NOT being_taken_back AND (last_day IS NULL OR last_day > ${days.renewalOn}::date))::int
+               AS held_past_renewal,
+             COALESCE(array_agg(id::text ORDER BY valid_from, id) FILTER (
+               WHERE NOT being_taken_back AND last_day <= ${days.renewalOn}::date AND valid_from <= ${days.today}::date
+                 AND (valid_until IS NULL OR valid_until > ${days.today}::date)), '{}') AS ending_ids,
+             count(*) FILTER (WHERE valid_until IS NULL OR valid_until > ${days.today}::date)::int AS active_today
+        FROM seats
+       GROUP BY plan_id`;
+
+    return new Map(
+      rows.map((row) => [
+        row.plan_id,
+        {
+          heldPastRenewal: row.held_past_renewal,
+          endingAssignmentIds: row.ending_ids,
+          activeSeatsToday: row.active_today,
+        },
+      ]),
+    );
   }
 }

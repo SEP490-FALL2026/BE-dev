@@ -4,7 +4,7 @@ import type { AuthenticatedPrincipal } from '../../../../infrastructure/security
 import { AuditApi } from '../../../audit/public/audit.api';
 import { IdentityAccessApi } from '../../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
-import { catalogAuditEvent } from '../../catalog-audit-event.mapper';
+import { catalogAuditEvent, type CatalogAuditActor } from '../../catalog-audit-event.mapper';
 import { PlanFactsService, type LockedPlan } from '../../plan/plan-facts.service';
 import { needsVendorAdmins } from '../../plan/plan-vendor-admins.policy';
 import { PoolSeatNotAddableError } from '../../public/catalog.errors';
@@ -353,12 +353,12 @@ export class SubscriptionPoolService {
   }
 
   /** The subscription stops pricing its plan because a later period takes the flag over (a renewal): the flag leaves it with an audit record. */
-  async releasePrimary(tx: DbTx, actor: AuthenticatedPrincipal, organizationId: string, id: string): Promise<void> {
+  async releasePrimary(tx: DbTx, actor: CatalogAuditActor, organizationId: string, id: string): Promise<void> {
     await this.subscriptions.clearPrimary(tx, id);
     await this.auditRelease(tx, actor, organizationId, id);
   }
 
-  private auditRelease(tx: DbTx, actor: AuthenticatedPrincipal, organizationId: string, id: string): Promise<void> {
+  private auditRelease(tx: DbTx, actor: CatalogAuditActor, organizationId: string, id: string): Promise<void> {
     return this.audit.record(
       tx,
       catalogAuditEvent(

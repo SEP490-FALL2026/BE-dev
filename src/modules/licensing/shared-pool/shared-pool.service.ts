@@ -224,6 +224,50 @@ export class SharedPoolService {
     return choosePoolLine(subscriptions, stock)?.subscriptionId ?? null;
   }
 
+  /** Batch `chooseLine` resolution per K2 planId (`W3-21`): which subscription/line receives the next seat grant for that plan. */
+  async chosenLinesOfPlans(
+    planIds: readonly string[],
+    today: BusinessDate,
+    tx?: DbTx,
+  ): Promise<Map<string, { subscriptionId: string; subscriptionLineId: string | null }>> {
+    const result = new Map<string, { subscriptionId: string; subscriptionLineId: string | null }>();
+    const uniquePlans = [...new Set(planIds)];
+    if (uniquePlans.length === 0) return result;
+
+    const grantableOfPlans = await this.catalog.getGrantableSubscriptionsOfPlans(uniquePlans, today, tx);
+    const ending = await this.capacityRepo.endingAmong(
+      [...grantableOfPlans.values()].flat().map((subscription) => subscription.subscriptionId),
+      tx,
+    );
+    const grantable = new Map(
+      [...grantableOfPlans].map(([planId, subscriptions]) => [planId, this.withoutEnding(subscriptions, ending)]),
+    );
+    const pairs = [...grantable.entries()].flatMap(([planId, subs]) =>
+      subs.map((subscription) => ({ subscriptionId: subscription.subscriptionId, planId })),
+    );
+    const pairOccupancy = await this.capacityRepo.occupancyOfPlanPairs(pairs, today, tx);
+    const lineIds = [...grantable.values()]
+      .flat()
+      .map((s) => s.subscriptionLineId)
+      .filter((id): id is string => typeof id === 'string' && id.length > 0);
+    const ledgerSeats = lineIds.length > 0 ? await this.seatLedger.seatsOnDays(lineIds, today, today, tx) : undefined;
+
+    for (const planId of uniquePlans) {
+      const subs = grantable.get(planId) ?? [];
+      if (subs.length === 0) continue;
+      const stock = stockFrom(subs, planOccupancySlice(planId, subs, pairOccupancy), null, ledgerSeats, today);
+      const chosen = choosePoolLine(subs, stock);
+      if (chosen) {
+        result.set(planId, {
+          subscriptionId: chosen.subscriptionId,
+          subscriptionLineId: chosen.subscriptionLineId ?? null,
+        });
+      }
+    }
+
+    return result;
+  }
+
   /**
    * Read-only `chooseLine` context for a K2 plan (`W3-20`): returns `free` seats today and, when `free === 0`, the line
    * `chooseLine` would select along with its monthly unit price, minimum seats, and seat total today.

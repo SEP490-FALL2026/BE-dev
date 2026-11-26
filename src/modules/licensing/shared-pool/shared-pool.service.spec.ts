@@ -110,4 +110,59 @@ describe('SharedPoolService (ledger seats & chooseLine)', () => {
     expect(stock.freeSubscriptionIds).toEqual([]);
     expect(getGrantableSubscriptions).not.toHaveBeenCalled();
   });
+
+  it('chosenLinesOfPlans resolves the chosen line per plan in batch', async () => {
+    const catalog = {
+      getGrantableSubscriptionsOfPlans: jest.fn().mockResolvedValue(
+        new Map([
+          [
+            'plan-1',
+            [
+              {
+                subscriptionId: 'sub-full',
+                subscriptionLineId: 'line-full',
+                lineCreatedAt: new Date('2026-01-01T00:00:00.000Z'),
+                purchasedQuantity: 2,
+                isPrimaryForPlan: false,
+              },
+              {
+                subscriptionId: 'sub-free',
+                subscriptionLineId: 'line-free',
+                lineCreatedAt: new Date('2026-06-01T00:00:00.000Z'),
+                purchasedQuantity: 5,
+                isPrimaryForPlan: false,
+              },
+            ],
+          ],
+        ]),
+      ),
+    };
+    const capacityRepo = {
+      endingAmong: jest.fn().mockResolvedValue(new Set()),
+      occupancyOfPlanPairs: jest.fn().mockResolvedValue(
+        new Map([
+          ['sub-full:plan-1', { occupied: 2, inRevocation: 0 }],
+          ['sub-free:plan-1', { occupied: 1, inRevocation: 0 }],
+        ]),
+      ),
+    };
+    const seatLedger = {
+      seatsOnDays: jest.fn().mockResolvedValue(
+        new Map([
+          ['line-full', new Map([['2026-11-21', 2]])],
+          ['line-free', new Map([['2026-11-21', 5]])],
+        ]),
+      ),
+    };
+    const service = new SharedPoolService(
+      catalog as unknown as CatalogApi,
+      capacityRepo as unknown as SharedPoolCapacityRepo,
+      {} as unknown as SharedPoolAvoidedCostRepo,
+      seatLedger as unknown as SeatLedgerApi,
+    );
+
+    const chosen = await service.chosenLinesOfPlans(['plan-1'], '2026-11-21', tx);
+
+    expect(chosen.get('plan-1')).toEqual({ subscriptionId: 'sub-free', subscriptionLineId: 'line-free' });
+  });
 });

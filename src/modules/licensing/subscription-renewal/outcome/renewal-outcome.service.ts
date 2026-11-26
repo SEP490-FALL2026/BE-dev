@@ -5,29 +5,52 @@ import type { AuthenticatedPrincipal } from '../../../../infrastructure/security
 import { AuditApi } from '../../../audit/public/audit.api';
 import { SubscriptionPeriodApi } from '../../../catalog/public/subscription-period.api';
 import { SubscriptionPeriodRefusedError } from '../../../catalog/public/subscription-period.errors';
-import type { NextPeriodInput, RenewalPeriodFacts } from '../../../catalog/public/subscription-period.types';
+import type {
+  NextPeriodInput,
+  PeriodAuditActor,
+  RenewalPeriodFacts,
+} from '../../../catalog/public/subscription-period.types';
 import type { AuditValue } from '../../../audit/public/audit.types';
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { carriedPast, seatsToCarry } from '../../assignment/assignment.policy';
 import { AssignmentService } from '../../assignment/assignment.service';
 import { licensingAuditEvent } from '../../licensing-audit-event.mapper';
+import { isSystemActor, type SystemActor } from '../../public/licensing.types';
 import { RenewalError } from '../subscription-renewal.errors';
 import { RenewalPartiesService } from '../subscription-renewal-parties.service';
 import { SubscriptionRenewalSeatRepo } from '../subscription-renewal-seat.repo';
 import { SubscriptionRenewalRepo } from '../subscription-renewal.repo';
 import type {
+  HeldSeat,
   OutcomeWrite,
   RenewalDecisionRecord,
   RenewalOutcomeKind,
   RenewalRecord,
 } from '../subscription-renewal.types';
-import { checkOutcome } from './renewal-outcome.policy';
+import { checkOutcome, validateOutcomeLineQuantities } from './renewal-outcome.policy';
+
+const SYSTEM_ACTOR_ID = '00000000-0000-0000-0000-000000000000';
+
+export interface RecordOutcomeLineInput {
+  subscriptionLineId: string;
+  quantity: number;
+  monthlyUnitPrice?: { amount: string; currency: string };
+}
+
+export interface RecordOutcomeNextPeriodInput extends Omit<
+  NextPeriodInput,
+  'previousSubscriptionId' | 'lines' | 'purchasedQuantity' | 'unitPrice'
+> {
+  purchasedQuantity?: number;
+  unitPrice?: { amount: string; currency: string };
+  lines?: readonly RecordOutcomeLineInput[];
+}
 
 export interface RecordOutcomeInput {
   outcome: RenewalOutcomeKind;
   note?: string;
   /** The new period the vendor confirmed, when there is one. */
-  nextPeriod?: Omit<NextPeriodInput, 'previousSubscriptionId'>;
+  nextPeriod?: RecordOutcomeNextPeriodInput;
 }
 
 /** The case an outcome is recorded against: the case itself, its decision and its period locked. */
@@ -57,7 +80,7 @@ export interface RecordedOutcome {
 
 /** What the outcome writes: who and when, the follow-up left open unless as decided, and the new period (savings deferred to first invoice confirm). */
 function outcomeWriteOf(
-  actor: AuthenticatedPrincipal,
+  actor: AuthenticatedPrincipal | SystemActor,
   input: RecordOutcomeInput,
   now: Date,
   next: RenewalPeriodFacts | null,
@@ -65,13 +88,20 @@ function outcomeWriteOf(
   return {
     kind: input.outcome,
     note: input.note?.trim() || null,
-    recordedByEmployeeId: actor.employeeId,
-    recordedByAppUserId: actor.appUserId,
+    recordedByEmployeeId: isSystemActor(actor) ? SYSTEM_ACTOR_ID : actor.employeeId,
+    recordedByAppUserId: isSystemActor(actor) ? SYSTEM_ACTOR_ID : actor.appUserId,
     recordedAt: now,
     vendorFollowUpOpen: input.outcome !== 'AS_DECIDED',
     nextSubscriptionId: next?.subscriptionId ?? null,
     realisedSavings: null,
   };
+}
+
+function nextTotalQuantityOf(nextPeriod: RecordOutcomeNextPeriodInput | undefined): number | null {
+  if (!nextPeriod) return null;
+  if (nextPeriod.lines) return nextPeriod.lines.reduce((sum, item) => sum + item.quantity, 0);
+
+  return nextPeriod.purchasedQuantity ?? null;
 }
 
 /**
@@ -119,7 +149,7 @@ export class RenewalOutcomeService {
    */
   async recordIn(
     tx: DbTx,
-    actor: AuthenticatedPrincipal,
+    actor: AuthenticatedPrincipal | SystemActor,
     found: OutcomeCase,
     input: RecordOutcomeInput,
     when: { today: BusinessDate; now: Date },
@@ -143,7 +173,7 @@ export class RenewalOutcomeService {
   /** The audit event of the outcome: what was recorded against what was decided, the seats carried and whether it came late. */
   private async trail(
     tx: DbTx,
-    actor: AuthenticatedPrincipal,
+    actor: AuthenticatedPrincipal | SystemActor,
     before: RenewalRecord,
     recorded: RenewalRecord,
     carriedSeats: number,
@@ -178,7 +208,7 @@ export class RenewalOutcomeService {
   /** The outcome fits the decision, and a cancellation as decided finds no seat still held (`MF-4`). */
   private async assertFits(
     tx: DbTx,
-    { decision, period }: OutcomeCase,
+    { record, decision, period }: OutcomeCase,
     input: RecordOutcomeInput,
     today: BusinessDate,
   ): Promise<void> {
@@ -187,12 +217,33 @@ export class RenewalOutcomeService {
       decidedChoice: decision.choice,
       decidedQuantity: decision.quantity,
       purchasedQuantity: period.purchasedQuantity,
-      nextQuantity: input.nextPeriod?.purchasedQuantity ?? null,
+      nextQuantity: nextTotalQuantityOf(input.nextPeriod),
     });
     if (problem) throw new RenewalError(problem);
+    if (input.nextPeriod) {
+      await this.assertLineQuantitiesFit(tx, record.id, input.nextPeriod);
+    }
     if (decision.choice === 'CANCEL' && input.outcome === 'AS_DECIDED') {
       await this.assertAllTakenBack(tx, period, today);
     }
+  }
+
+  private async assertLineQuantitiesFit(
+    tx: DbTx,
+    renewalId: string,
+    nextPeriod: RecordOutcomeNextPeriodInput,
+  ): Promise<void> {
+    const targets = (await this.repo.lineTargetsOfRenewal?.(renewalId, tx)) ?? [];
+    const proposed = targets.filter((t) => t.recordedQuantity !== null);
+    if (proposed.length === 0) return;
+    if (!nextPeriod.lines) {
+      if (proposed.length > 1) throw new RenewalError('LINES_REQUIRED', { lineCount: proposed.length });
+
+      return;
+    }
+    const proposedByLine = new Map(proposed.map((t) => [t.subscriptionLineId, t.recordedQuantity!]));
+    const mismatches = validateOutcomeLineQuantities(proposedByLine, nextPeriod.lines);
+    if (mismatches) throw new RenewalError('QUANTITY_INVALID', { lines: mismatches });
   }
 
   /**
@@ -216,15 +267,55 @@ export class RenewalOutcomeService {
     if (held.length > 0) throw new RenewalError('EXCESS_NOT_REVOKED', { seatsInUse: held.length, quantity: 0 });
   }
 
+  private async assertCarryCapacity(
+    tx: DbTx,
+    periodId: string,
+    carry: readonly HeldSeat[],
+    nextPeriod: RecordOutcomeNextPeriodInput,
+  ): Promise<void> {
+    if (nextPeriod.lines) {
+      await this.assertPerLineCarryCapacity(tx, periodId, carry, nextPeriod.lines);
+    }
+    const totalNextQty = nextTotalQuantityOf(nextPeriod) ?? 0;
+    if (carry.length > totalNextQty) {
+      throw new RenewalError('EXCESS_NOT_REVOKED', { seatsInUse: carry.length, quantity: totalNextQty });
+    }
+  }
+
+  private async assertPerLineCarryCapacity(
+    tx: DbTx,
+    periodId: string,
+    carry: readonly HeldSeat[],
+    lines: NonNullable<RecordOutcomeNextPeriodInput['lines']>,
+  ): Promise<void> {
+    const periodLines = await this.periods.linesOfSubscription(periodId, tx);
+    const lineToPlan = new Map(periodLines.map((line) => [line.id, line.planId]));
+    const qtyByPlan = new Map<string, number>();
+    for (const item of lines) {
+      const planId = lineToPlan.get(item.subscriptionLineId);
+      if (planId) qtyByPlan.set(planId, item.quantity);
+    }
+    const inUseByPlan = new Map<string, number>();
+    for (const seat of carry) {
+      if (seat.planId) inUseByPlan.set(seat.planId, (inUseByPlan.get(seat.planId) ?? 0) + 1);
+    }
+    for (const [planId, seatsInUse] of inUseByPlan) {
+      const allowed = qtyByPlan.get(planId) ?? 0;
+      if (seatsInUse > allowed) {
+        throw new RenewalError('EXCESS_NOT_REVOKED', { seatsInUse, quantity: allowed, planId });
+      }
+    }
+  }
+
   /**
    * Records the new period and carries to it the seats held on its first day; refused while there are more than it buys. With `endingBy`, the
    * seats whose last day is that day or before stay on the old period (`QĐ-106i`(2)).
    */
   private async continueInto(
     tx: DbTx,
-    actor: AuthenticatedPrincipal,
+    actor: AuthenticatedPrincipal | SystemActor,
     period: RenewalPeriodFacts,
-    nextPeriod: Omit<NextPeriodInput, 'previousSubscriptionId'>,
+    nextPeriod: RecordOutcomeNextPeriodInput,
     endingBy?: BusinessDate,
   ): Promise<{ period: RenewalPeriodFacts; carried: number }> {
     const held = seatsToCarry(
@@ -232,19 +323,25 @@ export class RenewalOutcomeService {
       nextPeriod.startDate,
     );
     const carry = endingBy === undefined ? held : carriedPast(held, endingBy);
-    if (carry.length > nextPeriod.purchasedQuantity) {
-      throw new RenewalError('EXCESS_NOT_REVOKED', {
-        seatsInUse: carry.length,
-        quantity: nextPeriod.purchasedQuantity,
-      });
-    }
+    await this.assertCarryCapacity(tx, period.subscriptionId, carry, nextPeriod);
     const busy = carry.filter((seat) => seat.hasOpenTask).length;
     if (busy > 0) throw new RenewalError('SEATS_HAVE_OPEN_TASKS', { seats: busy });
 
+    const { lines: outcomeLines, ...restNextPeriod } = nextPeriod;
+    const mappedLines = outcomeLines?.map((item, idx) => ({
+      previousLineId: item.subscriptionLineId,
+      quantity: item.quantity,
+      ...(item.monthlyUnitPrice
+        ? { monthlyUnitPrice: item.monthlyUnitPrice, monthlyUnitPricePath: `nextPeriod.lines.${idx}.monthlyUnitPrice` }
+        : {}),
+    }));
+    const periodActor: PeriodAuditActor = isSystemActor(actor) ? { systemCorrelationId: actor.correlationId } : actor;
+
     let next: RenewalPeriodFacts;
     try {
-      next = await this.periods.recordNextPeriod(tx, actor, {
-        ...nextPeriod,
+      next = await this.periods.recordNextPeriod(tx, periodActor, {
+        ...restNextPeriod,
+        ...(mappedLines ? { lines: mappedLines } : {}),
         previousSubscriptionId: period.subscriptionId,
         // `nextPeriod` of both routes that record a result: a money error points at the field of their body.
         unitPricePath: 'nextPeriod.unitPrice',
@@ -259,7 +356,7 @@ export class RenewalOutcomeService {
       assignmentIds: carry.map((seat) => seat.assignmentId),
       nextSubscriptionId: next.subscriptionId,
       startDate: nextPeriod.startDate,
-      actorAppUserId: actor.appUserId,
+      actorAppUserId: isSystemActor(actor) ? SYSTEM_ACTOR_ID : actor.appUserId,
     });
 
     return { period: next, carried };

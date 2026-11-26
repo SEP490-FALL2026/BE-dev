@@ -94,4 +94,20 @@ describe('the renewal day passed with no outcome (SBF-20 §4.5, §13)', () => {
     expect(tell).not.toHaveBeenCalled();
     expect(record).not.toHaveBeenCalled();
   });
+
+  it('delegates lockCutoffIfDue and recordPassedRenewalDay to SubscriptionRenewalLinesService when bound', async () => {
+    const lockCutoffIfDue = jest.fn().mockResolvedValue(true);
+    const handlePassedRenewalDay = jest.fn().mockResolvedValue(true);
+    const service = new RenewalDeadlineService(
+      {} as unknown as SubscriptionRenewalRepo,
+      {} as unknown as RenewalNotifier,
+      {} as unknown as AuditApi,
+      {} as unknown as TransactionRunner,
+      { lockCutoffIfDue, handlePassedRenewalDay } as never,
+    );
+
+    expect(await service.lockCutoffIfDue({ period, adjustment, today: '2026-12-02' })).toBe(true);
+    expect(await service.recordPassedRenewalDay(subject('AUTO_RENEWAL_INCIDENT', true))).toBe(true);
+    expect(handlePassedRenewalDay).toHaveBeenCalled();
+  });
 });

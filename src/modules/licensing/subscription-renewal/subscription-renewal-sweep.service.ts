@@ -131,21 +131,41 @@ export class SubscriptionRenewalSweepService {
     // Finance, the spending approver and the Super Admin are read once, and only when a period has something to tell.
     world.shared ??= await this.parties.sharedPeople();
     const people = await this.parties.peopleOf(period, world.shared);
-    for (const problem of problems) {
-      done.told += await this.alerts.dataQualityWarning({
-        organizationId: world.organizationId,
-        period,
-        itAdmin: people.itAdmin,
-        problem,
-      });
-    }
+    done.told += await this.sendDataQualityWarnings(problems, world, period, people.itAdmin);
     if (adjustment === null || candidates.length === 0) return done;
 
+    return this.sweepNotices(period, adjustment, world, people, { hasCase, eventRecorded, toldSoFar: done.told });
+  }
+
+  private async sendDataQualityWarnings(
+    problems: ReturnType<typeof dataQualityProblemsOf>,
+    world: PassWorld,
+    period: RenewalPeriodFacts,
+    itAdmin: Awaited<ReturnType<RenewalPartiesService['peopleOf']>>['itAdmin'],
+  ): Promise<number> {
+    let told = 0;
+    for (const problem of problems) {
+      told += await this.alerts.dataQualityWarning({ organizationId: world.organizationId, period, itAdmin, problem });
+    }
+    return told;
+  }
+
+  private async sweepNotices(
+    period: RenewalPeriodFacts,
+    adjustment: NonNullable<RenewalPeriodFacts['adjustment']>,
+    world: PassWorld,
+    people: Awaited<ReturnType<RenewalPartiesService['peopleOf']>>,
+    state: { hasCase: boolean; eventRecorded: boolean; toldSoFar: number },
+  ): Promise<SweepResult> {
     // The seats are counted only now, for a period with something due (R2-12).
+    if (!state.hasCase && !state.eventRecorded && world.today > adjustment.deadline) {
+      await this.lockPastDeadline(period, adjustment, world.today);
+    }
     const counts = await this.seatsNeeded.countFor({
       subscriptionId: period.subscriptionId,
       planId: period.planId,
       vendorMinimumSeats: period.vendorMinimumSeats,
+      ...(period.minimumSeatsTotal !== undefined ? { minimumSeatsTotal: period.minimumSeatsTotal } : {}),
       isPrimaryForPlan: period.isPrimaryForPlan,
       renewalOn: adjustment.end,
       today: world.today,
@@ -153,18 +173,25 @@ export class SubscriptionRenewalSweepService {
     const due = dueNotices(
       adjustment,
       world.today,
-      hasCase,
+      state.hasCase,
       counts.activeSeatsToday > 0,
       period.purchasedQuantity,
       counts.target,
       period.autoRenew,
-      eventRecorded,
+      state.eventRecorded,
     );
     const written = await this.write(due, { world, period, adjustment, people, seatsNeeded: counts.seatsNeeded });
-    done.told += written.told;
-    done.deadlineEvents += written.deadlineEvents;
+    return { told: state.toldSoFar + written.told, deadlineEvents: written.deadlineEvents, failed: 0 };
+  }
 
-    return done;
+  private lockPastDeadline(
+    period: RenewalPeriodFacts,
+    adjustment: PeriodAdjustment,
+    today: BusinessDate,
+  ): Promise<boolean> {
+    return this.deadlines.lockCutoffIfDue
+      ? this.deadlines.lockCutoffIfDue({ period, adjustment, today })
+      : Promise.resolve(false);
   }
 
   /** Writes the notices due: the alerts, and the event of the renewal day passed. */

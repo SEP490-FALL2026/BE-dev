@@ -45,6 +45,25 @@ export function computeRealisedSaving(
   return { amountMinor: diff > 0n ? diff : 0n, currency };
 }
 
+/** Computes realised savings across old->new line pairs (`W3-21`: `q_old = seats(L, closedOn)`, `q_new = seats(L', startDate)`). */
+export function computePerLineRealisedSaving(
+  term: 1 | 12 | null,
+  pairs: readonly { priorQty: number; priorMonthlyMinor: bigint; nextQty: number; nextMonthlyMinor: bigint }[],
+  currency = 'VND',
+): { amountMinor: bigint; currency: string } | null {
+  if (term === null || pairs.length === 0) return null;
+  const t = BigInt(term);
+  let baseline = 0n;
+  let compared = 0n;
+  for (const pair of pairs) {
+    baseline += BigInt(pair.priorQty) * pair.priorMonthlyMinor * t;
+    compared += BigInt(pair.nextQty) * pair.nextMonthlyMinor * t;
+  }
+  const diff = baseline - compared;
+
+  return { amountMinor: diff > 0n ? diff : 0n, currency };
+}
+
 /**
  * Whether `invoiceServiceMonth` (`YYYY-MM-01`) falls in the start month of `newPeriodStartDate` (`W3-09`).
  */

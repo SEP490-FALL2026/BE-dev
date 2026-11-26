@@ -1,11 +1,17 @@
-import { Injectable } from '@nestjs/common';
-import type { BusinessDate } from '../../../../core/business-date';
+import { Injectable, Optional } from '@nestjs/common';
+import { addDays, type BusinessDate } from '../../../../core/business-date';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import { CatalogApi } from '../../../catalog/public/catalog.api';
+import { SeatLedgerApi } from '../../../catalog/public/seat-ledger.api';
 import { SubscriptionPeriodApi } from '../../../catalog/public/subscription-period.api';
 import type { SubscriptionPrice } from '../../../catalog/public/catalog.types';
+import type { SubscriptionPurchaseFacts } from '../../../catalog/public/subscription-period.types';
 import { SubscriptionRenewalRepo } from '../subscription-renewal.repo';
-import { computeRealisedSaving, isFirstInvoiceMonthOfPeriod } from './renewal-savings.policy';
+import {
+  computePerLineRealisedSaving,
+  computeRealisedSaving,
+  isFirstInvoiceMonthOfPeriod,
+} from './renewal-savings.policy';
 import { RenewalSavingsRepo, type RenewalSavingsCandidate } from './renewal-savings.repo';
 
 export interface RecordRealisedSavingInput {
@@ -39,6 +45,7 @@ export class RenewalSavingsService {
     private readonly renewals: SubscriptionRenewalRepo,
     private readonly periods: SubscriptionPeriodApi,
     private readonly catalog: CatalogApi,
+    @Optional() private readonly seatLedger?: SeatLedgerApi,
   ) {}
 
   endingAmong(subscriptionIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
@@ -72,6 +79,11 @@ export class RenewalSavingsService {
       return null;
     }
 
+    if (this.seatLedger && next.startDate !== null) {
+      const perLine = await this.computePerLineSaving(tx, prior, next);
+      if (perLine) return perLine;
+    }
+
     const priorPrice = await this.catalog.getSubscriptionPrice(priorSubscriptionId, tx);
     const nextPrice = await this.catalog.getSubscriptionPrice(input.newPeriodId, tx);
 
@@ -89,5 +101,49 @@ export class RenewalSavingsService {
         currency: priceCurrencyOf(nextPrice),
       },
     );
+  }
+
+  private async computePerLineSaving(tx: DbTx, prior: SubscriptionPurchaseFacts, next: SubscriptionPurchaseFacts) {
+    const linesMap = await this.seatLedger!.linesOfSubscriptions([prior.subscriptionId, next.subscriptionId], tx);
+    const priorLines = (linesMap.get(prior.subscriptionId) ?? []).filter((l) => l.closedReason !== 'REMOVED');
+    const nextLines = linesMap.get(next.subscriptionId) ?? [];
+    if (priorLines.length === 0 || nextLines.length === 0 || next.startDate === null) return null;
+
+    const defaultClosedOn = addDays(next.startDate, -1);
+    const closedDates = priorLines.map((l) => l.closedOn ?? defaultClosedOn);
+    const minPriorDay = closedDates.reduce((a, b) => (a <= b ? a : b));
+    const maxPriorDay = closedDates.reduce((a, b) => (a >= b ? a : b));
+    const priorSeatsMap = await this.seatLedger!.seatsOnDays(
+      priorLines.map((l) => l.id),
+      minPriorDay,
+      maxPriorDay,
+      tx,
+    );
+    const nextSeatsMap = await this.seatLedger!.seatsOnDays(
+      nextLines.map((l) => l.id),
+      next.startDate,
+      next.startDate,
+      tx,
+    );
+    const nextByOldId = new Map(
+      nextLines.filter((l) => l.renewedFromLineId !== null).map((l) => [l.renewedFromLineId!, l]),
+    );
+    const pairs = priorLines.map((oldLine) => {
+      const newLine =
+        nextByOldId.get(oldLine.id) ??
+        nextLines.find((l) => l.planId === oldLine.planId && l.renewedFromLineId === null);
+      const closedDay = oldLine.closedOn ?? defaultClosedOn;
+      const priorQty = priorSeatsMap.get(oldLine.id)?.get(closedDay) ?? prior.purchasedQuantity ?? 0;
+      const nextQty = newLine ? (nextSeatsMap.get(newLine.id)?.get(next.startDate!) ?? next.purchasedQuantity ?? 0) : 0;
+
+      return {
+        priorQty,
+        priorMonthlyMinor: oldLine.monthlyUnitPriceMinor,
+        nextQty,
+        nextMonthlyMinor: newLine ? newLine.monthlyUnitPriceMinor : 0n,
+      };
+    });
+
+    return computePerLineRealisedSaving(prior.commitmentTermMonths, pairs);
   }
 }

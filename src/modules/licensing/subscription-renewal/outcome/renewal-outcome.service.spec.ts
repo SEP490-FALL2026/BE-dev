@@ -181,4 +181,58 @@ describe('RenewalOutcomeService', () => {
       }),
     );
   });
+
+  it('W3-21: rejects outcome nextPeriod.lines (11, 3) after proposal (11, 2) with 422 QUANTITY_INVALID details.lines', async () => {
+    const lineTargetsOfRenewal = jest.fn().mockResolvedValue([
+      { subscriptionLineId: 'line-std', recordedQuantity: 11, target: 11, seatsNeeded: 11 },
+      { subscriptionLineId: 'line-prm', recordedQuantity: 2, target: 2, seatsNeeded: 2 },
+    ]);
+    const service = new RenewalOutcomeService(
+      { lineTargetsOfRenewal } as unknown as SubscriptionRenewalRepo,
+      {} as unknown as SubscriptionRenewalSeatRepo,
+      {} as unknown as AssignmentService,
+      {} as unknown as SubscriptionPeriodApi,
+      {} as unknown as RenewalPartiesService,
+      {} as unknown as OrganizationReadApi,
+      {} as unknown as AuditApi,
+      {} as unknown as TransactionRunner,
+    );
+
+    const err = await service
+      .recordIn(
+        {} as never,
+        actor,
+        {
+          record: {
+            id: 'ren-1',
+            subscriptionId: 'sub-1',
+            state: 'DECIDED',
+            decision: { choice: 'REDUCE', quantity: 13 },
+          } as never,
+          decision: { choice: 'REDUCE', quantity: 13 } as never,
+          period: { subscriptionId: 'sub-1', purchasedQuantity: 14 } as never,
+        },
+        {
+          outcome: 'DIFFERENT',
+          nextPeriod: {
+            billingCycle: 'ANNUAL',
+            startDate: '2027-07-01',
+            autoRenew: true,
+            allowsMidTermReduction: false,
+            lines: [
+              { subscriptionLineId: 'line-std', quantity: 11 },
+              { subscriptionLineId: 'line-prm', quantity: 3 },
+            ],
+          },
+        },
+        { today: '2027-05-02', now: new Date('2027-05-02T00:00:00Z') },
+      )
+      .catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(RenewalError);
+    expect((err as RenewalError).problem).toBe('QUANTITY_INVALID');
+    expect((err as RenewalError).details).toEqual({
+      lines: [{ subscriptionLineId: 'line-prm', proposed: 2, quantity: 3 }],
+    });
+  });
 });

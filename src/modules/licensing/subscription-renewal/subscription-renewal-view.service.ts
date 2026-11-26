@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
+import type { BusinessDate } from '../../../core/business-date';
 import { pageOf, type Page } from '../../../core/application/pagination';
 import { formatAmount } from '../../../core/money/money';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
@@ -6,11 +7,13 @@ import { SubscriptionPeriodApi } from '../../catalog/public/subscription-period.
 import type { RenewalPeriodFacts } from '../../catalog/public/subscription-period.types';
 import { FinanceApi } from '../../finance/public/finance.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { SubscriptionRenewalLinesService } from './lines/subscription-renewal-lines.service';
 import type {
   DeadlineEventWire,
   RankedSeatWire,
   RenewalAdjustmentWire,
   RenewalDetailWire,
+  RenewalLineWire,
   RenewalSummaryWire,
 } from './subscription-renewal.dto';
 import { RenewalError } from './subscription-renewal.errors';
@@ -46,6 +49,7 @@ export class RenewalViewService {
     private readonly seatsNeeded: RenewalSeatsNeededService,
     private readonly organizationReads: OrganizationReadApi,
     private readonly finance: FinanceApi,
+    @Optional() private readonly lines?: SubscriptionRenewalLinesService,
   ) {}
 
   /** Throws RenewalError (`READ_FORBIDDEN`). */
@@ -68,12 +72,16 @@ export class RenewalViewService {
     );
     const periods = await this.periodsOf(items.map((item) => item.subscriptionId));
     const admins = await this.itAdminsOf([...periods.values()]);
+    const linesMap = this.periods.linesOfSubscriptions
+      ? await this.periods.linesOfSubscriptions(items.map((item) => item.subscriptionId))
+      : new Map<string, { closedReason: string | null }[]>();
 
     return pageOf(
       items.flatMap((item) => {
         const period = periods.get(item.subscriptionId);
+        const rawLines = (linesMap.get(item.subscriptionId) ?? []).filter((line) => line.closedReason !== 'REMOVED');
 
-        return period ? [toRenewalSummary(item, period, admins)] : [];
+        return period ? [toRenewalSummary(item, period, admins, rawLines.length > 0 ? rawLines.length : 1)] : [];
       }),
       total,
       query.page,
@@ -109,20 +117,29 @@ export class RenewalViewService {
     if ('refusal' in found) throw new RenewalError(found.refusal.problem, found.refusal.details);
     if (decidedCancel) throw new RenewalError('ALREADY_PROPOSED', { renewalId: decidedCancel.id });
     const { adjustment } = found;
+    const today = await this.organizationReads.businessToday();
     const counts = await this.seatsNeeded.countFor({
       subscriptionId,
       planId: period.planId,
       vendorMinimumSeats: period.vendorMinimumSeats,
+      minimumSeatsTotal: period.minimumSeatsTotal ?? null,
       isPrimaryForPlan: period.isPrimaryForPlan,
       renewalOn: adjustment.end,
-      today: await this.organizationReads.businessToday(),
+      today,
     });
+    const lineInfo = await this.lineInfoOf(period, today);
 
-    return toAdjustmentWire(period, adjustment, counts, {
-      responsibleItAdminEmployeeId: await this.parties.usableResponsibleItAdminOf(period),
-      callerEmployeeId: actor.employeeId,
-      recordedRenewalId: existingCaseOf(cases, adjustment.deadline)?.id ?? null,
-    });
+    return toAdjustmentWire(
+      period,
+      adjustment,
+      counts,
+      {
+        responsibleItAdminEmployeeId: await this.parties.usableResponsibleItAdminOf(period),
+        callerEmployeeId: actor.employeeId,
+        recordedRenewalId: existingCaseOf(cases, adjustment.deadline)?.id ?? null,
+      },
+      lineInfo,
+    );
   }
 
   /** The page of a case just written, read as its route answers it to the caller; the IT Admin does not read the money snapshot. */
@@ -130,7 +147,10 @@ export class RenewalViewService {
     const period = (await this.periodsOf([record.subscriptionId])).get(record.subscriptionId);
     if (!period) throw new RenewalError('NOT_FOUND');
     const today = await this.organizationReads.businessToday();
-    const seats = await this.ranking.seatsOf(record.subscriptionId, today);
+    const [seats, lineInfo] = await Promise.all([
+      this.ranking.seatsOf(record.subscriptionId, today),
+      this.lineInfoOf(period, today),
+    ]);
 
     return toRenewalDetail(record, {
       period,
@@ -143,6 +163,8 @@ export class RenewalViewService {
         ? lateRenewalOf(record, period, await this.organizationReads.businessToday(record.outcome.recordedAt))
         : false,
       showSnapshot: !actor.roles.includes('IT_ADMIN'),
+      lines: lineInfo.lines,
+      shortfall: lineInfo.shortfall,
     });
   }
 
@@ -153,8 +175,16 @@ export class RenewalViewService {
   async seatRanking(
     actor: AuthenticatedPrincipal,
     id: string,
-    query: PageQuery & { proposedOnly?: boolean },
-  ): Promise<Page<RankedSeatWire> & { usage: { status: 'AVAILABLE' | 'NOT_AVAILABLE' }; seatsInUse: number }> {
+    query: PageQuery & { proposedOnly?: boolean; subscriptionLineId?: string },
+  ): Promise<
+    Page<RankedSeatWire> & {
+      usage: { status: 'AVAILABLE' | 'NOT_AVAILABLE' };
+      seatsInUse: number;
+      lines: RenewalLineWire[];
+      minimumSeatsTotal: number | null;
+      shortfall: number;
+    }
+  > {
     const today = await this.organizationReads.businessToday();
     const scope = this.scopeOf(actor);
     if (!scope.itAdmin) throw new RenewalError('READ_FORBIDDEN');
@@ -162,7 +192,10 @@ export class RenewalViewService {
     if (!record) throw new RenewalError('NOT_FOUND');
     const period = (await this.periodsOf([record.subscriptionId])).get(record.subscriptionId);
     if (!period) throw new RenewalError('NOT_FOUND');
-    const seats = await this.ranking.seatsOf(record.subscriptionId, today);
+    const [seats, lineInfo] = await Promise.all([
+      this.ranking.seatsOf(record.subscriptionId, today, undefined, query.subscriptionLineId),
+      this.lineInfoOf(period, today),
+    ]);
     const proposed = new Set((await this.repo.releasedOf(id)).map((seat) => seat.assignmentId));
     const shown =
       query.proposedOnly === true ? seats.ranked.filter((seat) => proposed.has(seat.assignmentId)) : seats.ranked;
@@ -195,6 +228,9 @@ export class RenewalViewService {
       ...pageOf(items, shown.length, query.page, query.pageSize),
       usage: { status: seats.usageAvailable ? 'AVAILABLE' : 'NOT_AVAILABLE' },
       seatsInUse: seats.held.length,
+      lines: lineInfo.lines,
+      minimumSeatsTotal: period.minimumSeatsTotal ?? null,
+      shortfall: lineInfo.shortfall,
     };
   }
 
@@ -250,6 +286,15 @@ export class RenewalViewService {
     const periods = await this.periods.getPeriods([...new Set(ids)]);
 
     return new Map(periods.map((period) => [period.subscriptionId, period]));
+  }
+
+  private lineInfoOf(
+    period: RenewalPeriodFacts,
+    today: BusinessDate,
+  ): Promise<{ lines: RenewalLineWire[]; shortfall: number }> {
+    if (!this.lines) return Promise.resolve({ lines: [], shortfall: 0 });
+
+    return this.lines.lineViewsOf(period, today);
   }
 
   private async savingsOf(record: RenewalRecord): Promise<{ amount: string; currency: string } | null> {

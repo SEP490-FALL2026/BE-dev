@@ -1,18 +1,19 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import { SubscriptionPeriodApi } from '../../../catalog/public/subscription-period.api';
-import type {
-  NextPeriodInput,
-  PeriodAdjustment,
-  RenewalPeriodFacts,
-} from '../../../catalog/public/subscription-period.types';
+import type { PeriodAdjustment, RenewalPeriodFacts } from '../../../catalog/public/subscription-period.types';
 import type { BusinessDate } from '../../../../core/business-date';
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
-import { RenewalOutcomeService } from '../outcome/renewal-outcome.service';
+import {
+  isLateAnnualProposal,
+  validateProposeLines,
+  type LineProposalDecision,
+} from '../lines/subscription-renewal-lines.policy';
+import { SubscriptionRenewalLinesService } from '../lines/subscription-renewal-lines.service';
+import { RenewalOutcomeService, type RecordOutcomeNextPeriodInput } from '../outcome/renewal-outcome.service';
 import type { SeatsNeededCounts } from '../seats-needed/renewal-seats-needed.policy';
 import { RenewalSeatsNeededService } from '../seats-needed/renewal-seats-needed.service';
-import { RenewalPartiesService } from '../subscription-renewal-parties.service';
 import { RenewalError } from '../subscription-renewal.errors';
 import { SubscriptionRenewalRepo } from '../subscription-renewal.repo';
 import type { RenewalChoice, RenewalOutcomeKind, RenewalRecord } from '../subscription-renewal.types';
@@ -24,36 +25,50 @@ import {
   nextPeriodProblem,
   nextStartProblem,
   noticeBasisOf,
+  pointOf,
   preflightOf,
   type RecordRefusal,
 } from './renewal-record.policy';
 
 export interface RecordRenewalInput {
   subscriptionId: string;
-  choice: RenewalChoice;
-  /** The seats of the next period; none for a cancellation. It must be the number the system counts (`QĐ-104d`(1)). */
+  choice?: RenewalChoice;
+  /** The seats of the next period; none for a cancellation. Only for single-line periods (`LINES_REQUIRED` when multi-line). */
   proposedQuantity?: number;
+  /** Per-line proposed quantities (`W3-21`). */
+  lines?: readonly { subscriptionLineId: string; quantity: number }[];
+  minimumTotalHolderLineId?: string;
+  minimumTotalNote?: string;
   /** The evidence of the vendor minimum, when the seats are that minimum above the need. */
   note?: string;
   outcome: RenewalOutcomeKind;
   outcomeNote?: string;
   /** The new period the vendor confirmed, when there is one. */
-  nextPeriod?: Omit<NextPeriodInput, 'previousSubscriptionId'>;
+  nextPeriod?: RecordOutcomeNextPeriodInput;
   /** What closing a subscription asks the IT Admin to confirm (`QĐ-99i`): only with a cancellation. */
   closure?: { dataExported: boolean; adminsTransferred: boolean };
 }
 
-/** What the checks of the request found under the lock of the period: its point and the seats counted. */
+/** What the checks of the request found under the lock of the period: its point, choice, and the seats counted. */
 interface Checked {
   adjustment: PeriodAdjustment;
   counts: SeatsNeededCounts;
+  choice: RenewalChoice;
   quantity: number | null;
   note: string | null;
+  lineDecisions: LineProposalDecision[];
 }
 
 const textOf = (value: string | undefined): string | null => value?.trim() || null;
 
 const errorOf = (refusal: RecordRefusal): RenewalError => new RenewalError(refusal.problem, refusal.details);
+
+const nextTotalOf = (nextPeriod?: RecordOutcomeNextPeriodInput): number | null => {
+  if (!nextPeriod) return null;
+  if (nextPeriod.lines) return nextPeriod.lines.reduce((sum, item) => sum + item.quantity, 0);
+
+  return nextPeriod.purchasedQuantity ?? null;
+};
 
 /**
  * The result of the adjustment of a subscription of the shared pool, recorded by the IT Admin in one write (`QĐ-103e`, `QĐ-104d`, `QĐ-106i`,
@@ -67,24 +82,22 @@ export class RenewalRecordService {
   constructor(
     private readonly repo: SubscriptionRenewalRepo,
     private readonly periods: SubscriptionPeriodApi,
-    private readonly parties: RenewalPartiesService,
     private readonly seatsNeeded: RenewalSeatsNeededService,
     private readonly outcomes: RenewalOutcomeService,
     private readonly organizationReads: OrganizationReadApi,
     private readonly trail: RenewalRecordTrail,
     private readonly runner: TransactionRunner,
+    @Optional() private readonly lines?: SubscriptionRenewalLinesService,
   ) {}
 
   /**
-   * Throws RenewalError (`NOT_FOUND`, `NOT_RESPONSIBLE`, `NOT_RENEWABLE`, `CONTRACT_DATA_INCOMPLETE`, `BEFORE_ADJUSTMENT_POINT`, `QUANTITY_INVALID`,
-   * `CANCEL_NOT_ALLOWED`, `QUANTITY_NOT_SEATS_NEEDED`, `VENDOR_MINIMUM_EVIDENCE_REQUIRED`, `ALREADY_PROPOSED`, `NEXT_PERIOD_REQUIRED` and the refusals of the
-   * outcome: `OUTCOME_MISMATCH`, `EXCESS_NOT_REVOKED`, `SEATS_HAVE_OPEN_TASKS`, `PERIOD_REFUSED`); nothing is written then.
+   * Throws RenewalError; nothing is written then.
    */
   async record(actor: AuthenticatedPrincipal, input: RecordRenewalInput, now = new Date()): Promise<RenewalRecord> {
     return this.runner.run(async (tx) => {
       const period = await this.periods.lockPeriod(tx, input.subscriptionId);
       if (!period) throw new RenewalError('NOT_FOUND');
-      const who = await this.parties.recordingAccessOf(actor, period, tx);
+      const who = await this.trail.recordingAccessOf(actor, period, tx);
       if (!who.allowed) throw new RenewalError('NOT_RESPONSIBLE');
       const today = await this.organizationReads.businessToday(now, tx);
       const checked = await this.check(tx, period, input, today);
@@ -107,7 +120,7 @@ export class RenewalRecordService {
       );
       await this.trail.told(tx, result.recorded, period, checked.adjustment, who, {
         outcome: input.outcome,
-        nextQuantity: input.nextPeriod?.purchasedQuantity ?? null,
+        nextQuantity: nextTotalOf(input.nextPeriod),
       });
 
       return result.recorded;
@@ -121,33 +134,23 @@ export class RenewalRecordService {
     input: RecordRenewalInput,
     today: BusinessDate,
   ): Promise<Checked> {
-    const quantity = input.proposedQuantity ?? null;
     const note = textOf(input.note);
     const cases = (await this.repo.ofSubscriptions([period.subscriptionId], tx)).get(period.subscriptionId) ?? [];
-    // A cancellation decided before this rule is answered by its case (ALREADY_PROPOSED, below); CANCELLED is for one recorded as decided.
     const ending =
       (await this.repo.endingAmong([period.subscriptionId], tx)).has(period.subscriptionId) &&
       decidedCancelOf(cases) === null;
-    const ready = preflightOf({ period, ending, today, choice: input.choice, quantity });
-    if ('refusal' in ready) throw errorOf(ready.refusal);
-    const { adjustment } = ready;
-    const counts = await this.seatsNeeded.countFor(
-      {
-        subscriptionId: period.subscriptionId,
-        planId: period.planId,
-        vendorMinimumSeats: period.vendorMinimumSeats,
-        isPrimaryForPlan: period.isPrimaryForPlan,
-        renewalOn: adjustment.end,
-        today,
-      },
-      tx,
-    );
-    const refusal = countsRefusal(counts, { choice: input.choice, quantity, note });
-    if (refusal) throw errorOf(refusal);
+    const computedLines = this.lines
+      ? await this.lines.computeForPeriod(period, today, tx)
+      : { servingLines: [], lines: [], shortfall: 0 };
+
+    const { adjustment, counts, choice, quantity, lineDecisions } = input.lines
+      ? await this.checkLineProposal(tx, period, ending, today, input, note, computedLines)
+      : await this.checkLegacyOrSingleProposal(tx, period, ending, today, input, note, computedLines);
+
     const standing = existingCaseOf(cases, adjustment.deadline);
     if (standing) throw new RenewalError('ALREADY_PROPOSED', { renewalId: standing.id });
     const nextPeriod = nextPeriodProblem({
-      choice: input.choice,
+      choice,
       outcome: input.outcome,
       hasNextPeriod: input.nextPeriod !== undefined,
       commitment: adjustment.commitment,
@@ -156,7 +159,124 @@ export class RenewalRecordService {
     const startRefusal = input.nextPeriod && nextStartProblem(adjustment, input.nextPeriod.startDate);
     if (startRefusal) throw errorOf(startRefusal);
 
-    return { adjustment, counts, quantity, note };
+    return { adjustment, counts, choice, quantity, note, lineDecisions };
+  }
+
+  private async checkLineProposal(
+    tx: DbTx,
+    period: RenewalPeriodFacts,
+    ending: boolean,
+    today: BusinessDate,
+    input: RecordRenewalInput,
+    note: string | null,
+    computedLines: Awaited<ReturnType<SubscriptionRenewalLinesService['computeForPeriod']>>,
+  ) {
+    const found = pointOf(period, ending);
+    if ('refusal' in found) throw errorOf(found.refusal);
+    const { adjustment } = found;
+    if (today < adjustment.point) {
+      throw new RenewalError('BEFORE_ADJUSTMENT_POINT', {
+        adjustmentPointOn: adjustment.point,
+        deadline: adjustment.deadline,
+      });
+    }
+    const verdict = validateProposeLines({
+      targets: computedLines.lines,
+      shortfall: computedLines.shortfall,
+      adjustment,
+      today,
+      proposedLines: input.lines!,
+      minimumTotalHolderLineId: input.minimumTotalHolderLineId,
+      minimumTotalNote: input.minimumTotalNote,
+      note,
+    });
+    if ('refusal' in verdict) throw errorOf(verdict.refusal);
+    const { accepted } = verdict;
+    if (input.choice === 'CANCEL' && accepted.totalQuantity > 0) throw new RenewalError('QUANTITY_INVALID');
+
+    const counts = await this.readCounts(tx, period, adjustment, today);
+    if (accepted.choice === 'CANCEL') {
+      const cancelRefusal = countsRefusal(counts, { choice: 'CANCEL', quantity: null, note });
+      if (cancelRefusal) throw errorOf(cancelRefusal);
+    }
+
+    return {
+      adjustment,
+      counts,
+      choice: input.choice ?? accepted.choice,
+      quantity: accepted.quantity,
+      lineDecisions: accepted.lineDecisions,
+    };
+  }
+
+  private async checkLegacyOrSingleProposal(
+    tx: DbTx,
+    period: RenewalPeriodFacts,
+    ending: boolean,
+    today: BusinessDate,
+    input: RecordRenewalInput,
+    note: string | null,
+    computedLines: Awaited<ReturnType<SubscriptionRenewalLinesService['computeForPeriod']>>,
+  ) {
+    const lineCount = computedLines.servingLines.length;
+    if (lineCount > 1) throw new RenewalError('LINES_REQUIRED', { lineCount });
+
+    const choice = input.choice ?? 'RENEW';
+    const quantity = input.proposedQuantity ?? null;
+    const ready = preflightOf({ period, ending, today, choice, quantity });
+    if ('refusal' in ready) throw errorOf(ready.refusal);
+    const { adjustment } = ready;
+    const counts = await this.readCounts(tx, period, adjustment, today);
+
+    const lateSingle = lineCount === 1 && choice !== 'CANCEL' && isLateAnnualProposal(adjustment, today);
+    if (lateSingle) {
+      const line = computedLines.lines[0];
+      const given = quantity ?? 0;
+      if (given < line.seatsAtDeadline) {
+        throw new RenewalError('REDUCTION_AFTER_DEADLINE', {
+          lines: [{ subscriptionLineId: line.subscriptionLineId, minimum: line.seatsAtDeadline }],
+        });
+      }
+    } else {
+      const refusal = countsRefusal(counts, { choice, quantity, note });
+      if (refusal) throw errorOf(refusal);
+    }
+
+    const lineDecisions = this.singleLineDecisions(computedLines.servingLines, counts, quantity);
+
+    return { adjustment, counts, choice, quantity, lineDecisions };
+  }
+
+  private singleLineDecisions(
+    servingLines: readonly { id: string }[],
+    counts: SeatsNeededCounts,
+    quantity: number | null,
+  ): LineProposalDecision[] {
+    if (servingLines.length !== 1) return [];
+
+    return [
+      {
+        subscriptionLineId: servingLines[0].id,
+        seatsNeeded: counts.seatsNeeded,
+        target: counts.target,
+        recordedQuantity: quantity ?? 0,
+      },
+    ];
+  }
+
+  private readCounts(tx: DbTx, period: RenewalPeriodFacts, adjustment: PeriodAdjustment, today: BusinessDate) {
+    return this.seatsNeeded.countFor(
+      {
+        subscriptionId: period.subscriptionId,
+        planId: period.planId,
+        vendorMinimumSeats: period.vendorMinimumSeats,
+        minimumSeatsTotal: period.minimumSeatsTotal ?? null,
+        isPrimaryForPlan: period.isPrimaryForPlan,
+        renewalOn: adjustment.end,
+        today,
+      },
+      tx,
+    );
   }
 
   /** Writes the case and its decision, the IT Admin in charge deciding alone, and returns what the outcome is recorded against. */
@@ -169,7 +289,7 @@ export class RenewalRecordService {
     who: RecordedBy,
     when: { today: BusinessDate; now: Date },
   ): Promise<{ record: RenewalRecord; decision: NonNullable<RenewalRecord['decision']>; period: RenewalPeriodFacts }> {
-    const { adjustment, counts, quantity } = checked;
+    const { adjustment, counts, choice, quantity, lineDecisions } = checked;
     const organization = await this.organizationReads.getOrganization(tx);
     if (!organization) throw new Error('A renewal was recorded before installation');
     const proposed = await this.repo.insert(tx, {
@@ -177,7 +297,7 @@ export class RenewalRecordService {
       subscriptionId: period.subscriptionId,
       noticeBasis: noticeBasisOf(adjustment.kind, period.notice.source),
       noticeBaseDate: adjustment.deadline,
-      proposedChoice: input.choice,
+      proposedChoice: choice,
       proposedQuantity: quantity,
       proposalNote: checked.note,
       seatsNeeded: counts.seatsNeeded,
@@ -188,7 +308,7 @@ export class RenewalRecordService {
     if (!proposed) throw new RenewalError('ALREADY_PROPOSED');
     await this.trail.proposed(tx, actor, proposed, counts, who);
     const record = await this.repo.recordDecision(tx, proposed.id, {
-      choice: input.choice,
+      choice,
       quantity,
       reason: null,
       decidedByEmployeeId: actor.employeeId,
@@ -201,6 +321,18 @@ export class RenewalRecordService {
       activeSeatsAtDecision: counts.heldPastRenewal,
       snapshot: { source: 'NOT_CONNECTED', takenAt: when.now.toISOString() },
     });
+    if (this.lines && lineDecisions.length > 0) {
+      await this.lines.persistProposalTargets(tx, {
+        renewalOn: adjustment.end,
+        renewalId: proposed.id,
+        now: when.now,
+        lockedBy: 'IT_ADMIN',
+        decisions: lineDecisions,
+        autoRecorded: false,
+        minimumTotalHolderLineId: input.minimumTotalHolderLineId ?? null,
+        minimumTotalNote: textOf(input.minimumTotalNote),
+      });
+    }
     const decision = record.decision;
     if (!decision) throw new Error('The decision just written is missing');
 

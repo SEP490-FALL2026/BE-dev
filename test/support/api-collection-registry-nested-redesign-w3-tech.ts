@@ -42,4 +42,22 @@ export const NESTED_ARRAYS_REDESIGN_W3_TECH: readonly NestedArrayEntry[] = [
     'SUBSCRIPTION_LINES_MAX in subscription.dto.ts, the maxItems of the schema: the plan lines of one subscription period',
     'The plan lines of a subscription period (at most SUBSCRIPTION_LINES_MAX = 20).',
   ),
+  bounded(
+    'subscriptionRenewalAdjustmentGet#adjustment.lines',
+    20,
+    'RENEWAL_LINES_MAX in subscription-renewal.dto.ts, the maxItems of the schema: the plan lines of the period adjustment view',
+    'The per-line targets and seat counts of one subscription period (at most RENEWAL_LINES_MAX = 20).',
+  ),
+  bounded(
+    'subscriptionRenewalGet#renewal.lines',
+    20,
+    'RENEWAL_LINES_MAX in subscription-renewal.dto.ts, the maxItems of the schema: the plan lines of the renewal detail view',
+    'The per-line targets and seat counts of one subscription renewal detail (at most RENEWAL_LINES_MAX = 20).',
+  ),
+  bounded(
+    'subscriptionRenewalSeatRanking#data.lines',
+    20,
+    'RENEWAL_LINES_MAX in subscription-renewal.dto.ts, the maxItems of the schema: the plan lines shown alongside ranked seats',
+    'The per-line targets and seat counts of the subscription period (at most RENEWAL_LINES_MAX = 20).',
+  ),
 ];

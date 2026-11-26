@@ -1,5 +1,6 @@
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import type { CatalogApi } from '../../../catalog/public/catalog.api';
+import type { SeatLedgerApi } from '../../../catalog/public/seat-ledger.api';
 import type { SubscriptionPeriodApi } from '../../../catalog/public/subscription-period.api';
 import type { SubscriptionPurchaseFacts } from '../../../catalog/public/subscription-period.types';
 import type { SubscriptionRenewalRepo } from '../subscription-renewal.repo';
@@ -172,5 +173,86 @@ describe('RenewalSavingsService (W3-09)', () => {
       await different.service.recordRealisedSaving(TX, { newPeriodId: 'sub-new', invoiceId: 'inv-1', now }),
     ).toEqual({ recorded: false });
     expect(different.recordRealisedSaving).not.toHaveBeenCalled();
+  });
+
+  it('W3-21: computes per-line savings from seats(L, closedOn) and seats(L_next, startDate) including dropped 0-lines (2D)', async () => {
+    const recordRealisedSaving = jest.fn().mockResolvedValue(true);
+    const seatLedger = {
+      linesOfSubscriptions: jest.fn().mockResolvedValue(
+        new Map([
+          [
+            'sub-old',
+            [
+              {
+                id: 'old-std',
+                planId: 'plan-std',
+                monthlyUnitPriceMinor: 500_000n,
+                closedOn: '2027-06-30',
+                closedReason: 'RENEWED',
+                renewedFromLineId: null,
+              },
+              {
+                id: 'old-prm',
+                planId: 'plan-prm',
+                monthlyUnitPriceMinor: 2_500_000n,
+                closedOn: '2027-06-30',
+                closedReason: 'RENEWED',
+                renewedFromLineId: null,
+              },
+            ],
+          ],
+          [
+            'sub-new',
+            [
+              {
+                id: 'new-std',
+                planId: 'plan-std',
+                monthlyUnitPriceMinor: 500_000n,
+                closedOn: null,
+                closedReason: null,
+                renewedFromLineId: 'old-std',
+              },
+            ],
+          ],
+        ]),
+      ),
+      seatsOnDays: jest
+        .fn()
+        .mockResolvedValueOnce(
+          new Map([
+            ['old-std', new Map([['2027-06-30', 10]])],
+            ['old-prm', new Map([['2027-06-30', 2]])],
+          ]),
+        )
+        .mockResolvedValueOnce(new Map([['new-std', new Map([['2027-07-01', 5]])]])),
+    } as unknown as SeatLedgerApi;
+
+    const service = new RenewalSavingsService(
+      {
+        lockByNextSubscriptionId: jest.fn().mockResolvedValue(candidateOf()),
+        recordRealisedSaving,
+      } as unknown as RenewalSavingsRepo,
+      { endingAmong: jest.fn() } as unknown as SubscriptionRenewalRepo,
+      {
+        getPurchaseFacts: jest
+          .fn()
+          .mockResolvedValue([
+            periodFactsOf('sub-old', { startDate: '2026-07-01', commitmentTermMonths: 12 }),
+            periodFactsOf('sub-new', { startDate: '2027-07-01', commitmentTermMonths: 12 }),
+          ]),
+      } as unknown as SubscriptionPeriodApi,
+      { getSubscriptionPrice: jest.fn() } as unknown as CatalogApi,
+      seatLedger,
+    );
+
+    const res = await service.recordRealisedSaving(TX, {
+      newPeriodId: 'sub-new',
+      invoiceId: 'inv-1',
+      serviceMonth: '2027-07-01',
+      now,
+    });
+
+    // (10*500k + 2*2.5M)*12 - (5*500k + 0)*12 = 120M - 30M = 90M VND
+    expect(res).toEqual({ recorded: true, amountMinor: 90_000_000n, currency: 'VND' });
   });
 });

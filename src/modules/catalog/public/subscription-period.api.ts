@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { ApplicationFactsService } from '../catalog-entry/application-facts.service';
 import { SubscriptionPeriodService } from '../subscription/period/subscription-period.service';
 import type {
   NextPeriodInput,
   PaymentScheduleFacts,
+  PeriodAuditActor,
   PoolAdjustmentWindows,
   RenewalPeriodFacts,
   SubscriptionPurchaseFacts,
@@ -80,7 +80,22 @@ export class SubscriptionPeriodApi {
    * Records the period the vendor confirmed as the continuation of an old one, in the caller's transaction, chained once (`QĐ-16`).
    * Throws SubscriptionPeriodRefusedError with nothing written.
    */
-  recordNextPeriod(tx: DbTx, actor: AuthenticatedPrincipal, input: NextPeriodInput): Promise<RenewalPeriodFacts> {
+  recordNextPeriod(tx: DbTx, actor: PeriodAuditActor, input: NextPeriodInput): Promise<RenewalPeriodFacts> {
     return this.periods.recordNext(tx, actor, input);
+  }
+
+  /** Closes all still-live lines of `subscriptionId` as `ENDED` on `closedOn` when a term expires without renewal. */
+  closeExpiredLines(tx: DbTx, subscriptionId: string, closedOn: BusinessDate): Promise<void> {
+    return this.periods.closeExpiredLines(tx, subscriptionId, closedOn);
+  }
+
+  /** All non-removed or stored lines of `subscriptionId`, oldest first. */
+  linesOfSubscription(subscriptionId: string, tx?: DbTx) {
+    return this.periods.linesOfSubscription(subscriptionId, tx);
+  }
+
+  /** Batch lines of `subscriptionIds`, keyed by subscription id. */
+  linesOfSubscriptions(subscriptionIds: readonly string[], tx?: DbTx) {
+    return this.periods.linesOfSubscriptions(subscriptionIds, tx);
   }
 }

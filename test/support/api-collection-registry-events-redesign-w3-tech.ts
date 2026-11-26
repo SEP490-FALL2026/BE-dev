@@ -49,4 +49,19 @@ export const REDESIGN_W3_TECH_REGISTRY_EVENTS: readonly RegistryEvent[] = [
     reason:
       'subscriptionGet now includes lines[] while subscriptionList returns summary fields lineCount and seatsToday (W3-15).',
   },
+  added(
+    'subscriptionRenewalAdjustmentGet#adjustment.lines',
+    'RENEWAL_LINES_MAX',
+    'The per-line targets and seat counts on a renewal adjustment read: at most RENEWAL_LINES_MAX (W3-21).',
+  ),
+  added(
+    'subscriptionRenewalGet#renewal.lines',
+    'RENEWAL_LINES_MAX',
+    'The per-line targets and seat counts on a renewal detail read: at most RENEWAL_LINES_MAX (W3-21).',
+  ),
+  added(
+    'subscriptionRenewalSeatRanking#data.lines',
+    'RENEWAL_LINES_MAX',
+    'The per-line targets and seat counts on a renewal seat ranking read: at most RENEWAL_LINES_MAX (W3-21).',
+  ),
 ];
