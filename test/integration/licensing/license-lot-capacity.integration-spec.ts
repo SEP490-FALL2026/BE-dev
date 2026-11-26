@@ -1,391 +1,438 @@
 import { randomBytes, randomUUID } from 'node:crypto';
-import { Client } from 'pg';
-import { Barrier } from '../../support/concurrency-harness';
+import request from 'supertest';
+import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
+import type { AuthenticatedPrincipal } from '../../../src/infrastructure/security/tokens/access-token-verifier.port';
+import { LicenseKeyAssignmentService } from '../../../src/modules/licensing/license-key/license-key-assignment.service';
+import { LicenseKeyStateError } from '../../../src/modules/licensing/license-key/license-key.errors';
+import { LicenseKeyService } from '../../../src/modules/licensing/license-key/license-key.service';
+import { LicensingDeviceActivationApi } from '../../../src/modules/licensing/public/licensing-device-activation.api';
 import {
-  dropDisposableDatabase,
-  provisionDisposableDatabase,
-  type DisposableDatabase,
-} from '../../support/disposable-database';
-import { DEPLOY_TIMEOUT_MS, deployMigrations } from '../../support/migration-history';
+  DeviceActivationKeyWithdrawnError,
+  DeviceActivationLotFullError,
+} from '../../../src/modules/licensing/public/licensing-device-activation.errors';
+import { ProvisioningPlanBoundToDeviceError } from '../../../src/modules/licensing/public/licensing.errors';
+import { ApiAccount, adminToken, createActivatedAccount } from '../../support/api-accounts';
+import { declareApplication } from '../../support/builders/catalog.builder';
+import { Barrier } from '../../support/concurrency-harness';
+import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from '../../support/http-test-app';
 import { lineWorld } from '../../support/w3-lines-world';
 
+const isDeadlockError = (error: unknown): boolean =>
+  typeof error === 'object' && error !== null && (error as { code?: unknown }).code === '40P01';
+
 /**
- * Redesign wave 3, W3-24 (M6): the licenses of a lot as PostgreSQL itself counts them — the activations of wave 2 and the keys given to a person
- * against the count of the lot, the old rights that have no key, the guard of the keys, and the plan that keeps its lots.
+ * FIX-W3-FINAL F-19: verifies K4 license-lot DB capacity/guard invariants and proves lock order (`6a -> 7 -> 7b`)
+ * via real `LicenseKeyAssignmentService.assign`, `LicenseKeyService.withdraw`, and `LicensingDeviceActivationApi.open`
+ * over concurrent connections (`managed_devices`, `device_activations`, valid enums, zero `40P01`).
  */
-describe('the licenses of a lot (integration, real PostgreSQL)', () => {
-  let database: DisposableDatabase;
-  let sql: Client;
+describe('the licenses of a lot (integration, real PostgreSQL & real services, F-19)', () => {
+  let ctx: HttpTestApp;
+  let seed: SeededInstallation;
+  let runner: TransactionRunner;
+  let assignments: LicenseKeyAssignmentService;
+  let licenseKeys: LicenseKeyService;
+  let activations: LicensingDeviceActivationApi;
+  let it1: ApiAccount;
+  let seq = 0;
 
-  beforeAll(async () => {
-    database = await provisionDisposableDatabase();
-    const deployed = await deployMigrations(database);
-    if (deployed.code !== 0) throw new Error(`Deploying history failed: ${deployed.stdout}`);
-    sql = new Client({ connectionString: database.url });
-    await sql.connect();
-  }, DEPLOY_TIMEOUT_MS);
-
-  afterAll(async () => {
-    await sql.end();
-    await dropDisposableDatabase(database);
+  const server = () => ctx.app.getHttpServer();
+  const as = (account: ApiAccount) => ({ Authorization: `Bearer ${account.accessToken}` });
+  const dataOf = <T>(res: request.Response): T => (res.body as { data: T }).data;
+  const unique = (prefix: string): string => `${prefix}-${(seq += 1)}`;
+  const itActor = (): AuthenticatedPrincipal => ({
+    subject: it1.appUserId,
+    appUserId: it1.appUserId,
+    sessionId: randomUUID(),
+    employeeId: it1.employeeId,
+    directRoles: ['IT_ADMIN'],
+    roles: ['IT_ADMIN'],
+  });
+  const actActor = () => ({
+    kind: 'USER' as const,
+    appUserId: it1.appUserId,
+    employeeId: it1.employeeId,
+    sessionId: randomUUID(),
   });
 
-  /** A lot of a K4 plan with the keys it holds, written as M6 or the lot routes write it. */
-  async function lotWorld(binding: 'ACCOUNT' | 'DEVICE_KEY', licenseCount: number, keys: number) {
-    const w = await lineWorld(sql);
-    const { vendorId } = await w.vendor('JetBrains');
-    const plan = await w.plan(vendorId, 'IntelliJ', 'K4', binding);
-    const lotId = randomUUID();
-    await sql.query(
-      `INSERT INTO license_lots (id, organization_id, plan_id, purchased_on, license_count, unit_price_minor, purpose, responsible_it_admin_employee_id,
-         updated_at) VALUES ($1, $2, $3, '2026-09-01', $4, 1000000, 'OPENING', $5, now())`,
-      [lotId, w.organizationId, plan, licenseCount, w.khoa],
-    );
-    const keyIds: string[] = [];
-    for (let i = 0; i < keys; i += 1) {
-      const id = randomUUID();
-      await sql.query(
-        `INSERT INTO license_keys (id, organization_id, license_lot_id, cost_borne, fingerprint, masked, ciphertext, cipher_key_id,
-           imported_by_app_user_id) VALUES ($1, $2, $3, true, $4, '....1234', decode(repeat('ab', 40), 'hex'), 'k1', $5)`,
-        [id, w.organizationId, lotId, randomBytes(32).toString('hex'), randomUUID()],
-      );
-      keyIds.push(id);
-    }
+  beforeAll(async () => {
+    ctx = await createHttpTestApp();
+    runner = ctx.app.get(TransactionRunner);
+    assignments = ctx.app.get(LicenseKeyAssignmentService, { strict: false });
+    licenseKeys = ctx.app.get(LicenseKeyService, { strict: false });
+    activations = ctx.app.get(LicensingDeviceActivationApi);
+    seed = await seedInstallation(ctx.app);
+    const admin = await adminToken(ctx, seed);
+    it1 = await createActivatedAccount(ctx, seed, { code: 'E-LOTIT', email: 'lotit@acme.vn', role: 'IT_ADMIN', admin });
+  }, 180_000);
 
-    return { w, plan, lotId, keyIds };
+  afterAll(async () => {
+    await ctx?.close();
+  });
+
+  async function createLotWithKeys(binding: 'ACCOUNT' | 'DEVICE_KEY', licenseCount: number, keysCount: number) {
+    const applicationId = await declareApplication(ctx, it1.accessToken, {
+      name: unique('LotApp'),
+      kind: 'LICENSED',
+      vendorName: unique('LotVendor'),
+      dataSensitivity: 'LOW',
+    });
+    const planId = dataOf<{ id: string }>(
+      await request(server())
+        .post('/api/v1/plans')
+        .set(as(it1))
+        .send({
+          applicationId,
+          name: unique('LotPlan'),
+          provisioningType: 'K4',
+          controlLevel: 'FULL',
+          keyBinding: binding,
+        })
+        .expect(201),
+    ).id;
+    const lotId = dataOf<{ id: string }>(
+      await request(server())
+        .post('/api/v1/license-lots')
+        .set(as(it1))
+        .send({
+          planId,
+          purchasedOn: '2026-09-01',
+          licenseCount,
+          unitPrice: { amount: '1000000', currency: 'VND' },
+          purpose: 'OPENING',
+        })
+        .expect(201),
+    ).id;
+    if (keysCount > 0) {
+      const keys = Array.from(
+        { length: keysCount },
+        () => `KEY-${randomUUID().replace(/-/g, '').slice(0, 16).toUpperCase()}`,
+      );
+      await request(server()).post(`/api/v1/license-lots/${lotId}/keys`).set(as(it1)).send({ keys }).expect(201);
+    }
+    const { rows } = await ctx.sql.query<{ id: string }>(
+      `SELECT id FROM license_keys WHERE license_lot_id = $1 ORDER BY imported_at, id`,
+      [lotId],
+    );
+
+    return { planId, lotId, keyIds: rows.map((r) => r.id) };
   }
 
-  const rightOf = async (
-    w: Awaited<ReturnType<typeof lineWorld>>,
-    plan: string,
-    code: string,
-    subscriptionId: string | null = null,
-  ) => {
+  async function createEmployee(code: string): Promise<string> {
     const id = randomUUID();
-    const employee = await w.person(code);
-    await sql.query(
-      `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id, account_identifier,
-         normalized_account_identifier, valid_from, valid_from_basis, created_by_app_user_id)
-       VALUES ($1, $2, 'PERSONAL', 'REQUEST', $3, $4, $5, $6, $6, '2026-09-02', 'ACTUAL', $7)`,
-      [id, w.organizationId, plan, subscriptionId, employee, `${code}@acme.vn`, randomUUID()],
+    await ctx.sql.query(
+      `INSERT INTO employees (id, organization_id, employee_code, full_name, employment_type, hire_date, updated_at)
+       VALUES ($1, $2, $3, $3, 'STAFF', '2026-01-01', now())`,
+      [id, seed.organizationId, unique(code)],
     );
 
     return id;
-  };
-  const giveKey = (keyId: string, assignmentId: string) =>
-    sql.query(`UPDATE license_keys SET status = 'ASSIGNED', assignment_id = $2 WHERE id = $1`, [keyId, assignmentId]);
+  }
 
-  it('never gives more keys to people than the lot has licenses', async () => {
-    const { w, plan, keyIds } = await lotWorld('ACCOUNT', 2, 3);
-    const rights = [await rightOf(w, plan, 'P1'), await rightOf(w, plan, 'P2'), await rightOf(w, plan, 'P3')];
+  async function createAssignment(planId: string, code: string, subscriptionId: string | null = null): Promise<string> {
+    const id = randomUUID();
+    const empId = await createEmployee(code);
+    const identifier = `${unique(code).toLowerCase()}@acme.vn`;
+    await ctx.sql.query(
+      `INSERT INTO license_assignments
+         (id, organization_id, kind, source, plan_id, subscription_id, employee_id, account_identifier,
+          normalized_account_identifier, valid_from, valid_from_basis, created_by_app_user_id)
+       VALUES ($1, $2, 'PERSONAL', 'REQUEST', $3, $4, $5, $6, $6, '2026-09-02', 'ACTUAL', $7)`,
+      [id, seed.organizationId, planId, subscriptionId, empId, identifier, it1.appUserId],
+    );
 
-    await giveKey(keyIds[0], rights[0]);
-    await giveKey(keyIds[1], rights[1]);
+    return id;
+  }
 
-    await expect(giveKey(keyIds[2], rights[2])).rejects.toMatchObject({
-      code: '23514',
-      constraint: 'license_lots_capacity',
-    });
+  async function createDevice(type: 'LAP' | 'PC' = 'LAP'): Promise<string> {
+    return dataOf<{ id: string }>(
+      await request(server())
+        .post('/api/v1/devices')
+        .set(as(it1))
+        .send({ deviceType: type, hostname: unique('LOT-HOST'), os: 'Windows 11' })
+        .expect(201),
+    ).id;
+  }
+
+  it('never assigns more keys via LicenseKeyAssignmentService than the lot has licenses', async () => {
+    const { planId, lotId, keyIds } = await createLotWithKeys('ACCOUNT', 2, 2);
+    const extraKeyId = randomUUID();
+    await ctx.sql.query(
+      `INSERT INTO license_keys
+         (id, organization_id, license_lot_id, cost_borne, fingerprint, masked, ciphertext, cipher_key_id, imported_by_app_user_id)
+       VALUES ($1, $2, $3, true, $4, '....9999', decode(repeat('ab', 40), 'hex'), 'k1', $5)`,
+      [extraKeyId, seed.organizationId, lotId, randomBytes(32).toString('hex'), it1.appUserId],
+    );
+    const r0 = await createAssignment(planId, 'CAP1');
+    const r1 = await createAssignment(planId, 'CAP2');
+    const r2 = await createAssignment(planId, 'CAP3');
+
+    await runner.run((tx) =>
+      assignments.assign(tx, itActor(), {
+        organizationId: seed.organizationId,
+        licenseKeyId: keyIds[0],
+        assignmentId: r0,
+        subscriptionId: null,
+        licenseLotId: lotId,
+      }),
+    );
+    await runner.run((tx) =>
+      assignments.assign(tx, itActor(), {
+        organizationId: seed.organizationId,
+        licenseKeyId: keyIds[1],
+        assignmentId: r1,
+        subscriptionId: null,
+        licenseLotId: lotId,
+      }),
+    );
+
+    await expect(
+      runner.run((tx) =>
+        assignments.assign(tx, itActor(), {
+          organizationId: seed.organizationId,
+          licenseKeyId: extraKeyId,
+          assignmentId: r2,
+          subscriptionId: null,
+          licenseLotId: lotId,
+        }),
+      ),
+    ).rejects.toMatchObject({ code: '23514', constraint: 'license_lots_capacity' });
   });
 
-  it('counts the rights of the subscription a lot came from that hold no key, and counts a right once when it holds a key', async () => {
-    const w = await lineWorld(sql);
+  it('counts unkeyed legacy assignments once and keyed assignments once against device_activation_occupied', async () => {
+    const w = await lineWorld(ctx.sql);
     const { vendorId } = await w.vendor('JetBrains');
     const plan = await w.plan(vendorId, 'IntelliJ', 'K4', 'ACCOUNT');
     const legacy = await w.perpetual(plan, { quantity: 2 });
-    const lotId = legacy;
-    await sql.query(
+    await ctx.sql.query(
       `INSERT INTO license_lots (id, organization_id, plan_id, purchased_on, license_count, unit_price_minor, purpose, legacy_subscription_id, updated_at)
        VALUES ($1, $2, $3, '2026-09-01', 2, 1000000, 'OPENING', $1, now())`,
-      [lotId, w.organizationId, plan],
+      [legacy, w.organizationId, plan],
     );
-    const old = await rightOf(w, plan, 'OLD1', legacy);
-    await rightOf(w, plan, 'OLD2', legacy);
+    const old = await createAssignment(plan, 'OLD1', legacy);
+    await createAssignment(plan, 'OLD2', legacy);
     const occupied = async () =>
-      Number((await sql.query<{ n: string }>(`SELECT device_activation_occupied($1) AS n`, [lotId])).rows[0].n);
+      Number((await ctx.sql.query<{ n: string }>(`SELECT device_activation_occupied($1) AS n`, [legacy])).rows[0].n);
 
-    // K4 rights are counted through the lot: the third right of the old subscription is not refused by its frozen quantity (the lot counts).
     expect(await occupied()).toBe(2);
-    await rightOf(w, plan, 'OLD3', legacy);
+    await createAssignment(plan, 'OLD3', legacy);
     expect(await occupied()).toBe(3);
 
-    // A key given to one of the old rights takes that right once, not twice.
     const keyId = await w.key(legacy);
-    await giveKey(keyId, old).catch((error: { constraint?: string }) => {
-      // The lot (2 licenses) is already past its count by the third old right: the key cannot be given until a license is added.
-      expect(error.constraint).toBe('license_lots_capacity');
-    });
-    await sql.query(`UPDATE license_lots SET license_count = 3 WHERE id = $1`, [lotId]);
-    await giveKey(keyId, old);
+    await expect(
+      runner.run((tx) =>
+        assignments.assign(tx, itActor(), {
+          organizationId: w.organizationId,
+          licenseKeyId: keyId,
+          assignmentId: old,
+          subscriptionId: legacy,
+          licenseLotId: legacy,
+        }),
+      ),
+    ).rejects.toMatchObject({ constraint: 'license_lots_capacity' });
+    await ctx.sql.query(`UPDATE license_lots SET license_count = 3 WHERE id = $1`, [legacy]);
+    await runner.run((tx) =>
+      assignments.assign(tx, itActor(), {
+        organizationId: w.organizationId,
+        licenseKeyId: keyId,
+        assignmentId: old,
+        subscriptionId: legacy,
+        licenseLotId: legacy,
+      }),
+    );
     expect(await occupied()).toBe(3);
   });
 
-  it('counts the activations of wave 2 against the licenses of the lot, and frees one that goes back to the lot', async () => {
-    const { w, plan, lotId, keyIds } = await lotWorld('DEVICE_KEY', 2, 2);
-    const user = randomUUID();
-    const device = async () => {
-      const id = randomUUID();
-      await sql.query(
-        `INSERT INTO managed_devices (id, organization_id, asset_code, normalized_asset_code, hostname, os, device_type, asset_code_origin,
-           created_by_app_user_id, updated_at) VALUES ($1, $2, $3, $3, 'host', 'Windows', 'OTH', 'LEGACY', $4, now())`,
-        [id, w.organizationId, `M-${id}`, user],
-      );
+  it('counts device activations via LicensingDeviceActivationApi.open and frees one closed with license_released = true', async () => {
+    const { planId, lotId, keyIds } = await createLotWithKeys('DEVICE_KEY', 2, 2);
+    const [d1, d2, d3] = await Promise.all([createDevice(), createDevice(), createDevice()]);
 
-      return id;
-    };
-    const activate = async (keyId: string) => {
-      const id = randomUUID();
-      await sql.query(
-        `INSERT INTO device_activations (id, organization_id, device_id, plan_id, license_key_id, origin, activated_on, activated_at,
-           activated_by_app_user_id) VALUES ($1, $2, $3, $4, $5, 'OPERATION', '2026-10-01', now(), $6)`,
-        [id, w.organizationId, await device(), plan, keyId, user],
-      );
-
-      return id;
-    };
-    const first = await activate(keyIds[0]);
-    await activate(keyIds[1]);
-    await expect(activate(keyIds[0])).rejects.toMatchObject({
-      code: '23514',
-      constraint: 'device_activations_lot_capacity',
-    });
-
-    // Closing with the license back in the lot frees it.
-    await sql.query(
-      `UPDATE device_activations SET deactivated_on = '2026-11-01', deactivated_at = now(), end_cause = 'MOVED'::"DeviceActivationEndCause",
-         license_released = true, closed_by_app_user_id = $2 WHERE id = $1`,
-      [first, user],
+    const first = await runner.run((tx) =>
+      activations.open(tx, {
+        organizationId: seed.organizationId,
+        deviceId: d1,
+        planId,
+        licenseKeyId: keyIds[0],
+        origin: 'OPERATION',
+        on: '2026-10-01',
+        by: actActor(),
+      }),
     );
-    await expect(activate(keyIds[0])).resolves.toEqual(expect.any(String));
+    await runner.run((tx) =>
+      activations.open(tx, {
+        organizationId: seed.organizationId,
+        deviceId: d2,
+        planId,
+        licenseKeyId: keyIds[1],
+        origin: 'OPERATION',
+        on: '2026-10-01',
+        by: actActor(),
+      }),
+    );
+    await expect(
+      runner.run((tx) =>
+        activations.open(tx, {
+          organizationId: seed.organizationId,
+          deviceId: d3,
+          planId,
+          licenseKeyId: keyIds[0],
+          origin: 'OPERATION',
+          on: '2026-10-01',
+          by: actActor(),
+        }),
+      ),
+    ).rejects.toBeInstanceOf(DeviceActivationLotFullError);
+
+    await ctx.sql.query(
+      `UPDATE device_activations
+          SET deactivated_on = '2026-11-01', deactivated_at = now(), end_cause = 'MOVED'::"DeviceActivationEndCause",
+              license_released = true, closed_by_app_user_id = $2
+        WHERE id = $1`,
+      [first.activation.id, it1.appUserId],
+    );
+    await expect(
+      runner.run((tx) =>
+        activations.open(tx, {
+          organizationId: seed.organizationId,
+          deviceId: d3,
+          planId,
+          licenseKeyId: keyIds[0],
+          origin: 'OPERATION',
+          on: '2026-11-02',
+          by: actActor(),
+        }),
+      ),
+    ).resolves.toMatchObject({ activation: { deviceId: d3 } });
     expect(
-      Number((await sql.query<{ n: string }>(`SELECT device_activation_occupied($1) AS n`, [lotId])).rows[0].n),
+      Number((await ctx.sql.query<{ n: string }>(`SELECT device_activation_occupied($1) AS n`, [lotId])).rows[0].n),
     ).toBe(2);
   });
 
-  it('refuses a key given to a person for a plan bound to a machine, and gives a key of a plan bound to an account', async () => {
-    const machine = await lotWorld('DEVICE_KEY', 2, 1);
-    const right = await rightOf(machine.w, machine.plan, 'M1');
-    await expect(giveKey(machine.keyIds[0], right)).rejects.toMatchObject({
-      code: '23514',
-      constraint: 'license_key_assignment_plan_account',
-    });
+  it('refuses assigning a DEVICE_KEY lot key to a personal right (ProvisioningPlanBoundToDeviceError) and keeps DB triggers intact', async () => {
+    const machine = await createLotWithKeys('DEVICE_KEY', 2, 1);
+    const machineRight = await createAssignment(machine.planId, 'DEV-ACC');
+    await expect(
+      runner.run((tx) =>
+        assignments.assign(tx, itActor(), {
+          organizationId: seed.organizationId,
+          licenseKeyId: machine.keyIds[0],
+          assignmentId: machineRight,
+          subscriptionId: null,
+          licenseLotId: machine.lotId,
+        }),
+      ),
+    ).rejects.toBeInstanceOf(ProvisioningPlanBoundToDeviceError);
 
-    const account = await lotWorld('ACCOUNT', 2, 1);
-    await expect(giveKey(account.keyIds[0], await rightOf(account.w, account.plan, 'A1'))).resolves.toBeDefined();
-  });
-
-  it('fixes the lot of a key, and lets its cost go from not borne to borne once', async () => {
-    const { w, plan, lotId, keyIds } = await lotWorld('ACCOUNT', 2, 1);
-    const other = randomUUID();
-    await sql.query(
+    const account = await createLotWithKeys('ACCOUNT', 2, 1);
+    const otherLotId = randomUUID();
+    await ctx.sql.query(
       `INSERT INTO license_lots (id, organization_id, plan_id, purchased_on, license_count, unit_price_minor, purpose, updated_at)
        VALUES ($1, $2, $3, '2026-09-01', 1, 1000000, 'OPENING', now())`,
-      [other, w.organizationId, plan],
+      [otherLotId, seed.organizationId, account.planId],
     );
-    await sql.query(`UPDATE license_keys SET cost_borne = false WHERE id = $1`, [keyIds[0]]).catch(() => undefined);
-
     await expect(
-      sql.query(`UPDATE license_keys SET license_lot_id = $2 WHERE id = $1`, [keyIds[0], other]),
-    ).rejects.toMatchObject({
-      code: '55000',
-      constraint: 'license_key_columns_fixed',
-    });
-    // A key that was not borne becomes borne, and never goes back.
-    const unborne = randomUUID();
-    await sql.query(
-      `INSERT INTO license_keys (id, organization_id, license_lot_id, cost_borne, fingerprint, masked, ciphertext, cipher_key_id, imported_by_app_user_id)
-       VALUES ($1, $2, $3, false, $4, '....1234', decode(repeat('ab', 40), 'hex'), 'k1', $5)`,
-      [unborne, w.organizationId, lotId, randomBytes(32).toString('hex'), randomUUID()],
-    );
-    await sql.query(`UPDATE license_keys SET cost_borne = true WHERE id = $1`, [unborne]);
+      ctx.sql.query(`UPDATE license_keys SET license_lot_id = $2 WHERE id = $1`, [account.keyIds[0], otherLotId]),
+    ).rejects.toMatchObject({ code: '55000', constraint: 'license_key_columns_fixed' });
     await expect(
-      sql.query(`UPDATE license_keys SET cost_borne = false WHERE id = $1`, [unborne]),
-    ).rejects.toMatchObject({
-      code: '55000',
-      constraint: 'license_key_cost_borne_once',
-    });
+      ctx.sql.query(`UPDATE license_lots SET purpose = 'REQUEST', request_id = $2 WHERE id = $1`, [
+        machine.lotId,
+        randomUUID(),
+      ]),
+    ).rejects.toMatchObject({ constraint: 'license_lots_purpose_binding' });
+    // T-9: STOCK is valid for ACCOUNT K4 plans.
+    await expect(
+      ctx.sql.query(
+        `INSERT INTO license_lots (id, organization_id, plan_id, purchased_on, license_count, unit_price_minor, purpose, updated_at)
+         VALUES (gen_random_uuid(), $1, $2, '2026-09-01', 1, 1000000, 'STOCK', now())`,
+        [seed.organizationId, account.planId],
+      ),
+    ).resolves.toBeDefined();
   });
 
-  it('keeps the plan of a lot K4 and bound as it is, and still refuses a binding that moves under a right of a plan with no lot', async () => {
-    const { plan, lotId } = await lotWorld('ACCOUNT', 2, 0);
-    await expect(sql.query(`UPDATE plans SET provisioning_type = 'K3' WHERE id = $1`, [plan])).rejects.toMatchObject({
-      code: '23514',
-      constraint: 'plans_change_keeps_license_lots',
-    });
-    await expect(sql.query(`UPDATE plans SET key_binding = 'DEVICE_KEY' WHERE id = $1`, [plan])).rejects.toMatchObject({
-      code: '23514',
-      constraint: 'plans_change_keeps_key_binding',
-    });
-    expect(lotId).toEqual(expect.any(String));
+  it('barrier x20: LicensingDeviceActivationApi.open || LicenseKeyService.withdraw on same DEVICE_KEY lot proves lock order with zero 40P01', async () => {
+    const { planId, keyIds } = await createLotWithKeys('DEVICE_KEY', 25, 20);
+    const devices = await Promise.all(Array.from({ length: 20 }, () => createDevice('PC')));
 
-    // A K4 plan bound to an account with no lot and a right of a person: the binding still cannot move (wave 2).
-    const w = await lineWorld(sql);
-    const { vendorId } = await w.vendor('Sublime');
-    const bare = await w.plan(vendorId, 'Sublime Text', 'K4', 'ACCOUNT');
-    await rightOf(w, bare, 'S1');
-    await expect(sql.query(`UPDATE plans SET key_binding = 'DEVICE_KEY' WHERE id = $1`, [bare])).rejects.toMatchObject({
-      code: '23514',
-      constraint: 'plans_change_keeps_key_binding_assignments',
-    });
-  });
+    for (let i = 0; i < 20; i += 1) {
+      const barrier = new Barrier(2);
+      const keyId = keyIds[i];
+      const deviceId = devices[i];
 
-  it('judges a lot as a lot: a K4 plan not bundled, the workspace of its vendor, a purpose that fits the binding', async () => {
-    const w = await lineWorld(sql);
-    const { vendorId, workspaceId } = await w.vendor('JetBrains');
-    const other = await w.vendor('Atlassian');
-    const bundled = await w.plan(vendorId, 'Windows 11 Pro OEM', 'K4', 'DEVICE_BUNDLED');
-    const account = await w.plan(vendorId, 'IntelliJ', 'K4', 'ACCOUNT');
-    const stock = await w.plan(vendorId, 'Office LTSC', 'K4', 'DEVICE_KEY');
-    const insert = (plan: string, purpose: string, workspace: string | null, request: string | null = null) =>
-      sql.query(
-        `INSERT INTO license_lots (id, organization_id, plan_id, workspace_id, purchased_on, license_count, unit_price_minor, purpose, request_id, updated_at)
-         VALUES (gen_random_uuid(), $1, $2, $3, '2026-09-01', 1, 1000000, $4, $5, now())`,
-        [w.organizationId, plan, workspace, purpose, request],
-      );
+      const activateTask = (async () => {
+        await barrier.wait();
+        return runner.run((tx) =>
+          activations.open(tx, {
+            organizationId: seed.organizationId,
+            deviceId,
+            planId,
+            licenseKeyId: keyId,
+            origin: 'OPERATION',
+            on: '2026-10-10',
+            by: actActor(),
+          }),
+        );
+      })();
+      const withdrawTask = (async () => {
+        await barrier.wait();
+        return licenseKeys.withdraw(itActor(), keyId, { reason: 'Retire device key' });
+      })();
 
-    await expect(insert(bundled, 'OPENING', null)).rejects.toMatchObject({ constraint: 'license_lots_plan_k4' });
-    await expect(insert(account, 'OPENING', other.workspaceId)).rejects.toMatchObject({
-      constraint: 'license_lots_workspace_vendor',
-    });
-    await expect(insert(stock, 'REQUEST', workspaceId, randomUUID())).rejects.toMatchObject({
-      constraint: 'license_lots_purpose_binding',
-    });
-    await expect(insert(account, 'STOCK', workspaceId)).rejects.toMatchObject({
-      constraint: 'license_lots_purpose_binding',
-    });
-    const request = randomUUID();
-    await insert(account, 'REQUEST', workspaceId, request);
-    await expect(insert(account, 'REQUEST', workspaceId, request)).rejects.toMatchObject({
-      code: '23505',
-      constraint: 'license_lots_request_key',
-    });
-  });
-
-  it('barrier x20 grant || device activation on same lot enforces license_count with zero 40P01 deadlocks', async () => {
-    const { w, plan, lotId, keyIds } = await lotWorld('DEVICE_KEY', 8, 1);
-    const deviceIds: string[] = [];
-    for (let i = 0; i < 10; i += 1) {
-      const empId = await w.person(`DEVUSER-${i}`);
-      const devId = randomUUID();
-      await sql.query(
-        `INSERT INTO devices (id, organization_id, asset_code, name, kind, status, owner_employee_id)
-         VALUES ($1, $2, $3, $4, 'LAPTOP', 'ASSIGNED', $5)`,
-        [devId, w.organizationId, `ASSET-${i}-${randomUUID().slice(0, 6)}`, `Mac-${i}`, empId],
-      );
-      deviceIds.push(devId);
+      const [actOutcome, withdrawOutcome] = await Promise.allSettled([activateTask, withdrawTask]);
+      if (actOutcome.status === 'rejected') {
+        expect(isDeadlockError(actOutcome.reason)).toBe(false);
+        expect(actOutcome.reason).toBeInstanceOf(DeviceActivationKeyWithdrawnError);
+      }
+      if (withdrawOutcome.status === 'rejected') {
+        expect(isDeadlockError(withdrawOutcome.reason)).toBe(false);
+      }
+      expect(withdrawOutcome.status).toBe('fulfilled');
     }
-
-    const workers = 20;
-    const barrier = new Barrier(workers);
-    const results = await Promise.all(
-      Array.from({ length: workers }, async (_, idx) => {
-        const client = new Client({ connectionString: database.url });
-        await client.connect();
-        try {
-          await barrier.wait();
-          await client.query('BEGIN');
-          // Strict lock order: tier 6a license_lots FOR UPDATE -> tier 7 plans FOR SHARE
-          await client.query(`SELECT id FROM license_lots WHERE id = $1 FOR UPDATE`, [lotId]);
-          await client.query(`SELECT id FROM plans WHERE id = $1 FOR SHARE`, [plan]);
-
-          if (idx % 2 === 0) {
-            const devId = deviceIds[Math.floor(idx / 2)];
-            await client.query(
-              `INSERT INTO device_activations (id, organization_id, device_id, license_key_id, activated_by_app_user_id)
-               VALUES ($1, $2, $3, $4, $5)`,
-              [randomUUID(), w.organizationId, devId, keyIds[0], randomUUID()],
-            );
-          } else {
-            const right = randomUUID();
-            const emp = await w.person(`GRANT-DEV-${idx}`);
-            await client.query(
-              `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id,
-                 account_identifier, normalized_account_identifier, valid_from, valid_from_basis, created_by_app_user_id)
-               VALUES ($1, $2, 'PERSONAL', 'REQUEST', $3, NULL, $4, $5, $5, '2026-09-02', 'ACTUAL', $6)`,
-              [right, w.organizationId, plan, emp, `gdev-${idx}@acme.vn`, randomUUID()],
-            );
-          }
-          await client.query('COMMIT');
-          return { ok: true as const };
-        } catch (err) {
-          await client.query('ROLLBACK').catch(() => undefined);
-          return { ok: false as const, code: (err as { code?: string }).code ?? 'UNKNOWN' };
-        } finally {
-          await client.end();
-        }
-      }),
-    );
-
-    const deadlocks = results.filter((r) => !r.ok && r.code === '40P01');
-    expect(deadlocks).toEqual([]);
-    const occupied = Number(
-      (await sql.query<{ n: string }>(`SELECT device_activation_occupied($1) AS n`, [lotId])).rows[0].n,
-    );
-    expect(occupied).toBeLessThanOrEqual(8);
-    expect(occupied).toBeGreaterThan(0);
   });
 
-  it('barrier x20 grant || key withdrawal on same ACCOUNT lot serializes cleanly via lot -> plan -> key with zero 40P01 deadlocks', async () => {
-    const { w, plan, lotId, keyIds } = await lotWorld('ACCOUNT', 10, 10);
-    const workers = 20;
-    const barrier = new Barrier(workers);
+  it('barrier x20: LicenseKeyAssignmentService.assign || LicenseKeyService.withdraw on same ACCOUNT lot serializes via lot -> plan -> key with zero 40P01', async () => {
+    const { planId, lotId, keyIds } = await createLotWithKeys('ACCOUNT', 25, 20);
+    const rightIds = await Promise.all(Array.from({ length: 20 }, (_, i) => createAssignment(planId, `BACC-${i}`)));
 
-    const results = await Promise.all(
-      Array.from({ length: workers }, async (_, idx) => {
-        const client = new Client({ connectionString: database.url });
-        await client.connect();
-        try {
-          await barrier.wait();
-          await client.query('BEGIN');
-          // Both grants and withdrawals lock tier 6a lot -> tier 7 plan -> tier 7b key
-          await client.query(`SELECT id FROM license_lots WHERE id = $1 FOR UPDATE`, [lotId]);
-          await client.query(`SELECT id FROM plans WHERE id = $1 FOR SHARE`, [plan]);
-          const keyId = keyIds[idx % 10];
-          const { rows: locked } = await client.query<{ status: string }>(
-            `SELECT status FROM license_keys WHERE id = $1 FOR UPDATE`,
-            [keyId],
-          );
-          if (locked[0]?.status !== 'IN_STORE') {
-            await client.query('ROLLBACK');
-            return { ok: false as const, code: 'NOT_IN_STORE' };
-          }
+    for (let i = 0; i < 20; i += 1) {
+      const barrier = new Barrier(2);
+      const keyId = keyIds[i];
+      const assignmentId = rightIds[i];
 
-          if (idx < 10) {
-            const right = randomUUID();
-            const emp = await w.person(`ACC-${idx}`);
-            await client.query(
-              `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id,
-                 account_identifier, normalized_account_identifier, valid_from, valid_from_basis, created_by_app_user_id)
-               VALUES ($1, $2, 'PERSONAL', 'REQUEST', $3, NULL, $4, $5, $5, '2026-09-02', 'ACTUAL', $6)`,
-              [right, w.organizationId, plan, emp, `acc-${idx}@acme.vn`, randomUUID()],
-            );
-            await client.query(`UPDATE license_keys SET status = 'ASSIGNED', assignment_id = $2 WHERE id = $1`, [
-              keyId,
-              right,
-            ]);
-          } else {
-            await client.query(`UPDATE license_keys SET status = 'WITHDRAWN' WHERE id = $1`, [keyId]);
-          }
-          await client.query('COMMIT');
-          return { ok: true as const };
-        } catch (err) {
-          await client.query('ROLLBACK').catch(() => undefined);
-          return { ok: false as const, code: (err as { code?: string }).code ?? 'UNKNOWN' };
-        } finally {
-          await client.end();
-        }
-      }),
-    );
+      const assignTask = (async () => {
+        await barrier.wait();
+        return runner.run((tx) =>
+          assignments.assign(tx, itActor(), {
+            organizationId: seed.organizationId,
+            licenseKeyId: keyId,
+            assignmentId,
+            subscriptionId: null,
+            licenseLotId: lotId,
+          }),
+        );
+      })();
+      const withdrawTask = (async () => {
+        await barrier.wait();
+        return licenseKeys.withdraw(itActor(), keyId, { reason: 'Damaged key' });
+      })();
 
-    const deadlocks = results.filter((r) => !r.ok && r.code === '40P01');
-    expect(deadlocks).toEqual([]);
-    const { rows: statuses } = await sql.query<{ status: string; n: string }>(
-      `SELECT status, count(*)::text AS n FROM license_keys WHERE license_lot_id = $1 GROUP BY status`,
-      [lotId],
-    );
-    const totalHandled = statuses
-      .filter((s) => s.status === 'ASSIGNED' || s.status === 'WITHDRAWN')
-      .reduce((sum, s) => sum + Number(s.n), 0);
-    expect(totalHandled).toBe(10);
+      const [assignOutcome, withdrawOutcome] = await Promise.allSettled([assignTask, withdrawTask]);
+      if (assignOutcome.status === 'rejected') {
+        expect(isDeadlockError(assignOutcome.reason)).toBe(false);
+        expect(assignOutcome.reason).toBeInstanceOf(LicenseKeyStateError);
+      }
+      if (withdrawOutcome.status === 'rejected') {
+        expect(isDeadlockError(withdrawOutcome.reason)).toBe(false);
+        expect(withdrawOutcome.reason).toBeInstanceOf(LicenseKeyStateError);
+      }
+      const wonCount = [assignOutcome, withdrawOutcome].filter((r) => r.status === 'fulfilled').length;
+      expect(wonCount).toBe(1);
+
+      const { rows } = await ctx.sql.query<{ status: string; withdrawn_at: Date | null }>(
+        `SELECT status::text, withdrawn_at FROM license_keys WHERE id = $1`,
+        [keyId],
+      );
+      expect(['ASSIGNED', 'IN_STORE']).toContain(rows[0].status);
+      if (rows[0].status === 'ASSIGNED') expect(rows[0].withdrawn_at).toBeNull();
+      else expect(rows[0].withdrawn_at).not.toBeNull();
+    }
   });
 });
