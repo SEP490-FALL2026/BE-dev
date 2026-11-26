@@ -82,12 +82,18 @@ describe('W3-25 P20: license-lot charges, 3-order allocation invariant (= A), an
     const requestId = randomUUID();
     const purchaseInvoiceId = randomUUID();
     const members = opts.members ?? [opts.unit.member.employeeId];
+    const policyJson = JSON.stringify({
+      version: 1,
+      branch: 'PAID_IN_CATALOG',
+      chain: ['NEED', 'SPEND_APPROVAL'],
+      slaWorkingDays: 3,
+    });
     await h.ctx.sql.query(
       `INSERT INTO access_requests
          (id, organization_id, type, branch, state, plan_id, department_id, cost_center_id,
           requester_employee_id, business_reason, submitted_at, budget_year, amount_months,
-          amount_currency, unit_price_minor)
-       VALUES ($1, $2, $3, 'PAID_IN_CATALOG', 'AWAITING_EXECUTION', $4, $5, $6, $7, 'K4 lot charges test', now(), $8, 1, 'VND', $9)`,
+          amount_minor, amount_currency, unit_price_minor, billing_cycle, pricing_status, policy, created_by_app_user_id)
+       VALUES ($1, $2, $3, 'PAID_IN_CATALOG', 'AWAITING_EXECUTION', $4, $5, $6, $7, 'K4 lot charges test', now(), $8, 1, $9, 'VND', $9, 'ANNUAL', 'PRICED', $10::jsonb, $11)`,
       [
         requestId,
         h.seed.organizationId,
@@ -98,6 +104,8 @@ describe('W3-25 P20: license-lot charges, 3-order allocation invariant (= A), an
         members[0],
         opts.year,
         opts.amountMinor.toString(),
+        policyJson,
+        h.finance.appUserId,
       ],
     );
     for (const empId of members) {

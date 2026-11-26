@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
 import { SeatLedgerApi, seatPurchaseExpectedAmount } from '../../../src/modules/catalog/public/seat-ledger.api';
+import { declareSubscription } from '../../support/builders/catalog.builder';
 import { Barrier } from '../../support/concurrency-harness';
 import { pretendBusinessToday } from '../../support/pretend-today';
 import { RevocationHarness } from '../../support/revocation-harness';
@@ -70,18 +71,7 @@ async function ensureOpenedLine(input: {
     );
   }
 
-  if (meta.ledger_opened_on !== null) {
-    await h.ctx.sql.query(`UPDATE subscription_lines SET ledger_opened_on = $2::date WHERE id = $1`, [
-      lineId,
-      input.effectiveOn,
-    ]);
-    await h.ctx.sql.query(
-      `UPDATE seat_changes
-          SET effective_on = $2::date, delta = $3
-        WHERE subscription_line_id = $1 AND reason IN ('INITIAL', 'RENEWAL')`,
-      [lineId, input.effectiveOn, input.quantity],
-    );
-  } else {
+  if (meta.ledger_opened_on === null) {
     const ledger = h.ctx.app.get(SeatLedgerApi, { strict: false });
     const runner = h.ctx.app.get(TransactionRunner);
     await runner.run((tx) =>
@@ -134,19 +124,20 @@ describe('Renewal carry purchase on ledger and grant shortcut (integration, real
   });
 
   it('Q-B: carries into a full next-period line by buying +1 on nextPeriodStartDate (2027-07-01, due 2027-07-07, unit price 6.000.000) without 409', async () => {
-    const subOld = await h.subscription(12, 'K2');
-    const planId = await h.planOf(subOld);
-    await h.ctx.sql.query(
-      `UPDATE subscriptions
-          SET billing_cycle = 'ANNUAL'::"BillingCycle",
-              commitment_term_months = 12,
-              start_date = '2026-07-01',
-              end_date = '2027-06-30',
-              unit_price_minor = 72000000,
-              monthly_unit_price_minor = 6000000
-        WHERE id = $1`,
-      [subOld],
-    );
+    const planId = await h.plan('K2', 'PER_SEAT');
+    const subOld = await declareSubscription(h.ctx, h.it1.accessToken, {
+      planId,
+      kind: 'TERM',
+      purchasedQuantity: 12,
+      unitPrice: { amount: '72000000', currency: 'VND' },
+      billingCycle: 'ANNUAL',
+      commitmentTermMonths: 12,
+      startDate: '2026-07-01',
+      endDate: '2027-06-30',
+      renewalDate: '2027-07-01',
+      autoRenew: true,
+      allowsMidTermReduction: false,
+    });
     const lineOld = await ensureOpenedLine({
       subscriptionId: subOld,
       effectiveOn: '2026-07-01',
@@ -271,20 +262,22 @@ describe('Renewal carry purchase on ledger and grant shortcut (integration, real
   });
 
   it('concurrency: 20 barriered carry-purchase || recordVendor runs on the same next line never hit 40P01', async () => {
-    const subOld = await h.subscription(30, 'K2');
-    const planId = await h.planOf(subOld);
+    const planId = await h.plan('K2', 'PER_SEAT');
     const startOld = h.inDays(-60);
     const startNext = h.inDays(30);
-    await h.ctx.sql.query(
-      `UPDATE subscriptions
-          SET billing_cycle = 'ANNUAL'::"BillingCycle",
-              commitment_term_months = 12,
-              start_date = $2::date,
-              end_date = ($3::date - 1),
-              monthly_unit_price_minor = 1000000
-        WHERE id = $1`,
-      [subOld, startOld, startNext],
-    );
+    const subOld = await declareSubscription(h.ctx, h.it1.accessToken, {
+      planId,
+      kind: 'TERM',
+      purchasedQuantity: 30,
+      unitPrice: { amount: '12000000', currency: 'VND' },
+      billingCycle: 'ANNUAL',
+      commitmentTermMonths: 12,
+      startDate: startOld,
+      endDate: h.inDays(29),
+      renewalDate: startNext,
+      autoRenew: true,
+      allowsMidTermReduction: false,
+    });
     const lineOld = await ensureOpenedLine({
       subscriptionId: subOld,
       effectiveOn: startOld,
@@ -303,10 +296,6 @@ describe('Renewal carry purchase on ledger and grant shortcut (integration, real
          FROM subscriptions old
         WHERE subscriptions.id = $1 AND old.id = $2`,
       [subNext, subOld, startNext],
-    );
-    await h.ctx.sql.query(
-      `UPDATE subscription_lines SET closed_reason = 'RENEWED', closed_on = '2027-06-30' WHERE id = $1`,
-      [lineOld],
     );
     await h.ctx.sql.query(
       `UPDATE subscription_lines SET closed_reason = 'RENEWED', closed_on = ($2::date - 1) WHERE id = $1`,
@@ -360,10 +349,19 @@ describe('Renewal carry purchase on ledger and grant shortcut (integration, real
   });
 
   it('W3-18: grant with purchase on a backfilled/opened INITIAL line writes TOP_UP +1 and passes DB capacity triggers', async () => {
-    const subId = await h.subscription(1, 'K2');
-    const planId = await h.planOf(subId);
+    const planId = await h.plan('K2', 'PER_SEAT');
     const openedOn = h.inDays(-10);
-    await h.ctx.sql.query(`UPDATE subscriptions SET start_date = $2::date WHERE id = $1`, [subId, openedOn]);
+    const subId = await declareSubscription(h.ctx, h.it1.accessToken, {
+      planId,
+      kind: 'TERM',
+      purchasedQuantity: 1,
+      unitPrice: { amount: '1000000', currency: 'VND' },
+      billingCycle: 'MONTHLY',
+      startDate: openedOn,
+      renewalDate: h.inDays(20),
+      autoRenew: true,
+      allowsMidTermReduction: false,
+    });
     const lineId = await ensureOpenedLine({
       subscriptionId: subId,
       effectiveOn: openedOn,
@@ -399,10 +397,19 @@ describe('Renewal carry purchase on ledger and grant shortcut (integration, real
   });
 
   it('F-5: IT Admin other than subscription responsible granting with purchase emits SUBSCRIPTION_SEATS_BOUGHT to R1', async () => {
-    const subId = await h.subscription(1, 'K2');
-    const planId = await h.planOf(subId);
+    const planId = await h.plan('K2', 'PER_SEAT');
     const openedOn = h.inDays(-10);
-    await h.ctx.sql.query(`UPDATE subscriptions SET start_date = $2::date WHERE id = $1`, [subId, openedOn]);
+    const subId = await declareSubscription(h.ctx, h.it1.accessToken, {
+      planId,
+      kind: 'TERM',
+      purchasedQuantity: 1,
+      unitPrice: { amount: '1000000', currency: 'VND' },
+      billingCycle: 'MONTHLY',
+      startDate: openedOn,
+      renewalDate: h.inDays(20),
+      autoRenew: true,
+      allowsMidTermReduction: false,
+    });
     await ensureOpenedLine({
       subscriptionId: subId,
       effectiveOn: openedOn,

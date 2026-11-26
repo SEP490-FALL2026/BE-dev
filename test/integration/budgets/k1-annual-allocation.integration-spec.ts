@@ -73,13 +73,21 @@ describe('W3-23 P13b: K1 annual allocations, 01/01 pairing, F8 transfer (D-16), 
     const assignmentId = randomUUID();
     const purchaseInvoiceId = randomUUID();
 
+    const policyJson = JSON.stringify({
+      version: 1,
+      branch: 'PAID_IN_CATALOG',
+      chain: ['NEED', 'SPEND_APPROVAL'],
+      slaWorkingDays: 3,
+    });
     await h.ctx.sql.query(
       `INSERT INTO access_requests
          (id, organization_id, type, branch, state, plan_id, department_id, cost_center_id,
           requester_employee_id, business_reason, submitted_at, budget_year, amount_months,
-          next_year_amount_minor, amount_currency, term_months, unit_price_minor, billing_cycle, expected_end_date)
+          next_year_amount_minor, amount_minor, amount_currency, term_months, unit_price_minor,
+          billing_cycle, pricing_status, expected_end_date, policy, created_by_app_user_id)
        VALUES ($1, $2, 'GRANT', 'PAID_IN_CATALOG', 'COMPLETED', $3, $4, $5, $6, 'K1 annual allocation test',
-               '2026-11-05T02:00:00Z', $7, 2, $8, 'VND', 12, $9, 'MONTHLY', '2027-11-04')`,
+               '2026-11-05T02:00:00Z', $7, 2, $8, 900000, 'VND', 12, $9, 'MONTHLY', 'PRICED',
+               '2027-11-04', $10::jsonb, $11)`,
       [
         requestId,
         h.seed.organizationId,
@@ -90,6 +98,8 @@ describe('W3-23 P13b: K1 annual allocations, 01/01 pairing, F8 transfer (D-16), 
         Y1,
         '4500000',
         MONTHLY_PRICE.toString(),
+        policyJson,
+        h.finance.appUserId,
       ],
     );
 

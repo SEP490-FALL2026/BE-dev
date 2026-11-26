@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
+import { isCheckViolation } from '../../../src/infrastructure/database/unique-violation';
 import type { AuthenticatedPrincipal } from '../../../src/infrastructure/security/tokens/access-token-verifier.port';
 import { LicenseKeyAssignmentService } from '../../../src/modules/licensing/license-key/license-key-assignment.service';
 import { LicenseKeyStateError } from '../../../src/modules/licensing/license-key/license-key.errors';
@@ -185,8 +186,8 @@ describe('the licenses of a lot (integration, real PostgreSQL & real services, F
       }),
     );
 
-    await expect(
-      runner.run((tx) =>
+    const overAssignError = await runner
+      .run((tx) =>
         assignments.assign(tx, itActor(), {
           organizationId: seed.organizationId,
           licenseKeyId: extraKeyId,
@@ -194,8 +195,9 @@ describe('the licenses of a lot (integration, real PostgreSQL & real services, F
           subscriptionId: null,
           licenseLotId: lotId,
         }),
-      ),
-    ).rejects.toMatchObject({ code: '23514', constraint: 'license_lots_capacity' });
+      )
+      .catch((error: unknown) => error);
+    expect(isCheckViolation(overAssignError, 'license_lots_capacity')).toBe(true);
   });
 
   it('counts unkeyed legacy assignments once and keyed assignments once against device_activation_occupied', async () => {
@@ -219,8 +221,8 @@ describe('the licenses of a lot (integration, real PostgreSQL & real services, F
     expect(await occupied()).toBe(3);
 
     const keyId = await w.key(legacy);
-    await expect(
-      runner.run((tx) =>
+    const legacyOverCapError = await runner
+      .run((tx) =>
         assignments.assign(tx, itActor(), {
           organizationId: w.organizationId,
           licenseKeyId: keyId,
@@ -228,8 +230,9 @@ describe('the licenses of a lot (integration, real PostgreSQL & real services, F
           subscriptionId: legacy,
           licenseLotId: legacy,
         }),
-      ),
-    ).rejects.toMatchObject({ constraint: 'license_lots_capacity' });
+      )
+      .catch((error: unknown) => error);
+    expect(isCheckViolation(legacyOverCapError, 'license_lots_capacity')).toBe(true);
     await ctx.sql.query(`UPDATE license_lots SET license_count = 3 WHERE id = $1`, [legacy]);
     await runner.run((tx) =>
       assignments.assign(tx, itActor(), {

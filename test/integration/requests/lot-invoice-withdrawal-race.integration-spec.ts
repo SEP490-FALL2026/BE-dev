@@ -55,9 +55,9 @@ describe('lot invoice confirmation vs group member withdrawal race (integration,
       `INSERT INTO access_requests
          (id, organization_id, type, branch, state, plan_id, department_id, cost_center_id,
           requester_employee_id, business_reason, submitted_at, budget_year, amount_months,
-          amount_currency, unit_price_minor, amount_minor, pricing_status, policy, created_by_app_user_id)
+          amount_currency, unit_price_minor, amount_minor, billing_cycle, pricing_status, policy, created_by_app_user_id)
        VALUES ($1, $2, 'GROUP_GRANT', 'PAID_IN_CATALOG', 'AWAITING_EXECUTION', $3, $4, $5, $6,
-               'K4 group lot race test', now(), $7, 1, 'VND', 12000000, $8, 'PRICED', $9::jsonb, $10)`,
+               'K4 group lot race test', now(), $7, 1, 'VND', 12000000, $8, 'ANNUAL', 'PRICED', $9::jsonb, $10)`,
       [
         reqId,
         h.seed.organizationId,
