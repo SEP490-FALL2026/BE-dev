@@ -39,6 +39,9 @@ export const RUNTIME_TABLE_EXCEPTIONS: Readonly<Record<string, readonly string[]
   policy_acknowledgements: ['INSERT', 'SELECT'],
   // The answers of a checklist a decision was made with are evidence too: added to and never changed (its triggers refuse it first).
   decision_checklists: ['INSERT', 'SELECT'],
+  // Append-only seat ledger and invoice allocations: added to and never changed (their triggers refuse UPDATE/DELETE/TRUNCATE first).
+  seat_changes: ['INSERT', 'SELECT'],
+  invoice_allocations: ['INSERT', 'SELECT'],
 };
 
 /** Sequence privileges the runtime role holds on every sequence of `public`: drawing numbers (`nextval`) and `currval`. */
