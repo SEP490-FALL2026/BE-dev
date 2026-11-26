@@ -273,6 +273,17 @@ describe('W3-23 P13b: K1 annual allocations, 01/01 pairing, F8 transfer (D-16), 
     expect(spent.get(`${uAfter.department.unitId}:${Y1}`)).toBe(990_000n);
     expect(spent.get(`${uAfter.department.unitId}:${Y2}`)).toBe(4_950_000n);
 
+    // F-8: priceBasisOf reads invoice_allocations (actual) & invoice_year_applications (basis), never 5.940.000 vs 900.000 (560%)
+    const basis = await invRepo.priceBasisOf([
+      { costCenterId: uBefore.department.unitId, year: Y1 },
+      { costCenterId: uBefore.department.unitId, year: Y2 },
+    ]);
+    expect(basis.get(`${uBefore.department.unitId}:${Y1}`)).toEqual({ basisMinor: 900_000n, actualMinor: 990_000n });
+    expect(basis.get(`${uBefore.department.unitId}:${Y2}`)).toEqual({
+      basisMinor: 4_500_000n,
+      actualMinor: 4_950_000n,
+    });
+
     const { rows: states } = await h.ctx.sql.query<{ state: string; applied_minor: string }>(
       `SELECT state::text, applied_minor::text FROM budget_commitments WHERE request_id IN ($1, $2) AND year = $3`,
       [s1.requestId, s2.requestId, Y2],

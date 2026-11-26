@@ -127,3 +127,32 @@ describe('InvoiceRepo pool variance closure', () => {
     expect(record?.poolVarianceInReview).toBe(false);
   });
 });
+
+describe('InvoiceRepo.priceBasisOf (F-8)', () => {
+  it('separates unallocated invoices, COST_CENTER invoice_allocations, and invoice_year_applications via UNION ALL without JOIN row multiplication', async () => {
+    const calls: string[] = [];
+    const tx = {
+      $queryRaw: jest.fn((query: TemplateStringsArray | { strings?: string[] }) => {
+        const sql = Array.isArray(query)
+          ? query.join('?')
+          : ((query as { strings?: string[] }).strings?.join('?') ?? '');
+        calls.push(sql);
+
+        return Promise.resolve([{ cost_center_id: 'cc-1', year: 2026, basis: '900000', actual: '990000' }]);
+      }),
+    } as unknown as DbTx;
+    const repo = new InvoiceRepo({} as PrismaService);
+
+    const res = await repo.priceBasisOf([{ costCenterId: 'cc-1', year: 2026 }], tx, '2027-01-01');
+
+    expect(res.get('cc-1:2026')).toEqual({ basisMinor: 900_000n, actualMinor: 990_000n });
+    const sql = calls[0] ?? '';
+    expect(sql).toContain('NOT EXISTS (SELECT 1 FROM invoice_allocations');
+    expect(sql).toContain('FROM invoice_allocations l');
+    expect(sql).toContain("l.bucket = 'COST_CENTER'");
+    expect(sql).toContain('FROM invoice_year_applications a');
+    expect(sql).toContain('UNION ALL');
+    // Allocations and applications must never be joined in a single FROM clause (prevents row multiplication)
+    expect(sql).not.toMatch(/FROM\s+invoice_allocations[\s\S]*JOIN\s+invoice_year_applications/i);
+  });
+});

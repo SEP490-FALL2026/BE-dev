@@ -303,13 +303,43 @@ export class InvoiceRepo {
     const rows = await (tx ?? this.prisma).$queryRaw<
       { cost_center_id: string; year: number; basis: string; actual: string }[]
     >`
-      SELECT COALESCE(i.cost_center_id, c.cost_center_id) AS cost_center_id,
-             COALESCE(EXTRACT(YEAR FROM i.service_month)::int, c.year) AS year,
-             SUM(i.applied_minor)::text AS basis, SUM(i.actual_cost_minor)::text AS actual
-        FROM invoices i
-        LEFT JOIN budget_commitments c ON c.id = i.commitment_id
-       WHERE i.commitment_id IS NOT NULL
-         AND (COALESCE(i.cost_center_id, c.cost_center_id), COALESCE(EXTRACT(YEAR FROM i.service_month)::int, c.year)) IN (${wanted}) ${bound}
+      SELECT cost_center_id, year, SUM(basis)::text AS basis, SUM(actual)::text AS actual
+        FROM (
+          SELECT COALESCE(i.cost_center_id, c.cost_center_id) AS cost_center_id,
+                 COALESCE(EXTRACT(YEAR FROM i.service_month)::int, c.year) AS year,
+                 i.applied_minor AS basis,
+                 i.actual_cost_minor AS actual
+            FROM invoices i
+            LEFT JOIN budget_commitments c ON c.id = i.commitment_id
+           WHERE i.commitment_id IS NOT NULL
+             AND (COALESCE(i.cost_center_id, c.cost_center_id), COALESCE(EXTRACT(YEAR FROM i.service_month)::int, c.year)) IN (${wanted}) ${bound}
+             AND NOT EXISTS (SELECT 1 FROM invoice_allocations a WHERE a.invoice_id = i.id)
+          UNION ALL
+          SELECT l.cost_center_id,
+                 EXTRACT(YEAR FROM l.month)::int AS year,
+                 0::bigint AS basis,
+                 l.amount_minor AS actual
+            FROM invoice_allocations l
+            JOIN invoices i ON i.id = l.invoice_id
+           WHERE l.bucket = 'COST_CENTER'
+             AND (l.cost_center_id, EXTRACT(YEAR FROM l.month)::int) IN (${wanted}) ${bound}
+             AND EXISTS (
+               SELECT 1 FROM invoice_year_applications ya
+                WHERE ya.invoice_id = l.invoice_id
+                  AND ya.year = EXTRACT(YEAR FROM l.month)::int
+                  AND ya.cost_center_id = l.cost_center_id
+                  AND ya.commitment_id IS NOT NULL
+             )
+          UNION ALL
+          SELECT a.cost_center_id,
+                 a.year,
+                 a.applied_minor AS basis,
+                 0::bigint AS actual
+            FROM invoice_year_applications a
+            JOIN invoices i ON i.id = a.invoice_id
+           WHERE a.commitment_id IS NOT NULL
+             AND (a.cost_center_id, a.year) IN (${wanted}) ${bound}
+        ) price_basis
        GROUP BY 1, 2`;
     for (const row of rows) {
       basis.set(`${row.cost_center_id}:${row.year}`, {
