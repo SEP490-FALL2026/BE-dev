@@ -8,7 +8,7 @@ import { OrganizationApi } from '../../organization/public/organization.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { PersonnelAccessRefusedError } from '../public/personnel.errors';
 import { ItHandoverRefusedError } from './it-handover.errors';
-import { handoverRefusal, milestoneDay, milestoneReached } from './it-handover.policy';
+import { handoverRefusal, milestoneDay, milestoneReached, remainingResponsibilities } from './it-handover.policy';
 import { ItHandoverRepo } from './it-handover.repo';
 import { ItHandoverSourceRepo } from './it-handover-source.repo';
 import { ItHandoverTellingService } from './it-handover-telling.service';
@@ -73,22 +73,35 @@ export class ItHandoverService {
         milestoneReached: milestoneReached(day, today),
         actorEmployeeId: actor.employeeId,
         leavingEmployeeId: employeeId,
-        remaining: (left?.subscriptions ?? 0) + (left?.applications ?? 0),
+        remaining: remainingResponsibilities(left),
       });
       if (refusal) throw new ItHandoverRefusedError(refusal);
 
       const moved = await this.move(tx, actor, source, employeeId, toEmployeeId);
       // What was counted a moment ago can have been moved by a write of its own since: nothing moved is nothing to record (the item keeps no empty hand-over).
-      if (moved.subscriptions + moved.applications === 0) throw new ItHandoverRefusedError('NOTHING_TO_HAND_OVER');
+      if (moved.subscriptions + moved.applications + moved.workspaces + moved.licenseLots === 0)
+        throw new ItHandoverRefusedError('NOTHING_TO_HAND_OVER');
       const at = new Date();
       await this.items.recordDone(tx, {
         organizationId: facts.organizationId,
         source,
         done: { at, toEmployeeId, subscriptions: moved.subscriptions, applications: moved.applications },
       });
-      await this.telling.tell(tx, actor, facts.organizationId, source, { employeeId, toEmployeeId, ...moved });
+      await this.telling.tell(tx, actor, facts.organizationId, source, {
+        employeeId,
+        toEmployeeId,
+        subscriptions: moved.subscriptions,
+        applications: moved.applications,
+      });
 
-      return { source, fromEmployeeId: employeeId, toEmployeeId, ...moved, at };
+      return {
+        source,
+        fromEmployeeId: employeeId,
+        toEmployeeId,
+        subscriptions: moved.subscriptions,
+        applications: moved.applications,
+        at,
+      };
     });
   }
 
@@ -99,11 +112,16 @@ export class ItHandoverService {
     source: HandoverSource,
     fromEmployeeId: string,
     toEmployeeId: string,
-  ): Promise<{ subscriptions: number; applications: number }> {
+  ): Promise<{ subscriptions: number; applications: number; workspaces: number; licenseLots: number }> {
     try {
       const moved = await this.catalog.transferResponsibilities(tx, actor, fromEmployeeId, toEmployeeId, source);
 
-      return { subscriptions: moved.subscriptionIds.length, applications: moved.applicationIds.length };
+      return {
+        subscriptions: moved.subscriptionIds.length,
+        applications: moved.applicationIds.length,
+        workspaces: moved.workspaceIds.length,
+        licenseLots: moved.licenseLotIds.length,
+      };
     } catch (error) {
       if (error instanceof ResponsibilityHandoverRefusedError)
         throw new ItHandoverRefusedError(error.problem === 'SAME_EMPLOYEE' ? 'SAME_PERSON' : 'TARGET_NOT_IT_ADMIN');

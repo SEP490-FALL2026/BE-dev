@@ -141,7 +141,7 @@ export class PersonnelDashboardFactsService {
     return employeeIds.filter((employeeId) => {
       const left = answers.get(employeeId);
 
-      return left !== undefined && left.subscriptions + left.applications > 0;
+      return left !== undefined && left.subscriptions + left.applications + left.workspaces + left.licenseLots > 0;
     }).length;
   }
 }

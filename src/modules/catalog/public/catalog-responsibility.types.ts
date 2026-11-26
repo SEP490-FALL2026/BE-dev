@@ -1,7 +1,9 @@
-/** What one IT Admin answers for in the catalog: the subscriptions and the applications that name them responsible. */
+/** What one IT Admin answers for in the catalog: subscriptions, applications, workspaces, and license lots that name them responsible. */
 export interface ResponsibilityCounts {
   subscriptions: number;
   applications: number;
+  workspaces: number;
+  licenseLots: number;
 }
 
 /**

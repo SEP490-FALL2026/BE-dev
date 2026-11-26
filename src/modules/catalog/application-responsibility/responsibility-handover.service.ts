@@ -33,15 +33,26 @@ export class ResponsibilityHandoverService {
     private readonly lots: LicenseLotRepo,
   ) {}
 
-  /** How many subscriptions and applications each of these employees answers for, in two statements; an employee with none is counted zero. */
+  /** How many subscriptions, applications, workspaces, and license lots each of these employees answers for; an employee with none is counted zero. */
   async countOf(employeeIds: readonly string[], tx?: DbTx): Promise<Map<string, ResponsibilityCounts>> {
     const ids = [...new Set(employeeIds)];
+    if (ids.length === 0) return new Map();
     // One statement at a time: the caller's transaction runs a single query on its client.
     const subscriptions = await this.subscriptions.countResponsibleOf(ids, tx);
     const applications = await this.applications.countResponsibleOf(ids, tx);
+    const workspaces = await this.workspaces.countResponsibleOf(ids, tx);
+    const licenseLots = await this.lots.countResponsibleOf(ids, tx);
 
     return new Map(
-      ids.map((id) => [id, { subscriptions: subscriptions.get(id) ?? 0, applications: applications.get(id) ?? 0 }]),
+      ids.map((id) => [
+        id,
+        {
+          subscriptions: subscriptions.get(id) ?? 0,
+          applications: applications.get(id) ?? 0,
+          workspaces: workspaces.get(id) ?? 0,
+          licenseLots: licenseLots.get(id) ?? 0,
+        },
+      ]),
     );
   }
 

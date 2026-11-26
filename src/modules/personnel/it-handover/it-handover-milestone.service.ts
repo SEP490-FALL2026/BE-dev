@@ -3,7 +3,7 @@ import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { CatalogResponsibilityApi } from '../../catalog/public/catalog-responsibility.api';
 import { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
-import { pendingNoticeOwed } from './it-handover.policy';
+import { pendingNoticeOwed, remainingResponsibilities } from './it-handover.policy';
 import type { HandoverSource } from './it-handover.types';
 
 /**
@@ -27,7 +27,7 @@ export class ItHandoverMilestoneService {
     // A departure puts the workspaces its person administers at risk; a transfer does not (the account of the person goes on).
     if (input.source.kind === 'OFFBOARDING_CASE') await this.vendorAdminsLost(tx, input);
     const left = (await this.catalog.countResponsibilitiesOf([input.employeeId], tx)).get(input.employeeId);
-    const remaining = (left?.subscriptions ?? 0) + (left?.applications ?? 0);
+    const remaining = remainingResponsibilities(left);
     if (!pendingNoticeOwed({ milestoneReached: true, cancelled: false, remaining })) return 0;
 
     return this.notifier.itHandoverPending(tx, input);

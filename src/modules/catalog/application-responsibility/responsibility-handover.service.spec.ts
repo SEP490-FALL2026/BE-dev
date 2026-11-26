@@ -26,6 +26,30 @@ function setup(subscriptionIds: string[], workingIds: string[]) {
   return { service, findActiveResponsibleItAdminIdsOfPlan, workingAdminsAmong };
 }
 
+describe('ResponsibilityHandoverService.countOf', () => {
+  it('counts subscriptions, applications, workspaces, and licenseLots per employee and defaults absent ones to 0', async () => {
+    const applications = { countResponsibleOf: jest.fn().mockResolvedValue(new Map([['it-1', 2]])) };
+    const subscriptions = { countResponsibleOf: jest.fn().mockResolvedValue(new Map([['it-1', 1]])) };
+    const workspaces = { countResponsibleOf: jest.fn().mockResolvedValue(new Map([['it-2', 1]])) };
+    const lots = { countResponsibleOf: jest.fn().mockResolvedValue(new Map([['it-2', 3]])) };
+    const service = new ResponsibilityHandoverService(
+      applications as unknown as ApplicationRepo,
+      subscriptions as unknown as SubscriptionRepo,
+      {} as PlanFactsService,
+      {} as OrganizationReadApi,
+      {} as AuditApi,
+      workspaces as unknown as WorkspaceRepo,
+      lots as unknown as LicenseLotRepo,
+    );
+
+    const counts = await service.countOf(['it-1', 'it-2', 'it-3'], TX);
+
+    expect(counts.get('it-1')).toEqual({ subscriptions: 1, applications: 2, workspaces: 0, licenseLots: 0 });
+    expect(counts.get('it-2')).toEqual({ subscriptions: 0, applications: 0, workspaces: 1, licenseLots: 3 });
+    expect(counts.get('it-3')).toEqual({ subscriptions: 0, applications: 0, workspaces: 0, licenseLots: 0 });
+  });
+});
+
 describe('ResponsibilityHandoverService.usableSubscriptionItAdminsOfPlan', () => {
   it('returns empty without calling workingAdminsAmong when no active subscription names a responsible IT Admin', async () => {
     const { service, workingAdminsAmong } = setup([], []);

@@ -60,4 +60,27 @@ describe('ItHandoverMilestoneService', () => {
     });
     expect(itHandoverPending).toHaveBeenCalledTimes(1);
   });
+
+  it('notifies Super Admin with itHandoverPending when the leaving IT Admin only holds workspaces and license lots', async () => {
+    const catalog = {
+      vendorAdminRolesOf: jest.fn().mockResolvedValue([]),
+      countResponsibilitiesOf: jest
+        .fn()
+        .mockResolvedValue(new Map([['leaver', { subscriptions: 0, applications: 0, workspaces: 1, licenseLots: 1 }]])),
+    } as unknown as CatalogResponsibilityApi;
+    const workspaceAdminNotWorking = jest.fn().mockResolvedValue(0);
+    const itHandoverPending = jest.fn().mockResolvedValue(1);
+    const notifier = { workspaceAdminNotWorking, itHandoverPending } as unknown as PersonnelNotifier;
+    const service = new ItHandoverMilestoneService(catalog, notifier);
+
+    const told = await service.reached(TX, {
+      organizationId: 'org-1',
+      source: { kind: 'OFFBOARDING_CASE', id: 'case-1' },
+      employeeId: 'leaver',
+      dueOn: '2026-11-10',
+    });
+
+    expect(told).toBe(1);
+    expect(itHandoverPending).toHaveBeenCalledTimes(1);
+  });
 });

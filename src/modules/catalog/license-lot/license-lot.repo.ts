@@ -219,6 +219,17 @@ export class LicenseLotRepo {
     return ids;
   }
 
+  /** How many license lots name each of these IT Admins responsible; one who answers for none is absent. */
+  async countResponsibleOf(employeeIds: readonly string[], tx?: DbTx): Promise<Map<string, number>> {
+    if (employeeIds.length === 0) return new Map();
+    const rows = await (tx ?? this.prisma).$queryRaw<{ employee_id: string; total: number }[]>`
+      SELECT responsible_it_admin_employee_id AS employee_id, count(*)::int AS total
+        FROM license_lots WHERE responsible_it_admin_employee_id = ANY(${[...employeeIds]}::uuid[])
+       GROUP BY responsible_it_admin_employee_id`;
+
+    return new Map(rows.map((row) => [row.employee_id, row.total]));
+  }
+
   /** Records what Finance confirmed the invoice of the lot at; refuses overwriting an already-invoiced lot (`F14a`). */
   async setInvoiceActual(tx: DbTx, id: string, actualMinor: bigint): Promise<void> {
     const { count } = await tx.licenseLot.updateMany({

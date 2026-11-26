@@ -47,6 +47,18 @@ export function handoverState(facts: { remaining: number }): ItHandoverState {
   return facts.remaining > 0 ? 'PENDING' : 'DONE';
 }
 
+/** Total catalog responsibilities held by an IT Admin across subscriptions, applications, workspaces, and license lots. */
+export function remainingResponsibilities(counts?: {
+  subscriptions: number;
+  applications: number;
+  workspaces?: number;
+  licenseLots?: number;
+}): number {
+  if (!counts) return 0;
+
+  return counts.subscriptions + counts.applications + (counts.workspaces ?? 0) + (counts.licenseLots ?? 0);
+}
+
 /**
  * The plans an admin at the vendor who leaves puts out of reach (`QĐ-110k`, SPEC T-IT, X-IT.6): those that nobody else who still works as an IT Admin
  * administers. Two or more left is fine and one left is only the flag a reader of the subscription sees; none left alerts the active subscription

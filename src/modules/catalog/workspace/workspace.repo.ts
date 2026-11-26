@@ -245,6 +245,17 @@ export class WorkspaceRepo {
     await tx.workspace.update({ where: { id }, data: { responsibleItAdminEmployeeId: employeeId } });
   }
 
+  /** How many workspaces name each of these IT Admins responsible; one who answers for none is absent. */
+  async countResponsibleOf(employeeIds: readonly string[], tx?: DbTx): Promise<Map<string, number>> {
+    if (employeeIds.length === 0) return new Map();
+    const rows = await (tx ?? this.prisma).$queryRaw<{ employee_id: string; total: number }[]>`
+      SELECT responsible_it_admin_employee_id AS employee_id, count(*)::int AS total
+        FROM workspaces WHERE responsible_it_admin_employee_id = ANY(${[...employeeIds]}::uuid[])
+       GROUP BY responsible_it_admin_employee_id`;
+
+    return new Map(rows.map((row) => [row.employee_id, row.total]));
+  }
+
   /**
    * How many live subscriptions each of these workspaces holds on `today`: unclosed (`closed_at IS NULL`) drafts, or active periods not continued
    * by a later period (`renewed_from_id`) and not past their `end_date` (perpetuals have no end). Matches `isLiveSubscription` + `closed_at IS NULL`.
