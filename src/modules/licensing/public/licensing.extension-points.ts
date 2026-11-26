@@ -91,6 +91,8 @@ export interface GrantRequestGate {
     lotRequests: readonly { lotId: string; requestId: string }[],
     tx?: DbTx,
   ): Promise<Map<string, { beneficiaries: number; chargedExcess: number }>>;
+  /** Whether the lot already has at least one `license_lot_charges` row. */
+  hasLotCharges?(lotId: string, tx?: DbTx): Promise<boolean>;
 }
 
 /** The one gate of requests the provisioning asks (bound by requests; every graph that loads licensing loads it). */

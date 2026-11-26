@@ -174,6 +174,10 @@ export class AccessRequestGrantGate implements GrantRequestGate, OnModuleInit {
     return this.settlement.reservedForRequestLots(lotRequests, tx);
   }
 
+  hasLotCharges(lotId: string, tx?: DbTx): Promise<boolean> {
+    return this.settlement.hasLotCharges(lotId, tx);
+  }
+
   async isWithdrawing(tx: DbTx, requestId: string, employeeId?: string): Promise<boolean> {
     const request = await this.repo.findById(requestId, tx);
     if (request?.type === 'GROUP_GRANT') {

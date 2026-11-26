@@ -115,7 +115,13 @@ export class LicenseLotService {
   }
 
   private async requirePriceOpen(tx: DbTx, lot: LicenseLotRecord): Promise<void> {
-    const keys = await this.occupancy.get().keyCountsOfLots([lot.id], tx);
-    assertPriceOpen({ invoiceActualMinor: lot.invoiceActualMinor, keysAssigned: keys.get(lot.id)?.assigned ?? 0 });
+    const reader = this.occupancy.get();
+    const keys = await reader.keyCountsOfLots([lot.id], tx);
+    const hasUsageHistory = await reader.hasLotBeenUsed(lot.id, tx);
+    assertPriceOpen({
+      invoiceActualMinor: lot.invoiceActualMinor,
+      keysAssigned: keys.get(lot.id)?.assigned ?? 0,
+      hasUsageHistory,
+    });
   }
 }

@@ -1,10 +1,12 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import type { BusinessDate } from '../../../../core/business-date';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
+import { AuditApi } from '../../../audit/public/audit.api';
 import { SeatOccupancyHook, type SeatOccupancyReader } from '../../../catalog/public/catalog.extension-points';
 import type { OpenSeatHolding, OpenSeatHoldings } from '../../../catalog/public/catalog.types';
 import { LicenseLotApi } from '../../../catalog/public/license-lot.api';
 import { DeviceActivationRepo } from '../../device-activation/device-activation.repo';
+import { GrantRequestGateHook } from '../../public/licensing.extension-points';
 import { SharedPoolCapacityRepo } from '../../shared-pool/shared-pool-capacity.repo';
 import { AssignmentRepo } from '../assignment.repo';
 
@@ -26,6 +28,8 @@ export class AssignmentSeatOccupancy implements SeatOccupancyReader, OnModuleIni
     private readonly deviceActivations: DeviceActivationRepo,
     private readonly lots: LicenseLotApi,
     private readonly hook: SeatOccupancyHook,
+    private readonly audit: AuditApi,
+    private readonly gate: GrantRequestGateHook,
   ) {}
 
   onModuleInit(): void {
@@ -52,6 +56,26 @@ export class AssignmentSeatOccupancy implements SeatOccupancyReader, OnModuleIni
     tx?: DbTx,
   ): Promise<ReadonlyMap<string, { inStore: number; assigned: number; withdrawn: number }>> {
     return this.deviceActivations.keyCountsOfLots(lotIds, tx);
+  }
+
+  async hasLotBeenUsed(lotId: string, tx?: DbTx): Promise<boolean> {
+    if (await this.deviceActivations.hasLotKeyHistory(lotId, tx)) return true;
+    if (tx) {
+      const keyIds = await this.deviceActivations.lotKeyIds(lotId, tx);
+      if (keyIds.length > 0) {
+        const events = await this.audit.pageOfResources(
+          tx,
+          keyIds.map((id) => ({ type: 'LicenseKey', id })),
+          { actions: ['LICENSE_KEY.ASSIGNED'], onlySubject: null, skip: 0, take: 1 },
+        );
+        if (events.total > 0) return true;
+      }
+    }
+    if (this.gate.isBound() && this.gate.get().hasLotCharges) {
+      return Boolean(await this.gate.get().hasLotCharges?.(lotId, tx));
+    }
+
+    return false;
   }
 
   openGrantTasksWithoutKeyOfPlans(planIds: readonly string[], tx?: DbTx) {

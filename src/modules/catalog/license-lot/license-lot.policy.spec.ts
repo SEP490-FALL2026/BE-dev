@@ -6,6 +6,7 @@ import {
   LicenseLotRequestRequiredError,
   LicenseLotVendorAdminsRequiredError,
 } from './license-lot.errors';
+import { toLicenseLotApiException } from './license-lot.http-errors';
 import {
   assertCreatable,
   assertLotVendorAdminsRecorded,
@@ -69,10 +70,25 @@ describe('the contract of a lot (QĐ-115au)', () => {
 });
 
 describe('the price of a lot and its keys', () => {
-  it('is set until a key of the lot is given or an invoice of it is confirmed', () => {
+  it('is set until a key of the lot is given, an invoice of it is confirmed, or usage/charge history exists', () => {
     expect(() => assertPriceOpen({ invoiceActualMinor: null, keysAssigned: 0 })).not.toThrow();
-    expect(() => assertPriceOpen({ invoiceActualMinor: 1n, keysAssigned: 0 })).toThrow(LicenseLotPriceLockedError);
-    expect(() => assertPriceOpen({ invoiceActualMinor: null, keysAssigned: 1 })).toThrow(LicenseLotPriceLockedError);
+    expect(() => assertPriceOpen({ invoiceActualMinor: null, keysAssigned: 0, hasUsageHistory: false })).not.toThrow();
+
+    for (const bad of [
+      { invoiceActualMinor: 1n, keysAssigned: 0 },
+      { invoiceActualMinor: null, keysAssigned: 1 },
+      { invoiceActualMinor: null, keysAssigned: 0, hasUsageHistory: true },
+    ]) {
+      let caught: unknown;
+      try {
+        assertPriceOpen(bad);
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(LicenseLotPriceLockedError);
+      const mapped = toLicenseLotApiException(caught) as { getResponse?: () => { code?: string } };
+      expect(mapped.getResponse?.().code).toBe('LICENSE_LOT.PRICE_LOCKED');
+    }
   });
 
   it('says what is free and worth: a lot of 3 with 1 taken and 1 key in the store has 2 free and 1 to grant', () => {

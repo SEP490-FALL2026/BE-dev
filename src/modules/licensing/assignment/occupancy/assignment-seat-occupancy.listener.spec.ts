@@ -1,6 +1,8 @@
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
+import type { AuditApi } from '../../../audit/public/audit.api';
 import { SeatOccupancyHook } from '../../../catalog/public/catalog.extension-points';
 import type { LicenseLotApi } from '../../../catalog/public/license-lot.api';
+import type { GrantRequestGateHook } from '../../public/licensing.extension-points';
 import type { DeviceActivationRepo } from '../../device-activation/device-activation.repo';
 import type { SharedPoolCapacityRepo } from '../../shared-pool/shared-pool-capacity.repo';
 import type { AssignmentRepo } from '../assignment.repo';
@@ -25,6 +27,8 @@ describe('AssignmentSeatOccupancy (S-6)', () => {
 
     const deviceActivations = {
       keyCountsOfLots: jest.fn().mockResolvedValue(new Map([['lot-1', { inStore: 2, assigned: 1, withdrawn: 0 }]])),
+      hasLotKeyHistory: jest.fn().mockResolvedValue(false),
+      lotKeyIds: jest.fn().mockResolvedValue([]),
       occupiedBySubscription: jest.fn().mockResolvedValue(3),
       occupiedBySubscriptions: jest.fn().mockResolvedValue(
         new Map([
@@ -40,9 +44,16 @@ describe('AssignmentSeatOccupancy (S-6)', () => {
         .mockImplementation((ids: string[]) => Promise.resolve(new Set(ids.filter((id) => lotIds.includes(id))))),
     } as unknown as LicenseLotApi;
     const hook = { bind: jest.fn() } as unknown as SeatOccupancyHook;
-    const listener = new AssignmentSeatOccupancy(repo, capacity, deviceActivations, lots, hook);
+    const audit = {
+      pageOfResources: jest.fn().mockResolvedValue({ rows: [], total: 0 }),
+    } as unknown as AuditApi;
+    const gate = {
+      isBound: jest.fn().mockReturnValue(true),
+      get: jest.fn().mockReturnValue({ hasLotCharges: jest.fn().mockResolvedValue(false) }),
+    } as unknown as GrantRequestGateHook;
+    const listener = new AssignmentSeatOccupancy(repo, capacity, deviceActivations, lots, hook, audit, gate);
 
-    return { listener, repo, capacity, deviceActivations };
+    return { listener, repo, capacity, deviceActivations, audit, gate };
   }
 
   it('adds device_activation_occupied into occupiedBySubscription', async () => {
@@ -89,6 +100,36 @@ describe('AssignmentSeatOccupancy (S-6)', () => {
       const map = await listener.seatsOfSubscriptions(['sub-seat', 'sub-key-only'], day, tx);
       expect(map.get('sub-seat')).toEqual({ occupied: 1, inRevocation: 1 });
       expect(map.get('sub-key-only')).toEqual({ occupied: 4, inRevocation: 0 });
+    });
+  });
+
+  describe('lot usage history (T-5)', () => {
+    it('returns true when deviceActivations reports key assignment or device activation history', async () => {
+      const { listener, deviceActivations } = setup();
+      (deviceActivations.hasLotKeyHistory as jest.Mock).mockResolvedValueOnce(true);
+
+      await expect(listener.hasLotBeenUsed('lot-1', tx)).resolves.toBe(true);
+    });
+
+    it('returns true when a key of the lot has LICENSE_KEY.ASSIGNED audit history after revocation', async () => {
+      const { listener, deviceActivations, audit } = setup();
+      (deviceActivations.lotKeyIds as jest.Mock).mockResolvedValueOnce(['key-1']);
+      (audit.pageOfResources as jest.Mock).mockResolvedValueOnce({ rows: [], total: 1 });
+
+      await expect(listener.hasLotBeenUsed('lot-1', tx)).resolves.toBe(true);
+    });
+
+    it('returns true when budgets records at least one license_lot_charges row', async () => {
+      const { listener, gate } = setup();
+      (gate.get().hasLotCharges as jest.Mock).mockResolvedValueOnce(true);
+
+      await expect(listener.hasLotBeenUsed('lot-1', tx)).resolves.toBe(true);
+    });
+
+    it('returns false when the lot has never been assigned, activated, or charged', async () => {
+      const { listener } = setup();
+
+      await expect(listener.hasLotBeenUsed('lot-1', tx)).resolves.toBe(false);
     });
   });
 });

@@ -46,9 +46,15 @@ export function judgeContractChange(input: {
   return 'CHANGED';
 }
 
-/** The price of a lot is set until a key of it is given or an invoice of it is confirmed. Throws LicenseLotPriceLockedError. */
-export function assertPriceOpen(input: { invoiceActualMinor: bigint | null; keysAssigned: number }): void {
-  if (input.invoiceActualMinor !== null || input.keysAssigned > 0) throw new LicenseLotPriceLockedError();
+/** The price of a lot is set until a key of it is given/activated/charged or an invoice of it is confirmed. Throws LicenseLotPriceLockedError. */
+export function assertPriceOpen(input: {
+  invoiceActualMinor: bigint | null;
+  keysAssigned: number;
+  hasUsageHistory?: boolean;
+}): void {
+  if (input.invoiceActualMinor !== null || input.keysAssigned > 0 || input.hasUsageHistory) {
+    throw new LicenseLotPriceLockedError();
+  }
 }
 
 /** The licenses a lot can still give out, and what they are worth, from the licenses taken. */

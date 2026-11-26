@@ -181,6 +181,37 @@ export class DeviceActivationRepo {
     return result;
   }
 
+  /** Whether any key of `lotId` is linked to a license assignment or has any device activation history. */
+  async hasLotKeyHistory(lotId: string, client?: DbTx): Promise<boolean> {
+    const rows = await (client ?? this.prisma).$queryRaw<{ used: boolean }[]>`
+      SELECT (
+        EXISTS (
+          SELECT 1
+            FROM license_assignments a
+            JOIN license_keys k ON k.assignment_id = a.id
+           WHERE COALESCE(k.license_lot_id, k.subscription_id) = ${lotId}::uuid
+        )
+        OR EXISTS (
+          SELECT 1
+            FROM device_activations da
+            JOIN license_keys k ON k.id = da.license_key_id
+           WHERE COALESCE(k.license_lot_id, k.subscription_id) = ${lotId}::uuid
+        )
+      ) AS used`;
+
+    return rows[0]?.used ?? false;
+  }
+
+  /** Ids of all license keys belonging to `lotId`. */
+  async lotKeyIds(lotId: string, client?: DbTx): Promise<string[]> {
+    const rows = await (client ?? this.prisma).licenseKey.findMany({
+      where: { OR: [{ licenseLotId: lotId }, { subscriptionId: lotId }] },
+      select: { id: true },
+    });
+
+    return rows.map((row) => row.id);
+  }
+
   /** Open `GRANT` tasks for K4 `planIds` that do not hold an assigned license key yet. */
   async openGrantTasksWithoutKeyOfPlans(
     planIds: readonly string[],

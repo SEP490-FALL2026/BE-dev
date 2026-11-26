@@ -80,6 +80,13 @@ export class GrantSettlementService {
     return result;
   }
 
+  /** Whether the lot already has at least one `license_lot_charges` row. */
+  async hasLotCharges(lotId: string, tx?: DbTx): Promise<boolean> {
+    const counts = await this.budgets.chargedExcessCountsOfLots([lotId], tx);
+
+    return (counts.get(lotId) ?? 0) > 0;
+  }
+
   async recordPoolGrantAvoidedCost(tx: DbTx, request: AccessRequestRecord, facts: GrantOutcomeFacts): Promise<void> {
     if (!facts.fromPool || facts.taskId === undefined) return;
     const grantYear = fiscalYearOf(facts.grantedOn);

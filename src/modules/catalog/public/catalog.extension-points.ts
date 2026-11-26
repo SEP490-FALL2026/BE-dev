@@ -63,6 +63,8 @@ export interface SeatOccupancyReader {
     lotIds: readonly string[],
     tx?: DbTx,
   ): Promise<ReadonlyMap<string, { inStore: number; assigned: number; withdrawn: number }>>;
+  /** Whether any key of the lot has ever been assigned, activated on a device, or recorded in lot charges. */
+  hasLotBeenUsed(lotId: string, tx?: DbTx): Promise<boolean>;
   openGrantTasksWithoutKeyOfPlans?(planIds: readonly string[], tx?: DbTx): Promise<OpenK4GrantTask[]>;
 }
 
