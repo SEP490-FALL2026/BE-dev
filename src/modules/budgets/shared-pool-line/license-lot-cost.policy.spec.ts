@@ -204,11 +204,12 @@ describe('license-lot-cost.policy (W3-25 & QD-120a)', () => {
         },
       },
       {
-        caseName: '10. STOCK DEVICE_KEY lot 10x2M -> POOL_DEVICE_LOT 20M',
+        caseName: '10. STOCK DEVICE_KEY lot 10x2M -> POOL_DEVICE_LOT 20M; STOCK ACCOUNT lot -> POOL_IDLE',
         run: () => {
           expect(
             conf({
               purpose: 'STOCK',
+              keyBinding: 'DEVICE_KEY',
               actualMinor: 20n * M,
               licenseCount: 10,
               beneficiaryCount: 0,
@@ -219,6 +220,22 @@ describe('license-lot-cost.policy (W3-25 & QD-120a)', () => {
             bucket: 'POOL_DEVICE_LOT',
             amountMinor: 20n * M,
             unitCostActualMinor: 2n * M,
+            taxVariancePerLicenseMinor: 0n,
+          });
+          expect(
+            conf({
+              purpose: 'STOCK',
+              keyBinding: 'ACCOUNT',
+              actualMinor: 18n * M,
+              licenseCount: 3,
+              beneficiaryCount: 0,
+              unitPriceMinor: 6n * M,
+            }),
+          ).toEqual({
+            kind: 'POOL_BUCKET',
+            bucket: 'POOL_IDLE',
+            amountMinor: 18n * M,
+            unitCostActualMinor: 6n * M,
             taxVariancePerLicenseMinor: 0n,
           });
         },

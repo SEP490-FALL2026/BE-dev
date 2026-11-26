@@ -242,4 +242,56 @@ describe('LicenseLotInvoiceService', () => {
       taxVarianceMinor: 0n,
     });
   });
+
+  it('T-9: confirms STOCK + ACCOUNT lot into POOL_IDLE and STOCK + DEVICE_KEY lot into POOL_DEVICE_LOT', async () => {
+    const accountCtx = setup();
+    accountCtx.lots.lockLot.mockResolvedValue(makeLot({ purpose: 'STOCK', keyBinding: 'ACCOUNT', requestId: null }));
+    await accountCtx.service.recordLotInvoiceConfirmation(tx, actor, {
+      organizationId: 'org-1',
+      purchaseInvoiceId: 'pi-acc',
+      requestId: null,
+      subscriptionId: null,
+      licenseLotId: 'lot-1',
+      vendorId: 'v-1',
+      number: 'INV-STOCK-ACC',
+      issuedOn: '2027-05-10',
+      serviceMonth: '2027-05-01',
+      allocationMonth: '2027-05-01',
+      netMinor: 18n * M,
+      deductibleTaxMinor: 0n,
+      nonDeductibleTaxMinor: 0n,
+      matchResult: 'MATCHED',
+      chargedCostCenterId: null,
+      unallocated: null,
+      now: new Date('2027-05-10T10:00:00Z'),
+    });
+    expect(accountCtx.allocations.insertMany).toHaveBeenCalledWith(tx, [
+      expect.objectContaining({ bucket: 'POOL_IDLE', amountMinor: 18n * M, kind: 'ORIGINAL' }),
+    ]);
+
+    const deviceCtx = setup();
+    deviceCtx.lots.lockLot.mockResolvedValue(makeLot({ purpose: 'STOCK', keyBinding: 'DEVICE_KEY', requestId: null }));
+    await deviceCtx.service.recordLotInvoiceConfirmation(tx, actor, {
+      organizationId: 'org-1',
+      purchaseInvoiceId: 'pi-dev',
+      requestId: null,
+      subscriptionId: null,
+      licenseLotId: 'lot-1',
+      vendorId: 'v-1',
+      number: 'INV-STOCK-DEV',
+      issuedOn: '2027-05-10',
+      serviceMonth: '2027-05-01',
+      allocationMonth: '2027-05-01',
+      netMinor: 20n * M,
+      deductibleTaxMinor: 0n,
+      nonDeductibleTaxMinor: 0n,
+      matchResult: 'MATCHED',
+      chargedCostCenterId: null,
+      unallocated: null,
+      now: new Date('2027-05-10T10:00:00Z'),
+    });
+    expect(deviceCtx.allocations.insertMany).toHaveBeenCalledWith(tx, [
+      expect.objectContaining({ bucket: 'POOL_DEVICE_LOT', amountMinor: 20n * M, kind: 'ORIGINAL' }),
+    ]);
+  });
 });

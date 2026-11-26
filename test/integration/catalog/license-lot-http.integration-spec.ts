@@ -56,8 +56,8 @@ describe('the lots of licenses over HTTP (integration, real PostgreSQL)', () => 
     await ctx?.close();
   });
 
-  /** A K4 plan of keys that go to an account (no admin console, so no workspace is needed). */
-  const plan = async (): Promise<string> => {
+  /** A K4 plan of keys (defaults to ACCOUNT, no admin console, so no workspace is needed). */
+  const plan = async (keyBinding: 'ACCOUNT' | 'DEVICE_BUNDLED' = 'ACCOUNT'): Promise<string> => {
     const application = await declareApplication(ctx, it1.accessToken, {
       name: unique('Software'),
       kind: 'LICENSED',
@@ -69,7 +69,13 @@ describe('the lots of licenses over HTTP (integration, real PostgreSQL)', () => 
       await request(server())
         .post('/api/v1/plans')
         .set(as(it1.accessToken))
-        .send({ applicationId: application, name: unique('Plan'), provisioningType: 'K4', controlLevel: 'FULL' })
+        .send({
+          applicationId: application,
+          name: unique('Plan'),
+          provisioningType: 'K4',
+          keyBinding,
+          controlLevel: 'FULL',
+        })
         .expect(201),
     ).id;
   };
@@ -138,22 +144,31 @@ describe('the lots of licenses over HTTP (integration, real PostgreSQL)', () => 
     ).toBe('LICENSE_LOT.NOT_FOUND');
   });
 
-  it('refuses a lot the plan cannot take, naming the rule, and makes nothing', async () => {
-    const planId = await plan();
-    const refuse = async (extra: object, status: number) =>
+  it('allows STOCK on ACCOUNT K4 plans (201) and refuses STOCK on DEVICE_BUNDLED and missing requestId on REQUEST', async () => {
+    const accountPlanId = await plan('ACCOUNT');
+    const bundledPlanId = await plan('DEVICE_BUNDLED');
+    const refuse = async (targetPlanId: string, extra: object, status: number) =>
       codeOf(
         await request(server())
           .post('/api/v1/license-lots')
           .set(as(it1.accessToken))
-          .send(lotBody(planId, extra))
+          .send(lotBody(targetPlanId, extra))
           .expect(status),
       );
 
-    expect(await refuse({ purpose: 'STOCK' }, 422)).toBe('LICENSE_LOT.PURPOSE_NOT_AVAILABLE');
-    expect(await refuse({ purpose: 'REQUEST' }, 422)).toBe('LICENSE_LOT.REQUEST_REQUIRED');
-    expect(await refuse({ unitPrice: { amount: '100', currency: 'USD' } }, 422)).toBe('LICENSE_LOT.PRICE_NOT_VND');
+    await request(server())
+      .post('/api/v1/license-lots')
+      .set(as(it1.accessToken))
+      .send(lotBody(accountPlanId, { purpose: 'STOCK' }))
+      .expect(201);
+
+    expect(await refuse(bundledPlanId, { purpose: 'STOCK' }, 422)).toBe('LICENSE_LOT.PURPOSE_NOT_AVAILABLE');
+    expect(await refuse(accountPlanId, { purpose: 'REQUEST' }, 422)).toBe('LICENSE_LOT.REQUEST_REQUIRED');
+    expect(await refuse(accountPlanId, { unitPrice: { amount: '100', currency: 'USD' } }, 422)).toBe(
+      'LICENSE_LOT.PRICE_NOT_VND',
+    );
     const page = dataOf<{ items: LotWire[] }>(
-      await request(server()).get(`/api/v1/license-lots?planId=${planId}`).set(as(it1.accessToken)).expect(200),
+      await request(server()).get(`/api/v1/license-lots?planId=${bundledPlanId}`).set(as(it1.accessToken)).expect(200),
     );
     expect(page.items).toEqual([]);
   });

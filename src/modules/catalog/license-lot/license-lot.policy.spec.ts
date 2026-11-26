@@ -20,9 +20,10 @@ describe('what a lot of licenses may be (W3-24)', () => {
   const account = { planProvisioningType: 'K4', keyBinding: 'ACCOUNT' as const, requestId: undefined };
   const machine = { planProvisioningType: 'K4', keyBinding: 'DEVICE_KEY' as const, requestId: undefined };
 
-  it('is made for a K4 plan whose key goes to an account (a request, a replacement) or on a machine (a stock)', () => {
+  it('is made for a K4 plan whose key goes to an account (a request, replacement, or stock) or on a machine (stock or replacement)', () => {
     expect(() => assertCreatable({ ...account, purpose: 'REQUEST', requestId: 'r-1' })).not.toThrow();
     expect(() => assertCreatable({ ...account, purpose: 'REPLACEMENT' })).not.toThrow();
+    expect(() => assertCreatable({ ...account, purpose: 'STOCK' })).not.toThrow();
     expect(() => assertCreatable({ ...machine, purpose: 'STOCK' })).not.toThrow();
     expect(() => assertCreatable({ ...machine, purpose: 'REPLACEMENT' })).not.toThrow();
   });
@@ -36,11 +37,16 @@ describe('what a lot of licenses may be (W3-24)', () => {
     );
   });
 
-  it('refuses a purpose the plan cannot take: a request for a key on a machine, a stock for a key on an account, a plan bundled with the machine', () => {
+  it('refuses a purpose the plan cannot take: a request for a key on a machine, stock without key binding, or a plan bundled with the machine', () => {
     expect(() => assertCreatable({ ...machine, purpose: 'REQUEST', requestId: 'r-1' })).toThrow(
       LicenseLotPurposeNotAvailableError,
     );
-    expect(() => assertCreatable({ ...account, purpose: 'STOCK' })).toThrow(LicenseLotPurposeNotAvailableError);
+    expect(() => assertCreatable({ ...account, keyBinding: null, purpose: 'STOCK' })).toThrow(
+      LicenseLotPurposeNotAvailableError,
+    );
+    expect(() => assertCreatable({ ...account, keyBinding: 'DEVICE_BUNDLED', purpose: 'STOCK' })).toThrow(
+      LicenseLotPurposeNotAvailableError,
+    );
     expect(() => assertCreatable({ ...account, keyBinding: 'DEVICE_BUNDLED', purpose: 'REPLACEMENT' })).toThrow(
       LicenseLotPurposeNotAvailableError,
     );

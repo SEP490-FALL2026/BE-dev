@@ -230,7 +230,7 @@ describe('shared dataset v4: the catalog and the shared pool (W3-28)', () => {
   it('buys K4 plans only as lots (JetBrains twice, Visio/Sublime/DataGrip/Office H&B once, Windows bundled never)', () => {
     for (const lot of F.lots) {
       expect(plan(lot.plan)).toMatchObject({ provisioningType: 'K4' });
-      expect(lot.purpose).toBe(plan(lot.plan).keyBinding === 'DEVICE_KEY' ? 'STOCK' : 'REPLACEMENT');
+      expect(lot.purpose).toBe('STOCK');
     }
     expect(F.lots.filter((lot) => lot.plan === 'jetbrains-all')).toHaveLength(2);
     expect(F.lots.filter((lot) => lot.plan === 'jetbrains-datagrip')).toHaveLength(1);

@@ -23,7 +23,7 @@ export const createLicenseLotBodySchema = z.strictObject({
   originalUnitPrice: originalUnitPrice.optional(),
   purpose: z.enum(['REQUEST', 'REPLACEMENT', 'STOCK']).meta({
     description:
-      'Why the lot is bought: for a request (a plan whose key is given to an account), to replace keys that failed, or to keep in stock (a plan whose key goes on a machine). The opening lots are made by the move of the data, not by this route.',
+      'Why the lot is bought: for a request (a plan whose key is given to an account), to replace keys that failed, or to keep in stock (a plan whose key goes to an account or on a machine). The opening lots are made by the move of the data, not by this route.',
   }),
   requestId: z
     .uuid()

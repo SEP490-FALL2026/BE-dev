@@ -53,6 +53,7 @@ export class LicenseLotInvoiceLedgerService {
   ): Promise<PurchaseInvoiceRecorded> {
     const plan = planLotInvoiceConfirmation({
       purpose: lot.purpose,
+      keyBinding: lot.keyBinding,
       actualMinor: meta.actualCostMinor,
       licenseCount: lot.licenseCount,
       beneficiaryCount: 0,

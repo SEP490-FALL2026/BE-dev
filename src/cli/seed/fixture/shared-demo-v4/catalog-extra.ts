@@ -145,12 +145,7 @@ const byMonth = (
 });
 
 /** Licenses bought once, on a day in the past, by the IT Admin who answers for them: a lot named by the key of its plan; its keys come from the key store. */
-const lot = (
-  key: string,
-  amount: string,
-  licenseCount: number,
-  purpose: DemoLot['purpose'] = 'REPLACEMENT',
-): DemoLot => ({
+const lot = (key: string, amount: string, licenseCount: number, purpose: DemoLot['purpose'] = 'STOCK'): DemoLot => ({
   key,
   plan: key,
   licenseCount,

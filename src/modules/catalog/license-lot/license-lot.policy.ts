@@ -13,7 +13,7 @@ type KeyBinding = 'ACCOUNT' | 'DEVICE_KEY' | 'DEVICE_BUNDLED' | null;
 
 /**
  * Whether a lot of this purpose can be made for this plan: the plan is a K4 plan, not bundled with the machine; a lot for a request is of a plan whose
- * key is given to an account and names its request; a lot kept in stock is of a plan whose key goes on a machine. Throws LicenseLotPlanNotK4Error,
+ * key is given to an account and names its request; a lot kept in stock is of a plan whose key goes to an account or on a machine. Throws LicenseLotPlanNotK4Error,
  * LicenseLotPurposeNotAvailableError, LicenseLotRequestRequiredError.
  */
 export function assertCreatable(input: {
@@ -25,7 +25,8 @@ export function assertCreatable(input: {
   if (input.planProvisioningType !== 'K4') throw new LicenseLotPlanNotK4Error();
   if (input.keyBinding === 'DEVICE_BUNDLED') throw new LicenseLotPurposeNotAvailableError();
   if (input.purpose === 'REQUEST' && input.keyBinding !== 'ACCOUNT') throw new LicenseLotPurposeNotAvailableError();
-  if (input.purpose === 'STOCK' && input.keyBinding !== 'DEVICE_KEY') throw new LicenseLotPurposeNotAvailableError();
+  if (input.purpose === 'STOCK' && input.keyBinding !== 'ACCOUNT' && input.keyBinding !== 'DEVICE_KEY')
+    throw new LicenseLotPurposeNotAvailableError();
   if (input.purpose === 'REQUEST' && !input.requestId) throw new LicenseLotRequestRequiredError();
 }
 

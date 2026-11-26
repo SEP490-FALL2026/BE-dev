@@ -453,14 +453,22 @@ describe('W3-25 P20: license-lot charges, 3-order allocation invariant (= A), an
     });
     expect(ha13c.chargeMinor).toBe(12n * M);
 
-    // STOCK (20M) + REPLACEMENT (6M) + F14b alert in 2027-05
+    // STOCK DEVICE_KEY (20M -> POOL_DEVICE_LOT) + STOCK ACCOUNT (18M -> POOL_IDLE) + REPLACEMENT (6M -> POOL_REPLACEMENT) in 2027-05
     const piStock = randomUUID();
+    const piStockAccount = randomUUID();
     const piRepl = randomUUID();
     const stockLot = await seedLot({
       planId: k4DevicePlanId,
       purpose: 'STOCK',
       licenseCount: 10,
       unitPriceMinor: 2n * M,
+      keysCount: 0,
+    });
+    const stockAccountLot = await seedLot({
+      planId: k4AccountPlanId,
+      purpose: 'STOCK',
+      licenseCount: 3,
+      unitPriceMinor: 6n * M,
       keysCount: 0,
     });
     const replLot = await seedLot({
@@ -472,6 +480,7 @@ describe('W3-25 P20: license-lot charges, 3-order allocation invariant (= A), an
     });
     for (const [piId, lId, net] of [
       [piStock, stockLot.lotId, 20n * M],
+      [piStockAccount, stockAccountLot.lotId, 18n * M],
       [piRepl, replLot.lotId, 6n * M],
     ] as const) {
       await h.ctx.sql.query(
@@ -508,6 +517,14 @@ describe('W3-25 P20: license-lot charges, 3-order allocation invariant (= A), an
     const figures = await h.ctx.app.get(SharedPoolLineFactsService, { strict: false }).yearFigures(2027, 12);
     expect(figures.deviceLotPurchasesMinor).toBe(20n * M);
     expect(figures.replacementKeysMinor).toBe(6n * M);
+    const { rows: stockAccAllocs } = await h.ctx.sql.query<{ bucket: string; amount_minor: string }>(
+      `SELECT a.bucket, a.amount_minor::text
+         FROM invoice_allocations a
+         JOIN invoices i ON i.id = a.invoice_id
+        WHERE i.subscription_id = $1`,
+      [stockAccountLot.lotId],
+    );
+    expect(stockAccAllocs).toEqual([{ bucket: 'POOL_IDLE', amount_minor: (18n * M).toString() }]);
 
     // F12(a): 2 excess pre-invoice (24M), then confirm 39.6M -> Duc 13.2M, POOL_LOT_DIFFERENCE +2.4M
     const req12a = await seedRequest({ unit: ccA, year: 2027, amountMinor: 12n * M, planId: k4AccountPlanId });

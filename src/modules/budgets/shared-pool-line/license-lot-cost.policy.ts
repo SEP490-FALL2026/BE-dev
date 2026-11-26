@@ -16,7 +16,7 @@ export type LotInvoiceConfirmationPlan =
   | { readonly kind: 'OPENING' }
   | {
       readonly kind: 'POOL_BUCKET';
-      readonly bucket: 'POOL_DEVICE_LOT' | 'POOL_REPLACEMENT';
+      readonly bucket: 'POOL_IDLE' | 'POOL_DEVICE_LOT' | 'POOL_REPLACEMENT';
       readonly amountMinor: bigint;
       readonly unitCostActualMinor: bigint;
       readonly taxVariancePerLicenseMinor: bigint;
@@ -31,6 +31,7 @@ export type LotInvoiceConfirmationPlan =
 
 export interface LotInvoiceConfirmationInput {
   readonly purpose: 'OPENING' | 'REQUEST' | 'REPLACEMENT' | 'STOCK';
+  readonly keyBinding?: 'ACCOUNT' | 'DEVICE_KEY' | 'DEVICE_BUNDLED' | null;
   readonly actualMinor: bigint;
   readonly licenseCount: number;
   readonly beneficiaryCount: number;
@@ -93,9 +94,16 @@ export function planLotInvoiceConfirmation(input: LotInvoiceConfirmationInput): 
   const taxVariancePerLicenseMinor = unitCostActualMinor - input.unitPriceMinor;
 
   if (input.purpose === 'STOCK' || input.purpose === 'REPLACEMENT') {
+    const bucket =
+      input.purpose === 'REPLACEMENT'
+        ? 'POOL_REPLACEMENT'
+        : input.keyBinding === 'ACCOUNT'
+          ? 'POOL_IDLE'
+          : 'POOL_DEVICE_LOT';
+
     return {
       kind: 'POOL_BUCKET',
-      bucket: input.purpose === 'STOCK' ? 'POOL_DEVICE_LOT' : 'POOL_REPLACEMENT',
+      bucket,
       amountMinor: input.actualMinor,
       unitCostActualMinor,
       taxVariancePerLicenseMinor,

@@ -59,7 +59,7 @@ describe('the body of a lot the dataset declares (W3-28)', () => {
       purchasedOn: '2026-05-01',
       licenseCount: 3,
       unitPrice: { amount: '6000000', currency: 'VND' },
-      purpose: 'REPLACEMENT',
+      purpose: 'STOCK',
     });
     expect(lotBody(ctx, lot('office-home-business-2024'), 'plan-2')).toMatchObject({
       licenseCount: 25,
