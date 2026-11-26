@@ -123,32 +123,131 @@ describe('workspace >= 2 working admin gate and WORKSPACE_ADMIN_NOT_WORKING aler
   });
 
   describe('8 acceptance scenarios of W3-12', () => {
+    it('3. Nam locked, baseline open -> 201 with vendorAdminsBelowMinimum flag', async () => {
+      const wsRes = await postWorkspace(h.unique('WS-Gate')).expect(201);
+      const ws = h.dataOf<{ id: string; updatedAt: string }>(wsRes);
+      await setAdmins(ws.id, ws.updatedAt, [
+        { employeeId: khoa.employeeId, role: 'OWNER' },
+        { employeeId: nam.employeeId, role: 'ADMIN' },
+      ]).expect(200);
+      const planId = await makeK2Plan();
+      await setAccountStatus(nam, 'LOCKED');
+
+      try {
+        const res = await declareTerm(planId, ws.id).expect(201);
+        expect(h.dataOf<{ vendorAdminsBelowMinimum: boolean }>(res).vendorAdminsBelowMinimum).toBe(true);
+      } finally {
+        await setAccountStatus(nam, 'ACTIVE');
+      }
+    });
+
+    it('K4.3. K4 hasAdminConsole=true, Nam locked, baseline open -> 201', async () => {
+      const ws = h.dataOf<{ id: string; updatedAt: string }>(await postWorkspace(h.unique('WS-K4-Open')).expect(201));
+      await setAdmins(ws.id, ws.updatedAt, [
+        { employeeId: khoa.employeeId, role: 'OWNER' },
+        { employeeId: nam.employeeId, role: 'ADMIN' },
+      ]).expect(200);
+      const planId = await makeK4Plan(true);
+      await setAccountStatus(nam, 'LOCKED');
+
+      try {
+        await request(h.server())
+          .post('/api/v1/license-lots')
+          .set(h.as(khoa))
+          .send({
+            planId,
+            workspaceId: ws.id,
+            purchasedOn: '2026-11-25',
+            licenseCount: 3,
+            unitPrice: { amount: '12000000', currency: 'VND' },
+            purpose: 'REPLACEMENT',
+          })
+          .expect(201);
+      } finally {
+        await setAccountStatus(nam, 'ACTIVE');
+      }
+    });
+
+    it('4. renewal outcome recorded while Nam is locked succeeds and flags vendorAdminsBelowMinimum on the new period', async () => {
+      await h.closeBaseline().expect(200);
+      const ws = h.dataOf<{ id: string; updatedAt: string }>(await postWorkspace(h.unique('WS-Renew')).expect(201));
+      await setAdmins(ws.id, ws.updatedAt, [
+        { employeeId: khoa.employeeId, role: 'OWNER' },
+        { employeeId: nam.employeeId, role: 'ADMIN' },
+      ]).expect(200);
+      const planId = await makeK2Plan();
+      const today = await h.ctx.app.get(OrganizationReadApi, { strict: false }).businessToday();
+      const firstId = h.dataOf<{ id: string }>(
+        await declareTerm(planId, ws.id, {
+          purchasedQuantity: 1,
+          startDate: addDays(today, -28),
+          renewalDate: addDays(today, 2),
+        }).expect(201),
+      ).id;
+      await h.ctx.sql.query(
+        `INSERT INTO license_assignments (
+           id, organization_id, kind, source, plan_id, subscription_id, employee_id,
+           account_identifier, normalized_account_identifier, valid_from, valid_from_basis,
+           granted_on, created_by_app_user_id
+         ) VALUES (
+           gen_random_uuid(), $1, 'PERSONAL'::"AssignmentKind", 'REQUEST'::"AssignmentSource",
+           $2, $3, $4, 'khoa@acme.vn', 'khoa@acme.vn', $5::date, 'ACTUAL'::"AssignmentDateBasis",
+           $5::date, $6
+         )`,
+        [h.seed.organizationId, planId, firstId, khoa.employeeId, addDays(today, -28), khoa.appUserId],
+      );
+
+      await setAccountStatus(nam, 'LOCKED');
+      try {
+        const renewalRes = await request(h.server())
+          .post('/api/v1/subscription-renewals')
+          .set(h.as(khoa))
+          .send({
+            subscriptionId: firstId,
+            choice: 'RENEW',
+            proposedQuantity: 1,
+            outcome: 'AS_DECIDED',
+            nextPeriod: {
+              purchasedQuantity: 1,
+              unitPrice: { amount: '1000000', currency: 'VND' },
+              billingCycle: 'MONTHLY',
+              startDate: addDays(today, 2),
+              renewalDate: addDays(today, 32),
+              autoRenew: true,
+              allowsMidTermReduction: false,
+            },
+          })
+          .expect(201);
+        const nextId = h.dataOf<{ outcomeDetail: { nextSubscriptionId: string } }>(renewalRes).outcomeDetail
+          .nextSubscriptionId;
+        const nextView = h.dataOf<{ vendorAdminsBelowMinimum: boolean }>(
+          await request(h.server()).get(`/api/v1/subscriptions/${nextId}`).set(h.as(khoa)).expect(200),
+        );
+        expect(nextView.vendorAdminsBelowMinimum).toBe(true);
+      } finally {
+        await setAccountStatus(nam, 'ACTIVE');
+      }
+    });
+
     it.each([
       {
         label: '1. workspace has Khoa & Nam working (baseline closed) -> 201',
-        baselineClosed: true,
         lockNam: false,
         expectedStatus: 201,
         expectedBelowFlag: false,
       },
       {
         label: '2. Nam locked, baseline closed -> 422 SUBSCRIPTION.VENDOR_ADMINS_REQUIRED',
-        baselineClosed: true,
         lockNam: true,
         expectedStatus: 422,
         expectedCode: 'SUBSCRIPTION.VENDOR_ADMINS_REQUIRED',
       },
-      {
-        label: '3. Nam locked, baseline open -> 201 with vendorAdminsBelowMinimum flag',
-        baselineClosed: false,
-        lockNam: true,
-        expectedStatus: 201,
-        expectedBelowFlag: true,
-      },
-    ])('$label', async ({ baselineClosed, lockNam, expectedStatus, expectedCode, expectedBelowFlag }) => {
+    ])('$label', async ({ lockNam, expectedStatus, expectedCode, expectedBelowFlag }) => {
       await h.ctx.sql.query(
-        `UPDATE seat_baselines SET closed_at = ${baselineClosed ? 'now()' : 'NULL'} WHERE organization_id = $1`,
-        [h.seed.organizationId],
+        `UPDATE seat_baseline_states
+            SET closed_at = now(), closed_by_app_user_id = $2
+          WHERE organization_id = $1 AND closed_at IS NULL`,
+        [h.seed.organizationId, khoa.appUserId],
       );
       const wsRes = await postWorkspace(h.unique('WS-Gate')).expect(201);
       const ws = h.dataOf<{ id: string; updatedAt: string }>(wsRes);
@@ -168,54 +267,6 @@ describe('workspace >= 2 working admin gate and WORKSPACE_ADMIN_NOT_WORKING aler
         }
       } finally {
         if (lockNam) await setAccountStatus(nam, 'ACTIVE');
-      }
-    });
-
-    it('4. renewal outcome recorded while Nam is locked succeeds and flags vendorAdminsBelowMinimum on the new period', async () => {
-      await h.closeBaseline().expect(200);
-      const ws = h.dataOf<{ id: string; updatedAt: string }>(await postWorkspace(h.unique('WS-Renew')).expect(201));
-      await setAdmins(ws.id, ws.updatedAt, [
-        { employeeId: khoa.employeeId, role: 'OWNER' },
-        { employeeId: nam.employeeId, role: 'ADMIN' },
-      ]).expect(200);
-      const planId = await makeK2Plan();
-      const today = await h.ctx.app.get(OrganizationReadApi, { strict: false }).businessToday();
-      const firstId = h.dataOf<{ id: string }>(
-        await declareTerm(planId, ws.id, {
-          startDate: addDays(today, -28),
-          renewalDate: addDays(today, 2),
-        }).expect(201),
-      ).id;
-
-      await setAccountStatus(nam, 'LOCKED');
-      try {
-        const renewalRes = await request(h.server())
-          .post('/api/v1/subscription-renewals')
-          .set(h.as(khoa))
-          .send({
-            subscriptionId: firstId,
-            choice: 'RENEW',
-            proposedQuantity: 10,
-            outcome: 'AS_DECIDED',
-            nextPeriod: {
-              purchasedQuantity: 10,
-              unitPrice: { amount: '1000000', currency: 'VND' },
-              billingCycle: 'MONTHLY',
-              startDate: addDays(today, 2),
-              renewalDate: addDays(today, 32),
-              autoRenew: true,
-              allowsMidTermReduction: false,
-            },
-          })
-          .expect(201);
-        const nextId = h.dataOf<{ outcomeDetail: { nextSubscriptionId: string } }>(renewalRes).outcomeDetail
-          .nextSubscriptionId;
-        const nextView = h.dataOf<{ vendorAdminsBelowMinimum: boolean }>(
-          await request(h.server()).get(`/api/v1/subscriptions/${nextId}`).set(h.as(khoa)).expect(200),
-        );
-        expect(nextView.vendorAdminsBelowMinimum).toBe(true);
-      } finally {
-        await setAccountStatus(nam, 'ACTIVE');
       }
     });
 
@@ -270,8 +321,22 @@ describe('workspace >= 2 working admin gate and WORKSPACE_ADMIN_NOT_WORKING aler
       ]).expect(200);
       const runner = h.ctx.app.get(TransactionRunner, { strict: false });
       const grants = h.ctx.app.get(RoleGrantService, { strict: false });
+      const currentFinance = (
+        await h.ctx.sql.query<{ app_user_id: string }>(
+          `SELECT app_user_id FROM role_grants WHERE organization_id = $1 AND role = 'FINANCE' AND revoked_at IS NULL`,
+          [h.seed.organizationId],
+        )
+      ).rows[0]?.app_user_id;
 
       await runner.run(async (tx) => {
+        if (currentFinance) {
+          await grants.revokeRole(tx, {
+            appUserId: currentFinance,
+            role: 'FINANCE',
+            revokedBy: h.seed.superAdmin.employeeId,
+            now: new Date(),
+          });
+        }
         await grants.revokeRole(tx, {
           appUserId: khoa.appUserId,
           role: 'IT_ADMIN',
@@ -294,6 +359,21 @@ describe('workspace >= 2 working admin gate and WORKSPACE_ADMIN_NOT_WORKING aler
         expect(rows[0].recipient_employee_id).toBe(h.seed.superAdmin.employeeId);
       } finally {
         await runner.run(async (tx) => {
+          await grants.revokeRole(tx, {
+            appUserId: khoa.appUserId,
+            role: 'FINANCE',
+            revokedBy: h.seed.superAdmin.employeeId,
+            now: new Date(),
+          });
+          if (currentFinance) {
+            await grants.grantRole(tx, {
+              organizationId: h.seed.organizationId,
+              appUserId: currentFinance,
+              role: 'FINANCE',
+              grantedBy: h.seed.superAdmin.employeeId,
+              grantedAt: new Date(),
+            });
+          }
           await grants.grantRole(tx, {
             organizationId: h.seed.organizationId,
             appUserId: khoa.appUserId,
@@ -340,36 +420,28 @@ describe('workspace >= 2 working admin gate and WORKSPACE_ADMIN_NOT_WORKING aler
       {
         label: '1. K4 hasAdminConsole=true, Khoa & Nam working, baseline closed -> 201',
         hasAdminConsole: true,
-        baselineClosed: true,
         lockNam: false,
         expectedStatus: 201,
       },
       {
         label: '2. K4 hasAdminConsole=true, Nam locked, baseline closed -> 422 LICENSE_LOT.VENDOR_ADMINS_REQUIRED',
         hasAdminConsole: true,
-        baselineClosed: true,
         lockNam: true,
         expectedStatus: 422,
         expectedCode: 'LICENSE_LOT.VENDOR_ADMINS_REQUIRED',
       },
       {
-        label: '3. K4 hasAdminConsole=true, Nam locked, baseline open -> 201',
-        hasAdminConsole: true,
-        baselineClosed: false,
-        lockNam: true,
-        expectedStatus: 201,
-      },
-      {
         label: '4. K4 hasAdminConsole=false, Nam locked, baseline closed -> 201',
         hasAdminConsole: false,
-        baselineClosed: true,
         lockNam: true,
         expectedStatus: 201,
       },
-    ])('$label', async ({ hasAdminConsole, baselineClosed, lockNam, expectedStatus, expectedCode }) => {
+    ])('$label', async ({ hasAdminConsole, lockNam, expectedStatus, expectedCode }) => {
       await h.ctx.sql.query(
-        `UPDATE seat_baselines SET closed_at = ${baselineClosed ? 'now()' : 'NULL'} WHERE organization_id = $1`,
-        [h.seed.organizationId],
+        `UPDATE seat_baseline_states
+            SET closed_at = now(), closed_by_app_user_id = $2
+          WHERE organization_id = $1 AND closed_at IS NULL`,
+        [h.seed.organizationId, khoa.appUserId],
       );
       const ws = h.dataOf<{ id: string; updatedAt: string }>(await postWorkspace(h.unique('WS-LotGate')).expect(201));
       await setAdmins(ws.id, ws.updatedAt, [
