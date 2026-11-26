@@ -235,4 +235,61 @@ describe('RenewalOutcomeService', () => {
       lines: [{ subscriptionLineId: 'line-prm', proposed: 2, quantity: 3 }],
     });
   });
+
+  it('F-11: closes live lines ENDED on CANCEL AS_DECIDED with endDate ?? renewalDay - 1', async () => {
+    const tx = {};
+    const recordOutcome = jest.fn().mockResolvedValue({
+      id: 'ren-1',
+      organizationId: 'org-1',
+      subscriptionId: 'sub-1',
+      decision: { choice: 'CANCEL' },
+      outcome: {
+        kind: 'AS_DECIDED',
+        note: null,
+        recordedByEmployeeId: 'e-it',
+        recordedAt: new Date('2027-06-15T00:00:00Z'),
+        vendorFollowUpOpen: false,
+        nextSubscriptionId: null,
+        realisedSavings: null,
+      },
+      lateFlaggedAt: null,
+    });
+    const closeExpiredLines = jest.fn().mockResolvedValue(undefined);
+    const service = new RenewalOutcomeService(
+      { recordOutcome } as unknown as SubscriptionRenewalRepo,
+      { notEndedBy: jest.fn().mockResolvedValue([]) } as unknown as SubscriptionRenewalSeatRepo,
+      { carry: jest.fn() } as unknown as AssignmentService,
+      { closeExpiredLines } as unknown as SubscriptionPeriodApi,
+      {} as unknown as RenewalPartiesService,
+      {} as unknown as OrganizationReadApi,
+      { record: jest.fn().mockResolvedValue(undefined) } as unknown as AuditApi,
+      {} as unknown as TransactionRunner,
+    );
+
+    await service.recordIn(
+      tx as never,
+      actor,
+      {
+        record: { id: 'ren-1', subscriptionId: 'sub-1', state: 'DECIDED', decision: { choice: 'CANCEL' } } as never,
+        decision: { choice: 'CANCEL', quantity: null } as never,
+        period: {
+          subscriptionId: 'sub-1',
+          purchasedQuantity: 10,
+          endDate: null,
+          adjustment: {
+            kind: 'RENEWAL_DATE',
+            point: '2027-06-01',
+            deadline: '2027-07-01',
+            end: '2027-07-01',
+            redAlertOn: null,
+            commitment: 'ANNUAL',
+          },
+        } as never,
+      },
+      { outcome: 'AS_DECIDED' },
+      { today: '2027-06-15', now: new Date('2027-06-15T00:00:00Z') },
+    );
+
+    expect(closeExpiredLines).toHaveBeenCalledWith(tx, 'sub-1', '2027-06-30');
+  });
 });

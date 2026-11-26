@@ -118,7 +118,10 @@ export class SubscriptionRenewalSweepService {
   /** What the pass does for one period: the warnings of its data, then, when something is due today, its alerts and its event. */
   private async sweepPeriod(period: RenewalPeriodFacts, world: PassWorld): Promise<SweepResult> {
     const done: SweepResult = { told: 0, deadlineEvents: 0, failed: 0 };
-    if (world.ending.has(period.subscriptionId)) return done;
+    if (world.ending.has(period.subscriptionId)) {
+      await this.closeEndingPastRenewal(period, world.today);
+      return done;
+    }
     const { adjustment } = period;
     const problems = dataQualityProblemsOf(adjustment);
     const eventRecorded = world.events.has(period.subscriptionId);
@@ -135,6 +138,11 @@ export class SubscriptionRenewalSweepService {
     if (adjustment === null || candidates.length === 0) return done;
 
     return this.sweepNotices(period, adjustment, world, people, { hasCase, eventRecorded, toldSoFar: done.told });
+  }
+
+  private async closeEndingPastRenewal(period: RenewalPeriodFacts, today: BusinessDate): Promise<void> {
+    if (period.adjustment === null || period.adjustment.end >= today || period.renewedById !== null) return;
+    await this.deadlines.closeExpiredPeriod({ period, adjustment: period.adjustment });
   }
 
   private async sendDataQualityWarnings(
@@ -181,6 +189,15 @@ export class SubscriptionRenewalSweepService {
       state.eventRecorded,
     );
     const written = await this.write(due, { world, period, adjustment, people, seatsNeeded: counts.seatsNeeded });
+    if (
+      written.deadlineEvents === 0 &&
+      adjustment.end < world.today &&
+      !state.hasCase &&
+      !state.eventRecorded &&
+      period.renewedById === null
+    ) {
+      await this.deadlines.closeExpiredPeriod({ period, adjustment });
+    }
     return { told: state.toldSoFar + written.told, deadlineEvents: written.deadlineEvents, failed: 0 };
   }
 

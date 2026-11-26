@@ -55,6 +55,7 @@ function build(
   const sendDue = jest.fn<Promise<number>, [subject: Written]>().mockResolvedValue(1);
   const dataQualityWarning = jest.fn<Promise<number>, [subject: Written]>().mockResolvedValue(1);
   const recordPassedRenewalDay = jest.fn<Promise<boolean>, [subject: Written]>().mockResolvedValue(true);
+  const closeExpiredPeriod = jest.fn<Promise<boolean>, [subject: Written]>().mockResolvedValue(true);
   const workspaceAdminSweep = jest.fn<Promise<number>, [organizationId: string]>().mockResolvedValue(0);
   const service = new SubscriptionRenewalSweepService(
     { listAdjustmentSubjects: jest.fn().mockResolvedValue(subjects) } as unknown as SubscriptionPeriodApi,
@@ -66,7 +67,7 @@ function build(
     } as unknown as OrganizationReadApi,
     { countFor } as unknown as RenewalSeatsNeededService,
     { sendDue, dataQualityWarning, sweepWorkspaceAdmins: workspaceAdminSweep } as unknown as RenewalAlertsService,
-    { recordPassedRenewalDay } as unknown as RenewalDeadlineService,
+    { recordPassedRenewalDay, closeExpiredPeriod } as unknown as RenewalDeadlineService,
     {
       remindOverdue: jest.fn().mockResolvedValue({ told: 0, failed: 0 }),
     } as unknown as SeatPurchaseInvoiceDueService,
@@ -80,6 +81,7 @@ function build(
     sendDue,
     dataQualityWarning,
     recordPassedRenewalDay,
+    closeExpiredPeriod,
     workspaceAdminSweep,
   };
 }
@@ -144,16 +146,20 @@ describe('the pass over the points of adjustment (SBF-20 §4.5)', () => {
     expect(sendDue).not.toHaveBeenCalled();
   });
 
-  it('marks the end of a plan that does not renew itself, and records nothing when no seat is held or the event exists', async () => {
+  it('marks the end of a plan that does not renew itself regardless of holdsSeats (F-11), and skips incident/already-recorded', async () => {
     TODAY.value = '2026-12-07';
     const ends = periodOf('a', annual, { autoRenew: false });
     const marked = build([ends]);
     await sweep(marked.service);
     expect(marked.recordPassedRenewalDay.mock.calls[0][0]).toMatchObject({ kind: 'EXPIRY_MARKED' });
 
-    const empty = build([ends], { counts: { activeSeatsToday: 0 } });
-    expect(await sweep(empty.service)).toEqual({ told: 0, deadlineEvents: 0, failed: 0 });
-    expect(empty.recordPassedRenewalDay).not.toHaveBeenCalled();
+    const emptyEnds = build([ends], { counts: { activeSeatsToday: 0 } });
+    expect(await sweep(emptyEnds.service)).toEqual({ told: 0, deadlineEvents: 1, failed: 0 });
+    expect(emptyEnds.recordPassedRenewalDay.mock.calls[0][0]).toMatchObject({ kind: 'EXPIRY_MARKED' });
+
+    const emptyAuto = build([periodOf('a', annual, { autoRenew: true })], { counts: { activeSeatsToday: 0 } });
+    expect(await sweep(emptyAuto.service)).toEqual({ told: 0, deadlineEvents: 0, failed: 0 });
+    expect(emptyAuto.recordPassedRenewalDay).not.toHaveBeenCalled();
 
     const already = build([ends], { events: ['a'] });
     await sweep(already.service);

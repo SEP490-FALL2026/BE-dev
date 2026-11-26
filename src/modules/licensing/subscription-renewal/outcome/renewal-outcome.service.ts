@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { BusinessDate } from '../../../../core/business-date';
+import { addDays, type BusinessDate } from '../../../../core/business-date';
 import { TransactionRunner, type DbTx } from '../../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../../audit/public/audit.api';
@@ -155,8 +155,9 @@ export class RenewalOutcomeService {
     when: { today: BusinessDate; now: Date },
     extras: OutcomeExtras = {},
   ): Promise<RecordedOutcome> {
-    const { record, period } = found;
+    const { record, decision, period } = found;
     await this.assertFits(tx, found, input, when.today);
+    await this.closeLinesIfCancelled(tx, decision, period, input.outcome, when.today);
     const next = input.nextPeriod
       ? await this.continueInto(tx, actor, period, input.nextPeriod, extras.endingBy)
       : null;
@@ -168,6 +169,18 @@ export class RenewalOutcomeService {
     await this.trail(tx, actor, record, recorded, next?.carried ?? 0, extras.audit ?? {});
 
     return { recorded, next: next?.period ?? null, carried: next?.carried ?? 0 };
+  }
+
+  private async closeLinesIfCancelled(
+    tx: DbTx,
+    decision: RenewalDecisionRecord,
+    period: RenewalPeriodFacts,
+    outcome: RenewalOutcomeKind,
+    today: BusinessDate,
+  ): Promise<void> {
+    if (decision.choice !== 'CANCEL' || outcome !== 'AS_DECIDED') return;
+    const closedOn = period.endDate ?? (period.adjustment ? addDays(period.adjustment.end, -1) : today);
+    await this.periods.closeExpiredLines(tx, period.subscriptionId, closedOn);
   }
 
   /** The audit event of the outcome: what was recorded against what was decided, the seats carried and whether it came late. */

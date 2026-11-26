@@ -90,6 +90,18 @@ export class SubscriptionRenewalAutoService {
     });
   }
 
+  /** Closes live lines `ENDED` quietly (`endDate ?? renewalDay - 1`) without events/notices (e.g. cancelled or empty period past renewal day). */
+  async closeExpiredPeriod(subject: { period: RenewalPeriodFacts; adjustment: PeriodAdjustment }): Promise<boolean> {
+    return this.runner.run(async (tx) => {
+      const locked = await this.periods.lockPeriod(tx, subject.period.subscriptionId);
+      if (!locked || locked.renewedById !== null) return false;
+      const closedOn = locked.endDate ?? addDays(subject.adjustment.end, -1);
+      await this.periods.closeExpiredLines(tx, locked.subscriptionId, closedOn);
+
+      return true;
+    });
+  }
+
   private async markExpired(tx: DbTx, locked: RenewalPeriodFacts, subject: AutoPassedRenewalSubject): Promise<boolean> {
     const renewalDay = subject.adjustment.end;
     const event = await this.repo.insertDeadlineEvent(tx, {
@@ -102,7 +114,7 @@ export class SubscriptionRenewalAutoService {
     });
     if (!event) return false;
 
-    const closedOn = locked.endDate ?? renewalDay;
+    const closedOn = locked.endDate ?? addDays(renewalDay, -1);
     await this.periods.closeExpiredLines(tx, locked.subscriptionId, closedOn);
     await this.audit.record(tx, {
       organizationId: subject.organizationId,

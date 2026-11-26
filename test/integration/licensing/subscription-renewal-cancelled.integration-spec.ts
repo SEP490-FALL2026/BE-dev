@@ -146,4 +146,50 @@ describe('a subscription recorded as cancelled leaves the adjustment and the sto
     const inTransaction = await h.ctx.app.get(TransactionRunner).run((tx) => pool.stockOf(tx, planId, h.today(), 'K2'));
     expect([...inTransaction.freeBySubscription.keys()]).toEqual([spare]);
   });
+
+  it('F-11: CANCEL closes K2 lines ENDED so re-declaring the same (workspace, plan) returns 201, and renewalDate-only expiry sets closed_on = renewalDay - 1', async () => {
+    const planId = await h.plan('K2', 'PER_SEAT');
+    const cancelled = await monthly(planId, 5);
+    await cancel(cancelled).expect(201);
+
+    const closedCancel = await h.ctx.sql.query<{ closed_reason: string | null; workspace_id: string }>(
+      `SELECT closed_reason, workspace_id FROM subscription_lines WHERE subscription_id = $1`,
+      [cancelled],
+    );
+    expect(closedCancel.rows).toHaveLength(1);
+    expect(closedCancel.rows[0].closed_reason).toBe('ENDED');
+
+    const redeclared = await declareSubscription(h.ctx, h.it1.accessToken, {
+      planId,
+      workspaceId: closedCancel.rows[0].workspace_id,
+      kind: 'TERM',
+      purchasedQuantity: 4,
+      unitPrice: { amount: '1000000', currency: 'VND' },
+      billingCycle: 'MONTHLY',
+      startDate: h.today(),
+      renewalDate: h.inDays(30),
+      autoRenew: true,
+      allowsMidTermReduction: false,
+    });
+    expect(redeclared).toBeTruthy();
+
+    const planNoEnd = await h.plan('K2', 'PER_SEAT');
+    const subNoEnd = await declareSubscription(h.ctx, h.it1.accessToken, {
+      planId: planNoEnd,
+      kind: 'TERM',
+      purchasedQuantity: 3,
+      unitPrice: { amount: '12000000', currency: 'VND' },
+      billingCycle: 'ANNUAL',
+      startDate: '2026-07-01',
+      renewalDate: '2027-07-01',
+      autoRenew: false,
+      allowsMidTermReduction: false,
+    });
+    await sweepOn('2027-07-02');
+    const closedNoEnd = await h.ctx.sql.query<{ closed_on: string | null; closed_reason: string | null }>(
+      `SELECT closed_on::text, closed_reason FROM subscription_lines WHERE subscription_id = $1`,
+      [subNoEnd],
+    );
+    expect(closedNoEnd.rows).toEqual([{ closed_on: '2027-06-30', closed_reason: 'ENDED' }]);
+  });
 });

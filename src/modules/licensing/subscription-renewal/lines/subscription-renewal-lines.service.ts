@@ -57,6 +57,10 @@ export class SubscriptionRenewalLinesService {
     return this.auto.handlePassedRenewalDay(subject);
   }
 
+  closeExpiredPeriod(subject: Parameters<SubscriptionRenewalAutoService['closeExpiredPeriod']>[0]): Promise<boolean> {
+    return this.auto.closeExpiredPeriod(subject);
+  }
+
   targetsOfLines(lineIds: readonly string[], tx?: DbTx) {
     return this.reader.targetsOfLines(lineIds, tx);
   }

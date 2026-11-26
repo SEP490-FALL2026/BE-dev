@@ -250,6 +250,25 @@ describe('SubscriptionRenewalAutoService (W3-21 cutoff lock, Ca B auto-renew, Ca
     expect(periods.closeExpiredLines).toHaveBeenCalledWith(tx, 'sub-1', '2027-06-30');
   });
 
+  it('F-11: when endDate is null and renewalDate is 2027-07-01, closes lines ENDED on 2027-06-30', async () => {
+    const { tx, service, periods } = setup();
+    const noEnd = makePeriod({ autoRenew: false, endDate: null, renewalDate: '2027-07-01' });
+    periods.lockPeriod.mockResolvedValue(noEnd);
+
+    const recorded = await service.handlePassedRenewalDay({
+      organizationId: 'org-1',
+      today: '2027-07-02',
+      period: noEnd,
+      adjustment: ADJUSTMENT,
+      kind: 'EXPIRY_MARKED',
+      people: PEOPLE,
+      now: new Date('2027-07-02T01:00:00Z'),
+    });
+
+    expect(recorded).toBe(true);
+    expect(periods.closeExpiredLines).toHaveBeenCalledWith(tx, 'sub-1', '2027-06-30');
+  });
+
   it('2-instance guard: returns false without writing when locked period already has renewedById', async () => {
     const { service, periods, repo, outcomes } = setup();
     periods.lockPeriod.mockResolvedValue(makePeriod({ renewedById: 'sub-2' }));

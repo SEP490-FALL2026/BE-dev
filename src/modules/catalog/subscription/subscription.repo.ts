@@ -358,7 +358,15 @@ export class SubscriptionRepo {
     if (planIds.length === 0) return [];
     const rows = await (tx ?? this.prisma).subscription.findMany({
       where: { planId: { in: [...planIds] }, plan: { provisioningType: { in: ['K2', 'K4'] } }, renewedBy: null },
-      select: { id: true, planId: true, workspaceId: true, status: true, kind: true, endDate: true },
+      select: {
+        id: true,
+        planId: true,
+        workspaceId: true,
+        status: true,
+        kind: true,
+        endDate: true,
+        lines: { select: { closedReason: true } },
+      },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     });
 
@@ -369,7 +377,7 @@ export class SubscriptionRepo {
       status: row.status,
       kind: row.kind,
       endDate: date(row.endDate),
-      renewed: false,
+      renewed: row.lines.length > 0 && row.lines.every((line) => line.closedReason !== null),
     }));
   }
 

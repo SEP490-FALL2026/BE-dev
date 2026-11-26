@@ -46,6 +46,13 @@ export class RenewalDeadlineService {
     return this.lines.lockCutoffIfDue(subject);
   }
 
+  /** Closes live lines `ENDED` quietly without creating a deadline event or alert. */
+  closeExpiredPeriod(subject: { period: RenewalPeriodFacts; adjustment: PeriodAdjustment }): Promise<boolean> {
+    if (!this.lines) return Promise.resolve(false);
+
+    return this.lines.closeExpiredPeriod(subject);
+  }
+
   /** Records the passed renewal day (`autoRenew` -> system renewal + incident, `!autoRenew` -> expiry + close lines `ENDED`). */
   async recordPassedRenewalDay(subject: DeadlineSubject): Promise<boolean> {
     if (this.lines) return this.lines.handlePassedRenewalDay(subject);

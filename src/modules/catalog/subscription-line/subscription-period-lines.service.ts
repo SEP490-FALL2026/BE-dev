@@ -79,7 +79,11 @@ export class SubscriptionPeriodLinesService {
       existing.map((line) => line.id),
     );
     for (const line of locked) {
-      if (line.closedReason === null) await this.lines.close(tx, line.id, closedOn, reason);
+      if (line.closedReason === null) {
+        const effectiveClosedOn =
+          line.ledgerOpenedOn !== null && closedOn < line.ledgerOpenedOn ? line.ledgerOpenedOn : closedOn;
+        await this.lines.close(tx, line.id, effectiveClosedOn, reason);
+      }
     }
 
     return locked;
