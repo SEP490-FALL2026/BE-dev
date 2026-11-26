@@ -223,15 +223,20 @@ export class SubscriptionPeriodLinesService {
     const current = await this.ensureAndSyncActivationLines(tx, period, workspaceId);
     const unOpened = current.filter((line) => line.ledgerOpenedOn === null);
     if (unOpened.length === 0 || period.startDate === null) return;
+    if (unOpened.length > 1) {
+      throw new Error('Cannot activate a draft period with multiple un-opened lines');
+    }
 
     const initialQuantity = period.purchasedQuantity ?? 0;
     await this.seatLedger.openLines(tx, {
-      lines: unOpened.map((line, idx) => ({
-        lineId: line.id,
-        effectiveOn: period.startDate!,
-        quantity: unOpened.length === 1 || idx === 0 ? initialQuantity : 0,
-        recordedByEmployeeId: actorEmployeeId,
-      })),
+      lines: [
+        {
+          lineId: unOpened[0].id,
+          effectiveOn: period.startDate,
+          quantity: initialQuantity,
+          recordedByEmployeeId: actorEmployeeId,
+        },
+      ],
     });
   }
 

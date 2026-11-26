@@ -28498,6 +28498,18 @@
                       }
                     }
                   },
+                  "SUBSCRIPTION.STILL_DRAFT": {
+                    "summary": "The subscription still lacks data to be complete.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.STILL_DRAFT",
+                        "message": "The subscription still lacks data to be complete.",
+                        "details": { "missing": ["UNIT_PRICE"] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
                   "SUBSCRIPTION.LINES_XOR_PLAN": {
                     "summary": "Send either lines or planId when declaring a subscription, never both or neither.",
                     "value": {

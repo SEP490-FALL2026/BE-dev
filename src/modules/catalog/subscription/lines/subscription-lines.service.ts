@@ -18,12 +18,13 @@ import {
   SubscriptionDuplicatePlanError,
   SubscriptionPerpetualHasNoTermError,
   SubscriptionPlanNotFoundError,
+  SubscriptionStillDraftError,
 } from '../subscription.errors';
 import {
   assertSubscriptionShape,
   declaredStateOf,
+  missingDataOf,
   resolveSubscriptionPrices,
-  subscriptionStatusOf,
 } from '../subscription.policy';
 import { SubscriptionPricingService } from '../subscription-pricing.service';
 import { SubscriptionRepo } from '../subscription.repo';
@@ -184,7 +185,7 @@ export class SubscriptionMultiLineService {
       workspaceId,
       isPrimaryForPlan: false,
     });
-    if (workspaceId) {
+    if (workspaceId && (lines.length > 1 || lines[0].monthlyUnitPriceMinor > 0n)) {
       await this.periodLines.createForPeriod(tx, {
         organizationId,
         subscriptionId: created.id,
@@ -262,7 +263,12 @@ export class SubscriptionMultiLineService {
       kind: 'TERM',
       ...checkState,
     });
-    const complete = subscriptionStatusOf(firstPlan, 'TERM', checkState);
+    const missing = missingDataOf(firstPlan, 'TERM', checkState);
+    if (lines.some((line) => line.monthlyUnitPriceMinor <= 0n) && !missing.includes('UNIT_PRICE')) {
+      missing.push('UNIT_PRICE');
+    }
+    const complete: 'DRAFT' | 'ACTIVE' = missing.length === 0 ? 'ACTIVE' : 'DRAFT';
+    if (lines.length > 1 && complete === 'DRAFT') throw new SubscriptionStillDraftError(missing);
     this.poolRules.assert(firstPlan, 'TERM', checkState, complete === 'ACTIVE');
 
     return { state, priced, singleMonthlyMinor: singleResolved.monthlyUnitPriceMinor, complete };

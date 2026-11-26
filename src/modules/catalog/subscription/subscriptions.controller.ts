@@ -229,6 +229,7 @@ export class SubscriptionsController {
       ...INVALID,
       examples: [
         ...INVALID.examples,
+        SUBSCRIPTION_ERROR_EXAMPLES.STILL_DRAFT,
         SUBSCRIPTION_ERROR_EXAMPLES.LINES_XOR_PLAN,
         SUBSCRIPTION_ERROR_EXAMPLES.LINE_PLAN_NOT_K2,
       ],

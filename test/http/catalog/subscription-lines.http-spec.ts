@@ -394,5 +394,67 @@ describe('Subscription lines HTTP routes (W3-15)', () => {
         currency: 'VND',
       });
     });
+
+    it('F-3: POST /subscriptions rejects multi-line draft with 422 SUBSCRIPTION.STILL_DRAFT and returns 201 for 10/2 active lines', async () => {
+      const { SubscriptionStillDraftError } =
+        await import('../../../src/modules/catalog/subscription/subscription.errors');
+      subSvc.declare.mockRejectedValueOnce(new SubscriptionStillDraftError(['START_DATE']));
+
+      const draftErr = await request(app.getHttpServer())
+        .post('/api/v1/subscriptions')
+        .set('Authorization', itAuth)
+        .send({
+          kind: 'TERM',
+          billingCycle: 'MONTHLY',
+          commitmentTermMonths: 1,
+          lines: [
+            { planId: PLAN_1, monthlyUnitPrice: { amount: '500000', currency: 'VND' }, quantity: 10 },
+            { planId: PLAN_2, monthlyUnitPrice: { amount: '2500000', currency: 'VND' }, quantity: 2 },
+          ],
+        })
+        .expect(422);
+      expect(bodyOf(draftErr).error).toMatchObject({
+        code: 'SUBSCRIPTION.STILL_DRAFT',
+        details: { missing: ['START_DATE'] },
+      });
+
+      const activeView = {
+        ...subscriptionView,
+        purchasedQuantity: 12,
+        seatsToday: 12,
+        lineCount: 2,
+        lines: [
+          { ...subscriptionView.lines[0], plan: { id: PLAN_1, name: 'Standard' }, seatsToday: 10, freeToday: 8 },
+          {
+            ...subscriptionView.lines[0],
+            id: '33333333-3333-4333-8333-333333333339',
+            plan: { id: PLAN_2, name: 'Premium' },
+            monthlyUnitPrice: { amount: '2500000', currency: 'VND' },
+            seatsToday: 2,
+            assignedToday: 0,
+            freeToday: 2,
+          },
+        ],
+        createdAt: new Date(TS),
+        updatedAt: new Date(TS),
+      };
+      subSvc.declare.mockResolvedValueOnce(activeView);
+      const created = await request(app.getHttpServer())
+        .post('/api/v1/subscriptions')
+        .set('Authorization', itAuth)
+        .send({
+          kind: 'TERM',
+          billingCycle: 'ANNUAL',
+          commitmentTermMonths: 12,
+          startDate: '2026-11-01',
+          lines: [
+            { planId: PLAN_1, monthlyUnitPrice: { amount: '500000', currency: 'VND' }, quantity: 10 },
+            { planId: PLAN_2, monthlyUnitPrice: { amount: '2500000', currency: 'VND' }, quantity: 2 },
+          ],
+        })
+        .expect(201);
+      const createdData = dataOf<{ lines: Array<{ seatsToday: number }> }>(created);
+      expect(createdData.lines.map((item) => item.seatsToday)).toEqual([10, 2]);
+    });
   });
 });

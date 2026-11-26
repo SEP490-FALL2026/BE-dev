@@ -164,4 +164,63 @@ describe('SubscriptionPeriodLinesService (P18 renewal close & continuation lines
     expect(lines.insert).not.toHaveBeenCalled();
     expect(seatLedger.openLines).not.toHaveBeenCalled();
   });
+
+  it('F-3: createForPeriod on ACTIVE 10 / 2 opens seat_changes INITIAL with 10 and 2 for each line', async () => {
+    lines.insert
+      .mockResolvedValueOnce(line({ id: 'line-std', planId: 'plan-std' }))
+      .mockResolvedValueOnce(line({ id: 'line-prm', planId: 'plan-prm' }));
+
+    await service.createForPeriod(tx, {
+      organizationId: 'org-1',
+      subscriptionId: 'sub-1',
+      workspaceId: 'ws-1',
+      startDate: '2026-11-01',
+      status: 'ACTIVE',
+      recordedByEmployeeId: 'emp-1',
+      lines: [
+        { planId: 'plan-std', monthlyUnitPriceMinor: 500_000n, minimumSeats: null, quantity: 10 },
+        { planId: 'plan-prm', monthlyUnitPriceMinor: 2_500_000n, minimumSeats: null, quantity: 2 },
+      ],
+    });
+
+    expect(seatLedger.openLines).toHaveBeenCalledWith(tx, {
+      lines: [
+        { lineId: 'line-std', effectiveOn: '2026-11-01', quantity: 10, recordedByEmployeeId: 'emp-1' },
+        { lineId: 'line-prm', effectiveOn: '2026-11-01', quantity: 2, recordedByEmployeeId: 'emp-1' },
+      ],
+    });
+  });
+
+  it('F-3: activatePeriod refuses multi-line un-opened activation rather than falling back to idx === 0', async () => {
+    lines.ofSubscriptions.mockResolvedValueOnce(
+      new Map([
+        [
+          'sub-1',
+          [
+            line({ id: 'line-1', planId: 'plan-1', ledgerOpenedOn: null }),
+            line({ id: 'line-2', planId: 'plan-2', ledgerOpenedOn: null }),
+          ],
+        ],
+      ]),
+    );
+
+    await expect(
+      service.activatePeriod(
+        tx,
+        {
+          id: 'sub-1',
+          planId: 'plan-1',
+          planProvisioningType: 'K2',
+          kind: 'TERM',
+          workspace: { id: 'ws-1', name: 'Anthropic' },
+          startDate: '2026-11-01',
+          purchasedQuantity: 12,
+          monthlyUnitPriceMinor: 500_000n,
+          vendorMinimumSeats: null,
+        },
+        'emp-1',
+      ),
+    ).rejects.toThrow();
+    expect(seatLedger.openLines).not.toHaveBeenCalled();
+  });
 });
