@@ -58,6 +58,10 @@ export class SubscriptionMultiLineService {
     return this.periodLines.hasLines(subscriptionId, tx);
   }
 
+  hasPricedLines(subscriptionId: string, tx?: DbTx): Promise<boolean> {
+    return this.periodLines.hasPricedLines(subscriptionId, tx);
+  }
+
   createForPeriod(tx: DbTx, input: Parameters<SubscriptionPeriodLinesService['createForPeriod']>[1]) {
     return this.periodLines.createForPeriod(tx, input);
   }

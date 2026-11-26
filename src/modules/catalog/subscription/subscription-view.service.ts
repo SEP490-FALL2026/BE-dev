@@ -266,10 +266,8 @@ export class SubscriptionViewService {
     });
     const views: SubscriptionView[] = [];
     for (const record of records) {
-      const { lineViews, listSeatsToday, lineCount, effectivePurchasedQuantity, hasLine } = this.resolveRecordLines(
-        record,
-        linesCtx,
-      );
+      const { lineViews, listSeatsToday, lineCount, effectivePurchasedQuantity, hasPricedLine } =
+        this.resolveRecordLines(record, linesCtx);
       const notice = deriveNotice(noticeInputOf(record));
       const missing = missingData({
         kind: record.kind,
@@ -277,7 +275,7 @@ export class SubscriptionViewService {
         quantity: effectivePurchasedQuantity,
         startDate: record.startDate,
         billingCycle: record.billingCycle,
-        hasPrice: isPricedInDong(record) || hasLine,
+        hasPrice: isPricedInDong(record) || hasPricedLine,
       });
       let group: TaxEstimateResult['group'] | null = groups.get(record.vendor.id)?.group ?? null;
       let taxEstimate: TaxEstimateSummary | null = null;
@@ -406,7 +404,7 @@ export class SubscriptionViewService {
       lineViews,
       listSeatsToday: listSeatsTodayOf(lineCount, servingSeatsSum, record),
       lineCount,
-      hasLine: lineCount > 0,
+      hasPricedLine: lineCount > 0 && subLines.every((entry) => entry.line.monthlyUnitPriceMinor > 0n),
       effectivePurchasedQuantity: lineCount > 0 ? servingSeatsSum : record.purchasedQuantity,
     };
   }

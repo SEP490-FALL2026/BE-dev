@@ -167,7 +167,7 @@ export class SubscriptionChangeService {
     if (sameState(state, stateOf(current))) return current;
 
     const updated = await this.subscriptions.update(tx, id, state);
-    await this.syncLinesAfterChange(tx, actor, current, updated);
+    await this.syncLinesAfterChange(tx, actor, organizationId, current, updated);
     await this.auditChange(tx, actor, { current, updated, organizationId, quantityChangeReason });
     await this.notifySeatChange(tx, actor, current, updated, organizationId);
 
@@ -177,6 +177,7 @@ export class SubscriptionChangeService {
   private async syncLinesAfterChange(
     tx: DbTx,
     actor: AuthenticatedPrincipal,
+    organizationId: string,
     current: SubscriptionRecord,
     updated: SubscriptionRecord,
   ): Promise<void> {
@@ -187,6 +188,8 @@ export class SubscriptionChangeService {
     }
     if (current.status === 'DRAFT' && updated.status === 'DRAFT') {
       await this.periodLines.syncDraftUpdate(tx, {
+        organizationId,
+        workspaceId: updated.workspace?.id ?? null,
         subscriptionId: updated.id,
         planId: updated.planId,
         monthlyUnitPriceMinor: updated.monthlyUnitPriceMinor,

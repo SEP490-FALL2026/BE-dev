@@ -128,6 +128,7 @@ describe('Subscription lines HTTP routes (W3-15)', () => {
     complete: jest.fn(),
     onboardingCandidate: jest.fn(),
   };
+  const changeSvc = { update: jest.fn() };
 
   beforeAll(async () => {
     app = await createHttpContractApp({
@@ -135,7 +136,7 @@ describe('Subscription lines HTTP routes (W3-15)', () => {
         { token: SubscriptionLineService, useValue: lineSvc },
         { token: SeatChangeQueryService, useValue: changeQuerySvc },
         { token: SubscriptionService, useValue: subSvc },
-        { token: SubscriptionChangeService, useValue: { update: jest.fn() } },
+        { token: SubscriptionChangeService, useValue: changeSvc },
       ],
     });
   });
@@ -347,6 +348,51 @@ describe('Subscription lines HTTP routes (W3-15)', () => {
       expect(listItem.lineCount).toBe(1);
       expect(listItem.seatsToday).toBe(10);
       expect(listItem.lines).toBeUndefined();
+    });
+
+    it('F-2: returns 422 SUBSCRIPTION.STILL_DRAFT missing=[UNIT_PRICE] on unpriced draft completion, and returns priced line after PATCH + complete', async () => {
+      const { SubscriptionStillDraftError } =
+        await import('../../../src/modules/catalog/subscription/subscription.errors');
+      subSvc.complete.mockRejectedValueOnce(new SubscriptionStillDraftError(['UNIT_PRICE']));
+
+      const draftErr = await request(app.getHttpServer())
+        .post(`/api/v1/subscriptions/${SUB_ID}/completions`)
+        .set('Authorization', itAuth)
+        .expect(422);
+      expect(bodyOf(draftErr).error).toMatchObject({
+        code: 'SUBSCRIPTION.STILL_DRAFT',
+        details: { missing: ['UNIT_PRICE'] },
+      });
+
+      const patchedView = {
+        ...subscriptionView,
+        status: 'DRAFT' as const,
+        missingFinancialData: true,
+        missing: [],
+        monthlyUnitPrice: { amount: '600000', currency: 'VND' },
+        lines: [{ ...subscriptionView.lines[0], monthlyUnitPrice: { amount: '600000', currency: 'VND' } }],
+        createdAt: new Date(TS),
+        updatedAt: new Date(TS),
+      };
+      changeSvc.update.mockResolvedValueOnce(patchedView);
+      await request(app.getHttpServer())
+        .patch(`/api/v1/subscriptions/${SUB_ID}`)
+        .set('Authorization', itAuth)
+        .send({ monthlyUnitPrice: { amount: '600000', currency: 'VND' }, expectedUpdatedAt: TS })
+        .expect(200);
+
+      subSvc.complete.mockResolvedValueOnce({ ...patchedView, status: 'ACTIVE', missingFinancialData: false });
+      const completed = await request(app.getHttpServer())
+        .post(`/api/v1/subscriptions/${SUB_ID}/completions`)
+        .set('Authorization', itAuth)
+        .expect(200);
+      const completedBody = dataOf<{ lines: Array<{ monthlyUnitPrice: { amount: string; currency: string } }> }>(
+        completed,
+      );
+      expect(completedBody.lines[0].monthlyUnitPrice).toEqual({
+        amount: '600000',
+        currency: 'VND',
+      });
     });
   });
 });

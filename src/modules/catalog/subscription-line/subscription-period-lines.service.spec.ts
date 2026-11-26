@@ -31,8 +31,9 @@ describe('SubscriptionPeriodLinesService (P18 renewal close & continuation lines
     lockMany: jest.fn(),
     close: jest.fn(),
     insert: jest.fn(),
+    update: jest.fn(),
   };
-  const seatLedger = { openNextPeriod: jest.fn() };
+  const seatLedger = { openNextPeriod: jest.fn(), openLines: jest.fn() };
   const organization = { getOrganization: jest.fn() };
   const service = new SubscriptionPeriodLinesService(
     lines as unknown as SubscriptionLineRepo,
@@ -98,5 +99,69 @@ describe('SubscriptionPeriodLinesService (P18 renewal close & continuation lines
         },
       ],
     });
+  });
+
+  it('F-2: hasPricedLines is true only when at least one line exists and every line has monthlyUnitPriceMinor > 0n', async () => {
+    lines.ofSubscriptions.mockResolvedValueOnce(new Map());
+    await expect(service.hasPricedLines('sub-1', tx)).resolves.toBe(false);
+
+    lines.ofSubscriptions.mockResolvedValueOnce(new Map([['sub-1', [line({ monthlyUnitPriceMinor: 0n })]]]));
+    await expect(service.hasPricedLines('sub-1', tx)).resolves.toBe(false);
+
+    lines.ofSubscriptions.mockResolvedValueOnce(
+      new Map([
+        ['sub-1', [line({ id: 'l1', monthlyUnitPriceMinor: 500_000n }), line({ id: 'l2', monthlyUnitPriceMinor: 0n })]],
+      ]),
+    );
+    await expect(service.hasPricedLines('sub-1', tx)).resolves.toBe(false);
+
+    lines.ofSubscriptions.mockResolvedValueOnce(new Map([['sub-1', [line({ monthlyUnitPriceMinor: 500_000n })]]]));
+    await expect(service.hasPricedLines('sub-1', tx)).resolves.toBe(true);
+  });
+
+  it('F-2: syncDraftUpdate creates the K2 draft line when a positive price is patched onto an unpriced draft', async () => {
+    lines.ofSubscriptions.mockResolvedValueOnce(new Map());
+    lines.insert.mockResolvedValueOnce(line({ monthlyUnitPriceMinor: 500_000n }));
+
+    await service.syncDraftUpdate(tx, {
+      organizationId: 'org-1',
+      workspaceId: 'ws-1',
+      subscriptionId: 'sub-1',
+      planId: 'plan-1',
+      monthlyUnitPriceMinor: 500_000n,
+      minimumSeats: 2,
+    });
+
+    expect(lines.insert).toHaveBeenCalledWith(tx, {
+      organizationId: 'org-1',
+      subscriptionId: 'sub-1',
+      workspaceId: 'ws-1',
+      planId: 'plan-1',
+      monthlyUnitPriceMinor: 500_000n,
+      minimumSeats: 2,
+    });
+  });
+
+  it('F-2: activatePeriod does not create a 0-price line when monthlyUnitPriceMinor is null or <= 0n', async () => {
+    lines.ofSubscriptions.mockResolvedValueOnce(new Map());
+
+    await service.activatePeriod(
+      tx,
+      {
+        id: 'sub-1',
+        planId: 'plan-1',
+        planProvisioningType: 'K2',
+        kind: 'TERM',
+        workspace: { id: 'ws-1', name: 'Anthropic' },
+        startDate: '2026-11-01',
+        purchasedQuantity: 5,
+        monthlyUnitPriceMinor: null,
+        vendorMinimumSeats: null,
+      },
+      'emp-1',
+    );
+
+    expect(lines.insert).not.toHaveBeenCalled();
+    expect(seatLedger.openLines).not.toHaveBeenCalled();
   });
 });

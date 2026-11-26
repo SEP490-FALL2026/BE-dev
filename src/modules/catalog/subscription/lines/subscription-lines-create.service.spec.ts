@@ -266,4 +266,116 @@ describe('SubscriptionService lines[] & draft activation (W3-15)', () => {
 
     expect(activatePeriod).toHaveBeenCalledWith(tx, active, 'emp-khoa');
   });
+
+  it('F-2: does not create a 0-price line when declaring a K2 draft without price', async () => {
+    const tx = {} as DbTx;
+    const runner = { run: (work: (t: DbTx) => unknown) => Promise.resolve(work(tx)) } as unknown as TransactionRunner;
+    const createForPeriod = jest.fn();
+    const unpricedDraft = baseRecord({
+      status: 'DRAFT',
+      purchasedQuantity: 5,
+      unitPrice: null,
+      monthlyUnitPriceMinor: null,
+      priceSnapshot: null,
+    });
+    const service = new SubscriptionService(
+      { insert: jest.fn().mockResolvedValue(unpricedDraft) } as unknown as SubscriptionRepo,
+      {
+        lookups: jest.fn().mockResolvedValue([planA]),
+        lockExclusive: jest.fn().mockResolvedValue(planA),
+      } as unknown as PlanFactsService,
+      {
+        read: jest.fn(),
+        readOriginal: jest.fn(),
+        priceToday: jest.fn().mockResolvedValue({ unitPrice: null, priceSnapshot: null }),
+      } as unknown as SubscriptionPricingService,
+      {
+        viewAll: jest.fn().mockResolvedValue([{ id: 'sub-1' } as SubscriptionView]),
+      } as unknown as SubscriptionViewService,
+      {
+        requireOrganizationId: jest.fn().mockResolvedValue('org-1'),
+        createForPeriod,
+        activatePeriod: jest.fn(),
+        hasLines: jest.fn().mockResolvedValue(false),
+        hasPricedLines: jest.fn().mockResolvedValue(false),
+        declare: jest.fn(),
+      } as unknown as SubscriptionMultiLineService,
+      {
+        workspaceFor: jest.fn().mockResolvedValue('ws-1'),
+        assertNoLiveDuplicate: jest.fn(),
+        responsibleOfDeclaration: jest.fn().mockResolvedValue('emp-khoa'),
+        assert: jest.fn(),
+        assertVendorAdmins: jest.fn(),
+        requireItAdmin: jest.fn(),
+      } as unknown as SubscriptionPoolService,
+      { record: jest.fn() } as unknown as AuditApi,
+      runner,
+    );
+
+    await service.declare(actor, {
+      planId: 'plan-b',
+      kind: 'TERM',
+      purchasedQuantity: 5,
+      billingCycle: 'MONTHLY',
+      commitmentTermMonths: 1,
+      startDate: '2026-11-01',
+    });
+
+    expect(createForPeriod).not.toHaveBeenCalled();
+  });
+
+  it('F-2: refuses completing a draft without priced lines with 422 SUBSCRIPTION.STILL_DRAFT missing=[UNIT_PRICE]', async () => {
+    const tx = {} as DbTx;
+    const runner = { run: (work: (t: DbTx) => unknown) => Promise.resolve(work(tx)) } as unknown as TransactionRunner;
+    const unpricedDraft = baseRecord({
+      status: 'DRAFT',
+      purchasedQuantity: 5,
+      unitPrice: null,
+      monthlyUnitPriceMinor: null,
+      priceSnapshot: null,
+    });
+    const update = jest.fn();
+    const service = new SubscriptionService(
+      {
+        find: jest.fn().mockResolvedValue(unpricedDraft),
+        lock: jest.fn().mockResolvedValue(unpricedDraft),
+        update,
+      } as unknown as SubscriptionRepo,
+      {
+        lookups: jest.fn().mockResolvedValue([planA]),
+        lockExclusive: jest.fn().mockResolvedValue(planA),
+      } as unknown as PlanFactsService,
+      { read: jest.fn(), readOriginal: jest.fn(), priceToday: jest.fn() } as unknown as SubscriptionPricingService,
+      { viewAll: jest.fn() } as unknown as SubscriptionViewService,
+      {
+        requireOrganizationId: jest.fn().mockResolvedValue('org-1'),
+        hasLines: jest.fn().mockResolvedValue(true),
+        hasPricedLines: jest.fn().mockResolvedValue(false),
+        createForPeriod: jest.fn(),
+        activatePeriod: jest.fn(),
+        declare: jest.fn(),
+      } as unknown as SubscriptionMultiLineService,
+      {
+        workspaceFor: jest.fn().mockResolvedValue('ws-1'),
+        assertActivation: jest.fn(),
+        assertNoLiveDuplicate: jest.fn(),
+        takePrimaryFromPrevious: jest.fn(),
+      } as unknown as SubscriptionPoolService,
+      { record: jest.fn() } as unknown as AuditApi,
+      runner,
+    );
+
+    const err = await service.complete(actor, 'sub-1').catch((e: unknown) => e);
+    expect(err).toMatchObject({ missing: ['UNIT_PRICE'] });
+    const httpErr = toSubscriptionApiException(err) as {
+      getStatus: () => number;
+      getResponse: () => { code: string; details?: { missing?: string[] } };
+    };
+    expect(httpErr.getStatus()).toBe(HttpStatus.UNPROCESSABLE_ENTITY);
+    expect(httpErr.getResponse()).toMatchObject({
+      code: 'SUBSCRIPTION.STILL_DRAFT',
+      details: { missing: ['UNIT_PRICE'] },
+    });
+    expect(update).not.toHaveBeenCalled();
+  });
 });

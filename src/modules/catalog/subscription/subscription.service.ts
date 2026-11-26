@@ -350,7 +350,7 @@ export class SubscriptionService {
       const state = { ...stateOf(current), workspaceId: workspaceId ?? current.workspace?.id ?? null };
       const missing = this.missingOf(plan, current.kind, state);
       const effectiveMissing =
-        missing.includes('UNIT_PRICE') && (await this.multiLine.hasLines(id, tx))
+        missing.includes('UNIT_PRICE') && (await this.multiLine.hasPricedLines(id, tx))
           ? missing.filter((item) => item !== 'UNIT_PRICE')
           : missing;
       if (effectiveMissing.length > 0) throw new SubscriptionStillDraftError(effectiveMissing);
@@ -480,7 +480,15 @@ export class SubscriptionService {
   }): Promise<void> {
     const { tx, actor, plan, kind, state, status, subscriptionId, monthlyUnitPriceMinor, organizationId, workspaceId } =
       params;
-    if (plan.provisioningType !== 'K2' || kind !== 'TERM' || !workspaceId) return;
+    if (
+      plan.provisioningType !== 'K2' ||
+      kind !== 'TERM' ||
+      !workspaceId ||
+      monthlyUnitPriceMinor === null ||
+      monthlyUnitPriceMinor <= 0n
+    ) {
+      return;
+    }
     await this.multiLine.createForPeriod(tx, {
       organizationId,
       subscriptionId,
@@ -491,7 +499,7 @@ export class SubscriptionService {
       lines: [
         {
           planId: plan.id,
-          monthlyUnitPriceMinor: monthlyUnitPriceMinor ?? 0n,
+          monthlyUnitPriceMinor,
           minimumSeats: state.vendorMinimumSeats ?? null,
           quantity: state.purchasedQuantity ?? 0,
         },

@@ -51,6 +51,12 @@ export class SubscriptionPeriodLinesService {
     return (map.get(subscriptionId)?.length ?? 0) > 0;
   }
 
+  async hasPricedLines(subscriptionId: string, tx?: DbTx): Promise<boolean> {
+    const list = await this.linesOf(subscriptionId, tx);
+
+    return list.length > 0 && list.every((line) => line.monthlyUnitPriceMinor > 0n);
+  }
+
   async linesOf(subscriptionId: string, tx?: DbTx): Promise<SubscriptionLineRecord[]> {
     return (await this.lines.ofSubscriptions([subscriptionId], tx)).get(subscriptionId) ?? [];
   }
@@ -164,20 +170,36 @@ export class SubscriptionPeriodLinesService {
   async syncDraftUpdate(
     tx: DbTx,
     input: {
+      organizationId?: string;
+      workspaceId?: string | null;
       subscriptionId: string;
       planId: string;
       monthlyUnitPriceMinor: bigint | null;
       minimumSeats?: number | null;
     },
   ): Promise<void> {
-    const existing = (await this.lines.ofSubscriptions([input.subscriptionId], tx)).get(input.subscriptionId) ?? [];
-    if (existing.length !== 1 || existing[0].planId !== input.planId) return;
-    if (input.monthlyUnitPriceMinor === null && input.minimumSeats === undefined) return;
+    const existing = await this.linesOf(input.subscriptionId, tx);
+    const priced = input.monthlyUnitPriceMinor !== null && input.monthlyUnitPriceMinor > 0n;
+    if (existing.length === 0) {
+      if (!priced || !input.workspaceId) return;
+      const organizationId = input.organizationId ?? (await this.requireOrganizationId());
+      await this.lines.insert(tx, {
+        organizationId,
+        subscriptionId: input.subscriptionId,
+        workspaceId: input.workspaceId,
+        planId: input.planId,
+        monthlyUnitPriceMinor: input.monthlyUnitPriceMinor!,
+        minimumSeats: input.minimumSeats ?? null,
+      });
 
-    await this.lines.update(tx, existing[0].id, {
-      ...(input.monthlyUnitPriceMinor !== null ? { monthlyUnitPriceMinor: input.monthlyUnitPriceMinor } : {}),
+      return;
+    }
+    if (existing.length !== 1 || existing[0].planId !== input.planId) return;
+    const patch = {
+      ...(priced ? { monthlyUnitPriceMinor: input.monthlyUnitPriceMinor! } : {}),
       ...(input.minimumSeats !== undefined ? { minimumSeats: input.minimumSeats } : {}),
-    });
+    };
+    if (Object.keys(patch).length > 0) await this.lines.update(tx, existing[0].id, patch);
   }
 
   async activatePeriod(
@@ -226,19 +248,20 @@ export class SubscriptionPeriodLinesService {
     const map = await this.lines.ofSubscriptions([period.id], tx);
     const current = map.get(period.id) ?? [];
     if (current.length === 0) {
+      if (period.monthlyUnitPriceMinor === null || period.monthlyUnitPriceMinor <= 0n) return [];
       const organizationId = await this.requireOrganizationId();
       const inserted = await this.lines.insert(tx, {
         organizationId,
         subscriptionId: period.id,
         workspaceId,
         planId: period.planId,
-        monthlyUnitPriceMinor: period.monthlyUnitPriceMinor ?? 0n,
+        monthlyUnitPriceMinor: period.monthlyUnitPriceMinor,
         minimumSeats: period.vendorMinimumSeats ?? null,
       });
 
       return [inserted];
     }
-    if (period.monthlyUnitPriceMinor === null) return current;
+    if (period.monthlyUnitPriceMinor === null || period.monthlyUnitPriceMinor <= 0n) return current;
 
     const updatedLines: SubscriptionLineRecord[] = [];
     for (const line of current) {
