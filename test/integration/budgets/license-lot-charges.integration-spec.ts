@@ -124,8 +124,12 @@ describe('W3-25 P20: license-lot charges, 3-order allocation invariant (= A), an
              RETURNING request_id, employee_id
            )
            INSERT INTO access_request_lines (request_id, employee_id, state, need_step_id)
-           SELECT request_id, employee_id, 'APPROVED', $4 FROM b`,
+           SELECT request_id, employee_id, 'NEED_CONFIRMED', $4 FROM b`,
           [requestId, members[i], i + 1, needStepId],
+        );
+        await h.ctx.sql.query(
+          `UPDATE access_request_lines SET state = 'APPROVED' WHERE request_id = $1 AND employee_id = $2`,
+          [requestId, members[i]],
         );
       }
     } else {

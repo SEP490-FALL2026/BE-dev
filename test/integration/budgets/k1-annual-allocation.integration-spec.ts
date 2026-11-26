@@ -205,7 +205,7 @@ describe('W3-23 P13b: K1 annual allocations, 01/01 pairing, F8 transfer (D-16), 
         k1Annual: { lockSubjectKey: assignmentId },
         now: new Date(),
       });
-      await tx.$executeRaw`UPDATE purchase_invoices SET state = 'CONFIRMED', invoice_id = ${rec.invoiceId}::uuid WHERE id = ${purchaseInvoiceId}::uuid`;
+      await tx.$executeRaw`UPDATE purchase_invoices SET state = 'CONFIRMED', invoice_id = ${rec.invoiceId}::uuid, decided_by_employee_id = ${h.finance.employeeId}::uuid, decided_at = now() WHERE id = ${purchaseInvoiceId}::uuid`;
 
       return rec;
     });
@@ -363,13 +363,21 @@ describe('W3-23 P13b: K1 annual allocations, 01/01 pairing, F8 transfer (D-16), 
 
     // New request on new CC holding 7m * 450k = 3.150.000 in 2027
     const newRequestId = randomUUID();
+    const policyJson = JSON.stringify({
+      version: 1,
+      branch: 'PAID_IN_CATALOG',
+      chain: ['NEED', 'SPEND_APPROVAL'],
+      slaWorkingDays: 3,
+    });
     await h.ctx.sql.query(
       `INSERT INTO access_requests
          (id, organization_id, type, branch, state, plan_id, department_id, cost_center_id,
-          requester_employee_id, submitted_at, budget_year, amount_months,
-          term_months, unit_price_minor, billing_cycle)
-       VALUES ($1, $2, 'GRANT', 'PAID_IN_CATALOG', 'COMPLETED', $3, $4, $5, $6,
-               '2027-03-20T02:00:00Z', $7, 7, 12, '450000', 'MONTHLY')`,
+          requester_employee_id, business_reason, submitted_at, budget_year, amount_months,
+          amount_minor, amount_currency, term_months, unit_price_minor, billing_cycle, pricing_status,
+          policy, created_by_app_user_id)
+       VALUES ($1, $2, 'GRANT', 'PAID_IN_CATALOG', 'COMPLETED', $3, $4, $5, $6, 'K1 transfer re-grant',
+               '2027-03-20T02:00:00Z', $7, 7, 3150000, 'VND', 12, '450000', 'MONTHLY', 'PRICED',
+               $8::jsonb, $9)`,
       [
         newRequestId,
         h.seed.organizationId,
@@ -378,6 +386,8 @@ describe('W3-23 P13b: K1 annual allocations, 01/01 pairing, F8 transfer (D-16), 
         newUnit.department.unitId,
         oldUnit.member.employeeId,
         Y2,
+        policyJson,
+        h.finance.appUserId,
       ],
     );
     await h.ctx.sql.query(
@@ -486,14 +496,23 @@ describe('W3-23 P13b: K1 annual allocations, 01/01 pairing, F8 transfer (D-16), 
 
     const newRequestId = randomUUID();
     const newAsgId = randomUUID();
+    const policyJson = JSON.stringify({
+      version: 1,
+      branch: 'PAID_IN_CATALOG',
+      chain: ['NEED', 'SPEND_APPROVAL'],
+      slaWorkingDays: 3,
+    });
     await h.ctx.sql.query(`UPDATE license_assignments SET valid_until = '2026-12-20' WHERE id = $1`, [s.assignmentId]);
     await h.ctx.sql.query(
       `INSERT INTO access_requests
          (id, organization_id, type, branch, state, plan_id, department_id, cost_center_id,
-          requester_employee_id, submitted_at, budget_year, amount_months, next_year_amount_minor,
-          amount_currency, term_months, unit_price_minor, billing_cycle, expected_end_date, replaces_assignment_id)
-       VALUES ($1, $2, 'GRANT', 'PAID_IN_CATALOG', 'COMPLETED', $3, $4, $5, $6,
-               '2026-12-20T02:00:00Z', $7, 0, '4500000', 'VND', 12, '450000', 'MONTHLY', '2027-11-04', $8)`,
+          requester_employee_id, business_reason, submitted_at, budget_year, amount_months,
+          next_year_amount_minor, amount_minor, amount_currency, term_months, unit_price_minor,
+          billing_cycle, pricing_status, expected_end_date, replaces_assignment_id, policy,
+          created_by_app_user_id)
+       VALUES ($1, $2, 'GRANT', 'PAID_IN_CATALOG', 'COMPLETED', $3, $4, $5, $6, 'K1 transfer re-grant F-7',
+               '2026-12-20T02:00:00Z', $7, 0, '4500000', 0, 'VND', 12, '450000', 'MONTHLY', 'PRICED',
+               '2027-11-04', $8, $9::jsonb, $10)`,
       [
         newRequestId,
         h.seed.organizationId,
@@ -503,22 +522,24 @@ describe('W3-23 P13b: K1 annual allocations, 01/01 pairing, F8 transfer (D-16), 
         oldUnit.member.employeeId,
         Y1,
         s.assignmentId,
+        policyJson,
+        h.finance.appUserId,
       ],
     );
     await h.ctx.sql.query(
       `INSERT INTO license_assignments
          (id, organization_id, source, kind, plan_id, subscription_id, employee_id, account_identifier,
-          normalized_account_identifier, cost_center_id, owning_department_id, valid_from, granted_on,
-          expected_end_date, personal_commitment_months, billing_anchor_on, replaces_assignment_id, created_by_app_user_id)
-       VALUES ($1, $2, 'REQUEST', 'PERSONAL', $3, NULL, $4, $5, $5, $6, $7,
-               '2026-12-20', '2026-12-20', '2027-11-04', 12, '2026-11-05', $8, $9)`,
+          normalized_account_identifier, cost_center_id, owning_department_id, valid_from, valid_from_basis,
+          granted_on, expected_end_date, personal_commitment_months, billing_anchor_on, replaces_assignment_id,
+          created_by_app_user_id)
+       VALUES ($1, $2, 'REQUEST', 'PERSONAL', $3, NULL, $4, $5, $5, NULL, $6,
+               '2026-12-20', 'ACTUAL'::"AssignmentDateBasis", '2026-12-20', '2027-11-04', 12, '2026-11-05', $7, $8)`,
       [
         newAsgId,
         h.seed.organizationId,
         k1AnnualPlanId,
         oldUnit.member.employeeId,
         nextTag('acct-new'),
-        newUnit.department.unitId,
         newUnit.department.id,
         s.assignmentId,
         h.finance.appUserId,
@@ -526,8 +547,10 @@ describe('W3-23 P13b: K1 annual allocations, 01/01 pairing, F8 transfer (D-16), 
     );
     await h.ctx.sql.query(
       `INSERT INTO provisioning_tasks
-         (id, organization_id, kind, status, channel, request_id, assignment_id, completed_at, completed_by_app_user_id)
-       VALUES (gen_random_uuid(), $1, 'GRANT', 'COMPLETED', 'MANUAL', $2, $3, '2026-12-20T03:00:00Z', $4)`,
+         (id, organization_id, kind, status, channel, request_id, assignment_id, claimed_by_app_user_id,
+          claimed_at, completed_at, completed_by_app_user_id, evidence, max_attempts, created_by_app_user_id)
+       VALUES (gen_random_uuid(), $1, 'GRANT', 'COMPLETED', 'MANUAL', $2, $3, $4,
+               '2026-12-20T02:30:00Z', '2026-12-20T03:00:00Z', $4, 'K1 transfer grant completed', 1, $4)`,
       [h.seed.organizationId, newRequestId, newAsgId, h.finance.appUserId],
     );
 

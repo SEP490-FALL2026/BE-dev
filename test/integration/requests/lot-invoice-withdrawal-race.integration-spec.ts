@@ -100,8 +100,12 @@ describe('lot invoice confirmation vs group member withdrawal race (integration,
            RETURNING request_id, employee_id
          )
          INSERT INTO access_request_lines (request_id, employee_id, state, need_step_id)
-         SELECT request_id, employee_id, 'APPROVED', $4 FROM b`,
+         SELECT request_id, employee_id, 'NEED_CONFIRMED', $4 FROM b`,
         [reqId, members[i], i + 1, needStepId],
+      );
+      await h.ctx.sql.query(
+        `UPDATE access_request_lines SET state = 'APPROVED' WHERE request_id = $1 AND employee_id = $2`,
+        [reqId, members[i]],
       );
       await h.ctx.sql.query(
         `INSERT INTO access_request_line_amounts (request_id, employee_id, budget_year, amount_minor, currency, held)
