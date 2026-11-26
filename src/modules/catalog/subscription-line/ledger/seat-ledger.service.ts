@@ -296,6 +296,35 @@ export class SeatLedgerService {
     return this.ledger.seatsOnOfLines(lineIds, day, tx);
   }
 
+  /** Next-period opening seat count per prior line id via `renewed_from_line_id` (`Q-F`). */
+  async nextLineQuantities(priorLineIds: readonly string[], tx?: DbTx): Promise<Map<string, number>> {
+    const successors = await this.lines.successorLinesByPriorIds(priorLineIds, tx);
+    const result = new Map<string, number>();
+    const withStart = successors.filter(
+      (row): row is typeof row & { startDate: BusinessDate } => row.startDate !== null,
+    );
+    if (withStart.length === 0) return result;
+
+    let minStart = withStart[0].startDate;
+    let maxStart = withStart[0].startDate;
+    for (const row of withStart) {
+      if (row.startDate < minStart) minStart = row.startDate;
+      if (row.startDate > maxStart) maxStart = row.startDate;
+    }
+    const seatsMap = await this.seatsOnDays(
+      withStart.map((row) => row.id),
+      minStart,
+      maxStart,
+      tx,
+    );
+    for (const row of withStart) {
+      const qty = seatsMap.get(row.id)?.get(row.startDate) ?? row.fallbackQuantity;
+      if (qty !== null) result.set(row.renewedFromLineId, qty);
+    }
+
+    return result;
+  }
+
   /** Context of a line and its parent subscription period for seat purchase route checks. */
   findWithPurchaseContext(lineId: string, tx?: DbTx) {
     return this.lines.findWithPurchaseContext(lineId, tx);

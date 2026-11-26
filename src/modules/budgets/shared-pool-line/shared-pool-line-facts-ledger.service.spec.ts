@@ -85,6 +85,7 @@ describe('SharedPoolLineFactsService — ledger & label (1) (W3-22 & B2-R7)', ()
     };
     const seatLedger = {
       seatsOnDays: jest.fn().mockResolvedValue(new Map()),
+      nextLineQuantities: jest.fn().mockResolvedValue(new Map()),
     };
     const service = new SharedPoolLineFactsService(
       poolRepo as unknown as SharedPoolLineRepo,
@@ -239,5 +240,79 @@ describe('SharedPoolLineFactsService — ledger & label (1) (W3-22 & B2-R7)', ()
     expect(members.idleCostMinor).toBe(1_000_000n);
     expect(members.idleCostByLabel.missedAdjustmentMinor).toBe(0n);
     expect(licensing.getPriorLineTargets).toHaveBeenCalledWith(['prior-std', 'prior-prm'], undefined);
+  });
+
+  it('F-15 Q-F multi-line: resolves qNext per line via renewed_from_line_id (Standard 12->11 + Premium 2->2 gives 483_333 until 2027-07-01 + 483_334 until 2028-07-01)', async () => {
+    const { service, periods, licensing, seatLedger } = build();
+    const juneSeats = [
+      ...Array.from({ length: 10 }, (_, i) => ({
+        ...seat('sub-claude', '2026-07-01', null),
+        planId: 'plan-std',
+        assignmentId: `std-${i}`,
+      })),
+      ...Array.from({ length: 2 }, (_, i) => ({
+        ...seat('sub-claude', '2026-07-01', null),
+        planId: 'plan-prm',
+        assignmentId: `prm-${i}`,
+      })),
+    ];
+    licensing.getSeatsOfMonth.mockResolvedValue(juneSeats);
+    licensing.getNextPeriodQuantities.mockResolvedValue(new Map([['sub-claude', 13]]));
+    periods.getPurchaseFacts.mockResolvedValue([
+      fact({
+        subscriptionId: 'sub-claude',
+        purchasedQuantity: 14,
+        monthlyPriceMinor: null,
+        noticeDeadline: '2027-06-01',
+        nextPeriodPurchasedQuantity: 13,
+      }),
+    ]);
+    periods.linesOfSubscriptions.mockResolvedValue(
+      new Map([
+        [
+          'sub-claude',
+          [
+            lineRecord({
+              id: 'line-std',
+              subscriptionId: 'sub-claude',
+              planId: 'plan-std',
+              monthlyUnitPriceMinor: 500_000n,
+            }),
+            lineRecord({
+              id: 'line-prm',
+              subscriptionId: 'sub-claude',
+              planId: 'plan-prm',
+              monthlyUnitPriceMinor: 2_500_000n,
+            }),
+          ],
+        ],
+      ]),
+    );
+    const makeConst = (qty: number) => {
+      const m = new Map<string, number>();
+      for (let d = '2027-06-01'; d < '2027-07-01'; d = addDays(d, 1)) m.set(d, qty);
+
+      return m;
+    };
+    seatLedger.seatsOnDays.mockResolvedValue(
+      new Map([
+        ['line-std', makeConst(12)],
+        ['line-prm', makeConst(2)],
+      ]),
+    );
+    (seatLedger as { nextLineQuantities?: jest.Mock }).nextLineQuantities = jest.fn().mockResolvedValue(
+      new Map([
+        ['line-std', 11],
+        ['line-prm', 2],
+      ]),
+    );
+
+    const [detail] = await service.linesOfMonth('2027-06-01', undefined, 100);
+
+    expect(detail.idleCostByLabel.reducibleMinor).toBe(33_333n);
+    expect(detail.idleCostByLabel.lockedUntil).toEqual({
+      '2027-07-01': 483_333n,
+      '2028-07-01': 483_334n,
+    });
   });
 });

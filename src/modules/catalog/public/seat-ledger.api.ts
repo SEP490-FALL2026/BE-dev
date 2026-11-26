@@ -213,6 +213,10 @@ export class SeatLedgerApi {
     return this.ledger.linesOfSubscriptions(subscriptionIds, tx);
   }
 
+  nextLineQuantities(priorLineIds: readonly string[], tx?: DbTx): Promise<Map<string, number>> {
+    return this.ledger.nextLineQuantities(priorLineIds, tx);
+  }
+
   lockPeriodAndLine(tx: DbTx, subscriptionId: string, lineId: string) {
     return this.ledger.lockPeriodAndLine(tx, subscriptionId, lineId);
   }

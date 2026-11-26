@@ -98,7 +98,20 @@ type PeriodCostInput = {
   qNext: number | null;
   seatsMap: ReadonlyMap<string, ReadonlyMap<BusinessDate, number | null>>;
   priorTargets: readonly PriorLineLockedTarget[];
+  nextLineQNextMap: ReadonlyMap<string, number>;
 };
+
+function resolveLineQNext(input: PeriodCostInput, line: SubscriptionLineRecord, singleLine: boolean): number | null {
+  const byLine = input.nextLineQNextMap.get(line.id);
+  if (byLine !== undefined) return byLine;
+  if (input.qNext === 0) return 0;
+  if (singleLine) return input.qNext;
+  const hasRenewedSibling = input.lines.some(
+    (sibling) => sibling.closedReason !== 'REMOVED' && input.nextLineQNextMap.has(sibling.id),
+  );
+
+  return hasRenewedSibling ? 0 : null;
+}
 
 function evaluateSingleLine(input: PeriodCostInput, line: SubscriptionLineRecord, singleLine: boolean) {
   const dailySeats = input.seatsMap.get(line.id);
@@ -126,7 +139,7 @@ function evaluateSingleLine(input: PeriodCostInput, line: SubscriptionLineRecord
       ...input.fact,
       ...linePeriod,
       vendorMinimumSeats: line.minimumSeats ?? (singleLine ? input.fact.vendorMinimumSeats : null),
-      qNext: singleLine ? input.qNext : null,
+      qNext: resolveLineQNext(input, line, singleLine),
       windows: input.windows,
       missedSeats,
     },
@@ -174,6 +187,7 @@ function buildLineDetail(input: {
   qNext: number | null;
   seatsMap: ReadonlyMap<string, ReadonlyMap<BusinessDate, number | null>>;
   priorTargets: readonly PriorLineLockedTarget[];
+  nextLineQNextMap: ReadonlyMap<string, number>;
 }): SharedPoolLineDetail {
   const { fact, figure, variance } = input;
   const evaluated = evaluatePeriodCosts(input);
@@ -264,7 +278,13 @@ export class SharedPoolLineFactsService {
     const qNextMap = await this.licensing.getNextPeriodQuantities(eligibleIds, tx);
     const linesMap = await this.periods.linesOfSubscriptions(eligibleIds, tx);
 
-    const { seatsMap, priorTargets } = await this.readLineLedgerAndTargets(eligible, linesMap, start, monthEnd, tx);
+    const { seatsMap, priorTargets, nextLineQNextMap } = await this.readLineLedgerAndTargets(
+      eligible,
+      linesMap,
+      start,
+      monthEnd,
+      tx,
+    );
     const seatsBySub = groupSeatsBySubscription(seatsOfMonth);
     const figureBySub = new Map(figures.map((row) => [row.subscriptionId, row]));
     const varianceBySub = new Map(variances.map((row) => [row.subscriptionId, row]));
@@ -281,6 +301,7 @@ export class SharedPoolLineFactsService {
         qNext: fact.nextPeriodPurchasedQuantity ?? qNextMap.get(fact.subscriptionId) ?? null,
         seatsMap,
         priorTargets,
+        nextLineQNextMap,
       }),
     );
   }
@@ -294,6 +315,7 @@ export class SharedPoolLineFactsService {
   ): Promise<{
     seatsMap: ReadonlyMap<string, ReadonlyMap<BusinessDate, number | null>>;
     priorTargets: PriorLineLockedTarget[];
+    nextLineQNextMap: ReadonlyMap<string, number>;
   }> {
     const activeLines = eligible.flatMap((fact) =>
       (linesMap.get(fact.subscriptionId) ?? [])
@@ -301,7 +323,7 @@ export class SharedPoolLineFactsService {
         .map((line) => ({ fact, line })),
     );
     if (activeLines.length === 0) {
-      return { seatsMap: new Map(), priorTargets: [] };
+      return { seatsMap: new Map(), priorTargets: [], nextLineQNextMap: new Map() };
     }
 
     let minFrom = monthStart;
@@ -319,10 +341,13 @@ export class SharedPoolLineFactsService {
     const seatsMap = this.seatLedger
       ? await this.seatLedger.seatsOnDays(lineIds, minFrom, monthEnd, tx)
       : new Map<string, ReadonlyMap<BusinessDate, number | null>>();
+    const nextLineQNextMap = this.seatLedger
+      ? await this.seatLedger.nextLineQuantities(lineIds, tx)
+      : new Map<string, number>();
     const priorTargets =
       priorLineIds.length > 0 ? await this.licensing.getPriorLineTargets([...new Set(priorLineIds)], tx) : [];
 
-    return { seatsMap, priorTargets };
+    return { seatsMap, priorTargets, nextLineQNextMap };
   }
 
   /**

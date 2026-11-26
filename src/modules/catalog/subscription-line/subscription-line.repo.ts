@@ -248,6 +248,41 @@ export class SubscriptionLineRepo {
     return result;
   }
 
+  /** Renewal lines whose `renewed_from_line_id` is in `priorLineIds`, with their next period start date and fallback quantity. */
+  async successorLinesByPriorIds(
+    priorLineIds: readonly string[],
+    tx?: DbTx,
+  ): Promise<
+    { id: string; renewedFromLineId: string; startDate: BusinessDate | null; fallbackQuantity: number | null }[]
+  > {
+    if (priorLineIds.length === 0) return [];
+    const rows = await (tx ?? this.prisma).subscriptionLine.findMany({
+      where: {
+        renewedFromLineId: { in: [...priorLineIds] },
+        OR: [{ closedReason: null }, { closedReason: { not: 'REMOVED' } }],
+      },
+      select: {
+        id: true,
+        renewedFromLineId: true,
+        subscription: { select: { startDate: true, purchasedQuantity: true } },
+      },
+      orderBy: ORDER,
+    });
+
+    return rows.flatMap((row) =>
+      row.renewedFromLineId
+        ? [
+            {
+              id: row.id,
+              renewedFromLineId: row.renewedFromLineId,
+              startDate: row.subscription.startDate ? fromDateColumn(row.subscription.startDate) : null,
+              fallbackQuantity: row.subscription.purchasedQuantity,
+            },
+          ]
+        : [],
+    );
+  }
+
   /** Returns lines for the given `lineIds` with their parent `subscriptionId` and `monthlyUnitPriceMinor`. */
   async ofIds(lineIds: readonly string[], tx?: DbTx): Promise<SubscriptionLineRecord[]> {
     if (lineIds.length === 0) return [];
