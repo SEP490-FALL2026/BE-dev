@@ -71,11 +71,7 @@ export class AssignmentSeatOccupancy implements SeatOccupancyReader, OnModuleIni
         if (events.total > 0) return true;
       }
     }
-    if (this.gate.isBound() && this.gate.get().hasLotCharges) {
-      return Boolean(await this.gate.get().hasLotCharges?.(lotId, tx));
-    }
-
-    return false;
+    return this.gate.get().hasLotCharges(lotId, tx);
   }
 
   openGrantTasksWithoutKeyOfPlans(planIds: readonly string[], tx?: DbTx) {

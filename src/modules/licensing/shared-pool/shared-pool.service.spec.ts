@@ -31,6 +31,11 @@ describe('SharedPoolService (ledger seats & chooseLine)', () => {
       seatsOnDays: jest.fn().mockResolvedValue(new Map([['line-1', new Map([['2026-11-21', 12]])]])),
     };
 
+    const gate = {
+      isBound: () => true,
+      get: () => ({ reservedForRequestLots: jest.fn().mockResolvedValue(new Map()) }),
+    } as unknown as GrantRequestGateHook;
+
     const service = new SharedPoolService(
       catalog as unknown as CatalogApi,
       capacityRepo as unknown as SharedPoolCapacityRepo,
@@ -40,6 +45,7 @@ describe('SharedPoolService (ledger seats & chooseLine)', () => {
         accountLotCandidates: jest.fn().mockResolvedValue([]),
         chooseAccountLot: jest.fn(),
       } as unknown as LicenseLotStockApi,
+      gate,
     );
 
     const stock = await service.stockOf(tx, 'plan-1', '2026-11-21', 'K2');
@@ -86,6 +92,11 @@ describe('SharedPoolService (ledger seats & chooseLine)', () => {
       ),
     };
 
+    const gate = {
+      isBound: () => true,
+      get: () => ({ reservedForRequestLots: jest.fn().mockResolvedValue(new Map()) }),
+    } as unknown as GrantRequestGateHook;
+
     const service = new SharedPoolService(
       catalog as unknown as CatalogApi,
       capacityRepo as unknown as SharedPoolCapacityRepo,
@@ -95,6 +106,7 @@ describe('SharedPoolService (ledger seats & chooseLine)', () => {
         accountLotCandidates: jest.fn().mockResolvedValue([]),
         chooseAccountLot: jest.fn(),
       } as unknown as LicenseLotStockApi,
+      gate,
     );
 
     const chosen = await service.chooseLine(tx, {
@@ -117,6 +129,7 @@ describe('SharedPoolService (ledger seats & chooseLine)', () => {
         accountLotCandidates: jest.fn().mockResolvedValue([]),
         chooseAccountLot: jest.fn(),
       } as unknown as LicenseLotStockApi,
+      { isBound: () => true, get: () => ({ reservedForRequestLots: jest.fn() }) } as unknown as GrantRequestGateHook,
     );
 
     expect(await service.chooseLine(tx, { planId: 'plan-k1', provisioningType: 'K1', today: '2026-11-21' })).toBeNull();
@@ -169,6 +182,11 @@ describe('SharedPoolService (ledger seats & chooseLine)', () => {
         ]),
       ),
     };
+    const gate = {
+      isBound: () => true,
+      get: () => ({ reservedForRequestLots: jest.fn().mockResolvedValue(new Map()) }),
+    } as unknown as GrantRequestGateHook;
+
     const service = new SharedPoolService(
       catalog as unknown as CatalogApi,
       capacityRepo as unknown as SharedPoolCapacityRepo,
@@ -178,6 +196,7 @@ describe('SharedPoolService (ledger seats & chooseLine)', () => {
         accountLotCandidates: jest.fn().mockResolvedValue([]),
         chooseAccountLot: jest.fn(),
       } as unknown as LicenseLotStockApi,
+      gate,
     );
 
     const chosen = await service.chosenLinesOfPlans(['plan-1'], '2026-11-21', tx);
@@ -330,5 +349,40 @@ describe('SharedPoolService (ledger seats & chooseLine)', () => {
     await expect(
       service.assertK4LotGrantable(tx, { planId: 'plan-cad', lotId: 'lot-duc', requestId: 'req-minh' }),
     ).rejects.toBeInstanceOf(LicenseLotReservedForRequestError);
+  });
+
+  it('G-4: lotReservationsOf fails loudly when GrantRequestGateHook is unbound', async () => {
+    const { GrantRequestGateHook: HookClass } = await import('../public/licensing.extension-points');
+    const unboundGate = new HookClass();
+    const service = new SharedPoolService(
+      {} as unknown as CatalogApi,
+      {} as unknown as SharedPoolCapacityRepo,
+      {} as unknown as SharedPoolAvoidedCostRepo,
+      {} as unknown as SeatLedgerApi,
+      {} as unknown as LicenseLotStockApi,
+      unboundGate,
+    );
+
+    await expect(
+      service.lotReservationsOf(
+        [
+          {
+            id: 'lot-duc',
+            purchasedOn: '2027-04-01',
+            licenseCount: 3,
+            unitPriceMinor: 12_000_000n,
+            purpose: 'REQUEST',
+            requestId: 'req-duc',
+            legacySubscriptionId: null,
+            free: 1,
+            keysInStore: 1,
+            openTasksWithoutKey: 0,
+            grantable: 1,
+            excessGrantable: 2,
+          },
+        ],
+        tx,
+      ),
+    ).rejects.toThrow('not bound');
   });
 });

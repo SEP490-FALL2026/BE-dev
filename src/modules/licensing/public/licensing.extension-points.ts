@@ -87,12 +87,12 @@ export interface GrantRequestGate {
     expectedPlanId: string,
   ): Promise<Set<string>>;
   /** Returns `(beneficiaries, chargedExcess)` per `REQUEST` lot id for `F11` seat reservation checks. */
-  reservedForRequestLots?(
+  reservedForRequestLots(
     lotRequests: readonly { lotId: string; requestId: string }[],
     tx?: DbTx,
   ): Promise<Map<string, { beneficiaries: number; chargedExcess: number }>>;
   /** Whether the lot already has at least one `license_lot_charges` row. */
-  hasLotCharges?(lotId: string, tx?: DbTx): Promise<boolean>;
+  hasLotCharges(lotId: string, tx?: DbTx): Promise<boolean>;
 }
 
 /** The one gate of requests the provisioning asks (bound by requests; every graph that loads licensing loads it). */

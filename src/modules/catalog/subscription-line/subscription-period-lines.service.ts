@@ -3,6 +3,7 @@ import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { SeatLedgerService } from './ledger/seat-ledger.service';
+import { SubscriptionLinePeriodStillDraftError } from './subscription-line.errors';
 import { SubscriptionLineRepo } from './subscription-line.repo';
 import type { SubscriptionLineClosedReason, SubscriptionLineRecord } from './subscription-line.types';
 
@@ -228,7 +229,7 @@ export class SubscriptionPeriodLinesService {
     const unOpened = current.filter((line) => line.ledgerOpenedOn === null);
     if (unOpened.length === 0 || period.startDate === null) return;
     if (unOpened.length > 1) {
-      throw new Error('Cannot activate a draft period with multiple un-opened lines');
+      throw new SubscriptionLinePeriodStillDraftError(['MULTIPLE_UNOPENED_LINES']);
     }
 
     const initialQuantity = period.purchasedQuantity ?? 0;

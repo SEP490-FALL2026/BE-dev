@@ -1,4 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { LicenseLotApi } from '../../catalog/public/license-lot.api';
@@ -20,7 +20,7 @@ export class LicenseLotCostService {
     private readonly lots: LicenseLotApi,
     private readonly lotCharges: LicenseLotChargeRepo,
     private readonly commitments: CommitmentRepo,
-    @Optional() private readonly requestFacts?: CommitmentRequestFactsHook,
+    private readonly requestFacts: CommitmentRequestFactsHook,
   ) {}
 
   /**
@@ -95,7 +95,7 @@ export class LicenseLotCostService {
 
     const requestIds = [...new Set(requestLots.flatMap((lot) => (lot.requestId ? [lot.requestId] : [])))];
     const reqFacts =
-      requestIds.length > 0 && this.requestFacts?.isBound()
+      requestIds.length > 0
         ? await this.requestFacts.get().factsOf(requestIds)
         : new Map<string, { beneficiaryCount?: number }>();
     const charges = await this.lotCharges.ofLots(

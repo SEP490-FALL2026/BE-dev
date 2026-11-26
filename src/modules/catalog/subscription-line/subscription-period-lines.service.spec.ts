@@ -1,6 +1,7 @@
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { SeatLedgerService } from './ledger/seat-ledger.service';
+import { SubscriptionLinePeriodStillDraftError } from './subscription-line.errors';
 import type { SubscriptionLineRepo } from './subscription-line.repo';
 import { SubscriptionPeriodLinesService } from './subscription-period-lines.service';
 import type { SubscriptionLineRecord } from './subscription-line.types';
@@ -220,7 +221,7 @@ describe('SubscriptionPeriodLinesService (P18 renewal close & continuation lines
         },
         'emp-1',
       ),
-    ).rejects.toThrow();
+    ).rejects.toBeInstanceOf(SubscriptionLinePeriodStillDraftError);
     expect(seatLedger.openLines).not.toHaveBeenCalled();
   });
 });

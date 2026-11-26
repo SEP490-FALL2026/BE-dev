@@ -61,10 +61,13 @@ describe('accountLotGrantable and excessGrantableOf (W3-24 AC-2 & F11)', () => {
     expect(accountLotGrantable({ free: 2, keysInStore: 1, openTasksWithoutKey: 3 })).toBe(0);
   });
 
-  it('computes excess grantable = n - m - chargedExcess for a REQUEST lot', () => {
+  it('computes excess grantable = n - m - chargedExcess - openExcessTasksWithoutKey for a REQUEST lot', () => {
     expect(excessGrantableOf({ licenseCount: 3, beneficiaries: 1, chargedExcess: 0 })).toBe(2);
     expect(excessGrantableOf({ licenseCount: 3, beneficiaries: 1, chargedExcess: 2 })).toBe(0);
     expect(excessGrantableOf({ licenseCount: 2, beneficiaries: 3, chargedExcess: 0 })).toBe(0);
+    expect(
+      excessGrantableOf({ licenseCount: 3, beneficiaries: 2, chargedExcess: 0, openExcessTasksWithoutKey: 1 }),
+    ).toBe(0);
   });
 });
 

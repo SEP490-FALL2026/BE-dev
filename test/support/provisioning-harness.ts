@@ -95,6 +95,14 @@ export class FakeGrantGate implements GrantRequestGate {
     return Promise.resolve(valid);
   }
 
+  reservedForRequestLots(): Promise<Map<string, { beneficiaries: number; chargedExcess: number }>> {
+    return Promise.resolve(new Map<string, { beneficiaries: number; chargedExcess: number }>());
+  }
+
+  hasLotCharges(): Promise<boolean> {
+    return Promise.resolve(false);
+  }
+
   /** A request that is approved enough and not ended, for this person and plan, of this department (the seed one by default). */
   grantable(employeeId: string, planId: string, departmentId: string = this.defaultDepartmentId): string {
     return this.answer({

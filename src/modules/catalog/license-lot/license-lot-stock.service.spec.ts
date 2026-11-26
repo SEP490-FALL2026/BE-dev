@@ -119,11 +119,46 @@ describe('LicenseLotStockService (W3-24)', () => {
             ]),
           ),
           keyCountsOfLots: jest.fn().mockResolvedValue(new Map()),
+          openGrantTasksWithoutKeyOfPlans: jest.fn().mockResolvedValue([]),
         }),
       } as unknown as SeatOccupancyHook,
       { businessToday: jest.fn().mockResolvedValue('2027-04-15') } as unknown as OrganizationReadApi,
     );
 
     expect(await service.newestFreeLotUnitPrice('plan-1')).toBe(11_000_000n);
+  });
+
+  it('G-5: subtracts open excess tasks without a key from excessGrantable while excluding own request tasks', async () => {
+    const service = build({
+      lots: [lot({ id: 'lot-1', licenseCount: 3, requestId: 'req-c' })],
+      occupied: 0,
+      inStore: 3,
+      openTasks: [
+        {
+          taskId: 't-own',
+          planId: 'plan-1',
+          requestId: 'req-c',
+          subscriptionId: 'lot-1',
+          createdAt: new Date('2027-04-02T00:00:00Z'),
+        },
+        {
+          taskId: 't-excess',
+          planId: 'plan-1',
+          requestId: 'req-a',
+          subscriptionId: 'lot-1',
+          createdAt: new Date('2027-04-03T00:00:00Z'),
+        },
+      ],
+    });
+
+    const candidates = await service.accountLotCandidates('plan-1', {
+      reservations: new Map([['lot-1', { beneficiaries: 2, chargedExcess: 0 }]]),
+    });
+    expect(candidates[0]).toMatchObject({
+      openTasksWithoutKey: 2,
+      openExcessTasksWithoutKey: 1,
+      grantable: 1,
+      excessGrantable: 0,
+    });
   });
 });

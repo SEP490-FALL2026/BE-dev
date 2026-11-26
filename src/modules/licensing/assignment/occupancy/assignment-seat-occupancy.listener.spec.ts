@@ -131,5 +131,15 @@ describe('AssignmentSeatOccupancy (S-6)', () => {
 
       await expect(listener.hasLotBeenUsed('lot-1', tx)).resolves.toBe(false);
     });
+
+    it('G-4: fails loudly when GrantRequestGateHook is unbound instead of returning false', async () => {
+      const { listener, gate } = setup();
+      (gate.isBound as jest.Mock).mockReturnValue(false);
+      (gate.get as jest.Mock).mockImplementation(() => {
+        throw new Error('Extension hook licensing.grant-request-gate is not bound');
+      });
+
+      await expect(listener.hasLotBeenUsed('lot-1', tx)).rejects.toThrow('not bound');
+    });
   });
 });

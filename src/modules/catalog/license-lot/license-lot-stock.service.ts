@@ -7,6 +7,8 @@ import { SeatOccupancyHook, type OpenK4GrantTask } from '../public/catalog.exten
 import {
   chooseAccountLot,
   countOpenTasksByLot,
+  countOpenTasksByLotDetailed,
+  excessGrantableOf,
   pickK4LotUnitPrice,
   type AccountLotWithGrantable,
   type LotChoiceResult,
@@ -55,9 +57,7 @@ export class LicenseLotStockService {
     const ids = lotRows.map((l) => l.id);
     const taken = await reader.seatsOfSubscriptions(ids, today, tx);
     const keys = await reader.keyCountsOfLots(ids, tx);
-    const rawTasks = reader.openGrantTasksWithoutKeyOfPlans
-      ? await reader.openGrantTasksWithoutKeyOfPlans([planId], tx)
-      : [];
+    const rawTasks = await reader.openGrantTasksWithoutKeyOfPlans([planId], tx);
     const filteredTasks = options?.excludeTaskId
       ? rawTasks.filter((t) => t.taskId !== options.excludeTaskId)
       : rawTasks;
@@ -137,7 +137,7 @@ export class LicenseLotStockService {
   ): Promise<Map<string, number>> {
     const result = new Map<string, number>();
     const reader = this.occupancy.get();
-    if (records.length === 0 || !reader.openGrantTasksWithoutKeyOfPlans) return result;
+    if (records.length === 0) return result;
     const planIds = [...new Set(records.map((r) => r.planId))];
     const byPlanLots = await this.lots.ofPlans(planIds, tx);
     const allPlanLots = [...byPlanLots.values()].flat();
@@ -213,7 +213,7 @@ export class LicenseLotStockService {
     tasks: readonly OpenK4GrantTask[],
     reservations?: ReadonlyMap<string, RequestLotReservation>,
   ): AccountLotWithGrantable[] {
-    const taskCounts = countOpenTasksByLot(
+    const taskCounts = countOpenTasksByLotDetailed(
       lotRows.map((l) => ({
         id: l.id,
         purchasedOn: l.purchasedOn,
@@ -226,32 +226,51 @@ export class LicenseLotStockService {
       tasks,
     );
 
-    return lotRows.map((l) => {
-      const { free } = freeOf(l.licenseCount, taken.get(l.id)?.occupied ?? 0, l.unitPriceMinor);
-      const keysInStore = keys.get(l.id)?.inStore ?? 0;
-      const openTasksWithoutKey = taskCounts.get(l.id) ?? 0;
-      const res = reservations?.get(l.id);
-      const beneficiaries = l.purpose === 'REQUEST' ? (res?.beneficiaries ?? 1) : 0;
-      const chargedExcess = res?.chargedExcess ?? 0;
-      const grantable = Math.max(0, Math.min(free, keysInStore - openTasksWithoutKey));
-      const excessGrantable = Math.max(0, l.licenseCount - beneficiaries - chargedExcess);
+    return lotRows.map((l) =>
+      this.toAccountLotCandidate(
+        l,
+        taken.get(l.id)?.occupied ?? 0,
+        keys.get(l.id)?.inStore ?? 0,
+        taskCounts.get(l.id),
+        reservations?.get(l.id),
+      ),
+    );
+  }
 
-      return {
-        id: l.id,
-        purchasedOn: l.purchasedOn,
+  private toAccountLotCandidate(
+    l: LicenseLotRecord,
+    occupied: number,
+    keysInStore: number,
+    counted: { total: number; excess: number } | undefined,
+    res: RequestLotReservation | undefined,
+  ): AccountLotWithGrantable {
+    const { free } = freeOf(l.licenseCount, occupied, l.unitPriceMinor);
+    const openTasksWithoutKey = counted?.total ?? 0;
+    const openExcessTasksWithoutKey = counted?.excess ?? 0;
+    const beneficiaries = l.purpose === 'REQUEST' ? (res?.beneficiaries ?? 1) : 0;
+    const chargedExcess = res?.chargedExcess ?? 0;
+
+    return {
+      id: l.id,
+      purchasedOn: l.purchasedOn,
+      licenseCount: l.licenseCount,
+      unitPriceMinor: l.unitPriceMinor,
+      purpose: l.purpose,
+      requestId: l.requestId,
+      legacySubscriptionId: l.legacySubscriptionId,
+      free,
+      keysInStore,
+      openTasksWithoutKey,
+      openExcessTasksWithoutKey,
+      beneficiaries,
+      chargedExcess,
+      grantable: Math.max(0, Math.min(free, keysInStore - openTasksWithoutKey)),
+      excessGrantable: excessGrantableOf({
         licenseCount: l.licenseCount,
-        unitPriceMinor: l.unitPriceMinor,
-        purpose: l.purpose,
-        requestId: l.requestId,
-        legacySubscriptionId: l.legacySubscriptionId,
-        free,
-        keysInStore,
-        openTasksWithoutKey,
         beneficiaries,
         chargedExcess,
-        grantable,
-        excessGrantable,
-      };
-    });
+        openExcessTasksWithoutKey,
+      }),
+    };
   }
 }

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
 import request from 'supertest';
 import { Barrier } from '../../support/concurrency-harness';
@@ -25,7 +26,7 @@ describe('REQUEST license-lot creation vs request cancellation race (integration
     const k4SubId = await h.subscription(1, 'K4');
     k4PlanId = await h.planOf(k4SubId);
     unit = await h.departmentWithHead('P-W7R');
-    await h.budgetFor(unit, { total: 500 * M, held: 0, spent: 0 });
+    await h.budgetFor(unit, { total: 5000 * M, held: 0, spent: 0 });
     await h.setItAdminInCharge(unit.department, { employeeId: h.it1.employeeId, account: h.it1 });
   }, 300000);
 
@@ -121,6 +122,153 @@ describe('REQUEST license-lot creation vs request cancellation race (integration
       } else {
         expect(await lotCountOfRequest(requestId)).toBe(1);
       }
+    }
+  });
+
+  async function seedApprovedGroupAndLot(): Promise<string> {
+    seq += 1;
+    const reqC = randomUUID();
+    const emp1 = await h.worker(unit.department, `F17-C1-${seq}`);
+    const emp2 = await h.worker(unit.department, `F17-C2-${seq}`);
+    const members = [emp1.employeeId, emp2.employeeId];
+    const needStepId = randomUUID();
+    const spendStepId = randomUUID();
+    const checkId = randomUUID();
+    const policyJson = JSON.stringify({
+      version: 1,
+      branch: 'PAID_IN_CATALOG',
+      chain: ['NEED', 'SPEND_APPROVAL'],
+      slaWorkingDays: 3,
+    });
+    await h.ctx.sql.query(
+      `INSERT INTO access_requests
+         (id, organization_id, type, branch, state, plan_id, department_id, cost_center_id,
+          requester_employee_id, business_reason, submitted_at, budget_year, amount_months,
+          amount_currency, unit_price_minor, monthly_price_minor, amount_minor, billing_cycle, pricing_status, policy, created_by_app_user_id)
+       VALUES ($1, $2, 'GROUP_GRANT', 'PAID_IN_CATALOG', 'AWAITING_EXECUTION', $3, $4, $5, $6,
+               'F17 barrier lot test', now(), $7, 1, 'VND', 12000000, 12000000, 24000000, 'ANNUAL', 'PRICED', $8::jsonb, $9)`,
+      [
+        reqC,
+        h.seed.organizationId,
+        k4PlanId,
+        unit.department.id,
+        unit.department.unitId,
+        unit.head.employeeId,
+        h.year,
+        policyJson,
+        unit.head.account.appUserId,
+      ],
+    );
+    await h.ctx.sql.query(
+      `INSERT INTO access_request_steps
+         (id, request_id, kind, sequence, state, assignee_employee_id, routing_row, sla_working_days, assigned_at, decided_at)
+       VALUES ($1, $2, 'NEED', 1, 'APPROVED', $3, 1, 3, now(), now()),
+              ($4, $2, 'SPEND_APPROVAL', 2, 'APPROVED', $5, 1, 3, now(), now())`,
+      [needStepId, reqC, unit.head.employeeId, spendStepId, h.boss.employeeId],
+    );
+    await h.ctx.sql.query(
+      `INSERT INTO request_budget_checks
+         (id, organization_id, request_id, number, trigger, route, outcome, stale_cost_evidence,
+          plan_line_overdue, period_closed, off_plan, currency, binding_total_minor, ran_by_employee_id)
+       VALUES ($1, $2, $3, 1, 'SUBMISSION', 'SPEND_APPROVAL', 'WITHIN_BASE'::"BudgetCheckOutcome",
+               false, false, false, false, 'VND', 24000000, $4)`,
+      [checkId, h.seed.organizationId, reqC, h.boss.employeeId],
+    );
+    await h.ctx.sql.query(
+      `INSERT INTO spend_decisions (step_id, request_id, check_id, decision, decided_by_employee_id, decided_at)
+       VALUES ($1, $2, $3, 'APPROVED', $4, now())`,
+      [spendStepId, reqC, checkId, h.boss.employeeId],
+    );
+    for (let idx = 0; idx < members.length; idx += 1) {
+      await h.ctx.sql.query(
+        `WITH b AS (
+           INSERT INTO access_request_beneficiaries (request_id, employee_id, position)
+           VALUES ($1, $2, $3)
+           RETURNING request_id, employee_id
+         )
+         INSERT INTO access_request_lines (request_id, employee_id, state, need_step_id)
+         SELECT request_id, employee_id, 'NEED_CONFIRMED', $4 FROM b`,
+        [reqC, members[idx], idx + 1, needStepId],
+      );
+      await h.ctx.sql.query(
+        `UPDATE access_request_lines SET state = 'APPROVED' WHERE request_id = $1 AND employee_id = $2`,
+        [reqC, members[idx]],
+      );
+      await h.ctx.sql.query(
+        `INSERT INTO access_request_line_amounts (request_id, employee_id, budget_year, amount_minor, currency, held)
+         VALUES ($1, $2, $3, 12000000, 'VND', true)`,
+        [reqC, members[idx], h.year],
+      );
+    }
+    await h.ctx.sql.query(
+      `INSERT INTO budget_commitments
+         (id, organization_id, request_id, cost_center_id, year, amount_minor, currency, state, origin, unattached_reason)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, 24000000, 'VND', 'HELD', 'APPROVAL', 'NO_BUDGET')`,
+      [h.seed.organizationId, reqC, unit.department.unitId, h.year],
+    );
+
+    await h
+      .grant({ requestId: reqC, beneficiaryEmployeeId: emp1.employeeId, purchase: { reason: 'Buy lotC for ReqC' } })
+      .expect(201);
+
+    const lotCId = h.dataOf<{ id: string }>(
+      await request(h.server())
+        .post('/api/v1/license-lots')
+        .set(h.as(h.it1))
+        .send({
+          planId: k4PlanId,
+          purchasedOn: h.today(),
+          licenseCount: 3,
+          unitPrice: { amount: '12000000', currency: 'VND' },
+          purpose: 'REQUEST',
+          requestId: reqC,
+        })
+        .expect(201),
+    ).id;
+    await request(h.server())
+      .post(`/api/v1/license-lots/${lotCId}/keys`)
+      .set(h.as(h.it1))
+      .send({ keys: [`F17-${seq}-001-ABCDE-12345`, `F17-${seq}-002-ABCDE-12345`, `F17-${seq}-003-ABCDE-12345`] })
+      .expect(201);
+
+    return lotCId;
+  }
+
+  async function approvedSingleRequest(tag: string): Promise<string> {
+    const emp = await h.worker(unit.department, tag);
+    const sent = await h.sent(emp, k4PlanId, {});
+    await h.decide(sent.id, { decision: 'APPROVE' }, unit.head.account).expect(200);
+    await h.setPayments(sent.id, { amount: 12 * M });
+    await h.sendOn([sent.id], unit.head.account).expect(201);
+    await h.decideSpend(sent.id, { decision: 'APPROVE' }, h.boss.account).expect(200);
+
+    return sent.id;
+  }
+
+  it('G-5 barrier x20: two requests naming same K4 REQUEST lot -> one 201 and one 409 LICENSE_LOT.RESERVED_FOR_REQUEST', async () => {
+    for (let i = 0; i < 20; i += 1) {
+      const lotCId = await seedApprovedGroupAndLot();
+      const [reqA, reqB] = await Promise.all([
+        approvedSingleRequest(`F17-A-${i}`),
+        approvedSingleRequest(`F17-B-${i}`),
+      ]);
+      const barrier = new Barrier(2);
+
+      const resA = (async () => {
+        await barrier.wait();
+        return h.grant({ requestId: reqA, subscriptionId: lotCId });
+      })();
+      const resB = (async () => {
+        await barrier.wait();
+        return h.grant({ requestId: reqB, subscriptionId: lotCId });
+      })();
+
+      const outcomes = await Promise.all([resA, resB]);
+      const statuses = outcomes.map((r) => r.status).sort((a, b) => a - b);
+      expect(statuses).toEqual([201, 409]);
+      const refused = outcomes.find((r) => r.status === 409);
+      expect(refused).toBeDefined();
+      expect(h.codeOf(refused!)).toBe('LICENSE_LOT.RESERVED_FOR_REQUEST');
     }
   });
 });

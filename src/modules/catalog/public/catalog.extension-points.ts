@@ -50,7 +50,7 @@ export interface SeatOccupancyReader {
     day: BusinessDate,
     tx?: DbTx,
   ): Promise<ReadonlyMap<string, { occupied: number; inRevocation: number }>>;
-  occupiedBySubscriptionPlans?(
+  occupiedBySubscriptionPlans(
     subscriptionIds: readonly string[],
     day: BusinessDate,
     tx?: DbTx,
@@ -65,7 +65,7 @@ export interface SeatOccupancyReader {
   ): Promise<ReadonlyMap<string, { inStore: number; assigned: number; withdrawn: number }>>;
   /** Whether any key of the lot has ever been assigned, activated on a device, or recorded in lot charges. */
   hasLotBeenUsed(lotId: string, tx?: DbTx): Promise<boolean>;
-  openGrantTasksWithoutKeyOfPlans?(planIds: readonly string[], tx?: DbTx): Promise<OpenK4GrantTask[]>;
+  openGrantTasksWithoutKeyOfPlans(planIds: readonly string[], tx?: DbTx): Promise<OpenK4GrantTask[]>;
 }
 
 /**

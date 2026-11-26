@@ -11,6 +11,7 @@ import {
   SubscriptionLineLiveTakenError,
   SubscriptionLineNotResponsibleError,
   SubscriptionLinePeriodStaleError,
+  SubscriptionLinePeriodStillDraftError,
   SubscriptionLinePlanNotK2Error,
   SubscriptionLineQuantityViaPurchaseError,
 } from './subscription-line.errors';
@@ -345,6 +346,21 @@ describe('SubscriptionLineService (W3-15)', () => {
       await service.addLine(actor, 'sub-1', { ...baseAdd, quantity: 1 });
 
       expect(order).toEqual(['resolveAndLock', 'lockPeriod', 'lockPlan']);
+    });
+
+    it('G-3: rejects adding a line to a DRAFT period (even with null responsible) with 422 SUBSCRIPTION.STILL_DRAFT', async () => {
+      const { service, insert } = makeSut({
+        lines: {
+          readPeriodWorkspace: jest.fn().mockResolvedValue('ws-1'),
+          lockPeriod: jest.fn().mockResolvedValue(makePeriod({ status: 'DRAFT', responsibleItAdminEmployeeId: null })),
+        },
+      });
+
+      const caught = await service.addLine(actor, 'sub-1', baseAdd).catch((e: unknown) => e);
+
+      expect(caught).toBeInstanceOf(SubscriptionLinePeriodStillDraftError);
+      expect(codeOf(caught)).toEqual({ status: HttpStatus.UNPROCESSABLE_ENTITY, code: 'SUBSCRIPTION.STILL_DRAFT' });
+      expect(insert).not.toHaveBeenCalled();
     });
   });
 });

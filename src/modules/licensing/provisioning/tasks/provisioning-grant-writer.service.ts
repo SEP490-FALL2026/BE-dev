@@ -64,8 +64,9 @@ export class ProvisioningGrantWriter {
       input.requestId,
       input.purchase !== undefined,
     );
-    await this.requireGrantable(tx, plan, input.subscriptionId, today, input.requestId);
+    await this.requireGrantable(tx, plan, input.subscriptionId, today);
     const target = await this.lockTarget(tx, plan, subscriptionId, today);
+    await this.assertLockedK4Grantable(tx, plan, target, input.requestId);
     const replaced = await this.replacements.endReplacedRight(tx, actor, {
       claimed,
       target,
@@ -258,19 +259,28 @@ export class ProvisioningGrantWriter {
   /**
    * A subscription the IT Admin names must be one a seat can be taken from today: of the plan, active, its period not over
    * and not taken over by a next period that runs, and not recorded as cancelled. Read before the subscription is locked, like the choice of one.
-   * For K4 (`F11`), a named `REQUEST` lot is refused when its remaining free licenses are reserved for another request.
-   * Throws ProvisioningSubscriptionError (`NOT_GRANTABLE`) and LicenseLotReservedForRequestError.
+   * For K4 (`F11` / `F-17`), the reservation check runs in `write` after `lockTarget` acquires lock `6a` on the lot.
+   * Throws ProvisioningSubscriptionError (`NOT_GRANTABLE`).
    */
-  private async requireGrantable(
+  private async assertLockedK4Grantable(
     tx: DbTx,
     plan: SeatTarget,
-    named: string | undefined,
-    today: string,
+    target: SeatTarget,
     requestId: string,
   ): Promise<void> {
-    if (named === undefined || plan.provisioningType === 'K5' || plan.provisioningType === 'K1') return;
-    if (plan.provisioningType === 'K4') {
-      await this.sharedPool.assertK4LotGrantable(tx, { planId: plan.planId, lotId: named, requestId });
+    if (plan.provisioningType !== 'K4') return;
+    const lockedLotId = target.licenseLotId ?? target.subscriptionId;
+    if (lockedLotId === null) return;
+    await this.sharedPool.assertK4LotGrantable(tx, { planId: plan.planId, lotId: lockedLotId, requestId });
+  }
+
+  private async requireGrantable(tx: DbTx, plan: SeatTarget, named: string | undefined, today: string): Promise<void> {
+    if (
+      named === undefined ||
+      plan.provisioningType === 'K5' ||
+      plan.provisioningType === 'K1' ||
+      plan.provisioningType === 'K4'
+    ) {
       return;
     }
     const grantable = await this.sharedPool.grantableOf(tx, plan.planId, today);

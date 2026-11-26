@@ -17,6 +17,7 @@ import {
 } from '../workspace/workspace.errors';
 import {
   SubscriptionLineLiveTakenError,
+  SubscriptionLinePeriodStillDraftError,
   SubscriptionLinePlanNotK2Error,
   SubscriptionLinePlanTakenError,
   SubscriptionLinePriceNotVndError,
@@ -150,7 +151,7 @@ export function toSubscriptionApiException(error: unknown): unknown {
       requested: error.requested,
     });
   }
-  if (error instanceof SubscriptionStillDraftError) {
+  if (error instanceof SubscriptionStillDraftError || error instanceof SubscriptionLinePeriodStillDraftError) {
     return refuse(UNPROCESSABLE, 'SUBSCRIPTION.STILL_DRAFT', error.message, { missing: error.missing });
   }
   if (error instanceof SubscriptionPriceNotVndError) {

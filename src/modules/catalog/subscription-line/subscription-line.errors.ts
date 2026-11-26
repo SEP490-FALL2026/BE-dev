@@ -159,3 +159,11 @@ export class SubscriptionLinesLimitError extends Error {
     this.name = 'SubscriptionLinesLimitError';
   }
 }
+
+/** The period is still a draft and cannot receive a line or activate with multiple un-opened lines (`F-3`). */
+export class SubscriptionLinePeriodStillDraftError extends Error {
+  constructor(readonly missing: readonly string[] = []) {
+    super('The subscription period is still a draft.');
+    this.name = 'SubscriptionLinePeriodStillDraftError';
+  }
+}

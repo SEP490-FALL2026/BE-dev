@@ -29966,6 +29966,18 @@
                       }
                     }
                   },
+                  "SUBSCRIPTION.STILL_DRAFT": {
+                    "summary": "The subscription period is still a draft.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.STILL_DRAFT",
+                        "message": "The subscription period is still a draft.",
+                        "details": { "missing": [] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
                   "SUBSCRIPTION_LINE.PRICE_NOT_VND": {
                     "summary": "Subscription line prices must be entered in dong (VND).",
                     "value": {

@@ -153,4 +153,23 @@ describe('LicenseLotCostService', () => {
       expect.objectContaining({ takeMinor: 1_666_666n, reason: 'GRANTED_FROM_POOL' }),
     );
   });
+
+  it('G-4: idleAlertsForMonth fails loudly when CommitmentRequestFactsHook is unbound', async () => {
+    const { lots, lotCharges, commitments } = setup();
+    lotCharges.invoicedLotIdsInMonth.mockResolvedValue(['lot-1']);
+    lots.findLotsByIds = jest.fn().mockResolvedValue(new Map([['lot-1', makeLot()]]));
+    const service = new LicenseLotCostService(
+      lots as unknown as LicenseLotApi,
+      lotCharges as unknown as LicenseLotChargeRepo,
+      commitments as unknown as CommitmentRepo,
+      {
+        isBound: () => false,
+        get: () => {
+          throw new Error('Extension hook budgets.commitment-request-facts is not bound');
+        },
+      } as unknown as CommitmentRequestFactsHook,
+    );
+
+    await expect(service.idleAlertsForMonth('org-1', '2027-04-01', tx)).rejects.toThrow('not bound');
+  });
 });

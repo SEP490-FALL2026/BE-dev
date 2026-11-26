@@ -15,6 +15,7 @@ import {
   SubscriptionLinePeriodNotFoundError,
   SubscriptionLinePeriodNotTermError,
   SubscriptionLinePeriodStaleError,
+  SubscriptionLinePeriodStillDraftError,
   SubscriptionLinePlanNotK2Error,
   SubscriptionLinePlanTakenError,
   SubscriptionLinePriceNotVndError,
@@ -74,6 +75,9 @@ export function toSubscriptionLineApiException(error: unknown): unknown {
   if (error instanceof SubscriptionLinePeriodNotTermError) {
     return refuse(UNPROCESSABLE, 'SUBSCRIPTION_LINE.NOT_TERM', error.message);
   }
+  if (error instanceof SubscriptionLinePeriodStillDraftError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.STILL_DRAFT', error.message, { missing: error.missing });
+  }
   if (error instanceof SubscriptionLinePlanNotK2Error) {
     return refuse(UNPROCESSABLE, 'SUBSCRIPTION_LINE.PLAN_NOT_K2', error.message);
   }
@@ -111,6 +115,7 @@ export const SUBSCRIPTION_LINE_ERROR_EXAMPLES = {
   LINES_LIMIT: example(new SubscriptionLinesLimitError()),
   QUANTITY_VIA_PURCHASE: example(new SubscriptionLineQuantityViaPurchaseError()),
   NOT_TERM: example(new SubscriptionLinePeriodNotTermError()),
+  STILL_DRAFT: example(new SubscriptionLinePeriodStillDraftError([])),
   PLAN_NOT_K2: example(new SubscriptionLinePlanNotK2Error()),
   PRICE_NOT_VND: example(new SubscriptionLinePriceNotVndError('USD')),
   UPDATE_EMPTY: example(new SubscriptionLineUpdateEmptyError()),

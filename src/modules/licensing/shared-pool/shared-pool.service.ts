@@ -1,4 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { SeatTargetNotFoundError } from '../public/licensing.errors';
@@ -108,7 +108,7 @@ export class SharedPoolService {
     private readonly avoidedCosts: SharedPoolAvoidedCostRepo,
     private readonly seatLedger: SeatLedgerApi,
     private readonly lotStock: LicenseLotStockApi,
-    @Optional() private readonly gate?: GrantRequestGateHook,
+    private readonly gate: GrantRequestGateHook,
   ) {}
 
   /**
@@ -166,9 +166,9 @@ export class SharedPoolService {
     const reqLots = candidates
       .filter((l) => l.purpose === 'REQUEST' && l.requestId !== null)
       .map((l) => ({ lotId: l.id, requestId: l.requestId as string }));
-    if (reqLots.length === 0 || !this.gate?.isBound()) return new Map();
+    if (reqLots.length === 0) return new Map();
 
-    return (await this.gate.get().reservedForRequestLots?.(reqLots, tx)) ?? new Map();
+    return this.gate.get().reservedForRequestLots(reqLots, tx);
   }
 
   /** The stock of these subscriptions under the transaction; a K4 plan counts its free keys too (`QĐ-103d`). */

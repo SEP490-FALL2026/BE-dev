@@ -88,6 +88,7 @@ function makeWriter(overrides: {
     {
       chooseLine: jest.fn().mockResolvedValue('sub-1'),
       grantableOf: jest.fn().mockResolvedValue([{ subscriptionId: 'sub-1' }]),
+      assertK4LotGrantable: jest.fn().mockResolvedValue(undefined),
       judgePurchase: jest.fn().mockResolvedValue({
         decision: overrides.purchased ? { purchased: true, kind: 'POOL_TOP_UP', reason: null } : { purchased: false },
         stock: { free: 0, inRevocation: 0, freeSubscriptionIds: [], freeBySubscription: new Map([['sub-1', 0]]) },
@@ -231,6 +232,7 @@ describe('ProvisioningGrantWriter.takeSeat (W3-18 K2 shortcut + K1 legacy)', () 
       {
         chooseLine,
         grantableOf: jest.fn().mockResolvedValue([]),
+        assertK4LotGrantable: jest.fn().mockResolvedValue(undefined),
         judgePurchase: jest.fn().mockResolvedValue({
           decision: { purchased: false },
           stock: {
@@ -299,9 +301,32 @@ describe('ProvisioningGrantWriter.takeSeat (W3-18 K2 shortcut + K1 legacy)', () 
   });
 
   it('F-17: refuses named K4 lot reserved for another request with 409 LICENSE_LOT.RESERVED_FOR_REQUEST', async () => {
-    const { writer, createFromRequest } = makeWriter({ provisioningType: 'K4' });
+    const order: string[] = [];
+    const { writer, createFromRequest, lockSeatTarget } = makeWriter({ provisioningType: 'K4' });
+    lockSeatTarget.mockImplementationOnce(() => {
+      order.push('lock6a');
+      return Promise.resolve({
+        kind: 'SUBSCRIPTION',
+        subscriptionId: 'lot-duc',
+        licenseLotId: 'lot-duc',
+        subscriptionLineId: null,
+        responsibleItAdminEmployeeId: 'emp-owner',
+        planId: 'plan-1',
+        provisioningType: 'K4',
+        keyBinding: 'ACCOUNT',
+        referenceCommitmentMonths: null,
+        applicationStatus: 'APPROVED',
+        status: 'ACTIVE',
+        missing: [],
+        purchasedQuantity: 3,
+        allowsMidTermReduction: false,
+      });
+    });
     const pool = (writer as unknown as { sharedPool: Record<string, jest.Mock> }).sharedPool;
-    pool.assertK4LotGrantable = jest.fn().mockRejectedValue(new LicenseLotReservedForRequestError('lot-duc'));
+    pool.assertK4LotGrantable = jest.fn().mockImplementationOnce(() => {
+      order.push('assertF11');
+      return Promise.reject(new LicenseLotReservedForRequestError('lot-duc'));
+    });
 
     const err = await writer
       .write(tx, actor, { requestId: 'req-minh', subscriptionId: 'lot-duc', beneficiaryEmployeeId: 'emp-1' }, {
@@ -317,6 +342,7 @@ describe('ProvisioningGrantWriter.takeSeat (W3-18 K2 shortcut + K1 legacy)', () 
       } as never)
       .catch((e: unknown) => e);
 
+    expect(order).toEqual(['lock6a', 'assertF11']);
     expect(err).toBeInstanceOf(LicenseLotReservedForRequestError);
     expect((toProvisioningApiException(err) as { getResponse?: () => unknown }).getResponse?.()).toMatchObject({
       code: 'LICENSE_LOT.RESERVED_FOR_REQUEST',

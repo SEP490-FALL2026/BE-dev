@@ -21,6 +21,7 @@ import {
   SubscriptionLinePeriodNotFoundError,
   SubscriptionLinePeriodNotTermError,
   SubscriptionLinePeriodStaleError,
+  SubscriptionLinePeriodStillDraftError,
   SubscriptionLinePlanNotK2Error,
   SubscriptionLinePriceNotVndError,
   SubscriptionLineQuantityViaPurchaseError,
@@ -253,6 +254,7 @@ export class SubscriptionLineService {
   }
 
   private assertAddablePeriod(period: PeriodLockRecord, actor: AuthenticatedPrincipal, expectedUpdatedAt: Date): void {
+    if (period.status !== 'ACTIVE') throw new SubscriptionLinePeriodStillDraftError([]);
     if (period.kind !== 'TERM') throw new SubscriptionLinePeriodNotTermError();
     if (period.responsibleItAdminEmployeeId !== actor.employeeId) throw new SubscriptionLineNotResponsibleError();
     if (period.updatedAt.getTime() !== expectedUpdatedAt.getTime()) {
@@ -279,8 +281,8 @@ export class SubscriptionLineService {
     const [plan] = await this.plans.lookups([updated.planId]);
     const seatsMap = await this.seatLedger.seatsOnDays([updated.id], today, today);
     const seatsToday = seatsMap.get(updated.id)?.get(today) ?? 0;
-    const occupiedMap = await this.occupancy.get().occupiedBySubscriptionPlans?.([updated.subscriptionId], today);
-    const assignedToday = occupiedMap?.get(`${updated.subscriptionId}:${updated.planId}`) ?? 0;
+    const occupiedMap = await this.occupancy.get().occupiedBySubscriptionPlans([updated.subscriptionId], today);
+    const assignedToday = occupiedMap.get(`${updated.subscriptionId}:${updated.planId}`) ?? 0;
 
     return toSubscriptionLineDetail(updated, { id: updated.planId, name: plan?.name ?? '' }, seatsToday, assignedToday);
   }

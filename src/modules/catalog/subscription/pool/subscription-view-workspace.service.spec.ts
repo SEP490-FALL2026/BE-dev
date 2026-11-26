@@ -80,7 +80,10 @@ describe('SubscriptionViewService: workspace vendor admins and no SHOULD_MERGE (
         workingAdminsAmong: jest.fn(),
       } as unknown as PlanFactsService,
       {
-        get: () => ({ seatsOfSubscriptions: jest.fn().mockResolvedValue(new Map()) }),
+        get: () => ({
+          seatsOfSubscriptions: jest.fn().mockResolvedValue(new Map()),
+          occupiedBySubscriptionPlans: jest.fn().mockResolvedValue(new Map()),
+        }),
       } as unknown as SeatOccupancyHook,
       { idsWithSuccessor: jest.fn().mockResolvedValue(new Set()) } as unknown as SubscriptionGrantingRepo,
       { of: jest.fn().mockResolvedValue(new Map()) } as unknown as SubscriptionWindowsService,

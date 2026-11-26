@@ -363,7 +363,7 @@ export class SubscriptionViewService {
     );
     const reader = this.occupancy.get();
     const lineOccupied: ReadonlyMap<string, number> =
-      allLinePlanIds.length > 0 && reader.occupiedBySubscriptionPlans
+      allLinePlanIds.length > 0
         ? await reader.occupiedBySubscriptionPlans(
             records.map((record) => record.id),
             today,

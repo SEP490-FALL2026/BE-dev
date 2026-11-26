@@ -9,6 +9,7 @@ import {
   SubscriptionLineNotFoundError,
   SubscriptionLineNotResponsibleError,
   SubscriptionLinePeriodStaleError,
+  SubscriptionLinePeriodStillDraftError,
   SubscriptionLineQuantityViaPurchaseError,
   SubscriptionLineStaleError,
 } from '../../../src/modules/catalog/subscription-line/subscription-line.errors';
@@ -231,6 +232,17 @@ describe('Subscription lines HTTP routes (W3-15)', () => {
         .send(validBody)
         .expect(409);
       expect(bodyOf(res).error.code).toBe('SUBSCRIPTION.LINES_LIMIT');
+    });
+
+    it('G-3: returns 422 SUBSCRIPTION.STILL_DRAFT when adding a line to a DRAFT period', async () => {
+      lineSvc.addLine.mockRejectedValueOnce(new SubscriptionLinePeriodStillDraftError([]));
+
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/subscriptions/${SUB_ID}/lines`)
+        .set('Authorization', itAuth)
+        .send(validBody)
+        .expect(422);
+      expect(bodyOf(res).error.code).toBe('SUBSCRIPTION.STILL_DRAFT');
     });
   });
 
