@@ -67,7 +67,7 @@ const sameSnapshot = (a: ReturnType<typeof snapshot>, b: ReturnType<typeof snaps
   JSON.stringify(a) === JSON.stringify(b);
 
 /**
- * The workspace profile of a plan the company administers at the vendor (`QĐ-77d`, `QĐ-110k`, `QĐ-110u`), as the old route records it (W3-13): a K2
+ * The workspace profile of a plan the company administers at the vendor (`QĐ-77d`, `QĐ-110k`, `QĐ-110u`), as the old route records it: a K2
  * plan, or a K4 plan the IT Admin said has an admin console. The profile is the workspace of the vendor of the plan (`QĐ-115c`): the route finds it (the
  * only one of the vendor, or makes one named after the vendor when it has none) and writes through the services of the workspace, the same rules as
  * the routes of the workspace itself. The route, its body and its answer stay as they were; the old table is no longer written.

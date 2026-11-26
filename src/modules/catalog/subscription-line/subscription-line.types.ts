@@ -4,7 +4,7 @@ import type { BusinessDate } from '../../../core/business-date';
 export type SubscriptionLineClosedReason = 'RENEWED' | 'ENDED' | 'REMOVED';
 
 /**
- * One line of a subscription period (W3-15): a plan of seats of the workspace with its price per seat-month and the least seats of its tier.
+ * One line of a subscription period: a plan of seats of the workspace with its price per seat-month and the least seats of its tier.
  * The seats it serves on a day are its ledger up to that day when the ledger has opened by then (`ledgerOpenedOn`), the quantity of the
  * period before; a line with no ledger (`ledgerOpenedOn` null: a draft, a past period) reads the quantity of the period.
  */

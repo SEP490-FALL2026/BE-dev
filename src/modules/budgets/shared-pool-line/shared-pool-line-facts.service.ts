@@ -213,7 +213,7 @@ function buildLineDetail(input: {
 }
 
 /**
- * Computes monthly per-subscription shared-pool lines and cumulative year-to-month shared-pool figures (`W3-04`, `W3-06`, `W3-22`)
+ * Computes monthly per-subscription shared-pool lines and cumulative year-to-month shared-pool figures
  * from line seat ledgers, seat occupancy, catalog purchase periods, adjustment windows, locked prior-line targets, and pool invoice variances.
  */
 @Injectable()

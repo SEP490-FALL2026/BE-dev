@@ -6,7 +6,7 @@ import type { AvoidedCost } from './shared-pool.policy';
 /** The one writer of `pool_grant_avoided_costs`: one row for each task that granted from the pool, never changed (`QĐ-106e`). */
 @Injectable()
 export class SharedPoolAvoidedCostRepo {
-  /** Records the pre-computed avoided cost of a pool grant task (`W3-09`, idempotent per task). */
+  /** Records the pre-computed avoided cost of a pool grant task (idempotent per task). */
   async recordForTask(
     tx: DbTx,
     taskId: string,

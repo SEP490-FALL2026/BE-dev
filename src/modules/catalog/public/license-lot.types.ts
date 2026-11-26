@@ -4,7 +4,7 @@ import type { BusinessDate } from '../../../core/business-date';
 export type LicenseLotPurpose = 'OPENING' | 'REQUEST' | 'REPLACEMENT' | 'STOCK';
 
 /**
- * A lot of licenses of a K4 plan with the plan and application it belongs to (W3-24). A lot born from a perpetual purchase has the id of that
+ * A lot of licenses of a K4 plan with the plan and application it belongs to. A lot born from a perpetual purchase has the id of that
  * subscription, so what the machines of wave 2 call the purchase of a key is this id.
  */
 export interface LicenseLotView {
@@ -36,7 +36,7 @@ export interface LicenseLotView {
   updatedAt: Date;
 }
 
-/** What a lot is made from (W3-24): the plan, the purchase, the purpose, and what the purpose and the plan need. The IT Admin who makes it answers for it. */
+/** What a lot is made from: the plan, the purchase, the purpose, and what the purpose and the plan need. The IT Admin who makes it answers for it. */
 export interface CreateLicenseLotInput {
   planId: string;
   purchasedOn: BusinessDate;

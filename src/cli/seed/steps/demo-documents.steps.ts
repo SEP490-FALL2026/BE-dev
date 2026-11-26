@@ -13,7 +13,7 @@ interface ContractFixture {
   application: string;
   /** The periods of the shared pool the contract rests on (K2). */
   subscriptions: string[];
-  /** The lots of licenses (K4) the contract rests on: a lot names its contract itself (W3-24), a K4 subscription is never linked. */
+  /** The lots of licenses (K4) the contract rests on: a lot names its contract itself, a K4 subscription is never linked. */
   lots?: string[];
   openEnded?: boolean;
 }

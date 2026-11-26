@@ -65,7 +65,7 @@ export interface UpdateSubscriptionInput {
   vendorMinimumSeats?: number | null;
   isPrimaryForPlan?: boolean;
   quantityChangeReason?: string;
-  /** Moves the subscription to another workspace of the same vendor (W3-11). */
+  /** Moves the subscription to another workspace of the same vendor. */
   workspaceId?: string;
   seatCounting?: SeatCounting;
   minimumSeatsTotal?: number | null;
@@ -391,7 +391,7 @@ export class SubscriptionService {
 
   /**
    * The locks of a completion in the order of the lock table: the workspace first (tier 5b), read without a lock, locked, and read again once the
-   * period is locked (W3-14, N5); then the period. A draft of a plan that needs a workspace and has none takes the default of its vendor. Throws
+   * period is locked (N5); then the period. A draft of a plan that needs a workspace and has none takes the default of its vendor. Throws
    * SubscriptionNotFoundError, SubscriptionPlanNotFoundError and SubscriptionWorkspaceMovedError.
    */
   private async lockWorkspaceThenPeriod(tx: DbTx, actor: AuthenticatedPrincipal, id: string, organizationId: string) {

@@ -28,7 +28,7 @@ export interface SettlementPassResult extends MonthSettlementResult {
 
 /**
  * Settles monthly slices of K2 commitments at month-end (`MONTH_END`) and sweeps prior-year unspent K2 commitments
- * (`YEAR_END_SEAT_MONTHS`) once December is ready or from `(year+1)-02-01` onward (`W3-07`).
+ * (`YEAR_END_SEAT_MONTHS`) once December is ready or from `(year+1)-02-01` onward.
  */
 @Injectable()
 export class CommitmentMonthSettlementService {

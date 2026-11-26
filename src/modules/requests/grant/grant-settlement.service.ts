@@ -16,8 +16,8 @@ import { avoidedCostForPoolGrant, releasesAllOnPoolGrant } from './pool-grant-re
 const firstOfMonth = (day: string): string => `${day.slice(0, 7)}-01`;
 
 /**
- * Budget release, K4 license-lot accounting/reservations (`W3-24`/`W3-25`/`F10`/`F11`), and avoided-cost settlement
- * for access request grant outcomes (`W3-09`, `B1-R8`).
+ * Budget release, K4 license-lot accounting/reservations (/`F10`/`F11`), and avoided-cost settlement
+ * for access request grant outcomes (`B1-R8`).
  */
 @Injectable()
 export class GrantSettlementService {
@@ -34,7 +34,7 @@ export class GrantSettlementService {
     return this.budgets.releaseForRequest(tx, input);
   }
 
-  /** Settles pool release / K4 lot charge (`F10`, `W3-25`) and avoided cost (`W3-09`) on grant completion/failure. */
+  /** Settles pool release / K4 lot charge (`F10`) and avoided cost on grant completion/failure. */
   async settleOutcomeEffects(
     tx: DbTx,
     request: AccessRequestRecord,
@@ -55,7 +55,7 @@ export class GrantSettlementService {
     }
   }
 
-  /** Active beneficiary count (`m`) and charged excess count per `REQUEST` lot (`F11`, `W3-24`). */
+  /** Active beneficiary count (`m`) and charged excess count per `REQUEST` lot (`F11`). */
   async reservedForRequestLots(
     lotRequests: readonly { lotId: string; requestId: string }[],
     tx?: DbTx,

@@ -44,7 +44,7 @@ function isServingOnPurchaseDate(
   return !(withinPeriodStart && line.ledgerOpenedOn !== null && purchasedOn < line.ledgerOpenedOn);
 }
 
-/** Step 2 check (`W3-18`): line must serve `purchasedOn`, period ACTIVE, seatCounting FIXED, and plan K2. */
+/** Step 2 check: line must serve `purchasedOn`, period ACTIVE, seatCounting FIXED, and plan K2. */
 export function assertLinePurchasableForPurchase(input: LinePurchasabilityInput): void {
   if (input.period.status !== 'ACTIVE') {
     throw new SeatPurchaseLineNotPurchasableError('PERIOD_NOT_ACTIVE');
@@ -60,7 +60,7 @@ export function assertLinePurchasableForPurchase(input: LinePurchasabilityInput)
   }
 }
 
-/** Step 3 check (`W3-18`): `purchasedOn` must be <= `today`, >= `periodStartDate`, and inside an open month. */
+/** Step 3 check: `purchasedOn` must be <= `today`, >= `periodStartDate`, and inside an open month. */
 export function assertPurchaseDateWithinBounds(input: {
   purchasedOn: BusinessDate;
   today: BusinessDate;
@@ -75,7 +75,7 @@ export function assertPurchaseDateWithinBounds(input: {
   assertManualEffectiveOn(input.purchasedOn, input.today);
 }
 
-/** Step 5 check (`W3-18`): `requestedCount <= pendingCount - freeOnPurchasedOn`, else 409 STOCK_AVAILABLE. */
+/** Step 5 check: `requestedCount <= pendingCount - freeOnPurchasedOn`, else 409 STOCK_AVAILABLE. */
 export function assertStockAllowsSeatPurchase(input: {
   requestedCount: number;
   pendingCount: number;
@@ -88,7 +88,7 @@ export function assertStockAllowsSeatPurchase(input: {
 }
 
 /**
- * Expected invoice amount for a purchase of `seats` on `purchasedOn` (`W3-18`):
+ * Expected invoice amount for a purchase of `seats` on `purchasedOn`:
  * `roundHalfAway(seats * monthlyUnitPriceMinor * cover(purchasedOn, R - 1))` (single rounding per purchase).
  */
 export function seatPurchaseExpectedAmount(input: {
@@ -121,7 +121,7 @@ export function isSeatPurchaseInvoiceOverdue(invoiceDueOn: BusinessDate | null, 
 }
 
 /**
- * R1 recipient rule for `SUBSCRIPTION_SEATS_BOUGHT` (`W3-18`, §8.1): responsible IT Admin if usable and not actor,
+ * R1 recipient rule for `SUBSCRIPTION_SEATS_BOUGHT` (§8.1): responsible IT Admin if usable and not actor,
  * else usable Super Admin if not actor.
  */
 export function seatPurchaseRecipients(input: {
@@ -137,7 +137,7 @@ export function seatPurchaseRecipients(input: {
   return input.superAdmin !== null && input.superAdmin !== input.actor ? [input.superAdmin] : [];
 }
 
-/** Resolves `recordedBy + R1` deduplicated recipients for `SEAT_PURCHASE_INVOICE_OVERDUE` (`W3-18`, §8.2). */
+/** Resolves `recordedBy + R1` deduplicated recipients for `SEAT_PURCHASE_INVOICE_OVERDUE` (§8.2). */
 export function overduePurchaseInvoiceRecipients(input: {
   recorder: string;
   recorderUsable: boolean;
@@ -167,7 +167,7 @@ export function seatPurchasePeriodCutoff(
   return boundary === null ? null : addDays(boundary, -1);
 }
 
-/** Validates optional tier-step and seat-type-switch modes (`W3-19`): mutually exclusive, each requires 1 item. */
+/** Validates optional tier-step and seat-type-switch modes: mutually exclusive, each requires 1 item. */
 export function assertPurchaseModeValid(input: {
   itemCount: number;
   tierStepSeats?: number;
@@ -208,7 +208,7 @@ export interface SignedExpectedLine {
 }
 
 /**
- * Expected invoice amount across signed lines (`W3-19` switch & tier step): sums exact rationals
+ * Expected invoice amount across signed lines (switch & tier step): sums exact rationals
  * `seats * monthly * cover(purchasedOn, R - 1)` and performs ONE `roundHalfAway` on the net total.
  */
 export function seatPurchaseNetExpectedAmount(lines: readonly SignedExpectedLine[]): bigint | null {

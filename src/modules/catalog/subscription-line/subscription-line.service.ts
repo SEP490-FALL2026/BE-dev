@@ -72,7 +72,7 @@ async function retryOnLineWorkspaceMove<T>(work: () => Promise<T>): Promise<T> {
 }
 
 /**
- * Manages the lines of a term K2 subscription period (`W3-15`): adding a line to a workspace period (N5 lock order),
+ * Manages the lines of a term K2 subscription period: adding a line to a workspace period (N5 lock order),
  * updating a live line's price/minimum seats, and reading the paged seat-change ledger of a line.
  */
 @Injectable()

@@ -173,7 +173,7 @@ export class LicenseLotStockService {
     return result;
   }
 
-  /** Returns `ACCOUNT` K4 lots with `free > 0` for `G1` wasted-seat rule (`W3-26`). */
+  /** Returns `ACCOUNT` K4 lots with `free > 0` for `G1` wasted-seat rule. */
   async listAccountVacancies(asOf: BusinessDate, tx?: DbTx): Promise<AccountLotVacancy[]> {
     const allLots = await this.lots.allAccountLots(tx);
     if (allLots.length === 0) return [];

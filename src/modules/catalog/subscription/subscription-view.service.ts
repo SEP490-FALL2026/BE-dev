@@ -196,7 +196,7 @@ export class SubscriptionViewService {
 
   /**
    * The records as they are answered, with the derived notice, alerts, warnings, tax profile and estimate. A subscription that became a lot (a perpetual purchase)
-   * says who answers for the lot, which is where that is written (W3-24).
+   * says who answers for the lot, which is where that is written.
    */
   async viewAll(records: SubscriptionRecord[]): Promise<SubscriptionView[]> {
     if (records.length === 0) return [];
@@ -252,7 +252,7 @@ export class SubscriptionViewService {
     const { points, windows } = await this.pointsOf(records, today, await this.continuedAmong(records));
     const readings = this.readingsAt(records, points, today, seatCounts);
     const answerer = await this.answerersOf(records);
-    // A period that has lines is priced by its lines: the mark of the subscription that prices its plan is retired for it (W3-27).
+    // A period that has lines is priced by its lines: the mark of the subscription that prices its plan is retired for it.
     const lined = await this.lotFacts.withLines(records.map((record) => record.id));
     const linesCtx = await this.readLinesContext(records, today);
     const adjustment = (record: SubscriptionRecord, effectivePurchasedQuantity: number | null) => ({
@@ -412,7 +412,7 @@ export class SubscriptionViewService {
   }
 
   /**
-   * Who administers the workspace (or legacy plan profile when `workspace` is null) of each record at the vendor (`QĐ-110k`, `QĐ-110u`, W3-12):
+   * Who administers the workspace (or legacy plan profile when `workspace` is null) of each record at the vendor (`QĐ-110k`, `QĐ-110u`):
    * the names of the people and which of them work now as an IT Admin. A plan that needs none answers empty and quiet.
    */
   private async vendorAdminsOf(records: readonly SubscriptionRecord[]) {

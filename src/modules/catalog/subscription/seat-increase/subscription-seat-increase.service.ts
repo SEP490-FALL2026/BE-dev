@@ -26,7 +26,7 @@ export interface SeatIncrease {
   actor: AuthenticatedPrincipal;
 }
 
-/** Input for notifying a seat reduction on an active K2 subscription (W3-03). */
+/** Input for notifying a seat reduction on an active K2 subscription. */
 export interface SeatReduction {
   organizationId: string;
   subscriptionId: string;
@@ -97,7 +97,7 @@ export class SubscriptionSeatIncreaseService {
     return told;
   }
 
-  /** Notifies R1 + Finance when an active K2 subscription reduces purchasedQuantity (W3-03). */
+  /** Notifies R1 + Finance when an active K2 subscription reduces purchasedQuantity. */
   async toldReduction(tx: DbTx, input: SeatReduction): Promise<number> {
     if (
       !seatReductionNoticeOwed({

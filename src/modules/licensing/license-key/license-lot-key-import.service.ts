@@ -43,7 +43,7 @@ export interface PurchaseOfKeys {
 }
 
 /**
- * The keys a lot of licenses holds (W3-24): the batch of keys put in a lot, the purchase a key list is read for and the lock the routes of a key take first.
+ * The keys a lot of licenses holds: the batch of keys put in a lot, the purchase a key list is read for and the lock the routes of a key take first.
  * A purchase of wave 2 is named by the id of its subscription, which is the id of the lot born from it: the old route and the route of the lot are one path here.
  * A key of a plan bound to an account never passes the licenses of its lot (K-A6); the cost of a key is borne unless the lot was bought for a request.
  *

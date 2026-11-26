@@ -237,7 +237,7 @@ export class DocumentPurposeMismatchError extends Error {
   }
 }
 
-/** A lot of keys (K4) has its own contract column: only a subscription of seats (K2) rests on a contract through a link (W3-24). */
+/** A lot of keys (K4) has its own contract column: only a subscription of seats (K2) rests on a contract through a link. */
 export class ContractSubscriptionNotK2Error extends Error {
   constructor() {
     super(

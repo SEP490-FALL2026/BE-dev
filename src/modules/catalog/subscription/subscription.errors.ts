@@ -244,7 +244,7 @@ export class SubscriptionSeatCountingFixedError extends Error {
 }
 
 /**
- * The workspace of the subscription changed between the read that told which workspace to lock and the lock of the period (W3-14, N5): the write
+ * The workspace of the subscription changed between the read that told which workspace to lock and the lock of the period (N5): the write
  * starts again with the workspace it now holds. Never reaches a caller: after three tries it is a SubscriptionStaleError.
  */
 export class SubscriptionWorkspaceMovedError extends Error {
@@ -264,7 +264,7 @@ export class SubscriptionPriceMismatchError extends Error {
   }
 }
 
-/** The seats of a subscription are not set by editing it: they are bought, corrected and reduced on the lines of the subscription, and counted from its ledger (W3-27). */
+/** The seats of a subscription are not set by editing it: they are bought, corrected and reduced on the lines of the subscription, and counted from its ledger. */
 export class SubscriptionSeatCountViaLedgerError extends Error {
   constructor(readonly routes: readonly string[]) {
     super('The seats of a subscription are not edited: buy, correct or reduce them on its lines.');
@@ -272,7 +272,7 @@ export class SubscriptionSeatCountViaLedgerError extends Error {
   }
 }
 
-/** The subscription that prices its plan is no longer chosen by hand: the price of a plan is read from the line of the workspace (W3-27). */
+/** The subscription that prices its plan is no longer chosen by hand: the price of a plan is read from the line of the workspace. */
 export class SubscriptionPrimaryRetiredError extends Error {
   constructor() {
     super('A subscription is no longer marked as the one that prices its plan.');
@@ -280,7 +280,7 @@ export class SubscriptionPrimaryRetiredError extends Error {
   }
 }
 
-/** A plan of personal accounts (K1) is paid by the month for each account and has no subscription (W3-27). */
+/** A plan of personal accounts (K1) is paid by the month for each account and has no subscription. */
 export class SubscriptionK1HasNoSubscriptionError extends Error {
   constructor() {
     super('A plan of personal accounts has no subscription: its accounts are granted and paid one by one.');
@@ -288,7 +288,7 @@ export class SubscriptionK1HasNoSubscriptionError extends Error {
   }
 }
 
-/** A purchase made once (K4) is a lot of licenses, not a subscription (W3-27). */
+/** A purchase made once (K4) is a lot of licenses, not a subscription. */
 export class SubscriptionPerpetualIsLicenseLotError extends Error {
   constructor() {
     super('A purchase made once is a lot of licenses: create it as a lot.');

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 
-/** What a case says beyond its decision about being recorded by the system and about the least seats across the workspace (W3-16). */
+/** What a case says beyond its decision about being recorded by the system and about the least seats across the workspace. */
 export interface RenewalAutoFacts {
   /** The system recorded the case at the milestone with nobody deciding (its decider role is SYSTEM). */
   autoRecorded: boolean;
@@ -12,7 +12,7 @@ export interface RenewalAutoFacts {
 }
 
 /**
- * Reads and writes the three columns a renewal case adds in W3-16 and nothing else of it: `auto_recorded`, `minimum_total_holder_line_id`
+ * Reads and writes the three columns a renewal case adds and nothing else of it: `auto_recorded`, `minimum_total_holder_line_id`
  * and `minimum_total_note`. The case itself is written by `SubscriptionRenewalRepo`, which stays the one writer of its stages; these
  * columns are not frozen by the database guard of the proposal and the decision, so they can be written in the transaction of either.
  */

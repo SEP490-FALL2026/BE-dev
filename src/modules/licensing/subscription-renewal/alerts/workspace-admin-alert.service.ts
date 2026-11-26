@@ -6,7 +6,7 @@ import { RenewalNotifier } from '../subscription-renewal-notifier.service';
 
 /**
  * Emits `WORKSPACE_ADMIN_NOT_WORKING` once per `(workspace, admin)` during the hourly renewal sweep when a workspace administrator
- * no longer works as an IT Admin (role change off `IT_ADMIN`, locked account, or departure; W3-12). Recipient follows rule R1:
+ * no longer works as an IT Admin (role change off `IT_ADMIN`, locked account, or departure). Recipient follows rule R1:
  * the usable IT Admin responsible for the workspace (when different from the affected admin), else the usable Super Admin.
  */
 @Injectable()

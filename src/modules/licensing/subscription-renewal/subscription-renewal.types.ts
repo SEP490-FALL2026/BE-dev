@@ -9,7 +9,7 @@ export type RenewalOutcomeKind = 'AS_DECIDED' | 'VENDOR_REFUSED' | 'DIFFERENT' |
 export type NoticeBasis = 'DECLARED' | 'INFERRED_UNCONFIRMED' | 'BY_END_DATE' | 'BY_RENEWAL_DATE' | 'BY_PAYMENT_DATE';
 /**
  * `SPENDING_APPROVER`, `CONFLICT_SUBSTITUTE` and `OWNER_DEPARTMENT_HEAD` are historical: a decision of before the one-write renewal
- * (`QĐ-103e`). `IT_ADMIN_IN_CHARGE` is the one written now; `SYSTEM` is the automatic renewal recorded after the renewal day (`W3-21`).
+ * (`QĐ-103e`). `IT_ADMIN_IN_CHARGE` is the one written now; `SYSTEM` is the automatic renewal recorded after the renewal day.
  */
 export type DeciderRole =
   'SPENDING_APPROVER' | 'CONFLICT_SUBSTITUTE' | 'OWNER_DEPARTMENT_HEAD' | 'IT_ADMIN_IN_CHARGE' | 'SYSTEM';

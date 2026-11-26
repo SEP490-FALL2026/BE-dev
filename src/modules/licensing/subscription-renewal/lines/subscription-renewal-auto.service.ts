@@ -35,7 +35,7 @@ export interface AutoPassedRenewalSubject {
 }
 
 /**
- * Handles cutoff target locking (`lockedBy: 'SYSTEM'`) and post-renewal-day automatic resolution (`W3-21`):
+ * Handles cutoff target locking (`lockedBy: 'SYSTEM'`) and post-renewal-day automatic resolution:
  * - `autoRenew = true`: records a system `UNCONFIRMED` renewal via `RenewalOutcomeService.recordIn` with `seats(L, renewalOn - 1)`,
  *   carries held seats (`RENEWAL_CARRY`), and creates `AUTO_RENEWAL_INCIDENT`.
  * - `autoRenew = false`: records `EXPIRY_MARKED` and closes live lines `ENDED` on `endDate`.

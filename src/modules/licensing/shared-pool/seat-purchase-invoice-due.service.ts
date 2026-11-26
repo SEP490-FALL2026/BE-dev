@@ -14,7 +14,7 @@ import { NotificationsApi } from '../../notifications/public/notifications.api';
 
 /**
  * Reminds the recorder and R1 responsible party once (`SEAT_PURCHASE_INVOICE_OVERDUE:<purchaseId>`) when a seat
- * purchase invoice is past due (`invoiceDueOn < today`) and still has no open non-returned purchase invoice (`W3-18`).
+ * purchase invoice is past due (`invoiceDueOn < today`) and still has no open non-returned purchase invoice.
  */
 @Injectable()
 export class SeatPurchaseInvoiceDueService {

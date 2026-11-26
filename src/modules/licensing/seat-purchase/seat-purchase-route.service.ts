@@ -35,7 +35,7 @@ const pairKey = (requestId: string, beneficiaryEmployeeId: string): string => `$
 
 /**
  * Records a batch seat purchase (`MUA-xxxxxx`, `TOP_UP`), a vendor tier-step purchase (`TIER_STEP`), or a single-seat
- * line switch (`replacesFromLineId`) on a subscription line (`W3-18`, `W3-19`).
+ * line switch (`replacesFromLineId`) on a subscription line.
  * Lock order: period(s) `FOR UPDATE` (tier 6, `ORDER BY id`) -> line(s) `FOR UPDATE` (tier 6c, `ORDER BY id`) -> `seat_changes` (tier 6d).
  */
 @Injectable()

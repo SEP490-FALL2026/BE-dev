@@ -82,7 +82,7 @@ function asLedgerError(error: unknown): unknown {
 /**
  * The one writer of `seat_changes`, the ledger of the seats of a line: rows are added and never changed (a trigger). Every write runs
  * under the lock of its line (the row check of the database takes it, tier 6a, after the period and before the row), READ COMMITTED.
- * The seats of a day are the sum of the deltas that took effect up to it (W3-15).
+ * The seats of a day are the sum of the deltas that took effect up to it.
  */
 @Injectable()
 export class SeatLedgerRepo {

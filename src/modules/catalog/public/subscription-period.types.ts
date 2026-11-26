@@ -65,11 +65,11 @@ export interface RenewalPeriodFacts {
   renewedFromId: string | null;
   /** The period that continues this one, once a renewal recorded it; null while none does. */
   renewedById: string | null;
-  /** How the seats of the period are counted (`FIXED` vs `MEMBERS`, W3-11). */
+  /** How the seats of the period are counted (`FIXED` vs `MEMBERS`). */
   seatCounting?: 'FIXED' | 'MEMBERS';
-  /** Shared workspace id when the subscription sits in a vendor workspace (W3-11). */
+  /** Shared workspace id when the subscription sits in a vendor workspace. */
   workspaceId?: string | null;
-  /** Minimum total seats across all lines of the period (W3-21); null when unset. */
+  /** Minimum total seats across all lines of the period; null when unset. */
   minimumSeatsTotal?: number | null;
   /** Notice period days before expiry/renewal when inferred by days. */
   noticePeriodDays?: number | null;
@@ -77,7 +77,7 @@ export interface RenewalPeriodFacts {
   monthlyUnitPriceMinor?: bigint | null;
 }
 
-/** One line of the renewed period (W3-21). */
+/** One line of the renewed period. */
 export interface NextPeriodLineInput {
   previousLineId: string;
   quantity: number;

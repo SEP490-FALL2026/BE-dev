@@ -148,7 +148,7 @@ export class SharedPoolService {
     return this.stockOfSubscriptions(tx, planId, subscriptions, today, provisioningType === 'K4');
   }
 
-  /** Stock of a K4 `ACCOUNT` plan derived from its license lots and F11 reservation state (`W3-24`). */
+  /** Stock of a K4 `ACCOUNT` plan derived from its license lots and F11 reservation state. */
   async stockOfLots(tx: DbTx, planId: string, requestId: string | null): Promise<PoolStock> {
     if (!this.lotStock) {
       return { free: 0, inRevocation: 0, freeSubscriptionIds: [], freeBySubscription: new Map() };
@@ -331,7 +331,7 @@ export class SharedPoolService {
     return result.kind === 'SELECTED' ? result.lot.id : (result.lot?.id ?? null);
   }
 
-  /** Batch `chooseLine` resolution per K2 planId (`W3-21`): which subscription/line receives the next seat grant for that plan. */
+  /** Batch `chooseLine` resolution per K2 planId: which subscription/line receives the next seat grant for that plan. */
   async chosenLinesOfPlans(
     planIds: readonly string[],
     today: BusinessDate,
@@ -376,7 +376,7 @@ export class SharedPoolService {
   }
 
   /**
-   * Read-only `chooseLine` context for a K2 plan (`W3-20`): returns `free` seats today and, when `free === 0`, the line
+   * Read-only `chooseLine` context for a K2 plan: returns `free` seats today and, when `free === 0`, the line
    * `chooseLine` would select along with its monthly unit price, minimum seats, and seat total today.
    */
   async chosenK2LineContext(
@@ -455,7 +455,7 @@ export class SharedPoolService {
   }
 
   /**
-   * Records the pre-computed cost avoided when a pool grant task completes (`W3-09`, `B1-R8`), once per task.
+   * Records the pre-computed cost avoided when a pool grant task completes (`B1-R8`), once per task.
    */
   recordAvoidedCost(
     tx: DbTx,

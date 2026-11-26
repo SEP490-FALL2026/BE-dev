@@ -55,7 +55,7 @@ function k1SavingSchedule(facts: SavingFacts): {
 }
 
 /**
- * What a reclaim could save (`FR-4.15`, `R-J09`, `US-10-04` AC-3, `W3-09`, `W3-17`):
+ * What a reclaim could save (`FR-4.15`, `R-J09`, `US-10-04` AC-3,):
  * `amountAtPoint = seats × monthly × T`, with `T = commitmentTermMonths` (`12` or `1`) for `K2` and `K1`;
  * `realisableAt` is `RENEWAL` (K2 12m), `NEXT_BILLING` (K2 1m / K1 with schedule), `UNKNOWN`, or `NEVER` (`K4`).
  */

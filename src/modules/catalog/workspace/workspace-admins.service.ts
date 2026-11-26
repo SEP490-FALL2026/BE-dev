@@ -16,7 +16,7 @@ const snapshot = (admins: readonly WorkspaceAdminRecord[], primaryOwnerEmployeeI
 });
 
 /**
- * Who administers a workspace at the vendor (W3-10, `QĐ-110k`): recorded as a whole and replaced as a whole, by the IT Admin who answers for the
+ * Who administers a workspace at the vendor (`QĐ-110k`): recorded as a whole and replaced as a whole, by the IT Admin who answers for the
  * workspace alone (`QĐ-118f`). At least two different people, the primary owner among them as an owner, every one an IT Admin with an account that
  * can sign in; whether they still work is not judged here: a reader sees it in the flags (`QĐ-117e`).
  *

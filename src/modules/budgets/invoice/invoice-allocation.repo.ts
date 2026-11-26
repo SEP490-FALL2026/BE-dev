@@ -57,7 +57,7 @@ const toRecord = (row: Row): InvoiceAllocationRecord => ({
 });
 
 /**
- * The one writer of `invoice_allocations`: the lines an invoice is split into by month and bucket (W3-26). A line is added and never changed (a trigger);
+ * The one writer of `invoice_allocations`: the lines an invoice is split into by month and bucket. A line is added and never changed (a trigger);
  * the application keeps that the lines of an invoice add up to what it cost. The sums of what is spent read these lines, by month, for an invoice that has
  * any, and the invoice itself for one that has none (`InvoiceRepo.spentOf`, `SeatMonthRepo.yearTotals`).
  */

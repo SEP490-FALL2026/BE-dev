@@ -61,7 +61,7 @@ const toPlan = (row: PlanRow): PlanRecord => ({
 });
 
 /**
- * The profile of a plan as the workspace of its vendor says it (W3-10): the workspace is the source, the old profile of the plan is old data. A workspace
+ * The profile of a plan as the workspace of its vendor says it: the workspace is the source, the old profile of the plan is old data. A workspace
  * nobody is named in (no primary owner and no owner among the administrators) is no profile yet.
  */
 const toProfile = (planId: string, row: WorkspaceRow): WorkspaceProfileRecord | null => {
@@ -91,7 +91,7 @@ const toProfile = (planId: string, row: WorkspaceRow): WorkspaceProfileRecord | 
   };
 };
 
-/** The one writer of `plans`: the plan aggregate (US-04-02). It reads the profile of a plan from the workspace of its vendor (W3-10). */
+/** The one writer of `plans`: the plan aggregate (US-04-02). It reads the profile of a plan from the workspace of its vendor. */
 @Injectable()
 export class PlanRepo {
   constructor(private readonly prisma: PrismaService) {}

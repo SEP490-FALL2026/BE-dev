@@ -35,7 +35,7 @@ const priceCurrencyOf = (price: SubscriptionPrice | null): string | null =>
 
 /**
  * Computes and writes one-time realised renewal savings when Finance confirms the first invoice of the renewed period
- * (or closes its SBF-11a discrepancy case, `W3-09`, `Q-G`). Auto-renewals without a `subscription_renewals` case,
+ * (or closes its SBF-11a discrepancy case, `Q-G`). Auto-renewals without a `subscription_renewals` case,
  * second-month invoices, and repeat calls write nothing.
  */
 @Injectable()

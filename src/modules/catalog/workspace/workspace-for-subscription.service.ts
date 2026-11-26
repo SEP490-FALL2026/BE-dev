@@ -18,7 +18,7 @@ export interface WorkspaceTarget {
 }
 
 /**
- * Which workspace a subscription is held in (W3-11) and the lock on it (W3-14). A workspace named must be held at the vendor of the plan; none named,
+ * Which workspace a subscription is held and the lock on it. A workspace named must be held at the vendor of the plan; none named,
  * a plan the company administers at the vendor takes the only workspace of the vendor, a workspace named after the vendor is made when it has none
  * (the person who writes answers for it, `QĐ-118d`), and several is for the caller to choose. Any other plan is held in none unless one is named.
  *
@@ -33,7 +33,7 @@ export class WorkspaceForSubscriptionService {
     private readonly views: WorkspaceViewService,
   ) {}
 
-  /** How many administrators of this workspace work now as IT Admins (reused by subscription & lot gates, W3-12 / W3-24). */
+  /** How many administrators of this workspace work now as IT Admins (reused by subscription & lot gates). */
   async workingAdminCount(tx: DbTx, workspaceId: string): Promise<number> {
     const workspace = await this.repo.find(workspaceId, tx);
 

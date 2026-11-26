@@ -32,12 +32,12 @@ export class SubscriptionChangeGuard {
     return this.seatIncrease.told(tx, rise);
   }
 
-  /** Notifies R1 + Finance when an active K2 subscription reduces purchasedQuantity (W3-03). */
+  /** Notifies R1 + Finance when an active K2 subscription reduces purchasedQuantity. */
   tellSeatReduction(tx: DbTx, reduction: SeatReduction): Promise<number> {
     return this.seatIncrease.toldReduction(tx, reduction);
   }
 
-  /** The workspace of a subscription of this plan, locked (W3-14): see `SubscriptionPoolService.workspaceFor`. */
+  /** The workspace of a subscription of this plan, locked: see `SubscriptionPoolService.workspaceFor`. */
   workspaceFor(...args: Parameters<SubscriptionPoolService['workspaceFor']>): Promise<string | null> {
     return this.poolRules.workspaceFor(...args);
   }

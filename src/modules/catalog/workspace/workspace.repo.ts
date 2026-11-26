@@ -56,7 +56,7 @@ const emergencyColumns = (account: WorkspaceChanges['emergencyAccount']) =>
         emergencyLastReviewedOn: account ? toDateColumn(account.lastReviewedOn) : null,
       };
 
-/** The one writer of `workspaces` and `workspace_admins`: the workspaces the company holds at its vendors (W3-10). */
+/** The one writer of `workspaces` and `workspace_admins`: the workspaces the company holds at its vendors. */
 @Injectable()
 export class WorkspaceRepo {
   constructor(private readonly prisma: PrismaService) {}

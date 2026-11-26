@@ -47,7 +47,7 @@ const profileOf = (workspace: WorkspaceRecord): { [key: string]: AuditValue } =>
 });
 
 /**
- * The workspaces the company holds at its vendors (W3-10, `QĐ-115c`): the list and the detail every IT Admin and Finance read, the creation by any
+ * The workspaces the company holds at its vendors (`QĐ-115c`): the list and the detail every IT Admin and Finance read, the creation by any
  * IT Admin (who becomes the one who answers for it, `QĐ-118d`), and the change of its profile by that IT Admin alone (`QĐ-118f`). Who administers it
  * and who answers for it have services of their own.
  *

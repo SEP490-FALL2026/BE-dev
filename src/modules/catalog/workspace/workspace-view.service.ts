@@ -10,7 +10,7 @@ import { WorkspaceRepo } from './workspace.repo';
 import type { WorkspaceRecord } from './workspace.types';
 
 /**
- * What a reader of workspaces needs beside the rows (W3-10): the names of the people, which administrators work now as IT Admins, and the answers
+ * What a reader of workspaces needs beside the rows: the names of the people, which administrators work now as IT Admins, and the answers
  * built from them; and the judgment of whether a person may be named for a workspace. It reads, it never writes.
  */
 @Injectable()

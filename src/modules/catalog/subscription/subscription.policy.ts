@@ -328,7 +328,7 @@ export function isStaleEdit(expectedUpdatedAt: Date | undefined, currentUpdatedA
   return expectedUpdatedAt !== undefined && expectedUpdatedAt.getTime() !== currentUpdatedAt.getTime();
 }
 
-/** The routes that change the seats of a subscription: what an edit of the number answers with (W3-27). */
+/** The routes that change the seats of a subscription: what an edit of the number answers with. */
 export const SEAT_LEDGER_ROUTES = [
   'subscriptionLineSeatPurchase',
   'subscriptionLineSeatCorrection',
@@ -336,7 +336,7 @@ export const SEAT_LEDGER_ROUTES = [
 ] as const;
 
 /**
- * What an update no longer writes (W3-27): the seats (they are bought and corrected on the lines of the subscription) and the mark of the subscription that
+ * What an update no longer writes: the seats (they are bought and corrected on the lines of the subscription) and the mark of the subscription that
  * prices its plan. Both fields stay in the body so a client that sends them is told so. Throws SubscriptionSeatCountViaLedgerError, SubscriptionPrimaryRetiredError.
  */
 export function assertUpdateWritesNoRetiredField(input: {
@@ -348,7 +348,7 @@ export function assertUpdateWritesNoRetiredField(input: {
 }
 
 /**
- * What a declaration no longer takes (W3-27): a purchase made once is a lot, and a plan of personal accounts has no subscription. The kind is judged before
+ * What a declaration no longer takes: a purchase made once is a lot, and a plan of personal accounts has no subscription. The kind is judged before
  * the plan is read; the plan once it is. Throws SubscriptionPerpetualIsLicenseLotError, SubscriptionK1HasNoSubscriptionError.
  */
 export function assertDeclarable(kind: SubscriptionKind, planProvisioningType?: ProvisioningType): void {

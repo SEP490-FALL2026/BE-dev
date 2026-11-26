@@ -151,7 +151,7 @@ export function kpi3Percent(activeSeats: number, purchasedSeats: number): number
 
 /**
  * Sums period-end seat counts across live lines (`seats(L, cuối kỳ)` when ledger is open, falling back to
- * legacy `purchasedQuantity` when the ledger has not opened) as the `KPI-3` denominator (`W3-22`).
+ * legacy `purchasedQuantity` when the ledger has not opened) as the `KPI-3` denominator.
  */
 export function kpi3DenominatorOfLines(
   lines: ReadonlyArray<{

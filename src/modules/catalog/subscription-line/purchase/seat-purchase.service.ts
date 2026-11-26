@@ -99,7 +99,7 @@ export class SeatPurchaseService {
     return told;
   }
 
-  /** Sends `SEAT_LEDGER_VENDOR_RECORDED` to Finance and/or R1 (`W3-19`), deduplicated and excluding `actor`. */
+  /** Sends `SEAT_LEDGER_VENDOR_RECORDED` to Finance and/or R1, deduplicated and excluding `actor`. */
   async notifyVendorRecorded(tx: DbTx, input: NotifyVendorRecordedInput): Promise<number> {
     const recipients = new Set<string>();
     if (input.notifyR1) {

@@ -293,7 +293,7 @@ export class LicensingApi {
   }
 
   /**
-   * Records the avoided cost for a grant task completed from the shared pool (`W3-09`, `B1-R8`, idempotent per task).
+   * Records the avoided cost for a grant task completed from the shared pool (`B1-R8`, idempotent per task).
    */
   recordAvoidedCost(
     tx: DbTx,
@@ -306,7 +306,7 @@ export class LicensingApi {
 
   /**
    * Records one-time realised renewal savings when Finance confirms the first invoice of the renewed period
-   * (or closes its discrepancy case, `W3-09`, `Q-G`).
+   * (or closes its discrepancy case, `Q-G`).
    */
   recordRealisedSaving(tx: DbTx, input: RecordRealisedSavingInput): Promise<RecordRealisedSavingResult> {
     return this.renewalSavings.recordRealisedSaving(tx, input);

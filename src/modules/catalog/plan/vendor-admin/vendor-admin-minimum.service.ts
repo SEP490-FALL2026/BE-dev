@@ -21,7 +21,7 @@ export class VendorAdminMinimumService {
   ) {}
 
   /**
-   * How many workspaces that hold a subscription in use are short of administrators who work now (`QĐ-110k`, W3-12): fewer than two of those
+   * How many workspaces that hold a subscription in use are short of administrators who work now (`QĐ-110k`): fewer than two of those
    * recorded in the workspace. The same judgment as the flag `ADMINS_BELOW_MINIMUM` of the workspace, counted once for each workspace. Read only.
    */
   async countWorkspacesBelowMinimum(tx?: DbTx): Promise<number> {
@@ -33,7 +33,7 @@ export class VendorAdminMinimumService {
     return workspaces.filter((workspace) => workingAdminCount(workspace.admins, working) < MIN_VENDOR_ADMINS).length;
   }
 
-  /** Workspaces that currently list at least one administrator who is not a working IT Admin (W3-12). */
+  /** Workspaces that currently list at least one administrator who is not a working IT Admin. */
   async workspacesWithNotWorkingAdmins(tx?: DbTx): Promise<WorkspaceNotWorkingAdmins[]> {
     const workspaces = await this.workspaces.findAllWithAdmins(tx);
     if (workspaces.length === 0) return [];

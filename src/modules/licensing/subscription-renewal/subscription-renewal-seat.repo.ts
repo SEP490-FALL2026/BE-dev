@@ -116,7 +116,7 @@ export class SubscriptionRenewalSeatRepo {
     };
   }
 
-  /** Same seat-needed facts broken down by `planId` across all lines of `subscriptionId` in one query (`W3-21`). */
+  /** Same seat-needed facts broken down by `planId` across all lines of `subscriptionId` in one query. */
   async seatsNeededFactsByPlan(
     subscriptionId: string,
     days: { today: BusinessDate; renewalOn: BusinessDate },

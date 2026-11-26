@@ -37,7 +37,7 @@ export class SeatMonthService {
 
   /**
    * True when every K2 subscription with seats or existing seat-month rows in `month` has a completed run in `seat_month_runs`
-   * (`W3-07` F6(a), Ca I).
+   * (F6(a), Ca I).
    */
   async isMonthSettlingReady(organizationId: string, month: BusinessDate): Promise<boolean> {
     const seatSubs = (await this.licensing.getSeatsOfMonth(month)).map((seat) => seat.subscriptionId);

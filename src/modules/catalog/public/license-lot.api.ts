@@ -7,7 +7,7 @@ import { toLicenseLotApiException } from '../license-lot/license-lot.http-errors
 import type { CreateLicenseLotInput, LicenseLotView } from './license-lot.types';
 
 /**
- * What the rest of the application reads and locks of the lots of licenses of a K4 plan (W3-24). A lot is written by its own routes;
+ * What the rest of the application reads and locks of the lots of licenses of a K4 plan. A lot is written by its own routes;
  * here it is read, and locked in the order of the lock table: the lot (6a), then the plan (7), before the keys (7b) and the activations (8).
  */
 @Injectable()

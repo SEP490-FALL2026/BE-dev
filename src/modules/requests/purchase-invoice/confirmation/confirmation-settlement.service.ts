@@ -9,7 +9,7 @@ import { mismatchesOfRow } from '../purchase-invoice-match.policy';
 import type { PurchaseInvoiceRow } from '../purchase-invoice.repo';
 
 /**
- * Post-confirmation settlement (`SBF-11a`, `W3-09`): opens any mismatch discrepancy case, or when none is opened,
+ * Post-confirmation settlement (`SBF-11a`): opens any mismatch discrepancy case, or when none is opened,
  * records one-time realised renewal savings for a `SUBSCRIPTION` `RENEWAL`/`PERIOD` invoice.
  */
 @Injectable()

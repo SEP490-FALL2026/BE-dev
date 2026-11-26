@@ -1,4 +1,4 @@
-/** What differs between an invoice and what was approved or bought (`R-44` / `W3-05`): count, unit price, or expected pool amount. */
+/** What differs between an invoice and what was approved or bought (`R-44`): count, unit price, or expected pool amount. */
 export type InvoiceDiscrepancyMismatch = 'QUANTITY' | 'UNIT_PRICE' | 'EXPECTED_AMOUNT';
 
 export type InvoiceDiscrepancyState = 'OPEN' | 'CLOSED';

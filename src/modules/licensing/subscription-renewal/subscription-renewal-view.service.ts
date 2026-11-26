@@ -232,7 +232,7 @@ export class RenewalViewService {
     };
   }
 
-  /** Incremental monthly `KPI-4` (`missedAdjustment`) for `subscriptionId` across `months`, read-only (`W3-22`). */
+  /** Incremental monthly `KPI-4` (`missedAdjustment`) for `subscriptionId` across `months`, read-only. */
   async missedAdjustmentKpiOf(
     actor: AuthenticatedPrincipal,
     subscriptionId: string,

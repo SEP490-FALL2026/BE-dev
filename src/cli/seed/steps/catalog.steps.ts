@@ -474,7 +474,7 @@ function resolveCanvaPurchaseTarget(ctx: DemoRunContext) {
 }
 
 /**
- * Batch seat purchase (`W3-18`, `MUA-…`): buys 2 extra seats for the two open GRANT tasks of R61 (`canva-teams`) in one request,
+ * Batch seat purchase (`MUA-…`): buys 2 extra seats for the two open GRANT tasks of R61 (`canva-teams`) in one request,
  * then records the purchase id in `ctx.ids.seatPurchases` for the `SEAT_PURCHASE` invoice step.
  */
 async function seatPurchases(ctx: DemoRunContext): Promise<StepOutcome> {

@@ -74,7 +74,7 @@ export class LicenseKeyAssignmentService {
     };
   }
 
-  /** Transitions key `cost_borne` from false to true once granted (`W3-25`). */
+  /** Transitions key `cost_borne` from false to true once granted. */
   markCostBorne(tx: DbTx, licenseKeyId: string): Promise<void> {
     return this.repo.markCostBorne(tx, licenseKeyId);
   }

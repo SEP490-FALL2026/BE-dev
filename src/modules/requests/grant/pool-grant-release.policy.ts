@@ -31,7 +31,7 @@ export interface PoolAvoidedCostInput {
 }
 
 /**
- * Per-person avoided cost of a grant completed from the shared pool (`W3-09`, `B1-R8`, `Q-G`):
+ * Per-person avoided cost of a grant completed from the shared pool (`B1-R8`, `Q-G`):
  * - `K2`: `roundHalfAway(yearCommitmentAmount ÷ commitmentSeatCount)` (not prorated by elapsed days).
  * - `K4`: `roundHalfAway(requestAmount ÷ beneficiaryCount)` (retained even after commitment release).
  * Returns null when the source figure is absent/non-positive or the kind is not `K2`/`K4`.

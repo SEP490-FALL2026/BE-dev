@@ -107,7 +107,7 @@ export function paidThroughOnOfK1Annual(billingAnchorOn: BusinessDate, asOf: Bus
   return k1PaidThroughOn(billingAnchorOn, asOf, 12);
 }
 
-/** Formats `YYYY-MM-DD` as the Vietnamese lock label (`bị khóa tới DD/MM/YYYY`) for K1 annual revocations (`W3-17`). */
+/** Formats `YYYY-MM-DD` as the Vietnamese lock label (`bị khóa tới DD/MM/YYYY`) for K1 annual revocations. */
 export function k1PaidThroughLockLabel(paidThroughOn: BusinessDate): string {
   return `bị khóa tới ${paidThroughOn.slice(8, 10)}/${paidThroughOn.slice(5, 7)}/${paidThroughOn.slice(0, 4)}`;
 }
@@ -223,7 +223,7 @@ function monthlyLateGrantBreakdown(
 }
 
 /**
- * Per-month and capped total release for a revocation or transfer (`RV-07`, `W3-07` F2).
+ * Per-month and capped total release for a revocation or transfer (`RV-07`, F2).
  * When `commitment.months` is present (monthly-sliced K2), month bounds come from min/max slice months instead of `SeatCoverage`.
  */
 export function revocationBreakdown(input: {
@@ -265,7 +265,7 @@ export function revocationShare(input: {
 }
 
 /**
- * Per-month and capped total release for a late K2 grant (`M-10`, `W3-07` F1/F2).
+ * Per-month and capped total release for a late K2 grant (`M-10`, F1/F2).
  */
 export function lateGrantBreakdown(input: {
   commitment: SeatCommitment;

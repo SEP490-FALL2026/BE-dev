@@ -20,7 +20,7 @@ import { LicenseLotKeyImportService } from './license-lot-key-import.service';
 class LotIdParamDto extends createZodDto(z.strictObject({ id: z.uuid() })) {}
 
 /**
- * Puts license keys in a lot (`QĐ-115n`, W3-24): the same batch as the import of wave 2 (`licenseKeyImport`), named by the lot instead of the subscription, and only
+ * Puts license keys in a lot (`QĐ-115n`): the same batch as the import of wave 2 (`licenseKeyImport`), named by the lot instead of the subscription, and only
  * for the IT Admin who answers for the lot. A lot of a plan bound to an account never holds more keys than licenses; a lot whose key goes on a machine has no limit of keys.
  */
 @ApiTags('license-lots')

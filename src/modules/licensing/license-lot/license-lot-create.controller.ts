@@ -82,7 +82,7 @@ function toLotCreateApiException(error: unknown): unknown {
 }
 
 /**
- * Makes a lot of licenses of a K4 plan (`QĐ-115n`, W3-24). The lot is read and changed by the routes of `license-lots` in the catalog; it is made here because a lot
+ * Makes a lot of licenses of a K4 plan (`QĐ-115n`). The lot is read and changed by the routes of `license-lots` in the catalog; it is made here because a lot
  * bought for a request is judged against the grant task of that request, which licensing owns.
  */
 @ApiTags('license-lots')

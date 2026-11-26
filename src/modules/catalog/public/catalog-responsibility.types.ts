@@ -15,7 +15,7 @@ export interface VendorAdminRole {
   applicationName: string;
   role: 'OWNER' | 'ADMIN';
   othersWorking: number;
-  /** The workspace the role is held in: one entry for each workspace (W3-10); the plan above is the one it is known by. */
+  /** The workspace the role is held in: one entry for each workspace; the plan above is the one it is known by. */
   workspaceId?: string;
   workspaceName?: string;
   vendorId?: string;
@@ -26,13 +26,13 @@ export interface VendorAdminRole {
 export interface ResponsibilitiesTransferred {
   subscriptionIds: string[];
   applicationIds: string[];
-  /** The workspaces the IT Admin answered for (W3-10, `QĐ-116o`); they change hands in the same transaction. */
+  /** The workspaces the IT Admin answered for (`QĐ-116o`); they change hands in the same transaction. */
   workspaceIds: string[];
-  /** The lots of licenses the IT Admin answered for (W3-24); they change hands in the same transaction, after the subscriptions. */
+  /** The lots of licenses the IT Admin answered for; they change hands in the same transaction, after the subscriptions. */
   licenseLotIds: string[];
 }
 
-/** A workspace with administrators who are no longer working as IT Admins, for the hourly alert sweep (W3-12). */
+/** A workspace with administrators who are no longer working as IT Admins, for the hourly alert sweep. */
 export interface WorkspaceNotWorkingAdmins {
   workspaceId: string;
   organizationId: string;

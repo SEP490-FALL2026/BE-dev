@@ -255,7 +255,7 @@ export const ACCESS_REQUEST_ERROR_EXAMPLES = {
   EVIDENCE_REQUIRED: cancellation('EVIDENCE_REQUIRED'),
 } as const;
 
-/** The refused-term error examples for the routes that judge a request term (`QĐ-111i`, `INV-07`, `W3-17`). */
+/** The refused-term error examples for the routes that judge a request term (`QĐ-111i`, `INV-07`). */
 export const TERM_ERROR_EXAMPLES = [
   ACCESS_REQUEST_ERROR_EXAMPLES.TERM_REQUIRED,
   ACCESS_REQUEST_ERROR_EXAMPLES.TERM_MONTHS_OUT_OF_RANGE,

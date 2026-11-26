@@ -38,7 +38,7 @@ function tierStepSeatsOf(minimumSeats: number | null, seatsToday: number): numbe
 }
 
 /**
- * Computes the read-time vendor charge until renewal/next payment (`W3-20`):
+ * Computes the read-time vendor charge until renewal/next payment:
  * shown only when the line `chooseLine` would take has a 12-month commitment and the plan has `free === 0`.
  */
 export function vendorChargeUntilRenewalOf(input: VendorChargeInput): VendorChargeEstimate | undefined {

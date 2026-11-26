@@ -34,12 +34,12 @@ export class CatalogResponsibilityApi {
     return this.handover.usableSubscriptionItAdminsOfPlan(planId, tx);
   }
 
-  /** How many workspaces in use are short of administrators who work now (W3-12): the same judgment as the flag of the workspace. */
+  /** How many workspaces in use are short of administrators who work now: the same judgment as the flag of the workspace. */
   countWorkspacesBelowMinimum(tx?: DbTx): Promise<number> {
     return this.minimum.countWorkspacesBelowMinimum(tx);
   }
 
-  /** Workspaces that currently list at least one administrator who is not a working IT Admin (W3-12). */
+  /** Workspaces that currently list at least one administrator who is not a working IT Admin. */
   workspacesWithNotWorkingAdmins(tx?: DbTx): Promise<WorkspaceNotWorkingAdmins[]> {
     return this.minimum.workspacesWithNotWorkingAdmins(tx);
   }

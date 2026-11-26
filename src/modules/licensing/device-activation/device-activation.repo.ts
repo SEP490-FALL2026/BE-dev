@@ -181,7 +181,7 @@ export class DeviceActivationRepo {
     return result;
   }
 
-  /** Open `GRANT` tasks for K4 `planIds` that do not hold an assigned license key yet (`W3-24`). */
+  /** Open `GRANT` tasks for K4 `planIds` that do not hold an assigned license key yet. */
   async openGrantTasksWithoutKeyOfPlans(
     planIds: readonly string[],
     client?: DbTx,

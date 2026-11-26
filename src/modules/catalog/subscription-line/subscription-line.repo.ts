@@ -51,7 +51,7 @@ function asLineError(error: unknown): unknown {
 }
 
 /**
- * The one writer of `subscription_lines`: the lines of a subscription period (W3-15). The lock of a line (tier 6a, `FOR UPDATE`) comes after
+ * The one writer of `subscription_lines`: the lines of a subscription period. The lock of a line (tier 6a, `FOR UPDATE`) comes after
  * the lock of its period and before the ledger row it guards; the database holds C1 (one live line per workspace and plan) and C2.
  */
 interface PeriodLockSqlRow {

@@ -19,7 +19,7 @@ export interface LabelClassificationInput extends AdjustmentInput {
   /** Purchased quantity recorded for the following period, if already confirmed; defaults to `purchasedQuantity`. */
   qNext: number | null;
   windows: AdjustmentWindows;
-  /** Optional per-day seat counts from the line ledger (`W3-22`); falls back to `purchasedQuantity`. */
+  /** Optional per-day seat counts from the line ledger; falls back to `purchasedQuantity`. */
   dailySeats?: ReadonlyMap<BusinessDate, number | null>;
   /** Missed-adjustment seats carried from the prior period (`0` for `MEMBERS` or when target met). */
   missedSeats?: number;
@@ -151,7 +151,7 @@ function collectIdleSegments(
 }
 
 /**
- * Splits a period's or line's monthly idle seat cost into adjustment-window buckets (`W3-06` + `W3-22` label `(1)` winning
+ * Splits a period's or line's monthly idle seat cost into adjustment-window buckets (+ label `(1)` winning
  * over `(2)`/`(3)` + Q-F R-LATE split) with remainder assigned to the final segment so bucket totals sum exactly to `idleCostMinor`,
  * and computes the 10% excess-idle alert check excluding vendor minimum seat commitments. Pure.
  */
@@ -217,7 +217,7 @@ function allocateSegments(
 
 /**
  * Resolves `missed(L) = max(0, seats(L, startDate) - lockedTargetOfPriorLine)` for `FIXED` subscriptions;
- * `MEMBERS` subscriptions always yield `0` (`W3-22`).
+ * `MEMBERS` subscriptions always yield `0`.
  */
 export function resolveLineMissedSeats(input: {
   seatCounting: 'FIXED' | 'MEMBERS';
@@ -238,7 +238,7 @@ export function resolveLineMissedSeats(input: {
   return Math.max(0, input.seatsAtPeriodStart - best.target);
 }
 
-/** Aggregates per-line idle classifications within one subscription period (`W3-22`). */
+/** Aggregates per-line idle classifications within one subscription period. */
 export function aggregateIdleClassifications(items: readonly IdleCostClassification[]): IdleCostClassification {
   if (items.length === 1) return items[0];
   let idleCostMinor: bigint | null = 0n;

@@ -42,7 +42,7 @@ export function judgePurchase(input: {
 /** What a seat granted from the pool would have cost had it been bought instead: the cost avoided, recorded once (`BR-MF1-09c`). */
 export interface AvoidedCost {
   provisioningType: 'K2' | 'K4';
-  /** Unused after `W3-09` (stored as null for new rows); retained on row writer for schema compatibility (`D-12`). */
+  /** Unused (stored as null for new rows); retained on row writer for schema compatibility (`D-12`). */
   months: number | null;
   unitMinor: bigint;
   /** The unit price converted to the reporting currency when it was recorded; null when it was not converted. */
@@ -62,7 +62,7 @@ function compareLineCandidate(a: PoolSubscription, b: PoolSubscription): number 
 }
 
 /**
- * Selects the pool line/subscription to take a seat from (`W3-15`, `P0-05`):
+ * Selects the pool line/subscription to take a seat from (`P0-05`):
  * prefers candidates that still have free seats (`free > 0`), then sorts deterministically by
  * `lineCreatedAt ASC`, `subscriptionLineId ASC` (falling back to `subscriptionId` for legacy periods without lines).
  */

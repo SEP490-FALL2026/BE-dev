@@ -35,7 +35,7 @@ export interface RecordRenewalInput {
   choice?: RenewalChoice;
   /** The seats of the next period; none for a cancellation. Only for single-line periods (`LINES_REQUIRED` when multi-line). */
   proposedQuantity?: number;
-  /** Per-line proposed quantities (`W3-21`). */
+  /** Per-line proposed quantities. */
   lines?: readonly { subscriptionLineId: string; quantity: number }[];
   minimumTotalHolderLineId?: string;
   minimumTotalNote?: string;

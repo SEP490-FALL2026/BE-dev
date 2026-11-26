@@ -8,7 +8,7 @@ import type { HandoverSource } from './it-handover.types';
 
 /**
  * The milestone of a departure (the block of the access) or of a transfer (the day it takes effect) is here, in the transaction that opens it
- * (`QĐ-110j`, `R-26`, `QĐ-110k`, W3-12): a departure notifies the responsible IT Admin of each workspace the person administers (or the usable
+ * (`QĐ-110j`, `R-26`, `QĐ-110k`): a departure notifies the responsible IT Admin of each workspace the person administers (or the usable
  * Super Admin fallback) with `WORKSPACE_ADMIN_NOT_WORKING`; when the departing or transferred IT Admin still answers for a subscription or an
  * application, the usable Super Admin is told once for the file to hand them over. The same milestone seen twice tells nobody twice.
  */

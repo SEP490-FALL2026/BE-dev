@@ -73,7 +73,7 @@ function toWire(change: SeatChangeRecord): SeatCorrectionResult {
 
 /**
  * Handles vendor-side seat corrections (`POST /subscription-lines/:id/seat-corrections`) and mid-term seat reductions
- * (`POST /subscription-lines/:id/seat-reductions`) (`W3-19`).
+ * (`POST /subscription-lines/:id/seat-reductions`).
  * Lock order: period `FOR UPDATE` (tier 6) -> line `FOR UPDATE` (tier 6c) -> `seat_changes` insert (tier 6d).
  */
 @Injectable()

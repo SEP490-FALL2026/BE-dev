@@ -4,7 +4,7 @@ import type { DbTx } from '../../../../infrastructure/database/transaction-runne
 import { KpiMissedAdjustmentService } from './kpi-missed-adjustment.service';
 import type { SubscriptionKpi4Summary } from './subscription-renewal-kpi.types';
 
-/** Group entry for `subscription-renewal/kpi/` (`W3-22` incremental `KPI-4`). */
+/** Group entry for `subscription-renewal/kpi/` (incremental `KPI-4`). */
 @Injectable()
 export class SubscriptionRenewalKpiService {
   constructor(private readonly missedAdjustment: KpiMissedAdjustmentService) {}

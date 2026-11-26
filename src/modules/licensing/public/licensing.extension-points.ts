@@ -86,7 +86,7 @@ export interface GrantRequestGate {
     items: readonly { requestId: string; beneficiaryEmployeeId: string }[],
     expectedPlanId: string,
   ): Promise<Set<string>>;
-  /** Returns `(beneficiaries, chargedExcess)` per `REQUEST` lot id for `F11` seat reservation checks (`W3-24`). */
+  /** Returns `(beneficiaries, chargedExcess)` per `REQUEST` lot id for `F11` seat reservation checks. */
   reservedForRequestLots?(
     lotRequests: readonly { lotId: string; requestId: string }[],
     tx?: DbTx,

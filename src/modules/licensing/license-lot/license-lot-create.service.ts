@@ -11,7 +11,7 @@ import { LicenseKeyLotRequestNotOpenError } from '../license-key/license-key.err
 const OVER = new Set(['COMPLETED', 'CANCELLED', 'CLOSED_FAILED']);
 
 /**
- * Makes a lot of licenses (W3-24): for a request, only for the IT Admin who acts for the department of the person the grant task of that request is for; for any
+ * Makes a lot of licenses: for a request, only for the IT Admin who acts for the department of the person the grant task of that request is for; for any
  * other purpose, any IT Admin. For a REQUEST lot, task lookup and acting IT Admin check run in the same transaction (`runner.run`) as lot creation.
  */
 @Injectable()

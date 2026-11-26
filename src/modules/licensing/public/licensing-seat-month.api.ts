@@ -28,7 +28,7 @@ export class LicensingSeatMonthApi {
     @Optional() private readonly lineTargets?: SubscriptionLineTargetRepo,
   ) {}
 
-  /** Locked target snapshots of prior lines (`subscription_line_targets`, `W3-22`). */
+  /** Locked target snapshots of prior lines (`subscription_line_targets`). */
   async getPriorLineTargets(priorLineIds: readonly string[], tx?: DbTx): Promise<PriorLineLockedTarget[]> {
     if (!this.lineTargets || priorLineIds.length === 0) return [];
     const rows = await this.lineTargets.ofLines(priorLineIds, tx);

@@ -96,7 +96,7 @@ export class SpendApprovalSnapshotService {
   }
 
   /**
-   * What the vendor is paid for a whole year when the plan is bought for the first time on a yearly commitment (`BR-MF1-07b`, W3-02):
+   * What the vendor is paid for a whole year when the plan is bought for the first time on a yearly commitment (`BR-MF1-07b`):
    * for K2, `referenceCommitmentMonths` 12 or NULL (read as 12) shows `monthly × 12 × people` when no grantable subscription exists yet.
    * Null for any other request.
    */

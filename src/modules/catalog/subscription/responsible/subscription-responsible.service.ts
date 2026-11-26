@@ -43,7 +43,7 @@ export class SubscriptionResponsibleService {
     const changed = await this.runner.run(async (tx) => {
       const current = await this.subscriptions.lock(tx, subscriptionId);
       if (!current) throw new SubscriptionNotFoundError();
-      // A perpetual purchase that became a lot has the id of the lot (6a, after the period, 6): who answers for it is written in the lot and only there (W3-24).
+      // A perpetual purchase that became a lot has the id of the lot (6a, after the period, 6): who answers for it is written in the lot and only there.
       const lot = await this.lots.lock(tx, subscriptionId);
       const currentEmployeeId = lot ? lot.responsibleItAdminEmployeeId : current.responsibleItAdminEmployeeId;
       const decision = judgeResponsibleChange({

@@ -29,7 +29,7 @@ export interface AssignmentRecord {
   /** A personal seat of an IT Admin used for a machine account (`QĐ-110m`, `R-9`): INV-02 leaves it out; `machineAccountNote` says why. */
   isMachineAccount: boolean;
   machineAccountNote: string | null;
-  /** A personal right of a K1 plan: the months it commits to (1 or 12) and the day its billing counts from (W3-17); null for every other right. */
+  /** A personal right of a K1 plan: the months it commits to (1 or 12) and the day its billing counts from; null for every other right. */
   personalCommitmentMonths?: 1 | 12 | null;
   billingAnchorOn?: BusinessDate | null;
   /** Set when the grant it was made for was closed as failed: the period is then empty and no seat is taken. */
@@ -476,7 +476,7 @@ export interface RevocationCompletedFacts {
  * used) and the assignment it made.
  */
 export interface GrantOutcomeFacts {
-  /** Provisioning grant task id (`W3-09`); present when reported by `ProvisioningGrantCompletion`. */
+  /** Provisioning grant task id; present when reported by `ProvisioningGrantCompletion`. */
   taskId?: string;
   fromPool: boolean;
   provisioningType: ProvisioningKind;
@@ -485,9 +485,9 @@ export interface GrantOutcomeFacts {
   /** The day the seat began and the day it ends, as they stand once granted; the end is null when the seat has none (see `RevocationCompletedFacts.grantedStartDate`). */
   effectiveFrom: BusinessDate;
   expectedEndDate: BusinessDate | null;
-  /** The lot id of the assigned license key (`W3-25`); null/undefined when not a K4 key grant. */
+  /** The lot id of the assigned license key; null/undefined when not a K4 key grant. */
   licenseLotId?: string | null;
-  /** The license key id assigned on grant completion (`W3-25`). */
+  /** The license key id assigned on grant completion. */
   licenseKeyId?: string | null;
   /** Whether the key's cost was already borne before this grant (`cost_borne` before transition). */
   keyCostBorneBeforeGrant?: boolean | null;

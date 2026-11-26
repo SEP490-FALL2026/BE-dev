@@ -150,7 +150,7 @@ export interface KeyState {
 }
 
 /**
- * Whether a key may be given to the seat of a grant (`BR-MF1-09`, `QĐ-103d`, `W3-24`): a free key of the store, not withdrawn,
+ * Whether a key may be given to the seat of a grant (`BR-MF1-09`, `QĐ-103d`): a free key of the store, not withdrawn,
  * belonging to the chosen lot (when `expectedLotId` is provided) or matching `seatSubscriptionId`. Throws LicenseKeyStateError.
  */
 export function assertAssignable(

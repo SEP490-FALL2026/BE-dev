@@ -80,7 +80,7 @@ export interface SubscriptionRecord {
   isPrimaryForPlan: boolean;
   /** The period this one continues (`QĐ-16`); null for a first period. */
   renewedFromId: string | null;
-  /** The workspace the subscription is held in (W3-11); null only for data older than the rule. */
+  /** The workspace the subscription is held in; null only for data older than the rule. */
   workspace: { id: string; name: string } | null;
   seatCounting: SeatCounting;
   minimumSeatsTotal: number | null;
@@ -114,7 +114,7 @@ export interface NewSubscription {
   isPrimaryForPlan: boolean;
   /** Only the period a renewal records names the one it continues; set at insert and never changed. */
   renewedFromId?: string | null;
-  /** The workspace (W3-11) and how the seats are counted: left out, a write leaves them as they are (an insert takes the column defaults). */
+  /** The workspace and how the seats are counted: left out, a write leaves them as they are (an insert takes the column defaults). */
   workspaceId?: string | null;
   seatCounting?: SeatCounting;
   minimumSeatsTotal?: number | null;
@@ -271,7 +271,7 @@ export interface DeclareSubscriptionInput {
   allowsMidTermReduction?: boolean;
   responsibleItAdminEmployeeId?: string;
   vendorMinimumSeats?: number;
-  /** The workspace the subscription is held in (W3-11); left out, the default of the vendor for a plan the company administers there. */
+  /** The workspace the subscription is held in; left out, the default of the vendor for a plan the company administers there. */
   workspaceId?: string;
   seatCounting?: SeatCounting;
   minimumSeatsTotal?: number;

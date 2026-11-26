@@ -1,7 +1,6 @@
 import { MIN_WORKSPACE_ADMINS } from '../workspace/workspace.policy';
 import {
   LicenseLotContractReasonRequiredError,
-  LicenseLotKeysExceedLicensesError,
   LicenseLotPlanNotK4Error,
   LicenseLotPriceLockedError,
   LicenseLotPurposeNotAvailableError,
@@ -13,7 +12,7 @@ import type { LicenseLotPurpose } from './license-lot.types';
 type KeyBinding = 'ACCOUNT' | 'DEVICE_KEY' | 'DEVICE_BUNDLED' | null;
 
 /**
- * Whether a lot of this purpose can be made for this plan (W3-24): the plan is a K4 plan, not bundled with the machine; a lot for a request is of a plan whose
+ * Whether a lot of this purpose can be made for this plan: the plan is a K4 plan, not bundled with the machine; a lot for a request is of a plan whose
  * key is given to an account and names its request; a lot kept in stock is of a plan whose key goes on a machine. Throws LicenseLotPlanNotK4Error,
  * LicenseLotPurposeNotAvailableError, LicenseLotRequestRequiredError.
  */
@@ -47,29 +46,10 @@ export function judgeContractChange(input: {
   return 'CHANGED';
 }
 
-/** The price of a lot is set until a key of it is given or an invoice of it is confirmed (W3-24). Throws LicenseLotPriceLockedError. */
+/** The price of a lot is set until a key of it is given or an invoice of it is confirmed. Throws LicenseLotPriceLockedError. */
 export function assertPriceOpen(input: { invoiceActualMinor: bigint | null; keysAssigned: number }): void {
   if (input.invoiceActualMinor !== null || input.keysAssigned > 0) throw new LicenseLotPriceLockedError();
 }
-
-/**
- * The keys a lot of a plan bound to an account holds never pass its licenses (K-A6): the keys not withdrawn and the new ones. A lot whose key goes on a machine has no
- * limit of keys (its limit is the activations). Throws LicenseLotKeysExceedLicensesError.
- */
-export function assertKeysWithinLicenses(input: {
-  keyBinding: KeyBinding;
-  licenseCount: number;
-  keysNotWithdrawn: number;
-  adding: number;
-}): void {
-  if (input.keyBinding !== 'ACCOUNT') return;
-  if (input.keysNotWithdrawn + input.adding > input.licenseCount) {
-    throw new LicenseLotKeysExceedLicensesError(input.licenseCount, input.keysNotWithdrawn);
-  }
-}
-
-/** How a lot is cost-bound: a key bought for a request was charged then (false); the keys of every other purpose are borne (true). */
-export const costBorneOf = (purpose: LicenseLotPurpose): boolean => purpose !== 'REQUEST';
 
 /** The licenses a lot can still give out, and what they are worth, from the licenses taken. */
 export function freeOf(

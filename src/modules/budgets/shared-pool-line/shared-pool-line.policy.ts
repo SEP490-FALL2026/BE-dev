@@ -9,7 +9,7 @@ export interface PoolPeriodSpec {
   monthlyPriceMinor: bigint | null;
   startDate: BusinessDate | null;
   endExclusive: BusinessDate | null;
-  /** Optional per-day seat counts from the line ledger (`W3-22`); falls back to `purchasedQuantity` when absent. */
+  /** Optional per-day seat counts from the line ledger; falls back to `purchasedQuantity` when absent. */
   dailySeats?: ReadonlyMap<BusinessDate, number | null>;
 }
 
@@ -39,7 +39,7 @@ export function calendarDays(from: BusinessDate, to: BusinessDate): number {
 }
 
 /**
- * Days in `month` during which the purchase period `[startDate, endExclusive)` was paid (`W3-04`).
+ * Days in `month` during which the purchase period `[startDate, endExclusive)` was paid.
  * Unbounded ends fall to the month boundaries. Pure.
  */
 export function daysPaidOf(
@@ -56,7 +56,7 @@ export function daysPaidOf(
 
 /**
  * Total seat-days held on a period within `month`, counting all active days regardless of whether the holder had a
- * department placement (`W3-04`: a held seat without a placement is still held, not idle). When a period window is
+ * department placement (: a held seat without a placement is still held, not idle). When a period window is
  * provided, clamps each seat interval to the paid period bounds so days outside the period never offset days inside it. Pure.
  */
 export function heldSeatDaysOf(
@@ -127,7 +127,7 @@ function resolvePaidSeatDays(
 }
 
 /**
- * Paid seat cost, held seat-days, idle seat cost and data-quality flags for one pool period or line in one month (`W3-04`, `W3-22`).
+ * Paid seat cost, held seat-days, idle seat cost and data-quality flags for one pool period or line in one month.
  * Uses round-half-away-from-zero (`roundHalfAway`) and clamps negative idle seat-days at `0n`. Pure.
  */
 export function poolPeriodMonthCost(

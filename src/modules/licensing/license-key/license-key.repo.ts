@@ -24,7 +24,7 @@ export interface LicenseKeyListed {
   id: string;
   /** The purchase of the key: its lot, or the subscription of wave 2 for a key with no lot. */
   subscriptionId: string;
-  /** The lot the key belongs to (W3-24). */
+  /** The lot the key belongs to. */
   licenseLotId: string | null;
   masked: string;
   status: LicenseKeyStatus;

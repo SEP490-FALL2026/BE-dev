@@ -112,7 +112,7 @@ function addFraction(a: { num: bigint; den: bigint }, b: { num: bigint; den: big
 
 /**
  * Exact rational sum of `coveredDays_m / daysInMonth_m` over every calendar month intersecting `[from, toInclusive]`,
- * allowing callers to round once after multiplying by monthly price and seat count (`W3-05`, `W3-18`, `W3-20`).
+ * allowing callers to round once after multiplying by monthly price and seat count.
  */
 export function coverFraction(from: BusinessDate, toInclusive: BusinessDate): { num: bigint; den: bigint } {
   if (from > toInclusive) return { num: 0n, den: 1n };

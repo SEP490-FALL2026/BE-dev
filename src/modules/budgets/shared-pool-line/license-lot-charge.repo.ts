@@ -4,7 +4,7 @@ import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 
-/** What a lot cost that no invoice carries: a license left over in the store, given for the first time to a request (W3-25). */
+/** What a lot cost that no invoice carries: a license left over in the store, given for the first time to a request. */
 export interface LicenseLotChargeRecord {
   id: string;
   organizationId: string;

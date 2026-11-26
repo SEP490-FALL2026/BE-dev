@@ -15,7 +15,7 @@ import type { LineProposalDecision } from './subscription-renewal-lines.policy';
 import type { LineTargetLockedBy } from './subscription-renewal-lines.types';
 
 /**
- * Capability entry service for `subscription-renewal/lines/` (`W3-21`): per-line need/target/shortfall computation,
+ * Capability entry service for `subscription-renewal/lines/`: per-line need/target/shortfall computation,
  * cutoff target locking, proposal target persistence, and delegating system auto-renewal/expiry handling.
  */
 @Injectable()

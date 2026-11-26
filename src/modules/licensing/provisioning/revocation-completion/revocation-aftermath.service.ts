@@ -87,7 +87,7 @@ export class RevocationAftermath {
     return { licenseKeyId: taken?.licenseKeyId ?? null };
   }
 
-  /** For `K2` `MEMBERS` revocations, records `MEMBER` `REDUCE -1` effective on the next monthly payment date (`W3-19`). */
+  /** For `K2` `MEMBERS` revocations, records `MEMBER` `REDUCE -1` effective on the next monthly payment date. */
   private async recordMemberReduction(
     tx: DbTx,
     actor: AuthenticatedPrincipal,

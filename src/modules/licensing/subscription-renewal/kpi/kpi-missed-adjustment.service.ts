@@ -18,7 +18,7 @@ import type { LineKpi4Breakdown, SubscriptionKpi4Summary } from './subscription-
 
 /**
  * Computes incremental monthly `KPI-4` (`missedAdjustment` seat-months and VND cost) for a `FIXED` subscription's
- * lines (`W3-22`) by reading locked targets of prior lines, daily ledger seat counts, and held assignments.
+ * lines by reading locked targets of prior lines, daily ledger seat counts, and held assignments.
  */
 @Injectable()
 export class KpiMissedAdjustmentService {

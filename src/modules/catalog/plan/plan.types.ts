@@ -151,6 +151,6 @@ export interface PlanLookup {
   applicationKind: ApplicationKind;
   /** Whether the application is still in the catalog or has been retired. */
   applicationStatus: 'APPROVED' | 'RETIRED';
-  /** The vendor of the application (the workspace of a subscription is held at it, W3-11); null for an internal application. */
+  /** The vendor of the application (the workspace of a subscription is held at it); null for an internal application. */
   applicationVendorId?: string | null;
 }

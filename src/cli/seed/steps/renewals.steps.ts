@@ -43,7 +43,7 @@ function lineMonthlyPrice(
   return { amount: String(subscriptionMonthlyPriceOf(subscription as DemoSubscription, matchedPlan)), currency: 'VND' };
 }
 
-/** Record per-line adjustment targets (`W3-21`); a next period preserves each line's monthly unit price. */
+/** Record per-line adjustment targets; a next period preserves each line's monthly unit price. */
 export function renewalBody(
   adjustment: Adjustment,
   spec: DemoRenewal & Pick<DemoSubscription, 'billingCycle' | 'unitPrice' | 'lines'>,

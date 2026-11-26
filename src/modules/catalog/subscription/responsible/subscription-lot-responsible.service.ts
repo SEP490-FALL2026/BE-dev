@@ -15,7 +15,7 @@ export interface SubscriptionLineWithSeats {
 }
 
 /**
- * Who answers for a subscription that is a lot (W3-24) and which periods already carry subscription lines (W3-27 / W3-15):
+ * Who answers for a subscription that is a lot and which periods already carry subscription lines:
  * kept in its own collaborator so `SubscriptionViewService` stays focused and under the constructor parameter cap.
  */
 @Injectable()

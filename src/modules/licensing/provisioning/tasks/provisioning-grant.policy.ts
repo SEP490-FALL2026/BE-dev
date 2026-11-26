@@ -94,7 +94,7 @@ export const grantWarnings = (
   inCharge && inCharge.itAdminEmployeeId === null ? ['DEPARTMENT_WITHOUT_IT_ADMIN'] : [];
 
 /**
- * Effective date for a `MEMBER` `TOP_UP +1` grant (`W3-19`, `B2-R14`): if the line already has a future `MEMBER`
+ * Effective date for a `MEMBER` `TOP_UP +1` grant (`B2-R14`): if the line already has a future `MEMBER`
  * `REDUCE -1` (`effectiveOn > today`) not yet paired with a `MEMBER` `TOP_UP +1` on the same date, compensates the
  * earliest such `REDUCE` using its `effectiveOn`; otherwise takes effect on `today`.
  */

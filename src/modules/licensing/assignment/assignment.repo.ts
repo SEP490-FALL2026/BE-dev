@@ -39,7 +39,7 @@ export interface NewAssignment {
   baselineImportId: string | null;
   /** The older right of the same person that the grant of this one ended the day it was given (R-49); absent for every other right. */
   replacesAssignmentId?: string | null;
-  /** A personal right of a K1 plan names the months it commits to and the day its billing counts from (W3-17); every other right leaves both out. */
+  /** A personal right of a K1 plan names the months it commits to and the day its billing counts from; every other right leaves both out. */
   personalCommitmentMonths?: 1 | 12 | null;
   billingAnchorOn?: BusinessDate | null;
   /** A record that follows a flagged seat keeps its flag and its reason (`R-9`); every other record is written plain. */

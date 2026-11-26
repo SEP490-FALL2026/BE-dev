@@ -18,7 +18,7 @@ export class VendorAdminRolesService {
   ) {}
 
   async of(employeeId: string, tx?: DbTx): Promise<VendorAdminRole[]> {
-    // One entry for each workspace the person administers (W3-10): the other administrators are those of that workspace.
+    // One entry for each workspace the person administers: the other administrators are those of that workspace.
     const duties = (await this.plans.findWorkspaceDuties([employeeId], tx)).filter(
       (duty): duty is typeof duty & { workspace: NonNullable<typeof duty.workspace> } => duty.workspace !== undefined,
     );

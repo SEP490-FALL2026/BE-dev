@@ -3,7 +3,7 @@ import type { BusinessDate } from '../../../core/business-date';
 /** Why a lot was bought: the opening stock, a request, to replace keys that failed, or to keep in stock for machines. */
 export type LicenseLotPurpose = 'OPENING' | 'REQUEST' | 'REPLACEMENT' | 'STOCK';
 
-/** One purchase of licenses of a K4 plan (W3-24). A lot born from a perpetual purchase has the id of that subscription. */
+/** One purchase of licenses of a K4 plan. A lot born from a perpetual purchase has the id of that subscription. */
 export interface LicenseLotRecord {
   id: string;
   organizationId: string;
@@ -56,7 +56,7 @@ export interface LicenseLotChanges {
   note?: string | null;
 }
 
-/** A lot as the routes read it (W3-24): what it is, how many licenses it gave out and has left, and who answers for it. */
+/** A lot as the routes read it: what it is, how many licenses it gave out and has left, and who answers for it. */
 export interface LicenseLotDetail {
   id: string;
   plan: { id: string; name: string; keyBinding: 'ACCOUNT' | 'DEVICE_KEY' | 'DEVICE_BUNDLED' | null };

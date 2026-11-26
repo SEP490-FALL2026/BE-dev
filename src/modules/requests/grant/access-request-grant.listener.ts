@@ -166,7 +166,7 @@ export class AccessRequestGrantGate implements GrantRequestGate, OnModuleInit {
     await this.settlement.settleOutcomeEffects(tx, request, outcome, employeeId, facts, now);
   }
 
-  /** Active beneficiary count (`m`) and charged excess count per `REQUEST` lot (`F11`, `W3-24`). */
+  /** Active beneficiary count (`m`) and charged excess count per `REQUEST` lot (`F11`). */
   reservedForRequestLots(
     lotRequests: readonly { lotId: string; requestId: string }[],
     tx?: DbTx,

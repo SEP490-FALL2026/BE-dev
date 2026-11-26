@@ -23,7 +23,7 @@ function hasRequiredFacts(period: RealisedSavingPeriod): period is RealisedSavin
 }
 
 /**
- * Computes the realised saving of a renewal (`W3-09`, `Q-G`) when the first invoice of the new period confirms:
+ * Computes the realised saving of a renewal (`Q-G`) when the first invoice of the new period confirms:
  * `T = prior.commitmentTermMonths`, `baseline = q_old × monthly_old × T`, `compared = q_new × monthly_new × T`,
  * `saving = max(0, baseline - compared)`. Clamps negative differences to `0n` (`max(0)`).
  * Returns `null` when terms, quantities, or monthly prices are missing or currencies differ.
@@ -45,7 +45,7 @@ export function computeRealisedSaving(
   return { amountMinor: diff > 0n ? diff : 0n, currency };
 }
 
-/** Computes realised savings across old->new line pairs (`W3-21`: `q_old = seats(L, closedOn)`, `q_new = seats(L', startDate)`). */
+/** Computes realised savings across old->new line pairs (: `q_old = seats(L, closedOn)`, `q_new = seats(L', startDate)`). */
 export function computePerLineRealisedSaving(
   term: 1 | 12 | null,
   pairs: readonly { priorQty: number; priorMonthlyMinor: bigint; nextQty: number; nextMonthlyMinor: bigint }[],
@@ -65,7 +65,7 @@ export function computePerLineRealisedSaving(
 }
 
 /**
- * Whether `invoiceServiceMonth` (`YYYY-MM-01`) falls in the start month of `newPeriodStartDate` (`W3-09`).
+ * Whether `invoiceServiceMonth` (`YYYY-MM-01`) falls in the start month of `newPeriodStartDate`.
  */
 export function isFirstInvoiceMonthOfPeriod(
   periodStartDate: BusinessDate | null,

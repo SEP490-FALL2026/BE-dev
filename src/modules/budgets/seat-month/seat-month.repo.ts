@@ -236,7 +236,7 @@ export class SeatMonthRepo {
   /**
    * What the year cost the company and what of it fell to no Cost Center (`MG-03`, `SM1-05`): every invoice of the year whatever it is booked to, and the
    * seat-months of the year of a department that has no Cost Center yet. The year of an invoice is the one of the month it pays for, else its commitment's.
-   * An invoice that has allocation lines (W3-26) counts by its lines, whatever their bucket and Cost Center, in the year of the month of each line.
+   * An invoice that has allocation lines counts by its lines, whatever their bucket and Cost Center, in the year of the month of each line.
    */
   async yearTotals(year: number): Promise<{ companyMinor: bigint; withoutCostCenterMinor: bigint }> {
     const rows = await this.prisma.$queryRaw<{ company: string; without_cost_center: string }[]>`

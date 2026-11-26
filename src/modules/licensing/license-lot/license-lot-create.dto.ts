@@ -3,7 +3,7 @@ import { businessDate } from '../../../infrastructure/http/dto/business-date.dto
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 
-/** The most licenses one lot holds (W3-24). */
+/** The most licenses one lot holds. */
 export const LICENSE_LOT_LICENSES_MAX = 10_000;
 const money = z.strictObject({ amount: z.string().max(40), currency: z.string().regex(/^[A-Z]{3}$/) });
 const unitPrice = money.meta({

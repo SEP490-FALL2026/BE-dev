@@ -4,7 +4,7 @@ import type { PeriodAdjustment, RenewalPeriodFacts } from '../../../catalog/publ
 import type { RecordRefusal } from '../record/renewal-record.policy';
 import type { RenewalChoice } from '../subscription-renewal.types';
 
-/** Per-line seat need inputs gathered at a renewal point (`W3-21`). */
+/** Per-line seat need inputs gathered at a renewal point. */
 export interface LineNeedInputs {
   subscriptionLineId: string;
   planId: string;
@@ -16,7 +16,7 @@ export interface LineNeedInputs {
   approvedAwaitingGrantForLine: number;
 }
 
-/** Computed need and target for one subscription line (`W3-21`). */
+/** Computed need and target for one subscription line. */
 export interface ComputedLineTarget {
   subscriptionLineId: string;
   planId: string;
@@ -53,7 +53,7 @@ export type LineProposalVerdict =
       };
     };
 
-/** `need(L) = heldPastRenewal + pendingContinuations + approvedAwaitingGrant(chooseLine -> L)` (`W3-21`). */
+/** `need(L) = heldPastRenewal + pendingContinuations + approvedAwaitingGrant(chooseLine -> L)`. */
 export function lineNeedOf(
   input: Pick<LineNeedInputs, 'heldPastRenewal' | 'pendingContinuations' | 'approvedAwaitingGrantForLine'>,
 ): number {
@@ -74,7 +74,7 @@ export function shortfallOf(targets: readonly number[], minimumSeatsTotal: numbe
   return Math.max(0, minimumSeatsTotal - sumTarget);
 }
 
-/** Computes per-line needs, targets, and workspace-level `shortfall` (`W3-21`). */
+/** Computes per-line needs, targets, and workspace-level `shortfall`. */
 export function computeLineTargets(
   lines: readonly LineNeedInputs[],
   minimumSeatsTotal: number | null,
@@ -213,7 +213,7 @@ function validateBeforeDeadlineProposal(input: {
   return null;
 }
 
-/** Validates per-line proposed quantities before/on deadline and under R-LATE (`W3-21`). */
+/** Validates per-line proposed quantities before/on deadline and under R-LATE. */
 export function validateProposeLines(input: {
   targets: readonly ComputedLineTarget[];
   shortfall: number;
@@ -273,7 +273,7 @@ export function validateOutcomeLines(
   return mismatches.length > 0 ? { problem: 'QUANTITY_INVALID', details: { lines: mismatches } } : null;
 }
 
-/** Shifts period dates forward by one commitment term for system auto-renewal (`W3-21` Ca B). */
+/** Shifts period dates forward by one commitment term for system auto-renewal (Ca B). */
 function resolveAutoStartDate(
   period: Pick<RenewalPeriodFacts, 'renewalDate' | 'endDate'>,
   adjustmentEnd: BusinessDate,

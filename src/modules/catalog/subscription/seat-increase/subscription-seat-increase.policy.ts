@@ -34,7 +34,7 @@ export function seatIncreaseRecipients(input: {
   return input.superAdmin !== null && input.superAdmin !== input.actor ? [input.superAdmin] : [];
 }
 
-/** True when an active K2 subscription reduces its purchasedQuantity (W3-03). */
+/** True when an active K2 subscription reduces its purchasedQuantity. */
 export function seatReductionNoticeOwed(input: {
   planProvisioningType: ProvisioningType;
   status: SubscriptionStatus;
@@ -51,7 +51,7 @@ export function seatReductionNoticeOwed(input: {
 }
 
 /**
- * Recipients of a K2 seat reduction (W3-03): R1 (usable responsible IT Admin if not actor, else usable Super Admin if
+ * Recipients of a K2 seat reduction: R1 (usable responsible IT Admin if not actor, else usable Super Admin if
  * not actor) plus R2 (usable Finance account if not actor, deduplicated).
  */
 export function seatReductionRecipients(input: {

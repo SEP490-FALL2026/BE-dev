@@ -15,7 +15,7 @@ import {
 } from './subscription.errors';
 import { retryOnWorkspaceMove } from './pool/subscription-pool.service';
 
-/** How the seats are counted does not change once the subscription is active (W3-11). Throws SubscriptionSeatCountingFixedError. */
+/** How the seats are counted does not change once the subscription is active. Throws SubscriptionSeatCountingFixedError. */
 function assertSeatCountingOpen(
   current: SubscriptionRecord,
   requested: SubscriptionRecord['seatCounting'] | undefined,
@@ -196,7 +196,7 @@ export class SubscriptionChangeService {
   }
 
   /**
-   * The locks of a change, in the order of the lock table: the workspaces of a move first (tier 5b, W3-14, N5: read without a lock, lock, lock the
+   * The locks of a change, in the order of the lock table: the workspaces of a move first (tier 5b, N5: read without a lock, lock, lock the
    * period, read again, a subscription that moved meanwhile starts the write again), then the period, then the plan (for writing when this subscription
    * is to price it). Judges how the seats are counted on what is stored under the lock. Throws SubscriptionWorkspaceMovedError,
    * SubscriptionSeatCountingFixedError, SubscriptionPlanNotFoundError.
@@ -217,7 +217,7 @@ export class SubscriptionChangeService {
     return { current, plan };
   }
 
-  /** The workspace the subscription is in is the one read before the locks: else the write starts again (W3-14, N5). */
+  /** The workspace the subscription is in is the one read before the locks: else the write starts again (N5). */
   private assertNotMoved(probe: SubscriptionRecord | null, current: SubscriptionRecord): void {
     if (probe && (current.workspace?.id ?? null) !== (probe.workspace?.id ?? null)) {
       throw new SubscriptionWorkspaceMovedError(current.updatedAt);

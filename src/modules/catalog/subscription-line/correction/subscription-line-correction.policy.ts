@@ -35,7 +35,7 @@ export function assertLineCorrectable(input: {
 }
 
 /**
- * Classifies a `VENDOR_RECORD` correction (`W3-19`):
+ * Classifies a `VENDOR_RECORD` correction:
  * - `delta > 0` without `basis` on `FIXED` -> `outOfProcess = true`, notify Finance + R1
  * - `delta > 0` on `MEMBERS` -> reconciliation without `outOfProcess`
  * - `delta < 0` -> `REDUCE`, notify Finance
@@ -79,7 +79,7 @@ export function vendorCorrectionRecipients(input: {
   return [...recipients];
 }
 
-/** Rejects mid-term seat reduction when `allowsMidTermReduction` is disabled on the period (`W3-19`). */
+/** Rejects mid-term seat reduction when `allowsMidTermReduction` is disabled on the period. */
 export function assertMidTermReductionAllowed(input: { allowsMidTermReduction: boolean }): void {
   if (!input.allowsMidTermReduction) {
     throw new SeatLedgerMidTermReductionNotAllowedError();

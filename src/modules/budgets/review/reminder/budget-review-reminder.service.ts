@@ -12,7 +12,7 @@ import { reviewReminderFor } from '../budget-review.policy';
 import { BudgetReviewRepo } from '../budget-review.repo';
 
 /**
- * What the hourly pass of the review does for Finance and pool owners (`RV-1`, `QĐ-111ae`, R-47, `QĐ-104i`, `W3-06`):
+ * What the hourly pass of the review does for Finance and pool owners (`RV-1`, `QĐ-111ae`, R-47, `QĐ-104i`):
  * asks Finance to close the previous month on the fifth working day, warns Finance when cumulative shared-pool
  * unallocated spend exceeds reserve, reminds heads about overdue explanations, and warns subscription IT Admins when
  * ended-month excess idle seat cost exceeds 10% of paid cost. Each notice carries an idempotent event key.

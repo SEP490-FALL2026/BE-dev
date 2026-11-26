@@ -5,7 +5,7 @@ import { WorkspaceViewService } from '../workspace/workspace-view.service';
 import type { DefaultWorkspaceOfVendor, WorkspaceAdminView } from './workspace.types';
 
 /**
- * What the rest of the application reads of the workspaces the company holds at its vendors (W3-10): who administers one, how many of them work,
+ * What the rest of the application reads of the workspaces the company holds at its vendors: who administers one, how many of them work,
  * who answers for it, and which workspace a vendor offers when a subscription names none. It reads; every write has a route.
  */
 @Injectable()

@@ -99,7 +99,7 @@ export function monthRowsOf(input: {
 }
 
 /**
- * Caps monthly invoice application against a slice's remaining held amount (W3-07 #5, Ca E).
+ * Caps monthly invoice application against a slice's remaining held amount (Ca E).
  */
 export function applyToMonth(input: {
   amountMinor: bigint;
@@ -117,7 +117,7 @@ export function applyToMonth(input: {
 
 /**
  * Spreads month-specific release targets (LATE_GRANT, REVOKED, GRANTED_FROM_POOL, TRANSFER_EFFECTIVE)
- * onto existing slices, capping each month at its remaining held amount (W3-07 F1).
+ * onto existing slices, capping each month at its remaining held amount (F1).
  */
 export function spreadRelease(slices: readonly MonthlySliceState[], targets: readonly MonthTarget[]): SpreadResult {
   const byMonth = new Map(slices.map((s) => [s.month, s]));
@@ -208,7 +208,7 @@ export function settlementOf(slice: { shareMinor: bigint; appliedMinor: bigint; 
 }
 
 /**
- * Derives commitment state after monthly/year-level updates (W3-07 F3 / F3').
+ * Derives commitment state after monthly/year-level updates (F3 / F3').
  */
 export function stateOf(input: { amountMinor: bigint; appliedMinor: bigint; releasedMinor: bigint }): CommitmentState {
   if (input.amountMinor > input.appliedMinor + input.releasedMinor) {

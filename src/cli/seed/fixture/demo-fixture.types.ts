@@ -124,9 +124,9 @@ export interface DemoSubscription {
   key: string;
   /** Single plan key (omitted when `lines` declares one or more lines). */
   plan?: string;
-  /** Multi-line declaration on `POST /subscriptions` (`W3-15`, `W3-28`). */
+  /** Multi-line declaration on `POST /subscriptions`. */
   lines?: DemoSubscriptionLine[];
-  /** A period of the shared pool. A purchase made once (K4) is a lot (`DemoLot`), never a subscription (W3-24, W3-27). */
+  /** A period of the shared pool. A purchase made once (K4) is a lot (`DemoLot`), never a subscription. */
   kind: 'TERM';
   /** The price of one seat for one billing period, in dong (`QĐ-111an`). Omitted when `lines` specifies per-line monthly prices. */
   unitPrice?: { amount: string; currency: 'VND' };
@@ -472,7 +472,7 @@ export interface DemoFixture {
   approvalRoles: { SPENDING_APPROVER: string };
   applications: DemoApplication[];
   subscriptions: DemoSubscription[];
-  /** The lots of licenses of the K4 plans, bought through `POST /license-lots` (W3-24). */
+  /** The lots of licenses of the K4 plans, bought through `POST /license-lots`. */
   lots: DemoLot[];
   seats: DemoSeat[];
   /** The terms IT recorded for some plans; the others have none yet (the warning of a review due). */

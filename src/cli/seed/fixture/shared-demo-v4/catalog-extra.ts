@@ -202,7 +202,7 @@ export const EXTRA_SUBSCRIPTIONS: DemoSubscription[] = [
 ];
 
 /**
- * The lots of licenses of the K4 plans of this file, made through `POST /license-lots` (W3-24, W3-28). Windows 11 Pro OEM has none: its key comes with the
+ * The lots of licenses of the K4 plans of this file, made through `POST /license-lots`. Windows 11 Pro OEM has none: its key comes with the
  * machine (`DEVICE_BUNDLED`).
  */
 export const EXTRA_LOTS: DemoLot[] = [

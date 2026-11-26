@@ -33,11 +33,11 @@ export type RenewalProblem =
   | 'PERIOD_REFUSED'
   /** A result with no new period leaves the period with no way to be recorded: a renewal, a reduction or an increase carries it (`A1C-03`). */
   | 'NEXT_PERIOD_REQUIRED'
-  /** Per-line proposed quantity does not match the line target before deadline (`W3-21`). */
+  /** Per-line proposed quantity does not match the line target before deadline. */
   | 'LINE_QUANTITY_NOT_TARGET'
-  /** Annual commitment period cannot reduce seats below deadline seat count after deadline (`W3-21`, R-LATE). */
+  /** Annual commitment period cannot reduce seats below deadline seat count after deadline (R-LATE). */
   | 'REDUCTION_AFTER_DEADLINE'
-  /** Multi-line period renewal proposal must submit `lines[]` instead of legacy `proposedQuantity` (`W3-21`). */
+  /** Multi-line period renewal proposal must submit `lines[]` instead of legacy `proposedQuantity`. */
   | 'LINES_REQUIRED';
 
 /** A request about the renewal of a subscription was refused; nothing is written. */

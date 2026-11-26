@@ -27,7 +27,7 @@ export interface LicenseLotStockItem {
 }
 
 /**
- * Public catalog facade for K4 license-lot stock, selection (`W3-24`, `F11`), and G1 vacancies (`W3-26`).
+ * Public catalog facade for K4 license-lot stock, selection (`F11`), and G1 vacancies.
  */
 @Injectable()
 export class LicenseLotStockApi {

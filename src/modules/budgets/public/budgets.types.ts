@@ -48,7 +48,7 @@ export interface CommitmentHoldInput {
    * for a price that is not by the month (a one-time price), whose commitment is never released by day.
    */
   seatMonthlyMinor?: bigint | null;
-  /** Monthly seat counts for K2 commitments (`W3-07`); omitted or empty for K1/K4. */
+  /** Monthly seat counts for K2 commitments; omitted or empty for K1/K4. */
   months?: readonly MonthSliceInput[];
 }
 
@@ -70,7 +70,7 @@ export interface YearStartHoldInput {
     amountMinor: bigint;
     /** What one seat costs a month, kept for the release by day of a later slice. */
     seatMonthlyMinor: bigint;
-    /** Monthly seat counts for K2 commitments (`W3-07`); omitted or empty for K1/K4. */
+    /** Monthly seat counts for K2 commitments; omitted or empty for K1/K4. */
     months?: readonly MonthSliceInput[];
   }[];
 }

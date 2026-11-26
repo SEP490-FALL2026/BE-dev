@@ -290,7 +290,7 @@ export function carriedOverByCostCenter(
   return totals;
 }
 
-/** Monthly seat counts in `year` from 01/01 through each counted seat's end month (`W3-07` for K2). */
+/** Monthly seat counts in `year` from 01/01 through each counted seat's end month (for K2). */
 export function yearStartMonthsOf(input: {
   year: number;
   seats: readonly YearStartSeat[];

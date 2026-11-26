@@ -7,7 +7,7 @@ import type { SharedPoolVacancy } from '../public/licensing-ghost-seat.types';
 import { SharedPoolCapacityRepo } from './shared-pool-capacity.repo';
 
 /**
- * The seats bought and taken of every subscription that grants seats on a day (`INV-01`) plus free `ACCOUNT` license lots (`W3-26`):
+ * The seats bought and taken of every subscription that grants seats on a day (`INV-01`) plus free `ACCOUNT` license lots:
  * subscriptions read catalog + occupancy; K4 `ACCOUNT` lots with `free > 0` come from `LicenseLotStockApi`.
  */
 @Injectable()

@@ -1,6 +1,5 @@
 import {
   LicenseLotContractReasonRequiredError,
-  LicenseLotKeysExceedLicensesError,
   LicenseLotPlanNotK4Error,
   LicenseLotPriceLockedError,
   LicenseLotPurposeNotAvailableError,
@@ -9,10 +8,8 @@ import {
 } from './license-lot.errors';
 import {
   assertCreatable,
-  assertKeysWithinLicenses,
   assertLotVendorAdminsRecorded,
   assertPriceOpen,
-  costBorneOf,
   freeOf,
   grantableOf,
   judgeContractChange,
@@ -76,27 +73,6 @@ describe('the price of a lot and its keys', () => {
     expect(() => assertPriceOpen({ invoiceActualMinor: null, keysAssigned: 0 })).not.toThrow();
     expect(() => assertPriceOpen({ invoiceActualMinor: 1n, keysAssigned: 0 })).toThrow(LicenseLotPriceLockedError);
     expect(() => assertPriceOpen({ invoiceActualMinor: null, keysAssigned: 1 })).toThrow(LicenseLotPriceLockedError);
-  });
-
-  it('holds no more keys than licenses for a plan bound to an account, and no limit for a key on a machine (K-A6)', () => {
-    expect(() =>
-      assertKeysWithinLicenses({ keyBinding: 'ACCOUNT', licenseCount: 3, keysNotWithdrawn: 2, adding: 1 }),
-    ).not.toThrow();
-    expect(() =>
-      assertKeysWithinLicenses({ keyBinding: 'ACCOUNT', licenseCount: 3, keysNotWithdrawn: 3, adding: 1 }),
-    ).toThrow(LicenseLotKeysExceedLicensesError);
-    expect(() =>
-      assertKeysWithinLicenses({ keyBinding: 'DEVICE_KEY', licenseCount: 3, keysNotWithdrawn: 30, adding: 10 }),
-    ).not.toThrow();
-  });
-
-  it('bears the cost of every key but the ones bought for a request', () => {
-    expect([costBorneOf('REQUEST'), costBorneOf('OPENING'), costBorneOf('REPLACEMENT'), costBorneOf('STOCK')]).toEqual([
-      false,
-      true,
-      true,
-      true,
-    ]);
   });
 
   it('says what is free and worth: a lot of 3 with 1 taken and 1 key in the store has 2 free and 1 to grant', () => {

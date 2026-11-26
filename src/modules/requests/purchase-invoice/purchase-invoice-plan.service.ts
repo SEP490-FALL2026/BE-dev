@@ -60,7 +60,7 @@ export class PurchaseInvoicePlanService {
     private readonly finance: FinanceApi,
   ) {}
 
-  /** Resolves license-lot allocation month & active beneficiary count when Finance confirms a lot invoice (`W3-25`). */
+  /** Resolves license-lot allocation month & active beneficiary count when Finance confirms a lot invoice. */
   async lotConfirmationContextOf(
     row: { linkKind: string; licenseLotId: string | null; requestId: string | null },
     now: Date,

@@ -66,7 +66,7 @@ function activeDatesInMonth(
 }
 
 /**
- * Seats missed at the prior adjustment point for one line (`W3-22`): `max(0, seats(L, periodStart) - priorLockedTarget)`.
+ * Seats missed at the prior adjustment point for one line: `max(0, seats(L, periodStart) - priorLockedTarget)`.
  * Member-counted (`MEMBERS`) subscriptions never record missed adjustment seats (`0`).
  */
 export function missedSeatsOf(input: MissedSeatsInput): number {
@@ -102,7 +102,7 @@ export function resolvePriorLockedTarget(
 }
 
 /**
- * Computes incremental monthly `KPI-4` (`Σ_d missedIdle(d) / D` seat-months and VND cost) for one subscription line (`W3-22`).
+ * Computes incremental monthly `KPI-4` (`Σ_d missedIdle(d) / D` seat-months and VND cost) for one subscription line.
  * Member-counted (`MEMBERS`) subscriptions always yield `0` seat-months and `0n`.
  */
 export function lineMonthKpi4(input: LineMonthKpi4Input): MonthKpi4Result {

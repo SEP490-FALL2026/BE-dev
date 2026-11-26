@@ -43,7 +43,7 @@ export class RenewalAlertsService {
     private readonly workspaceAdmins: WorkspaceAdminAlertService,
   ) {}
 
-  /** Emits `WORKSPACE_ADMIN_NOT_WORKING` once per `(workspace, admin)` during the hourly renewal sweep (W3-12). */
+  /** Emits `WORKSPACE_ADMIN_NOT_WORKING` once per `(workspace, admin)` during the hourly renewal sweep. */
   sweepWorkspaceAdmins(organizationId: string): Promise<number> {
     return this.workspaceAdmins.sweep(organizationId);
   }

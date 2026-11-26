@@ -38,7 +38,7 @@ export type TermKind = 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
 /** The most months a request for `K1` asks for: a plan bought by the month is not a plan to keep (`QĐ-106b`, `QĐ-111i`). */
 export const K1_TERM_LIMIT_MONTHS = 9;
 
-/** The fixed commitment length in months for an annual K1 plan (`QĐ-116d`, `W3-17`). */
+/** The fixed commitment length in months for an annual K1 plan (`QĐ-116d`). */
 export const K1_ANNUAL_COMMITMENT_MONTHS = 12;
 
 /** Why the time of use a request gives is refused (`QĐ-111i`, `FR-2.8`, `INV-07`). */

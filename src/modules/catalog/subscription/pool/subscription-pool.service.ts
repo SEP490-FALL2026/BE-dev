@@ -39,7 +39,7 @@ import type {
   SubscriptionState,
 } from '../subscription.types';
 
-/** How many times a write whose workspace moved under it starts again before it says the subscription is stale (W3-14, N5). */
+/** How many times a write whose workspace moved under it starts again before it says the subscription is stale (N5). */
 const WORKSPACE_MOVE_TRIES = 3;
 
 /**
@@ -64,7 +64,7 @@ export interface PoolChangeInput {
   commitmentTermMonths?: CommitmentTermMonths;
   responsibleItAdminEmployeeId?: string;
   isPrimaryForPlan?: boolean;
-  /** How the seats are counted and the payment day: a write that names them is judged by the members rules (W3-11). */
+  /** How the seats are counted and the payment day: a write that names them is judged by the members rules. */
   seatCounting?: SeatCounting;
   renewalDate?: string | null;
   workspaceId?: string;
@@ -99,7 +99,7 @@ export class SubscriptionPoolService {
   ) {}
 
   /**
-   * The workspace a subscription of this plan is held in, locked for the rest of the transaction (W3-11, W3-14): the one named, else the default
+   * The workspace a subscription of this plan is held in, locked for the rest of the transaction: the one named, else the default
    * of the vendor for a plan the company administers there. Taken before the plan and the period are locked. Throws WorkspaceNotFoundError,
    * WorkspaceVendorMismatchError and WorkspaceRequiredError.
    */
@@ -204,7 +204,7 @@ export class SubscriptionPoolService {
 
   /**
    * A plan the company administers at the vendor (K2, or K4 with an admin console) needs at least two working IT Admins recorded on its
-   * workspace before a new subscription of it becomes active (`QĐ-110k`, `QĐ-110u`, `QĐ-114ae`, W3-12). While the seat baseline phase is open
+   * workspace before a new subscription of it becomes active (`QĐ-110k`, `QĐ-110u`, `QĐ-114ae`). While the seat baseline phase is open
    * the gate lets it through with a flag on the read. Throws SubscriptionVendorAdminsRequiredError.
    */
   async assertVendorAdmins(
@@ -227,7 +227,7 @@ export class SubscriptionPoolService {
   }
 
   /**
-   * The rules of the shared pool on an update (`QĐ-103e`, R-E01, R-G01, `QĐ-115g`, W3-14): activating a draft checks the whole state;
+   * The rules of the shared pool on an update (`QĐ-103e`, R-E01, R-G01, `QĐ-115g`): activating a draft checks the whole state;
    * an update to an already active subscription only checks the commitment, cycle, and member rules when it touches them, and checks for
    * a duplicate live subscription in the destination workspace when `workspaceId` changes.
    */
@@ -257,7 +257,7 @@ export class SubscriptionPoolService {
   }
 
   /**
-   * No second live subscription of a K2 or K4 plan in the same workspace, even while the seat baseline phase is open (`QĐ-116ag`, W3-14).
+   * No second live subscription of a K2 or K4 plan in the same workspace, even while the seat baseline phase is open (`QĐ-116ag`).
    * The caller holds the workspace `FOR UPDATE` (tier 5b) and the plan `FOR UPDATE` / `FOR SHARE`, so concurrent writes serialize cleanly.
    * Throws SubscriptionDuplicatePlanError.
    */

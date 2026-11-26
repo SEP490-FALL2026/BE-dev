@@ -29,7 +29,7 @@ export interface PoolTermsInput {
   activating: boolean;
   /** The subscription stays active after this write (including updates on an already active subscription). */
   active?: boolean;
-  /** How the seats are counted and the payment day of a subscription counted by its members (W3-11); left out, the rules of a fixed count apply. */
+  /** How the seats are counted and the payment day of a subscription counted by its members; left out, the rules of a fixed count apply. */
   seatCounting?: SeatCounting | undefined;
   renewalDate?: string | null | undefined;
 }
@@ -274,7 +274,7 @@ export function liveIdsByPlan(rows: readonly LivenessFacts[], today: string): Ma
 const workspacePlanKey = (workspaceId: string | null | undefined, planId: string): string =>
   `${workspaceId ?? ''}:${planId}`;
 
-/** The live subscriptions keyed by `(workspaceId, planId)`, each list in the order given (W3-14). */
+/** The live subscriptions keyed by `(workspaceId, planId)`, each list in the order given. */
 export function liveIdsByWorkspacePlan(rows: readonly LivenessFacts[], today: string): Map<string, string[]> {
   const live = new Map<string, string[]>();
   for (const row of rows) {
@@ -286,7 +286,7 @@ export function liveIdsByWorkspacePlan(rows: readonly LivenessFacts[], today: st
   return live;
 }
 
-/** The other live subscriptions of `(workspaceId, planId)` than `selfId` (W3-14). */
+/** The other live subscriptions of `(workspaceId, planId)` than `selfId`. */
 export function liveWorkspaceSiblingsOf(
   live: ReadonlyMap<string, readonly string[]>,
   workspaceId: string | null | undefined,

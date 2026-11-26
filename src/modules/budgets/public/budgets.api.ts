@@ -189,7 +189,7 @@ export class BudgetsApi {
     return this.lotCosts.chargedExcessCountsOfLots(lotIds, tx);
   }
 
-  /** Records excess-license charge or own-request hold (`F10`) when a K4 key from a lot is granted (`W3-25`). */
+  /** Records excess-license charge or own-request hold (`F10`) when a K4 key from a lot is granted. */
   recordExcessLotLicenseGrant(tx: DbTx, input: ExcessLicenseGrantInput): Promise<ExcessLicenseGrantRecorded> {
     return this.lotCosts.recordExcessLicenseGrant(tx, input);
   }

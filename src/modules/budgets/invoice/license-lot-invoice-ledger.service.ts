@@ -24,7 +24,7 @@ export interface InvoiceMeta {
 }
 
 /**
- * Budget-ledger writer for K4 license-lot invoices and post-invoice group withdrawals (`W3-25`, `F13c`, `D-16`).
+ * Budget-ledger writer for K4 license-lot invoices and post-invoice group withdrawals (`F13c`, `D-16`).
  * Lives in `invoice/` so `shared-pool-line/` never depends on `invoice/`.
  */
 @Injectable()

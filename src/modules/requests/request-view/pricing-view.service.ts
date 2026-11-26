@@ -103,7 +103,7 @@ export class PricingViewService {
     private readonly poolStock?: LicensingPoolStockApi,
   ) {}
 
-  /** Computes `vendorChargeUntilRenewal` (`W3-20`) at read time when commitment is 12 and `free === 0`. */
+  /** Computes `vendorChargeUntilRenewal` at read time when commitment is 12 and `free === 0`. */
   async vendorChargeUntilRenewalOf(planId: string | null): Promise<VendorChargeUntilRenewalView | undefined> {
     if (!planId || !this.poolStock) return undefined;
     const context = await this.poolStock.getVendorChargeContext(planId);

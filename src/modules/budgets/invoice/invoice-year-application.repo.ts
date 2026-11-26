@@ -45,7 +45,7 @@ const toRecord = (row: Row): InvoiceYearApplicationRecord => ({
 
 /**
  * The one writer of `invoice_year_applications`: what an invoice was applied to a Cost Center for in a year, as rows that are added and never changed
- * (a trigger). The sum by invoice, year and Cost Center is the amount applied, the source of the rule of the pair of invoice and year (W3-26).
+ * (a trigger). The sum by invoice, year and Cost Center is the amount applied, the source of the rule of the pair of invoice and year.
  */
 @Injectable()
 export class InvoiceYearApplicationRepo {

@@ -9,7 +9,7 @@ export interface SharedPoolVacancy {
   provisioningType: ProvisioningKind;
   /** Null while the plan has no pricing model; `K4` `ACCOUNT` allows `PER_SEAT` or `null`. */
   pricingModel: 'PER_SEAT' | 'FLAT_RATE' | 'CONCURRENT' | 'CONSUMPTION' | 'PER_HOST' | null;
-  /** Whether this vacancy represents a subscription or a K4 license lot (`W3-26`). Defaults to `'SUBSCRIPTION'`. */
+  /** Whether this vacancy represents a subscription or a K4 license lot. Defaults to `'SUBSCRIPTION'`. */
   subjectKind?: 'SUBSCRIPTION' | 'LICENSE_LOT';
   /** Key binding for `K4` (`ACCOUNT` only for ghost seats). */
   keyBinding?: 'ACCOUNT' | 'DEVICE_KEY' | 'DEVICE_BUNDLED' | null;

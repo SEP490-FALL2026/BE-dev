@@ -150,7 +150,7 @@ function tallyFifoTasks(
 }
 
 /**
- * Selects the `ACCOUNT` lot a grant should take a license from (`W3-24`, `F11`):
+ * Selects the `ACCOUNT` lot a grant should take a license from (`F11`):
  * - If the request owns a `REQUEST` lot, it ONLY uses that lot (never falls back to another lot).
  * - Otherwise picks oldest grantable lot by `(purchasedOn ASC, id ASC)`, skipping `REQUEST` lots of other requests
  *   when `excessGrantable <= 0` (`RESERVED_FOR_REQUEST`).

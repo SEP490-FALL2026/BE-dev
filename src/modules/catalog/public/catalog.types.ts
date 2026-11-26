@@ -25,7 +25,7 @@ export interface OpenSeatHolding {
 export interface SeatTarget {
   kind: 'SUBSCRIPTION' | 'PLAN';
   subscriptionId: string | null;
-  /** The lot id when targeting a K4 license lot (`W3-24`); null/undefined otherwise. */
+  /** The lot id when targeting a K4 license lot; null/undefined otherwise. */
   licenseLotId?: string | null;
   /** The subscription line serving `servingOn` for K2 targets; null for PLAN, K1, K4, or when no line serves that day. */
   subscriptionLineId?: string | null;
@@ -39,7 +39,7 @@ export interface SeatTarget {
   keyBinding: 'ACCOUNT' | 'DEVICE_KEY' | 'DEVICE_BUNDLED' | null;
   /** Reference commitment months on a K1/K2 plan (`1 | 12`), or null when unset or for other kinds. */
   referenceCommitmentMonths?: 1 | 12 | null;
-  /** Plan reference monthly unit price in minor units of dong (`W3-17` / `QĐ-113a`), or null when unset. */
+  /** Plan reference monthly unit price in minor units of dong (`QĐ-113a`), or null when unset. */
   monthlyUnitPriceMinor?: bigint | null;
   /** Whether the application of the plan is still in the catalog; a retired one takes no seat. */
   applicationStatus: 'APPROVED' | 'RETIRED';
@@ -197,7 +197,7 @@ export interface WorkspaceDuty {
   role: 'PRIMARY_OWNER' | 'OWNER' | 'ADMIN';
   /** The plan declares an emergency account: only that it exists, never its name, its holder or any secret. */
   emergencyAccountDeclared: boolean;
-  /** The workspace the duty is held in (W3-10): the plan above is the one it is known by. */
+  /** The workspace the duty is held in: the plan above is the one it is known by. */
   workspace?: {
     id: string;
     name: string;

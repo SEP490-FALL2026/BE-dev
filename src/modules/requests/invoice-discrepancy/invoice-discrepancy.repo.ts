@@ -141,7 +141,7 @@ export class InvoiceDiscrepancyRepo {
     });
   }
 
-  /** Recorded budget invoice link & label for deferred realised-saving evaluation (`W3-09`). */
+  /** Recorded budget invoice link & label for deferred realised-saving evaluation. */
   findInvoiceMeta(tx: DbTx, purchaseInvoiceId: string): Promise<{ invoiceId: string | null; label: string } | null> {
     return tx.purchaseInvoice.findUnique({
       where: { id: purchaseInvoiceId },

@@ -386,7 +386,7 @@ export class PersonnelNotifier {
 
   /**
    * Notifies the usable IT Admin responsible for `workspaceId` (if different from `employeeId`), or the usable Super Admin fallback,
-   * once per `(workspace, admin)` when an administrator stops working (W3-12).
+   * once per `(workspace, admin)` when an administrator stops working.
    */
   async workspaceAdminNotWorking(
     tx: DbTx,

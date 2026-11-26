@@ -62,7 +62,7 @@ export class SharedPoolCapacityRepo {
 
   /**
    * Peak occupancy from `today` on scoped to `(subscription_id, plan_id)` so multi-plan period rows count each
-   * plan line's assignments separately (`W3-15`, `W3-16`).
+   * plan line's assignments separately.
    */
   occupancyOfPlan(
     tx: DbTx,

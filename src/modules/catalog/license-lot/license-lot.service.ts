@@ -14,7 +14,7 @@ import type { LicenseLotChanges, LicenseLotDetail, LicenseLotRecord, UpdateLicen
 import { LicenseLotViewService } from './license-lot-view.service';
 
 /**
- * The lots of licenses of a K4 plan once made (W3-24; `LicenseLotCreateService` makes them): changed (contract, note, price) only by the IT Admin who answers for the lot, read in pages.
+ * The lots of licenses of a K4 plan once made (`LicenseLotCreateService` makes them): changed (contract, note, price) only by the IT Admin who answers for the lot, read in pages.
  *
  * Lock order: a change locks the lot `FOR UPDATE` (6a) and nothing else. One audit event for each write.
  */
