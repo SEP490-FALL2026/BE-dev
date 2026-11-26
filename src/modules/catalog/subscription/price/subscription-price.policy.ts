@@ -79,6 +79,30 @@ export interface PlanPriceFacts {
   source: 'SUBSCRIPTION' | 'PLAN_REFERENCE';
 }
 
+export function subscriptionPlanPriceOf(priced: {
+  subscriptionKind: string;
+  provisioningType: 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
+  referenceCommitmentMonths: 1 | 12 | null;
+  unitPriceMinor: bigint;
+  currency: string;
+  reporting: Money | null;
+  monthlyUnitPriceMinor?: bigint | null;
+  billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER';
+  allowsMidTermReduction: boolean;
+}): PlanPriceFacts {
+  return {
+    kind: priced.subscriptionKind === 'PERPETUAL' ? 'ONE_TIME' : 'RECURRING',
+    provisioningType: priced.provisioningType,
+    referenceCommitmentMonths: priced.referenceCommitmentMonths,
+    unitPrice: { amountMinor: priced.unitPriceMinor, currency: priced.currency },
+    reportingUnitPrice: priced.reporting,
+    monthlyPriceMinor: monthlyPriceOf({ monthlyUnitPriceMinor: priced.monthlyUnitPriceMinor ?? null }),
+    billingCycle: priced.billingCycle,
+    allowsMidTermReduction: priced.allowsMidTermReduction,
+    source: 'SUBSCRIPTION',
+  };
+}
+
 /**
  * The cycle a reference price is counted by (`QĐ-113a`): K1 and K2 give the price of one seat for one month, K4 the price of one purchase; any other
  * kind has no reference price. It is what the catalog of requestable software counts as a price that exists.

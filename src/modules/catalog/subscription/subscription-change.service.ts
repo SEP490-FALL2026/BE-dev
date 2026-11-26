@@ -68,7 +68,7 @@ export class SubscriptionChangeService {
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
     private readonly guard: SubscriptionChangeGuard,
-    private readonly periodLines?: SubscriptionPeriodLinesService,
+    private readonly periodLines: SubscriptionPeriodLinesService,
   ) {}
 
   /**
@@ -181,7 +181,7 @@ export class SubscriptionChangeService {
     current: SubscriptionRecord,
     updated: SubscriptionRecord,
   ): Promise<void> {
-    if (!this.periodLines || updated.planProvisioningType !== 'K2' || updated.kind !== 'TERM') return;
+    if (updated.planProvisioningType !== 'K2' || updated.kind !== 'TERM') return;
     if (current.status === 'DRAFT' && updated.status === 'ACTIVE') {
       await this.periodLines.activatePeriod(tx, updated, actor.employeeId);
       return;

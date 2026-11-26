@@ -1,4 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
@@ -87,12 +87,12 @@ export class SeatTargetService {
     private readonly lines: SubscriptionLineRepo,
     private readonly ledger: SubscriptionLineSeatsService,
     private readonly organizationReads: OrganizationReadApi,
-    @Optional() private readonly lots?: LicenseLotRepo,
+    private readonly lots: LicenseLotRepo,
   ) {}
 
   async find(ref: SeatTargetRef, tx?: DbTx): Promise<SeatTarget | null> {
     if ('licenseLotId' in ref) {
-      const lot = await this.lots?.find(ref.licenseLotId, tx);
+      const lot = await this.lots.find(ref.licenseLotId, tx);
       if (!lot) return null;
       const [plan] = await this.plans.lookups([ref.planId ?? lot.planId], tx);
 
@@ -117,7 +117,7 @@ export class SeatTargetService {
   async lock(tx: DbTx, ref: SeatTargetRef): Promise<SeatTarget | null> {
     if ('licenseLotId' in ref) {
       // K4 lot lock (tier 6a) strictly precedes plan FOR SHARE lock (tier 7).
-      const lot = await this.lots?.lock(tx, ref.licenseLotId);
+      const lot = await this.lots.lock(tx, ref.licenseLotId);
       if (!lot) return null;
       const plan = await this.plans.lockShared(tx, ref.planId ?? lot.planId);
 
@@ -147,7 +147,7 @@ export class SeatTargetService {
 
       return plan ? ofPlan(plan) : null;
     }
-    if (subscription.planProvisioningType === 'K4' && this.lots) {
+    if (subscription.planProvisioningType === 'K4') {
       const target = await this.resolveK4LotTarget(subscription.id, targetPlanId, locked, tx);
       if (target !== undefined) return target;
     }
@@ -171,7 +171,6 @@ export class SeatTargetService {
     locked: boolean,
     tx?: DbTx,
   ): Promise<SeatTarget | null | undefined> {
-    if (!this.lots) return undefined;
     const lot = locked && tx ? await this.lots.lock(tx, lotId) : await this.lots.find(lotId, tx);
     if (!lot) return undefined;
     const plan = await this.loadPlan(targetPlanId, locked, tx);

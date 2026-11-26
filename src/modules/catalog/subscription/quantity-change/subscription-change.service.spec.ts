@@ -1,6 +1,7 @@
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { LockedPlan } from '../../plan/plan-facts.service';
+import type { SubscriptionPeriodLinesService } from '../../subscription-line/subscription-period-lines.service';
 import { SubscriptionChangeService } from '../subscription-change.service';
 import { SubscriptionPrimaryRetiredError, SubscriptionUpdateEmptyError } from '../subscription.errors';
 import { toSubscriptionApiException } from '../subscription.http-errors';
@@ -126,6 +127,11 @@ function makeSut(stored: SubscriptionRecord = makeRecord()) {
     tellSeatReduction: jest.fn().mockResolvedValue(undefined),
   };
 
+  const periodLines = {
+    activatePeriod: jest.fn().mockResolvedValue(undefined),
+    syncDraftUpdate: jest.fn().mockResolvedValue(undefined),
+  };
+
   const service = new SubscriptionChangeService(
     subscriptions as never,
     plans as never,
@@ -134,6 +140,7 @@ function makeSut(stored: SubscriptionRecord = makeRecord()) {
     audit as never,
     runner as never,
     guard as never,
+    periodLines as unknown as SubscriptionPeriodLinesService,
   );
 
   return { service, subscriptions, plans, recordAudit, runner, guard };

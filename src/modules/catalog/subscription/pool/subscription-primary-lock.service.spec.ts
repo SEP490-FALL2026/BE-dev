@@ -2,6 +2,7 @@ import type { AuthenticatedPrincipal } from '../../../../infrastructure/security
 import type { TransactionRunner } from '../../../../infrastructure/database/transaction-runner';
 import type { AuditApi } from '../../../audit/public/audit.api';
 import type { PlanFactsService } from '../../plan/plan-facts.service';
+import type { SubscriptionPeriodLinesService } from '../../subscription-line/subscription-period-lines.service';
 import type { SubscriptionPoolService } from './subscription-pool.service';
 import { SubscriptionChangeGuard } from '../subscription-change-guard.service';
 import { SubscriptionChangeService } from '../subscription-change.service';
@@ -89,6 +90,7 @@ describe('Subscription primary lock order', () => {
         audit,
         runner,
         makeGuard(),
+        { activatePeriod: jest.fn(), syncDraftUpdate: jest.fn() } as unknown as SubscriptionPeriodLinesService,
       );
 
       await expect(service.update(actor, 'sub-1', { isPrimaryForPlan: true }, updatedAt)).rejects.toBeInstanceOf(
@@ -112,6 +114,7 @@ describe('Subscription primary lock order', () => {
         audit,
         runner,
         makeGuard(),
+        { activatePeriod: jest.fn(), syncDraftUpdate: jest.fn() } as unknown as SubscriptionPeriodLinesService,
       );
 
       await service.update(actor, 'sub-1', { autoRenew: true }, stored().updatedAt);

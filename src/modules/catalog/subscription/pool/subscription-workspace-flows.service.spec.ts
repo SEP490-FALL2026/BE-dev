@@ -2,6 +2,7 @@ import type { TransactionRunner } from '../../../../infrastructure/database/tran
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { AuditApi } from '../../../audit/public/audit.api';
 import type { PlanFactsService } from '../../plan/plan-facts.service';
+import type { SubscriptionPeriodLinesService } from '../../subscription-line/subscription-period-lines.service';
 import { SubscriptionSeatCountingFixedError, SubscriptionStaleError } from '../subscription.errors';
 import type { SubscriptionRepo } from '../subscription.repo';
 import type { SubscriptionRecord } from '../subscription.types';
@@ -116,6 +117,7 @@ describe('SubscriptionChangeService: the workspace of a subscription (W3-11, W3-
       { record: jest.fn() } as unknown as AuditApi,
       runner,
       guard,
+      { activatePeriod: jest.fn(), syncDraftUpdate: jest.fn() } as unknown as SubscriptionPeriodLinesService,
     );
 
     return {

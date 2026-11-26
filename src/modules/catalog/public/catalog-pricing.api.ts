@@ -4,7 +4,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { SubscriptionPeriodRepo } from '../subscription/period/subscription-period.repo';
 import { toSubscriptionPurchaseFacts } from '../subscription/period/subscription-purchase-facts.mapper';
 import { PlanReferencePriceRepo } from '../subscription/price/plan-reference-price.repo';
-import { SubscriptionPriceService } from '../subscription/price/subscription-price.service';
+import { CatalogPlanPriceService } from '../subscription/price/catalog-plan-price.service';
 import { SubscriptionRepo } from '../subscription/subscription.repo';
 import type { SubscriptionPurchaseFacts } from './subscription-period.types';
 
@@ -12,7 +12,7 @@ import type { SubscriptionPurchaseFacts } from './subscription-period.types';
 @Injectable()
 export class CatalogPricingApi {
   constructor(
-    private readonly prices: SubscriptionPriceService,
+    private readonly prices: CatalogPlanPriceService,
     private readonly subscriptions: SubscriptionRepo,
     private readonly periods: SubscriptionPeriodRepo,
     private readonly references: PlanReferencePriceRepo,

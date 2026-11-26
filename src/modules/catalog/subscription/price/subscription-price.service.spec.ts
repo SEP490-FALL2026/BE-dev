@@ -4,6 +4,12 @@ import type { SubscriptionRepo } from '../subscription.repo';
 import type { PlanReferencePriceRepo } from './plan-reference-price.repo';
 import { SubscriptionPriceService } from './subscription-price.service';
 
+const noLotStock = (): LicenseLotStockService =>
+  ({
+    newestFreeLotUnitPrice: jest.fn().mockResolvedValue(null),
+    plansWithFreeLot: jest.fn().mockResolvedValue(new Set<string>()),
+  }) as unknown as LicenseLotStockService;
+
 describe('BR-MF1-06 shared catalog price facts', () => {
   it.each([
     ['TERM', 'RECURRING', 100n],
@@ -24,7 +30,8 @@ describe('BR-MF1-06 shared catalog price facts', () => {
       });
       const service = new SubscriptionPriceService(
         { findPricedOfPlan } as unknown as SubscriptionRepo,
-        {} as PlanReferencePriceRepo,
+        { findPlanProvisioningType: jest.fn().mockResolvedValue('K2') } as unknown as PlanReferencePriceRepo,
+        noLotStock(),
       );
       const tx = {} as DbTx;
       expect(await service.priceOfPlan('plan', tx)).toEqual({
@@ -45,7 +52,11 @@ describe('BR-MF1-06 shared catalog price facts', () => {
   it('keeps an absent price absent when the plan has no reference price either', async () => {
     const service = new SubscriptionPriceService(
       { findPricedOfPlan: jest.fn().mockResolvedValue(null) } as unknown as SubscriptionRepo,
-      { findOfPlan: jest.fn().mockResolvedValue(null) } as unknown as PlanReferencePriceRepo,
+      {
+        findPlanProvisioningType: jest.fn().mockResolvedValue('K2'),
+        findOfPlan: jest.fn().mockResolvedValue(null),
+      } as unknown as PlanReferencePriceRepo,
+      noLotStock(),
     );
     expect(await service.priceOfPlan('plan')).toBeNull();
   });
@@ -64,7 +75,11 @@ describe('BR-MF1-06 shared catalog price facts', () => {
             allowsMidTermReduction: true,
           }),
         } as unknown as SubscriptionRepo,
-        { findOfPlan: findPlanReferencePrice } as unknown as PlanReferencePriceRepo,
+        {
+          findPlanProvisioningType: jest.fn().mockResolvedValue('K2'),
+          findOfPlan: findPlanReferencePrice,
+        } as unknown as PlanReferencePriceRepo,
+        noLotStock(),
       );
 
       const price = await service.priceOfPlan('plan');
@@ -84,7 +99,11 @@ describe('BR-MF1-06 shared catalog price facts', () => {
       });
       const service = new SubscriptionPriceService(
         { findPricedOfPlan: jest.fn().mockResolvedValue(null) } as unknown as SubscriptionRepo,
-        { findOfPlan: findPlanReferencePrice } as unknown as PlanReferencePriceRepo,
+        {
+          findPlanProvisioningType: jest.fn().mockResolvedValue('K2'),
+          findOfPlan: findPlanReferencePrice,
+        } as unknown as PlanReferencePriceRepo,
+        noLotStock(),
       );
 
       expect(await service.priceOfPlan('plan', tx)).toEqual({
@@ -108,6 +127,7 @@ describe('BR-MF1-06 shared catalog price facts', () => {
       const service = new SubscriptionPriceService(
         { findPricedOfPlan: jest.fn().mockResolvedValue(null) } as unknown as SubscriptionRepo,
         { findOfPlan: findPlanReferencePrice } as unknown as PlanReferencePriceRepo,
+        noLotStock(),
       );
 
       expect(await service.subscriptionPriceOfPlan('plan')).toBeNull();
@@ -118,8 +138,10 @@ describe('BR-MF1-06 shared catalog price facts', () => {
       const service = new SubscriptionPriceService(
         { findPricedOfPlan: jest.fn().mockResolvedValue(null) } as unknown as SubscriptionRepo,
         {
+          findPlanProvisioningType: jest.fn().mockResolvedValue('K4'),
           findOfPlan: jest.fn().mockResolvedValue({ provisioningType: 'K4', amountMinor: 9_000_000n, currency: 'VND' }),
         } as unknown as PlanReferencePriceRepo,
+        noLotStock(),
       );
 
       expect(await service.priceOfPlan('plan')).toMatchObject({ kind: 'ONE_TIME', source: 'PLAN_REFERENCE' });
@@ -134,7 +156,11 @@ describe('QĐ-113a: the "can be priced" cycles of plans count the reference pric
       {
         findPricedCyclesOfPlans: jest.fn().mockResolvedValue(new Map([['a', 'ANNUAL']])),
       } as unknown as SubscriptionRepo,
-      { findCyclesOfPlans } as unknown as PlanReferencePriceRepo,
+      {
+        findCyclesOfPlans,
+        findK4PlanIds: jest.fn().mockResolvedValue([]),
+      } as unknown as PlanReferencePriceRepo,
+      noLotStock(),
     );
 
     const cycles = await service.pricedCyclesOfPlans(['a', 'b', 'c']);

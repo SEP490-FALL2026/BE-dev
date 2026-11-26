@@ -6,6 +6,8 @@ import type { PlanFactsService } from '../plan/plan-facts.service';
 import type { SubscriptionLineRepo } from '../subscription-line/subscription-line.repo';
 import type { SubscriptionLineSeatsService } from '../subscription-line/subscription-line-seats.service';
 import type { SubscriptionLineRecord } from '../subscription-line/subscription-line.types';
+import type { SubscriptionPeriodLinesService } from '../subscription-line/subscription-period-lines.service';
+import type { LicenseLotRepo } from '../license-lot/license-lot.repo';
 import { SeatTargetService } from './seat-target.service';
 import type { SubscriptionPoolService } from './pool/subscription-pool.service';
 import { SubscriptionChangeGuard } from './subscription-change-guard.service';
@@ -116,6 +118,7 @@ describe('QĐ-113g: no owning department on a subscription', () => {
       audit,
       runner,
       guard,
+      { activatePeriod: jest.fn(), syncDraftUpdate: jest.fn() } as unknown as SubscriptionPeriodLinesService,
     );
 
     await service.update(actor, 'sub-1', { autoRenew: true }, stored().updatedAt);
@@ -326,6 +329,7 @@ describe('SeatTargetService (K2 lines and lock order)', () => {
       } as unknown as SubscriptionLineRepo,
       { seatsOn: jest.fn().mockResolvedValue(12) } as unknown as SubscriptionLineSeatsService,
       { businessToday: jest.fn().mockResolvedValue('2027-06-20') } as unknown as OrganizationReadApi,
+      { find: jest.fn().mockResolvedValue(null), lock: jest.fn().mockResolvedValue(null) } as unknown as LicenseLotRepo,
     );
 
     const target = await service.lock(tx, { subscriptionId: 'sub-1', planId: 'plan-1', servingOn: '2027-06-20' });
@@ -348,6 +352,7 @@ describe('SeatTargetService (K2 lines and lock order)', () => {
       } as unknown as SubscriptionLineRepo,
       { seatsOn: jest.fn().mockResolvedValue(12) } as unknown as SubscriptionLineSeatsService,
       { businessToday: jest.fn().mockResolvedValue('2027-07-01') } as unknown as OrganizationReadApi,
+      { find: jest.fn().mockResolvedValue(null), lock: jest.fn().mockResolvedValue(null) } as unknown as LicenseLotRepo,
     );
 
     const target = await service.find({ subscriptionId: 'sub-1', planId: 'plan-1', servingOn: '2027-07-01' });
@@ -362,6 +367,7 @@ describe('SeatTargetService (K2 lines and lock order)', () => {
       { lockByPeriodAndPlan } as unknown as SubscriptionLineRepo,
       { seatsOn: jest.fn() } as unknown as SubscriptionLineSeatsService,
       { businessToday: jest.fn() } as unknown as OrganizationReadApi,
+      { find: jest.fn().mockResolvedValue(null), lock: jest.fn().mockResolvedValue(null) } as unknown as LicenseLotRepo,
     );
 
     const target = await service.lock(tx, { subscriptionId: 'sub-1' });

@@ -23,7 +23,7 @@ export class SubscriptionLotResponsibleService {
   constructor(
     private readonly lots: LicenseLotRepo,
     private readonly lines: SubscriptionLineRepo,
-    private readonly periodLines?: SubscriptionPeriodLinesService,
+    private readonly periodLines: SubscriptionPeriodLinesService,
   ) {}
 
   /** For each of these subscriptions that is a lot (the lot has its id), the IT Admin who answers for the lot; the others are absent. */
@@ -54,9 +54,12 @@ export class SubscriptionLotResponsibleService {
     if (allLines.length === 0) return new Map();
 
     const lineIds = allLines.map((line) => line.id);
-    const seatsMap: ReadonlyMap<string, ReadonlyMap<BusinessDate, number | null>> = this.periodLines
-      ? await this.periodLines.seatsOnDays(lineIds, today, today, tx)
-      : new Map();
+    const seatsMap: ReadonlyMap<string, ReadonlyMap<BusinessDate, number | null>> = await this.periodLines.seatsOnDays(
+      lineIds,
+      today,
+      today,
+      tx,
+    );
     const recordById = new Map(records.map((record) => [record.id, record]));
     const result = new Map<string, SubscriptionLineWithSeats[]>();
 

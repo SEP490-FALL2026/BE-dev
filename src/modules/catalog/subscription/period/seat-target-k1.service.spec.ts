@@ -1,5 +1,6 @@
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import type { OrganizationReadApi } from '../../../organization/public/organization-read.api';
+import type { LicenseLotRepo } from '../../license-lot/license-lot.repo';
 import type { PlanFactsService } from '../../plan/plan-facts.service';
 import type { SubscriptionLineRepo } from '../../subscription-line/subscription-line.repo';
 import type { SubscriptionLineSeatsService } from '../../subscription-line/subscription-line-seats.service';
@@ -62,6 +63,7 @@ describe('SeatTargetService (P13a W3-17 K1 without subscription)', () => {
       { lockByPeriodAndPlan: jest.fn(), findOfPlan: jest.fn() } as unknown as SubscriptionLineRepo,
       { seatsOn: jest.fn() } as unknown as SubscriptionLineSeatsService,
       { businessToday: jest.fn() } as unknown as OrganizationReadApi,
+      { find: jest.fn().mockResolvedValue(null), lock: jest.fn().mockResolvedValue(null) } as unknown as LicenseLotRepo,
     );
 
     const byPlan = await service.lock(tx, { planId: 'plan-1' });

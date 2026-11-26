@@ -75,6 +75,7 @@ import { SubscriptionChangeService } from './subscription/subscription-change.se
 import { SubscriptionService } from './subscription/subscription.service';
 import { SubscriptionPoolService } from './subscription/pool/subscription-pool.service';
 import { SubscriptionPricingService } from './subscription/subscription-pricing.service';
+import { SubscriptionPriceService } from './subscription/price/subscription-price.service';
 import { SubscriptionViewService } from './subscription/subscription-view.service';
 import { SubscriptionWindowsService } from './subscription/subscription-windows.service';
 import { LicenseLotStockService } from './license-lot/license-lot-stock.service';
@@ -244,6 +245,7 @@ import { WorkspacesController } from './workspace/workspaces.controller';
     SubscriptionPoolService,
     SubscriptionSeatIncreaseService,
     SubscriptionPricingService,
+    SubscriptionPriceService,
     SubscriptionGrantingRepo,
     SubscriptionViewService,
     SubscriptionNoticeService,

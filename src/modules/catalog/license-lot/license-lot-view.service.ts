@@ -1,4 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { ContractRepo } from '../contract/contract.repo';
@@ -67,7 +67,7 @@ export class LicenseLotViewService {
     private readonly contracts: ContractRepo,
     private readonly occupancy: SeatOccupancyHook,
     private readonly organizationReads: OrganizationReadApi,
-    @Optional() private readonly stock?: LicenseLotStockService,
+    private readonly stock: LicenseLotStockService,
   ) {}
 
   async viewAll(records: readonly LicenseLotRecord[], tx?: DbTx): Promise<LicenseLotDetail[]> {
@@ -83,9 +83,7 @@ export class LicenseLotViewService {
     );
     const taken = await reader.seatsOfSubscriptions(ids, today, tx);
     const keys = await reader.keyCountsOfLots(ids, tx);
-    const openTasks = this.stock
-      ? await this.stock.openTasksByLot(records, taken, keys, tx)
-      : new Map<string, number>();
+    const openTasks = await this.stock.openTasksByLot(records, taken, keys, tx);
     const planById = new Map(plans.map((plan) => [plan.id, plan]));
     const workspaceById = new Map(workspaces.map((workspace) => [workspace.id, workspace]));
     const contractIds = [...new Set(records.flatMap((record) => (record.contractId ? [record.contractId] : [])))];
