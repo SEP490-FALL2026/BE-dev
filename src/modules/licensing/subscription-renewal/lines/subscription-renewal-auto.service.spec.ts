@@ -229,8 +229,8 @@ describe('SubscriptionRenewalAutoService (W3-21 cutoff lock, Ca B auto-renew, Ca
     });
   });
 
-  it('Ca C (autoRenew=false): records EXPIRY_MARKED, closes lines ENDED on endDate, and creates no renewal case', async () => {
-    const { tx, service, repo, periods, outcomes } = setup();
+  it('Ca C (autoRenew=false): records EXPIRY_MARKED, closes lines ENDED on endDate, notifies IT Admin + Finance (not approver), and creates no renewal case', async () => {
+    const { tx, service, repo, periods, outcomes, notifier } = setup();
     periods.lockPeriod.mockResolvedValue(makePeriod({ autoRenew: false }));
 
     const recorded = await service.handlePassedRenewalDay({
@@ -248,6 +248,14 @@ describe('SubscriptionRenewalAutoService (W3-21 cutoff lock, Ca B auto-renew, Ca
     expect(outcomes.recordIn).not.toHaveBeenCalled();
     expect(repo.insertDeadlineEvent).toHaveBeenCalledWith(tx, expect.objectContaining({ kind: 'EXPIRY_MARKED' }));
     expect(periods.closeExpiredLines).toHaveBeenCalledWith(tx, 'sub-1', '2027-06-30');
+    expect(notifier.tell).toHaveBeenCalledWith(tx, {
+      organizationId: 'org-1',
+      recipients: ['it-1', 'fin-1'],
+      code: 'SUBSCRIPTION_EXPIRY_MARKED',
+      subject: { type: 'SUBSCRIPTION', id: 'sub-1' },
+      params: { subscriptionId: 'sub-1', baseDate: '2027-07-01', endDate: '2027-06-30' },
+      eventKey: 'subscription-expiry:sub-1:2027-07-01',
+    });
   });
 
   it('F-11: when endDate is null and renewalDate is 2027-07-01, closes lines ENDED on 2027-06-30', async () => {

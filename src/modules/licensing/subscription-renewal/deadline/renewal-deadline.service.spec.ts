@@ -46,5 +46,9 @@ describe('RenewalDeadlineService', () => {
     const arg = subject('AUTO_RENEWAL_INCIDENT', true);
     expect(await service.recordPassedRenewalDay(arg)).toBe(true);
     expect(handlePassedRenewalDay).toHaveBeenCalledWith(arg);
+
+    const expiryArg = subject('EXPIRY_MARKED', false);
+    expect(await service.recordPassedRenewalDay(expiryArg)).toBe(true);
+    expect(handlePassedRenewalDay).toHaveBeenCalledWith(expiryArg);
   });
 });

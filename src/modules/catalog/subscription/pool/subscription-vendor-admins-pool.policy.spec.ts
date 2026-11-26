@@ -1,6 +1,10 @@
 import { SubscriptionVendorAdminsRequiredError } from '../subscription.errors';
 import { toSubscriptionApiException } from '../subscription.http-errors';
-import { assertVendorAdminsRecorded, vendorAdminFlags, withoutVendorAdminDetail } from './subscription-pool.policy';
+import {
+  assertVendorAdminsRecorded,
+  vendorAdminFlags,
+  withoutVendorAdminDetail,
+} from './subscription-vendor-admins-pool.policy';
 
 describe('the vendor admins of a plan that needs them (QĐ-110k, QĐ-110u, R-53)', () => {
   describe('assertVendorAdminsRecorded: a plan that needs admins is not activated without two working IT Admins', () => {

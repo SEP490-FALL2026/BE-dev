@@ -237,6 +237,8 @@ export class RenewalViewService {
     months: readonly BusinessDate[],
   ): Promise<SubscriptionKpi4Summary> {
     this.scopeOf(actor);
+    const periods = await this.periodsOf([subscriptionId]);
+    if (!periods.has(subscriptionId)) throw new RenewalError('NOT_FOUND');
 
     return this.kpi.kpi4ForSubscription(subscriptionId, months);
   }

@@ -15,7 +15,7 @@ describe('RenewalViewService.missedAdjustmentKpiOf (W3-22 KPI-4)', () => {
   const actor = (roles: AuthenticatedPrincipal['roles']): AuthenticatedPrincipal =>
     ({ employeeId: 'emp-1', appUserId: 'user-1', roles, sessionId: 's-1' }) as AuthenticatedPrincipal;
 
-  const build = () => {
+  const build = (periodExists = true) => {
     const kpiMissed = {
       kpi4ForSubscription: jest.fn().mockResolvedValue({
         subscriptionId: 'sub-1',
@@ -24,9 +24,12 @@ describe('RenewalViewService.missedAdjustmentKpiOf (W3-22 KPI-4)', () => {
         lines: [],
       }),
     };
+    const periods = {
+      getPeriods: jest.fn().mockResolvedValue(periodExists ? [{ subscriptionId: 'sub-1' }] : []),
+    };
     const service = new RenewalViewService(
       {} as SubscriptionRenewalRepo,
-      {} as SubscriptionPeriodApi,
+      periods as unknown as SubscriptionPeriodApi,
       new RenewalPartiesService({} as IdentityAccessApi),
       {} as RenewalRankingService,
       {} as RenewalSeatsNeededService,
@@ -59,5 +62,16 @@ describe('RenewalViewService.missedAdjustmentKpiOf (W3-22 KPI-4)', () => {
 
     expect(err).toBeInstanceOf(RenewalError);
     expect((err as RenewalError).problem).toBe('READ_FORBIDDEN');
+  });
+
+  it('G-16: throws NOT_FOUND when subscriptionId does not exist so HTTP route answers 404 per OpenAPI', async () => {
+    const { service, kpiMissed } = build(false);
+    const err = await service
+      .missedAdjustmentKpiOf(actor(['FINANCE']), 'missing-sub', ['2027-07-01'])
+      .catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(RenewalError);
+    expect((err as RenewalError).problem).toBe('NOT_FOUND');
+    expect(kpiMissed.kpi4ForSubscription).not.toHaveBeenCalled();
   });
 });

@@ -19,7 +19,7 @@ import {
   SubscriptionResponseDto,
   UpdateSubscriptionBodyDto,
 } from './subscription.dto';
-import { withoutVendorAdminDetail } from './pool/subscription-pool.policy';
+import { withoutVendorAdminDetail } from './pool/subscription-vendor-admins-pool.policy';
 import { SUBSCRIPTION_ERROR_EXAMPLES, toSubscriptionApiException } from './subscription.http-errors';
 import { SubscriptionChangeService } from './subscription-change.service';
 import { SubscriptionService } from './subscription.service';

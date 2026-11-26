@@ -691,5 +691,16 @@ describe('subscription renewal routes (e2e, no database)', () => {
 
       expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
     });
+
+    it('G-16: returns 404 SUBSCRIPTION_RENEWAL.NOT_FOUND when subscription does not exist', async () => {
+      missedAdjustmentKpiOf.mockRejectedValueOnce(new RenewalError('NOT_FOUND'));
+
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/subscriptions/${SUB}/renewals/missed-adjustment-kpi?months=2027-07-01`)
+        .set('Authorization', as(['FINANCE']))
+        .expect(404);
+
+      expect(bodyOf(response).error.code).toBe('SUBSCRIPTION_RENEWAL.NOT_FOUND');
+    });
   });
 });

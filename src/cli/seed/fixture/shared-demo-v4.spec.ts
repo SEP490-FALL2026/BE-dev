@@ -84,6 +84,10 @@ describe('shared dataset v4: the organization', () => {
     expect(F.seats.some((seat) => seat.holder === 'NV-NEW4')).toBe(false);
     expect(F.people.filter((p) => p.department === 'ENG').length).toBeGreaterThanOrEqual(5);
   });
+
+  it('has enough people in one department for a group', () => {
+    expect(F.people.filter((p) => p.department === 'ENG').length).toBeGreaterThanOrEqual(5);
+  });
 });
 
 describe('shared dataset v4: the catalog and the shared pool (W3-28)', () => {

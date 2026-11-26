@@ -303,20 +303,22 @@ describe('progress of the departures and the transfers on the overviews (integra
 
     it('counts the plans in use that need admins and have fewer than two who work, across the company, and falls when a second admin works', async () => {
       const k2 = await h.subscription(10, 'K2');
-      const { rows } = await h.ctx.sql.query<{ plan_id: string }>('SELECT plan_id FROM subscriptions WHERE id = $1', [
-        k2,
-      ]);
-      const planId = rows[0].plan_id;
+      const { rows } = await h.ctx.sql.query<{ workspace_id: string }>(
+        'SELECT workspace_id FROM subscriptions WHERE id = $1',
+        [k2],
+      );
+      const workspaceId = rows[0].workspace_id;
       const countBy = async (path: string, account: ApiAccount) =>
         (await progressOf(path, account)).sections.plansBelowVendorAdminMinimum;
       const shortOf = async () => (await countBy(OVERVIEW_PATHS.superAdmin, h.sa)).count ?? 0;
       const record = async (admins: string[]) => {
-        await h.ctx.sql.query('DELETE FROM plan_workspace_admins WHERE plan_id = $1', [planId]);
-        for (const employeeId of admins)
+        await h.ctx.sql.query('DELETE FROM workspace_admins WHERE workspace_id = $1', [workspaceId]);
+        for (const [index, employeeId] of admins.entries()) {
           await h.ctx.sql.query(
-            `INSERT INTO plan_workspace_admins (plan_id, employee_id, role) VALUES ($1, $2, 'ADMIN'::"WorkspaceRole")`,
-            [planId, employeeId],
+            `INSERT INTO workspace_admins (workspace_id, employee_id, role) VALUES ($1, $2, $3::"WorkspaceRole")`,
+            [workspaceId, employeeId, index === 0 ? 'OWNER' : 'ADMIN'],
           );
+        }
       };
 
       // Two IT Admins who work: the plan is not short. One: it is. None recorded: it is too (a plan older than the rule).

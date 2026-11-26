@@ -18,13 +18,13 @@ import {
 import {
   assertPoolTerms,
   assertResponsibleNamed,
-  assertVendorAdminsRecorded,
   defaultResponsibleOf,
   isLiveSubscription,
   isPooledPlan,
   liveIdsByWorkspacePlan,
   liveWorkspaceSiblingsOf,
 } from './subscription-pool.policy';
+import { assertVendorAdminsRecorded } from './subscription-vendor-admins-pool.policy';
 import { WorkspaceForSubscriptionService } from '../../workspace/workspace-for-subscription.service';
 import { SubscriptionRepo } from '../subscription.repo';
 import type {

@@ -65,7 +65,7 @@ describe('license key import and the kind of its plan, racing (integration, P28-
       .rows[0].type;
   const key = (label: string) => `KEY-${label}-${randomUUID().slice(0, 8).toUpperCase()}-ABCDE`;
 
-  it('change first: the import waits for the change of kind in flight, then refuses with nothing kept', async () => {
+  it('change first (lot): POST /license-lots waits for the change of kind in flight, then refuses with 422 LICENSE_LOT.PLAN_NOT_K4', async () => {
     const planId = await h.plan('K4');
     await holder.query('BEGIN');
     await holder.query(`UPDATE plans SET provisioning_type = 'K1', key_binding = NULL WHERE id = $1`, [planId]);
@@ -88,6 +88,25 @@ describe('license key import and the kind of its plan, racing (integration, P28-
     expect(response.status).toBe(422);
     expect(h.codeOf(response)).toBe('LICENSE_LOT.PLAN_NOT_K4');
     expect((await h.ctx.sql.query(`SELECT 1 FROM license_lots WHERE plan_id = $1`, [planId])).rowCount).toBe(0);
+  });
+
+  it('G-14 change first (import): key import waits for plan lock while application is retired, then refuses with nothing kept', async () => {
+    const { subscriptionId, planId } = await purchase();
+    await holder.query('BEGIN');
+    await holder.query(`SELECT id FROM plans WHERE id = $1 FOR UPDATE`, [planId]);
+    await holder.query(
+      `UPDATE applications SET status = 'RETIRED' WHERE id = (SELECT application_id FROM plans WHERE id = $1)`,
+      [planId],
+    );
+
+    const importing = importKeys(subscriptionId, [key('RET')]).then((response) => response);
+    await waitForLockWaiters(h.ctx.sql, 1);
+    await holder.query('COMMIT');
+    const response = await importing;
+
+    expect(response.status).toBe(422);
+    expect(h.codeOf(response)).toBe('LICENSE_KEY.APPLICATION_RETIRED');
+    expect(await keysOf(subscriptionId)).toBe(0);
   });
 
   it('import first: the change of kind waits for the import in flight, then is refused because the keys are kept', async () => {

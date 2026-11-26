@@ -8,7 +8,6 @@ import {
   WorkspaceLimitExceededError,
   WorkspacePrimaryOwnerNotAdminError,
   WorkspaceRequiredError,
-  WorkspaceStaleError,
   WorkspaceTextInvalidError,
 } from '../workspace/workspace.errors';
 import { WorkspaceRepo } from '../workspace/workspace.repo';
@@ -217,7 +216,6 @@ export class PlanWorkspaceService {
       return new PlanVendorAdminsInvalidError(error.given, error.minimum);
     if (error instanceof WorkspacePrimaryOwnerNotAdminError) return new PlanPrimaryOwnerNotListedError();
     if (error instanceof WorkspaceRequiredError) return new PlanWorkspaceAmbiguousError(error.workspaceIds);
-    if (error instanceof WorkspaceStaleError) return error;
 
     return error;
   }

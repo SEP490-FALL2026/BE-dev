@@ -19,7 +19,8 @@ import {
 } from './obligation/subscription-obligation.policy';
 import { alertDates, deriveNotice, missingData, noticeInputOf, noticeWarnings } from './subscription.policy';
 import { isPricedInDong } from './price/subscription-price.policy';
-import { poolWarnings, vendorAdminFlags } from './pool/subscription-pool.policy';
+import { poolWarnings } from './pool/subscription-pool.policy';
+import { vendorAdminFlags } from './pool/subscription-vendor-admins-pool.policy';
 import {
   SubscriptionLotResponsibleService,
   type SubscriptionLineWithSeats,

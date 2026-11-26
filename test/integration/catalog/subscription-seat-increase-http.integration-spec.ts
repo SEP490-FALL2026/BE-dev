@@ -1,7 +1,20 @@
 import request from 'supertest';
+import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
+import type { AuthenticatedPrincipal } from '../../../src/infrastructure/security/tokens/access-token-verifier.port';
+import { CatalogApi } from '../../../src/modules/catalog/public/catalog.api';
+import { SeatLedgerApi } from '../../../src/modules/catalog/public/seat-ledger.api';
 import type { ApiAccount } from '../../support/api-accounts';
 import { buildActivatedAccount } from '../../support/builders/account.builder';
 import { SeatHarness } from '../../support/seat-baseline-harness';
+
+const principalOf = (account: ApiAccount): AuthenticatedPrincipal => ({
+  subject: account.appUserId,
+  appUserId: account.appUserId,
+  sessionId: 'test-session',
+  employeeId: account.employeeId,
+  roles: ['IT_ADMIN'],
+  directRoles: ['IT_ADMIN'],
+});
 
 const h = new SeatHarness();
 
@@ -142,28 +155,74 @@ describe('the notice of a rise of the seats bought of a subscription (X-IT.7)', 
       const seen = await read(id);
 
       const first = await patch(id, {
-        purchasedQuantity: 6,
+        autoRenew: true,
         expectedUpdatedAt: seen,
-        quantityChangeReason: 'More seats',
       }).expect(200);
       const second = await patch(id, {
-        purchasedQuantity: 5,
+        autoRenew: false,
         expectedUpdatedAt: seen,
-        quantityChangeReason: 'More seats',
       }).expect(409);
 
       expect(h.codeOf(second)).toBe('SUBSCRIPTION.STALE');
       expect(h.detailsOf(second)).toMatchObject({ currentUpdatedAt: h.dataOf<{ updatedAt: string }>(first).updatedAt });
-      expect(await quantityOf(id)).toBe(6);
+      const row = await h.ctx.sql.query<{ auto_renew: boolean }>(`SELECT auto_renew FROM subscriptions WHERE id = $1`, [
+        id,
+      ]);
+      expect(row.rows[0].auto_renew).toBe(true);
     });
 
-    it('refuses a change of the seats sent with no version of a read: 422 SUBSCRIPTION.VERSION_REQUIRED, nothing written', async () => {
+    it('refuses a change of the seats sent on PATCH per W3-27: 409 SUBSCRIPTION.SEAT_COUNT_VIA_LEDGER, nothing written', async () => {
       const id = await h.subscription(4, 'K2');
 
-      const refused = await patch(id, { purchasedQuantity: 6, quantityChangeReason: 'More seats' }).expect(422);
+      const refused = await patch(id, { purchasedQuantity: 6, quantityChangeReason: 'More seats' }).expect(409);
 
-      expect(h.codeOf(refused)).toBe('SUBSCRIPTION.VERSION_REQUIRED');
+      expect(h.codeOf(refused)).toBe('SUBSCRIPTION.SEAT_COUNT_VIA_LEDGER');
       expect(await quantityOf(id)).toBe(4);
+    });
+
+    it('G-14 (3ba8b572): a seat bought on a K2 line between the read and the edit makes the line update stale: 409 SUBSCRIPTION_LINE.STALE', async () => {
+      const id = await h.subscription(4, 'K2');
+      await h.ctx.sql.query(`UPDATE subscriptions SET responsible_it_admin_employee_id = $2 WHERE id = $1`, [
+        id,
+        h.it1.employeeId,
+      ]);
+      const lineRow = (
+        await h.ctx.sql.query<{ id: string; updated_at: Date }>(
+          `SELECT id, updated_at FROM subscription_lines WHERE subscription_id = $1`,
+          [id],
+        )
+      ).rows[0];
+      expect(lineRow).toBeDefined();
+      const seen = lineRow.updated_at.toISOString();
+
+      const runner = h.ctx.app.get(TransactionRunner, { strict: false });
+      const catalog = h.ctx.app.get(CatalogApi, { strict: false });
+      const seatLedger = h.ctx.app.get(SeatLedgerApi, { strict: false });
+      await runner.run(async (tx) => {
+        const target = await catalog.lockSeatTarget(tx, { subscriptionId: id });
+        if (!target?.subscriptionLineId) throw new Error('Expected active K2 subscription line');
+        return seatLedger.recordVendor(tx, target.subscriptionLineId, {
+          delta: 1,
+          effectiveOn: '2026-01-05',
+          note: 'Seat bought in flight',
+          actor: principalOf(h.it1),
+          alreadyLocked: true,
+          today: '2026-01-05',
+        });
+      });
+
+      const stale = await request(h.server())
+        .post(`/api/v1/subscription-lines/${lineRow.id}/seat-corrections`)
+        .set(h.as(h.it1))
+        .send({
+          delta: 1,
+          effectiveOn: '2026-01-05',
+          note: 'Correction from stale read',
+          expectedUpdatedAt: seen,
+        })
+        .expect(409);
+
+      expect(h.codeOf(stale)).toBe('SUBSCRIPTION_LINE.STALE');
     });
   });
 });
