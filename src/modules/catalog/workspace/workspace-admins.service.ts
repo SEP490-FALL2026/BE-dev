@@ -20,8 +20,8 @@ const snapshot = (admins: readonly WorkspaceAdminRecord[], primaryOwnerEmployeeI
  * workspace alone (`QĐ-118f`). At least two different people, the primary owner among them as an owner, every one an IT Admin with an account that
  * can sign in; whether they still work is not judged here: a reader sees it in the flags (`QĐ-117e`).
  *
- * Lock order: ONE lock, the workspace `FOR UPDATE` (tier 5b of `docs/rules/database-business.md`); then each person named, in id order, the employee
- * `FOR SHARE` first and the account second, so a departure or a lock cannot slip in.
+ * Lock order: tier 1 `employees` `FOR SHARE` (and account second) in ascending `employeeId` order via `requireItAdmin`, BEFORE tier 5b `workspaces`
+ * `FOR UPDATE` (`docs/rules/database-business.md`).
  */
 @Injectable()
 export class WorkspaceAdminsService {
@@ -46,6 +46,9 @@ export class WorkspaceAdminsService {
     if (!organization) throw new Error('The workspaces were used before installation');
 
     await this.runner.run(async (tx) => {
+      for (const employeeId of [...new Set(input.admins.map((admin) => admin.employeeId))].sort()) {
+        await this.views.requireItAdmin(tx, employeeId);
+      }
       const current = await this.repo.lock(tx, id);
       if (!current) throw new WorkspaceNotFoundError();
       assertResponsible(actor.employeeId, current.responsibleItAdminEmployeeId);
@@ -57,9 +60,6 @@ export class WorkspaceAdminsService {
         ownerLimit: current.ownerLimit,
         adminLimit: current.adminLimit,
       });
-      for (const employeeId of [...new Set(input.admins.map((admin) => admin.employeeId))].sort()) {
-        await this.views.requireItAdmin(tx, employeeId);
-      }
 
       await this.repo.replaceAdmins(tx, id, input.admins, input.primaryOwnerEmployeeId);
       await this.audit.record(

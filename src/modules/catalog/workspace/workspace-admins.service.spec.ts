@@ -77,6 +77,38 @@ describe('WorkspaceAdminsService', () => {
     };
   }
 
+  it('locks employees in ascending id order via requireItAdmin (tier 1) before locking the workspace (tier 5b)', async () => {
+    const order: string[] = [];
+    const { service, repo, requireItAdmin } = setup();
+    (repo.lock as jest.Mock).mockImplementation(() => {
+      order.push('repo.lock');
+      return Promise.resolve({
+        id: 'ws-1',
+        responsibleItAdminEmployeeId: 'emp-khoa',
+        primaryOwnerEmployeeId: 'emp-khoa',
+        ownerLimit: null,
+        adminLimit: null,
+        admins: [{ employeeId: 'emp-khoa', role: 'OWNER' }],
+        updatedAt: version,
+      } as WorkspaceRecord);
+    });
+    requireItAdmin.mockImplementation((_tx: unknown, employeeId: string) => {
+      order.push(`requireItAdmin:${employeeId}`);
+      return Promise.resolve();
+    });
+
+    await service.set(khoa, 'ws-1', {
+      ...body,
+      admins: [
+        { employeeId: 'emp-nam', role: 'ADMIN' },
+        { employeeId: 'emp-khoa', role: 'OWNER' },
+        { employeeId: 'emp-nam', role: 'ADMIN' },
+      ],
+    });
+
+    expect(order).toEqual(['requireItAdmin:emp-khoa', 'requireItAdmin:emp-nam', 'repo.lock']);
+  });
+
   it('replaces the administrators as a whole, judges each person in id order and audits the change', async () => {
     const { service, repo, requireItAdmin, audit, detail } = setup();
 
@@ -99,13 +131,12 @@ describe('WorkspaceAdminsService', () => {
     );
   });
 
-  it('refuses an IT Admin who does not answer for the workspace (403), before the version and the people are judged', async () => {
-    const { service, repo, requireItAdmin } = setup();
+  it('refuses an IT Admin who does not answer for the workspace (403), before the version and the shape are judged', async () => {
+    const { service, repo } = setup();
 
     await expect(service.set(nam, 'ws-1', { ...body, expectedUpdatedAt: new Date(0) })).rejects.toBeInstanceOf(
       WorkspaceNotResponsibleError,
     );
-    expect(requireItAdmin).not.toHaveBeenCalled();
     expect((repo as unknown as { replaceAdmins: jest.Mock }).replaceAdmins).not.toHaveBeenCalled();
   });
 

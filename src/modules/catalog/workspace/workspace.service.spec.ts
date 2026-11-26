@@ -136,6 +136,46 @@ describe('WorkspaceService', () => {
   });
 
   describe('update', () => {
+    it('locks the emergency account holder via requireItAdmin (tier 1) before locking the workspace (tier 5b)', async () => {
+      const order: string[] = [];
+      const { service, repo, views } = setup();
+      views.requireItAdmin.mockImplementation((_tx: unknown, employeeId: string) => {
+        order.push(`requireItAdmin:${employeeId}`);
+        return Promise.resolve();
+      });
+      repo.lock.mockImplementation(() => {
+        order.push('repo.lock');
+        return Promise.resolve({
+          id: 'ws-1',
+          name: 'Anthropic',
+          responsibleItAdminEmployeeId: 'emp-khoa',
+          ownerLimit: null,
+          adminLimit: null,
+          ownerAccountEmail: null,
+          adminNote: null,
+          ownerTransferProcedure: null,
+          emergencyAccount: null,
+          admins: [
+            { employeeId: 'emp-khoa', role: 'OWNER' },
+            { employeeId: 'emp-nam', role: 'OWNER' },
+          ],
+          updatedAt: version,
+        });
+      });
+
+      await service.update(khoa, 'ws-1', {
+        expectedUpdatedAt: version,
+        emergencyAccount: {
+          identity: 'break-glass',
+          occupiesSeat: false,
+          holderEmployeeId: 'emp-nam',
+          lastReviewedOn: '2026-12-01',
+        },
+      });
+
+      expect(order).toEqual(['requireItAdmin:emp-nam', 'repo.lock']);
+    });
+
     it('writes the fields named on the version read, with the search key of a new name, and audits the profile before and after', async () => {
       const { service, repo, audit } = setup();
 

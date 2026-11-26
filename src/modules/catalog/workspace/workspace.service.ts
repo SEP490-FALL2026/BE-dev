@@ -51,8 +51,8 @@ const profileOf = (workspace: WorkspaceRecord): { [key: string]: AuditValue } =>
  * IT Admin (who becomes the one who answers for it, `QĐ-118d`), and the change of its profile by that IT Admin alone (`QĐ-118f`). Who administers it
  * and who answers for it have services of their own.
  *
- * Lock order: ONE lock, the workspace `FOR UPDATE` (tier 5b of `docs/rules/database-business.md`); a person named for the emergency account is judged
- * on the account as it is in this transaction (the employee `FOR SHARE` first, as everywhere).
+ * Lock order: when changing the emergency account, tier 1 `employees` `FOR SHARE` (and account second) via `requireItAdmin` BEFORE tier 5b
+ * `workspaces` `FOR UPDATE` (`docs/rules/database-business.md`).
  */
 @Injectable()
 export class WorkspaceService {
@@ -158,12 +158,12 @@ export class WorkspaceService {
     const changes = this.cleaned(input);
 
     await this.runner.run(async (tx) => {
+      if (changes.emergencyAccount) await this.views.requireItAdmin(tx, changes.emergencyAccount.holderEmployeeId);
       const current = await this.repo.lock(tx, id);
       if (!current) throw new WorkspaceNotFoundError();
       assertResponsible(actor.employeeId, current.responsibleItAdminEmployeeId);
       if (current.updatedAt.getTime() !== input.expectedUpdatedAt.getTime())
         throw new WorkspaceStaleError(current.updatedAt);
-      if (changes.emergencyAccount) await this.views.requireItAdmin(tx, changes.emergencyAccount.holderEmployeeId);
       assertWithinLimits(
         current.admins,
         changes.ownerLimit === undefined ? current.ownerLimit : changes.ownerLimit,
