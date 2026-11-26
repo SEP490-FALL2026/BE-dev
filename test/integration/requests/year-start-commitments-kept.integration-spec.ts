@@ -59,6 +59,7 @@ describe('the commitment of 01/01 is what the approval kept (T-RQ2 for 01/01, T-
       made.department.id,
       first,
     ]);
+    await h.setItAdminInCharge(made.department, { employeeId: h.it1.employeeId, account: h.it1 });
 
     return made;
   };

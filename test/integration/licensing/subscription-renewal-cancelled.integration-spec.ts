@@ -18,9 +18,10 @@ describe('a subscription recorded as cancelled leaves the adjustment and the sto
   const closure = { dataExported: true, adminsTransferred: true };
 
   /** A plan by the month, paid on a day 5 days away and renewing itself, with 10 seats and none held: it may be cancelled today. */
-  const monthly = async (planId: string, purchasedQuantity = 10): Promise<string> =>
+  const monthly = async (planId: string, purchasedQuantity = 10, workspaceId?: string): Promise<string> =>
     declareSubscription(h.ctx, h.it1.accessToken, {
       planId,
+      ...(workspaceId ? { workspaceId } : {}),
       kind: 'TERM',
       purchasedQuantity,
       unitPrice: { amount: '1000000', currency: 'VND' },
@@ -30,6 +31,22 @@ describe('a subscription recorded as cancelled leaves the adjustment and the sto
       autoRenew: true,
       allowsMidTermReduction: false,
     });
+  const secondWorkspaceOf = async (planId: string): Promise<string> => {
+    const vendorId = (
+      await h.ctx.sql.query<{ vendor_id: string }>(
+        `SELECT a.vendor_id FROM plans p JOIN applications a ON a.id = p.application_id WHERE p.id = $1`,
+        [planId],
+      )
+    ).rows[0].vendor_id;
+
+    return h.dataOf<{ id: string }>(
+      await request(h.server())
+        .post('/api/v1/workspaces')
+        .set(h.as(h.it1))
+        .send({ vendorId, name: h.unique('SpareWS') })
+        .expect(201),
+    ).id;
+  };
   const record = (body: object) =>
     request(h.server()).post('/api/v1/subscription-renewals').set(h.as(h.it1)).send(body);
   const adjustment = (subscriptionId: string) =>
@@ -59,6 +76,10 @@ describe('a subscription recorded as cancelled leaves the adjustment and the sto
 
   beforeAll(async () => {
     await h.start();
+    await h.ctx.sql.query(`UPDATE departments SET it_admin_employee_id = $2 WHERE id = $1`, [
+      h.seed.departmentId,
+      h.it1.employeeId,
+    ]);
     people = [];
     for (let i = 0; i < 12; i += 1) people.push(await h.person(`E-CXX-${i}`));
   }, 300000);
@@ -109,7 +130,7 @@ describe('a subscription recorded as cancelled leaves the adjustment and the sto
   it('A1C-02 grants no seat from the cancelled subscription: the other subscription of the plan with room gives it', async () => {
     const planId = await h.plan('K2', 'PER_SEAT');
     const cancelled = await monthly(planId, 10);
-    const spare = await monthly(planId, 3);
+    const spare = await monthly(planId, 3, await secondWorkspaceOf(planId));
     await cancel(cancelled).expect(201);
 
     const task = await h.granted(person(), planId);
@@ -136,7 +157,7 @@ describe('a subscription recorded as cancelled leaves the adjustment and the sto
   it('A1C-02 counts no free seat of the cancelled subscription in the stock of the plan', async () => {
     const planId = await h.plan('K2', 'PER_SEAT');
     const cancelled = await monthly(planId, 10);
-    const spare = await monthly(planId, 3);
+    const spare = await monthly(planId, 3, await secondWorkspaceOf(planId));
     const pool = h.ctx.app.get(SharedPoolService, { strict: false });
     expect((await pool.stockOfPlans([planId], h.today())).get(planId)).toMatchObject({ free: 13 });
 

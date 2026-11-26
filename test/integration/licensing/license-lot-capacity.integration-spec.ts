@@ -98,7 +98,7 @@ describe('the licenses of a lot (integration, real PostgreSQL & real services, F
           purchasedOn: '2026-09-01',
           licenseCount,
           unitPrice: { amount: '1000000', currency: 'VND' },
-          purpose: 'OPENING',
+          purpose: 'STOCK',
         })
         .expect(201),
     ).id;
@@ -205,7 +205,8 @@ describe('the licenses of a lot (integration, real PostgreSQL & real services, F
     const legacy = await w.perpetual(plan, { quantity: 2 });
     await ctx.sql.query(
       `INSERT INTO license_lots (id, organization_id, plan_id, purchased_on, license_count, unit_price_minor, purpose, legacy_subscription_id, updated_at)
-       VALUES ($1, $2, $3, '2026-09-01', 2, 1000000, 'OPENING', $1, now())`,
+       VALUES ($1, $2, $3, '2026-09-01', 2, 1000000, 'OPENING', $1, now())
+       ON CONFLICT (id) DO UPDATE SET license_count = 2, unit_price_minor = 1000000, updated_at = now()`,
       [legacy, w.organizationId, plan],
     );
     const old = await createAssignment(plan, 'OLD1', legacy);

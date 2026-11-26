@@ -79,7 +79,7 @@ describe('workspaceGet and workspaceList live subscriptionCount (integration, re
           planId: planLive1,
           workspaceId: ws.id,
           kind: 'TERM',
-          purchasedQuantity: 5,
+          purchasedQuantity: 1,
           unitPrice: { amount: '500000', currency: 'VND' },
           billingCycle: 'MONTHLY',
           commitmentTermMonths: 1,
@@ -89,16 +89,28 @@ describe('workspaceGet and workspaceList live subscriptionCount (integration, re
         })
         .expect(201),
     );
+    await h.ctx.sql.query(
+      `INSERT INTO license_assignments (
+         id, organization_id, kind, source, plan_id, subscription_id, employee_id,
+         account_identifier, normalized_account_identifier, valid_from, valid_from_basis,
+         granted_on, created_by_app_user_id
+       ) VALUES (
+         gen_random_uuid(), $1, 'PERSONAL'::"AssignmentKind", 'REQUEST'::"AssignmentSource",
+         $2, $3, $4, 'wsc-khoa@acme.vn', 'wsc-khoa@acme.vn', $5::date, 'ACTUAL'::"AssignmentDateBasis",
+         $5::date, $6
+       )`,
+      [h.seed.organizationId, planLive1, oldPeriod.id, khoa.employeeId, addDays(today, -28), khoa.appUserId],
+    );
     await request(h.server())
       .post('/api/v1/subscription-renewals')
       .set(h.as(khoa))
       .send({
         subscriptionId: oldPeriod.id,
         choice: 'RENEW',
-        proposedQuantity: 5,
+        proposedQuantity: 1,
         outcome: 'AS_DECIDED',
         nextPeriod: {
-          purchasedQuantity: 5,
+          purchasedQuantity: 1,
           unitPrice: { amount: '500000', currency: 'VND' },
           billingCycle: 'MONTHLY',
           startDate: addDays(today, 2),
@@ -109,7 +121,7 @@ describe('workspaceGet and workspaceList live subscriptionCount (integration, re
       })
       .expect(201);
 
-    // 2. Live draft subscription
+    // 2. Live draft subscription (omits unitPrice and billingCycle so it remains DRAFT)
     await request(h.server())
       .post('/api/v1/subscriptions')
       .set(h.as(khoa))
@@ -117,7 +129,6 @@ describe('workspaceGet and workspaceList live subscriptionCount (integration, re
         planId: planLive2,
         workspaceId: ws.id,
         kind: 'TERM',
-        status: 'DRAFT',
         startDate: today,
       })
       .expect(201);
@@ -125,16 +136,26 @@ describe('workspaceGet and workspaceList live subscriptionCount (integration, re
     // 3. Expired active term (end_date < today) -> excluded
     await h.ctx.sql.query(
       `INSERT INTO subscriptions (id, organization_id, plan_id, workspace_id, kind, status, purchased_quantity,
+         unit_price_minor, unit_price_currency, price_recorded_on, price_rate, price_rate_date, price_rate_source,
+         price_reporting_minor, price_reporting_currency, monthly_unit_price_minor,
          billing_cycle, commitment_term_months, start_date, end_date, responsible_it_admin_employee_id, updated_at)
-       VALUES (gen_random_uuid(), $1, $2, $3, 'TERM', 'ACTIVE', 5, 'MONTHLY', 1, $4::date, $5::date, $6, now())`,
+       VALUES (gen_random_uuid(), $1, $2, $3, 'TERM', 'ACTIVE', 5,
+         500000, 'VND', $4::date, 1.0, $4::date, 'SAME_CURRENCY'::"PriceRateSource",
+         500000, 'VND', 500000,
+         'MONTHLY', 1, $4::date, $5::date, $6, now())`,
       [h.seed.organizationId, planExpired, ws.id, addDays(today, -40), addDays(today, -10), khoa.employeeId],
     );
 
     // 4. Closed subscription (closed_at IS NOT NULL) -> excluded
     await h.ctx.sql.query(
       `INSERT INTO subscriptions (id, organization_id, plan_id, workspace_id, kind, status, purchased_quantity,
+         unit_price_minor, unit_price_currency, price_recorded_on, price_rate, price_rate_date, price_rate_source,
+         price_reporting_minor, price_reporting_currency, monthly_unit_price_minor,
          billing_cycle, commitment_term_months, start_date, responsible_it_admin_employee_id, closed_at, closed_reason, updated_at)
-       VALUES (gen_random_uuid(), $1, $2, $3, 'TERM', 'ACTIVE', 5, 'MONTHLY', 1, $4::date, $5, now(), 'K1_WITHOUT_SUBSCRIPTION', now())`,
+       VALUES (gen_random_uuid(), $1, $2, $3, 'TERM', 'ACTIVE', 5,
+         500000, 'VND', $4::date, 1.0, $4::date, 'SAME_CURRENCY'::"PriceRateSource",
+         500000, 'VND', 500000,
+         'MONTHLY', 1, $4::date, $5, now(), 'K1_WITHOUT_SUBSCRIPTION', now())`,
       [h.seed.organizationId, planClosed, ws.id, today, khoa.employeeId],
     );
 

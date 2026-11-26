@@ -28,6 +28,7 @@ describe('lot invoice confirmation vs group member withdrawal race (integration,
     vendorId = (await h.vendorOf(k4PlanId)).id;
     await h.declareTaxProfile(vendorId, [{ taxType: 'GTGT', ratePercent: '10', deductible: true }]).expect(200);
     unit = await h.departmentWithHead('P-F18R');
+    await h.setItAdminInCharge(unit.department, { employeeId: h.it1.employeeId, account: h.it1 });
     await h.roomFor(unit);
   }, 300000);
 
@@ -39,10 +40,78 @@ describe('lot invoice confirmation vs group member withdrawal race (integration,
     await h.stop();
   });
 
+  async function seedApprovedK4Group(members: readonly string[]): Promise<string> {
+    const reqId = randomUUID();
+    const needStepId = randomUUID();
+    const spendStepId = randomUUID();
+    const policyJson = JSON.stringify({
+      version: 1,
+      branch: 'PAID_IN_CATALOG',
+      chain: ['NEED', 'SPEND_APPROVAL'],
+      slaWorkingDays: 3,
+    });
+    const totalMinor = String(members.length * 12 * M);
+    await h.ctx.sql.query(
+      `INSERT INTO access_requests
+         (id, organization_id, type, branch, state, plan_id, department_id, cost_center_id,
+          requester_employee_id, business_reason, submitted_at, budget_year, amount_months,
+          amount_currency, unit_price_minor, amount_minor, pricing_status, policy, created_by_app_user_id)
+       VALUES ($1, $2, 'GROUP_GRANT', 'PAID_IN_CATALOG', 'AWAITING_EXECUTION', $3, $4, $5, $6,
+               'K4 group lot race test', now(), $7, 1, 'VND', 12000000, $8, 'PRICED', $9::jsonb, $10)`,
+      [
+        reqId,
+        h.seed.organizationId,
+        k4PlanId,
+        unit.department.id,
+        unit.department.unitId,
+        unit.head.employeeId,
+        h.year,
+        totalMinor,
+        policyJson,
+        unit.head.account.appUserId,
+      ],
+    );
+    await h.ctx.sql.query(
+      `INSERT INTO access_request_steps
+         (id, request_id, kind, sequence, state, assignee_employee_id, routing_row, sla_working_days, assigned_at, decided_at)
+       VALUES ($1, $2, 'NEED', 1, 'APPROVED', $3, 1, 3, now(), now()),
+              ($4, $2, 'SPEND_APPROVAL', 2, 'APPROVED', $5, 1, 3, now(), now())`,
+      [needStepId, reqId, unit.head.employeeId, spendStepId, h.boss.employeeId],
+    );
+    await h.ctx.sql.query(
+      `INSERT INTO spend_decisions (step_id, request_id, decision, decided_by_employee_id, decided_at)
+       VALUES ($1, $2, 'APPROVED', $3, now())`,
+      [spendStepId, reqId, h.boss.employeeId],
+    );
+    for (let i = 0; i < members.length; i += 1) {
+      await h.ctx.sql.query(
+        `INSERT INTO access_request_beneficiaries (request_id, employee_id, position) VALUES ($1, $2, $3)`,
+        [reqId, members[i], i + 1],
+      );
+      await h.ctx.sql.query(
+        `INSERT INTO access_request_lines (request_id, employee_id, state, need_step_id) VALUES ($1, $2, 'APPROVED', $3)`,
+        [reqId, members[i], needStepId],
+      );
+      await h.ctx.sql.query(
+        `INSERT INTO access_request_line_amounts (request_id, employee_id, budget_year, amount_minor, currency, held)
+         VALUES ($1, $2, $3, 12000000, 'VND', true)`,
+        [reqId, members[i], h.year],
+      );
+    }
+    await h.ctx.sql.query(
+      `INSERT INTO budget_commitments
+         (id, organization_id, request_id, cost_center_id, year, amount_minor, currency, state, origin, unattached_reason)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, 'VND', 'HELD', 'APPROVAL', 'NO_BUDGET')`,
+      [h.seed.organizationId, reqId, unit.department.unitId, h.year, totalMinor],
+    );
+
+    return reqId;
+  }
+
   async function seedGroupLotAndSubmittedInvoice() {
     seq += 1;
     const people = await h.colleagues(unit, 3);
-    const reqId = await h.groupApproved(unit, k4PlanId, people);
+    const reqId = await seedApprovedK4Group(people.map((person) => person.employeeId));
     await h
       .grantLine(
         { requestId: reqId, beneficiaryEmployeeId: people[0].employeeId, purchase: { reason: 'Buy K4 lot' } },

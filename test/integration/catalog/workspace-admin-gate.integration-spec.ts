@@ -218,8 +218,8 @@ describe('workspace >= 2 working admin gate and WORKSPACE_ADMIN_NOT_WORKING aler
             },
           })
           .expect(201);
-        const nextId = h.dataOf<{ outcomeDetail: { nextSubscriptionId: string } }>(renewalRes).outcomeDetail
-          .nextSubscriptionId;
+        const nextId = h.dataOf<{ renewal: { outcomeDetail: { nextSubscriptionId: string } } }>(renewalRes).renewal
+          .outcomeDetail.nextSubscriptionId;
         const nextView = h.dataOf<{ vendorAdminsBelowMinimum: boolean }>(
           await request(h.server()).get(`/api/v1/subscriptions/${nextId}`).set(h.as(khoa)).expect(200),
         );

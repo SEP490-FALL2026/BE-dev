@@ -28,11 +28,12 @@ async function ensureOpenedLine(input: {
 }): Promise<string> {
   const { rows } = await h.ctx.sql.query<{
     id: string | null;
+    ledger_opened_on: Date | null;
     organization_id: string;
     workspace_id: string;
     plan_id: string;
   }>(
-    `SELECT l.id, s.organization_id, s.workspace_id, s.plan_id
+    `SELECT l.id, l.ledger_opened_on, s.organization_id, s.workspace_id, s.plan_id
        FROM subscriptions s
        LEFT JOIN subscription_lines l ON l.subscription_id = s.id AND l.plan_id = s.plan_id
       WHERE s.id = $1`,
@@ -69,15 +70,28 @@ async function ensureOpenedLine(input: {
     );
   }
 
-  const ledger = h.ctx.app.get(SeatLedgerApi, { strict: false });
-  const runner = h.ctx.app.get(TransactionRunner);
-  await runner.run((tx) =>
-    input.kind === 'INITIAL'
-      ? ledger.openLines(tx, { lines: [{ lineId, quantity: input.quantity, effectiveOn: input.effectiveOn }] })
-      : ledger.openNextPeriod(tx, {
-          lines: [{ lineId, quantity: input.quantity, effectiveOn: input.effectiveOn, renewalId: null }],
-        }),
-  );
+  if (meta.ledger_opened_on !== null) {
+    await h.ctx.sql.query(`UPDATE subscription_lines SET ledger_opened_on = $2::date WHERE id = $1`, [
+      lineId,
+      input.effectiveOn,
+    ]);
+    await h.ctx.sql.query(
+      `UPDATE seat_changes
+          SET effective_on = $2::date, delta = $3
+        WHERE subscription_line_id = $1 AND reason IN ('INITIAL', 'RENEWAL')`,
+      [lineId, input.effectiveOn, input.quantity],
+    );
+  } else {
+    const ledger = h.ctx.app.get(SeatLedgerApi, { strict: false });
+    const runner = h.ctx.app.get(TransactionRunner);
+    await runner.run((tx) =>
+      input.kind === 'INITIAL'
+        ? ledger.openLines(tx, { lines: [{ lineId, quantity: input.quantity, effectiveOn: input.effectiveOn }] })
+        : ledger.openNextPeriod(tx, {
+            lines: [{ lineId, quantity: input.quantity, effectiveOn: input.effectiveOn, renewalId: null }],
+          }),
+    );
+  }
 
   return lineId;
 }
@@ -155,6 +169,10 @@ describe('Renewal carry purchase on ledger and grant shortcut (integration, real
          FROM subscriptions old
         WHERE subscriptions.id = $1 AND old.id = $2`,
       [subNext, subOld],
+    );
+    await h.ctx.sql.query(
+      `UPDATE subscription_lines SET closed_reason = 'RENEWED', closed_on = '2027-06-30' WHERE id = $1`,
+      [lineOld],
     );
     const lineNext = await ensureOpenedLine({
       subscriptionId: subNext,
@@ -285,6 +303,14 @@ describe('Renewal carry purchase on ledger and grant shortcut (integration, real
          FROM subscriptions old
         WHERE subscriptions.id = $1 AND old.id = $2`,
       [subNext, subOld, startNext],
+    );
+    await h.ctx.sql.query(
+      `UPDATE subscription_lines SET closed_reason = 'RENEWED', closed_on = '2027-06-30' WHERE id = $1`,
+      [lineOld],
+    );
+    await h.ctx.sql.query(
+      `UPDATE subscription_lines SET closed_reason = 'RENEWED', closed_on = ($2::date - 1) WHERE id = $1`,
+      [lineOld, startNext],
     );
     const lineNext = await ensureOpenedLine({
       subscriptionId: subNext,

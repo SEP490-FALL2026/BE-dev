@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { SpendHarness, Unit } from '../../support/spend-harness';
 
@@ -55,6 +56,7 @@ describe('BR-MF1-09: the commitment of a K4 request granted from the key pool (i
   const approved = async (planId: string, amount: number): Promise<string> => {
     counter += 1;
     const u: Unit = await h.departmentWithHead(`P-K4C${counter}`);
+    await h.setItAdminInCharge(u.department, { employeeId: h.it1.employeeId, account: h.it1 });
     await h.budgetFor(u, { total: 100 * M, held: 0, spent: 0 });
     const id = await h.waitingForApprover(u, planId, { amount });
     await h.decideSpend(id, { decision: 'APPROVE' }, h.boss.account).expect(200);
@@ -135,13 +137,72 @@ describe('BR-MF1-09: the commitment of a K4 request granted from the key pool (i
     const { planId } = await k4Pool(1, 0);
     counter += 1;
     const u = await h.departmentWithHead(`P-K4C${counter}`);
+    await h.setItAdminInCharge(u.department, { employeeId: h.it1.employeeId, account: h.it1 });
     await h.budgetFor(u, { total: 200 * M, held: 0, spent: 0 });
     const p2 = await h.staff(u.department, `K4C-P2-${counter}`);
 
-    const reqDuc = await h.sentForPeople(planId, [u.member, p2], u.head.account, { termMonths: undefined });
-    await h.setPayments(reqDuc, { amount: 24 * M });
-    await h.sendOn([reqDuc], u.head.account).expect(201);
-    await h.decideSpend(reqDuc, { decision: 'APPROVE' }, h.boss.account).expect(200);
+    const reqDuc = randomUUID();
+    const needStepId = randomUUID();
+    const spendStepId = randomUUID();
+    const members = [u.member.employeeId, p2.employeeId];
+    const policyJson = JSON.stringify({
+      version: 1,
+      branch: 'PAID_IN_CATALOG',
+      chain: ['NEED', 'SPEND_APPROVAL'],
+      slaWorkingDays: 3,
+    });
+    await h.ctx.sql.query(
+      `INSERT INTO access_requests
+         (id, organization_id, type, branch, state, plan_id, department_id, cost_center_id,
+          requester_employee_id, business_reason, submitted_at, budget_year, amount_months,
+          amount_currency, unit_price_minor, amount_minor, pricing_status, policy, created_by_app_user_id)
+       VALUES ($1, $2, 'GROUP_GRANT', 'PAID_IN_CATALOG', 'AWAITING_EXECUTION', $3, $4, $5, $6,
+               'K4 request lot test', now(), $7, 1, 'VND', 12000000, 24000000, 'PRICED', $8::jsonb, $9)`,
+      [
+        reqDuc,
+        h.seed.organizationId,
+        planId,
+        u.department.id,
+        u.department.unitId,
+        u.head.employeeId,
+        h.year,
+        policyJson,
+        u.head.account.appUserId,
+      ],
+    );
+    await h.ctx.sql.query(
+      `INSERT INTO access_request_steps
+         (id, request_id, kind, sequence, state, assignee_employee_id, routing_row, sla_working_days, assigned_at, decided_at)
+       VALUES ($1, $2, 'NEED', 1, 'APPROVED', $3, 1, 3, now(), now()),
+              ($4, $2, 'SPEND_APPROVAL', 2, 'APPROVED', $5, 1, 3, now(), now())`,
+      [needStepId, reqDuc, u.head.employeeId, spendStepId, h.boss.employeeId],
+    );
+    await h.ctx.sql.query(
+      `INSERT INTO spend_decisions (step_id, request_id, decision, decided_by_employee_id, decided_at)
+       VALUES ($1, $2, 'APPROVED', $3, now())`,
+      [spendStepId, reqDuc, h.boss.employeeId],
+    );
+    for (let i = 0; i < members.length; i += 1) {
+      await h.ctx.sql.query(
+        `INSERT INTO access_request_beneficiaries (request_id, employee_id, position) VALUES ($1, $2, $3)`,
+        [reqDuc, members[i], i + 1],
+      );
+      await h.ctx.sql.query(
+        `INSERT INTO access_request_lines (request_id, employee_id, state, need_step_id) VALUES ($1, $2, 'APPROVED', $3)`,
+        [reqDuc, members[i], needStepId],
+      );
+      await h.ctx.sql.query(
+        `INSERT INTO access_request_line_amounts (request_id, employee_id, budget_year, amount_minor, currency, held)
+         VALUES ($1, $2, $3, 12000000, 'VND', true)`,
+        [reqDuc, members[i], h.year],
+      );
+    }
+    await h.ctx.sql.query(
+      `INSERT INTO budget_commitments
+         (id, organization_id, request_id, cost_center_id, year, amount_minor, currency, state, origin, unattached_reason)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, 24000000, 'VND', 'HELD', 'APPROVAL', 'NO_BUDGET')`,
+      [h.seed.organizationId, reqDuc, u.department.unitId, h.year],
+    );
 
     await h
       .grant({ requestId: reqDuc, beneficiaryEmployeeId: u.member.employeeId, purchase: { reason: 'Buy Duc lot' } })

@@ -29,6 +29,10 @@ describe('Subscription line update vs seat grant lock order (integration, real P
 
   beforeAll(async () => {
     await h.start();
+    await h.ctx.sql.query(`UPDATE departments SET it_admin_employee_id = $2 WHERE id = $1`, [
+      h.seed.departmentId,
+      h.it1.employeeId,
+    ]);
     for (let i = 0; i < 20; i += 1) {
       people.push(await h.person(`E-F4-${i}`));
     }

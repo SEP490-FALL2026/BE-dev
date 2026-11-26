@@ -76,9 +76,9 @@ describe('W3-23 P13b: K1 annual allocations, 01/01 pairing, F8 transfer (D-16), 
     await h.ctx.sql.query(
       `INSERT INTO access_requests
          (id, organization_id, type, branch, state, plan_id, department_id, cost_center_id,
-          requester_employee_id, submitted_at, budget_year, amount_months,
+          requester_employee_id, business_reason, submitted_at, budget_year, amount_months,
           next_year_amount_minor, amount_currency, term_months, unit_price_minor, billing_cycle, expected_end_date)
-       VALUES ($1, $2, 'GRANT', 'PAID_IN_CATALOG', 'COMPLETED', $3, $4, $5, $6,
+       VALUES ($1, $2, 'GRANT', 'PAID_IN_CATALOG', 'COMPLETED', $3, $4, $5, $6, 'K1 annual allocation test',
                '2026-11-05T02:00:00Z', $7, 2, $8, 'VND', 12, $9, 'MONTHLY', '2027-11-04')`,
       [
         requestId,

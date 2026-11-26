@@ -85,9 +85,9 @@ describe('W3-25 P20: license-lot charges, 3-order allocation invariant (= A), an
     await h.ctx.sql.query(
       `INSERT INTO access_requests
          (id, organization_id, type, branch, state, plan_id, department_id, cost_center_id,
-          requester_employee_id, submitted_at, budget_year, amount_months,
+          requester_employee_id, business_reason, submitted_at, budget_year, amount_months,
           amount_currency, unit_price_minor)
-       VALUES ($1, $2, $3, 'PAID_IN_CATALOG', 'AWAITING_EXECUTION', $4, $5, $6, $7, now(), $8, 1, 'VND', $9)`,
+       VALUES ($1, $2, $3, 'PAID_IN_CATALOG', 'AWAITING_EXECUTION', $4, $5, $6, $7, 'K4 lot charges test', now(), $8, 1, 'VND', $9)`,
       [
         requestId,
         h.seed.organizationId,

@@ -95,6 +95,10 @@ describe('BR-MF1-09: a K4 key back to the store and withdrawn from it (integrati
 
   beforeAll(async () => {
     await h.start();
+    await h.ctx.sql.query(`UPDATE departments SET it_admin_employee_id = $2 WHERE id = $1`, [
+      h.seed.departmentId,
+      h.it1.employeeId,
+    ]);
   }, 240000);
 
   afterAll(async () => {

@@ -69,9 +69,13 @@ describe('automatic renewal concurrency across two instances (integration, W3-21
     );
     await h.ctx.sql.query(
       `INSERT INTO subscriptions (id, organization_id, plan_id, kind, status, purchased_quantity, billing_cycle, commitment_term_months,
+         unit_price_minor, unit_price_currency, price_recorded_on, price_rate, price_rate_date, price_rate_source,
+         price_reporting_minor, price_reporting_currency, monthly_unit_price_minor,
          start_date, end_date, renewal_date, notice_deadline, auto_renew, allows_mid_term_reduction,
          responsible_it_admin_employee_id, workspace_id, seat_counting, minimum_seats_total, updated_at)
        VALUES ($1, $2, $3, 'TERM'::"SubscriptionKind", 'ACTIVE'::"SubscriptionStatus", 14, 'ANNUAL'::"BillingCycle", 12,
+         6000000, 'VND', $4::date, 1.0, $4::date, 'SAME_CURRENCY'::"PriceRateSource",
+         6000000, 'VND', 500000,
          $4::date, $5::date, $6::date, $7::date, true, false, $8, $9, 'FIXED', 5, now())`,
       [subId, h.seed.organizationId, planStdId, startDate, endDate, renewalOn, deadline, h.it1.employeeId, workspaceId],
     );
