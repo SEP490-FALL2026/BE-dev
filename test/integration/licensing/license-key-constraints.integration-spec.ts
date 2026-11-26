@@ -98,8 +98,8 @@ describe('license keys (integration, PostgreSQL constraints)', () => {
     );
     const planId = randomUUID();
     await sql.query(
-      `INSERT INTO plans (id, organization_id, application_id, name, normalized_name, provisioning_type, pricing_model, control_level)
-       VALUES ($1, $2, $3, 'Office 2021', 'office 2021', 'K4', 'PER_SEAT', 'FULL')`,
+      `INSERT INTO plans (id, organization_id, application_id, name, normalized_name, provisioning_type, pricing_model, control_level, key_binding)
+       VALUES ($1, $2, $3, 'Office 2021', 'office 2021', 'K4', 'PER_SEAT', 'FULL', 'ACCOUNT')`,
       [planId, organizationId, applicationId],
     );
     subscriptionId = randomUUID();

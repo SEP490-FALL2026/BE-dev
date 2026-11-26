@@ -102,6 +102,10 @@ describe('Renewal carry purchase on ledger and grant shortcut (integration, real
 
   beforeAll(async () => {
     await h.start();
+    await h.ctx.sql.query(`UPDATE departments SET it_admin_employee_id = $2 WHERE id = $1`, [
+      h.seed.departmentId,
+      h.it1.employeeId,
+    ]);
     for (let i = 0; i < 60; i += 1) {
       people.push(await h.person(`E-RCPX-${i}`));
     }

@@ -30,6 +30,10 @@ describe('W3-17 P13a: K1 grant without subscription (integration, real PostgreSQ
 
   beforeAll(async () => {
     await h.start();
+    await h.ctx.sql.query(`UPDATE departments SET it_admin_employee_id = $2 WHERE id = $1`, [
+      h.seed.departmentId,
+      h.it1.employeeId,
+    ]);
   }, 240000);
 
   afterAll(async () => {

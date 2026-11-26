@@ -27,14 +27,31 @@ async function createOpenedLine(input: {
     plan_id: string;
   }>(`SELECT organization_id, workspace_id, plan_id FROM subscriptions WHERE id = $1`, [input.subscriptionId]);
   const sub = rows[0];
-  const lineId = randomUUID();
-  await h.ctx.sql.query(
-    `INSERT INTO subscription_lines (
-       id, organization_id, subscription_id, workspace_id, plan_id,
-       monthly_unit_price_minor, updated_at
-     ) VALUES ($1, $2, $3, $4, $5, $6, now())`,
-    [lineId, sub.organization_id, input.subscriptionId, sub.workspace_id, sub.plan_id, input.monthlyUnitPriceMinor],
+  const existing = await h.ctx.sql.query<{ id: string }>(
+    `SELECT id FROM subscription_lines WHERE subscription_id = $1 AND plan_id = $2`,
+    [input.subscriptionId, sub.plan_id],
   );
+  let lineId: string;
+  if (existing.rows[0]) {
+    lineId = existing.rows[0].id;
+    await h.ctx.sql.query(
+      `UPDATE subscription_lines
+          SET monthly_unit_price_minor = $2,
+              ledger_opened_on = NULL,
+              updated_at = now()
+        WHERE id = $1`,
+      [lineId, input.monthlyUnitPriceMinor],
+    );
+  } else {
+    lineId = randomUUID();
+    await h.ctx.sql.query(
+      `INSERT INTO subscription_lines (
+         id, organization_id, subscription_id, workspace_id, plan_id,
+         monthly_unit_price_minor, updated_at
+       ) VALUES ($1, $2, $3, $4, $5, $6, now())`,
+      [lineId, sub.organization_id, input.subscriptionId, sub.workspace_id, sub.plan_id, input.monthlyUnitPriceMinor],
+    );
+  }
   const ledger = h.ctx.app.get(SeatLedgerApi, { strict: false });
   const runner = h.ctx.app.get(TransactionRunner);
   await runner.run((tx) =>
@@ -56,7 +73,7 @@ async function seedPendingK2GrantItem(
        FROM employees e
        JOIN app_users u ON u.employee_id = e.id
       WHERE e.id = $1`,
-    [h.it1],
+    [h.it1.employeeId],
   );
   const meta = rows[0];
   await h.ctx.sql.query(
@@ -93,6 +110,10 @@ describe('Seat purchase concurrency (integration, real PostgreSQL, W3-18)', () =
 
   beforeAll(async () => {
     await h.start();
+    await h.ctx.sql.query(`UPDATE departments SET it_admin_employee_id = $2 WHERE id = $1`, [
+      h.seed.departmentId,
+      h.it1.employeeId,
+    ]);
     for (let i = 0; i < 60; i += 1) {
       people.push(await h.person(`E-SPC-${i}`));
     }
@@ -114,7 +135,7 @@ describe('Seat purchase concurrency (integration, real PostgreSQL, W3-18)', () =
               end_date = '2027-06-30'::date,
               renewal_date = '2027-07-01'::date,
               billing_cycle = 'ANNUAL'::"BillingCycle",
-              seat_counting = 'FIXED'::"SeatCounting",
+              seat_counting = 'FIXED',
               monthly_unit_price_minor = 500000
         WHERE id = $1`,
       [subId],

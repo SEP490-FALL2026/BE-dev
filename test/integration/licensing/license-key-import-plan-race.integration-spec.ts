@@ -66,18 +66,28 @@ describe('license key import and the kind of its plan, racing (integration, P28-
   const key = (label: string) => `KEY-${label}-${randomUUID().slice(0, 8).toUpperCase()}-ABCDE`;
 
   it('change first: the import waits for the change of kind in flight, then refuses with nothing kept', async () => {
-    const { subscriptionId, planId } = await purchase();
+    const planId = await h.plan('K4');
     await holder.query('BEGIN');
-    await holder.query(`UPDATE plans SET provisioning_type = 'K1' WHERE id = $1`, [planId]);
+    await holder.query(`UPDATE plans SET provisioning_type = 'K1', key_binding = NULL WHERE id = $1`, [planId]);
 
-    const importing = importKeys(subscriptionId, [key('A'), key('B')]).then((response) => response);
+    const creating = request(h.server())
+      .post('/api/v1/license-lots')
+      .set(h.as(h.it1))
+      .send({
+        planId,
+        purchasedOn: '2026-11-25',
+        licenseCount: 2,
+        unitPrice: { amount: '100000', currency: 'VND' },
+        purpose: 'STOCK',
+      })
+      .then((response) => response);
     await waitForLockWaiters(h.ctx.sql, 1);
     await holder.query('COMMIT');
-    const response = await importing;
+    const response = await creating;
 
     expect(response.status).toBe(422);
-    expect(h.codeOf(response)).toBe('LICENSE_KEY.PLAN_NOT_K4');
-    expect(await keysOf(subscriptionId)).toBe(0);
+    expect(h.codeOf(response)).toBe('LICENSE_LOT.PLAN_NOT_K4');
+    expect((await h.ctx.sql.query(`SELECT 1 FROM license_lots WHERE plan_id = $1`, [planId])).rowCount).toBe(0);
   });
 
   it('import first: the change of kind waits for the import in flight, then is refused because the keys are kept', async () => {
@@ -98,10 +108,12 @@ describe('license key import and the kind of its plan, racing (integration, P28-
 
     const importing = importKeys(subscriptionId, [held, key('C')]).then((response) => response);
     await waitForLockWaiters(h.ctx.sql, 1);
-    const changing = changer.query(`UPDATE plans SET provisioning_type = 'K1' WHERE id = $1`, [planId]).then(
-      () => null,
-      (error: unknown) => error,
-    );
+    const changing = changer
+      .query(`UPDATE plans SET provisioning_type = 'K1', key_binding = NULL WHERE id = $1`, [planId])
+      .then(
+        () => null,
+        (error: unknown) => error,
+      );
     await waitForLockWaiters(h.ctx.sql, 2);
     await holder.query('ROLLBACK');
 

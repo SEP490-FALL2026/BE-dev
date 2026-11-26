@@ -72,7 +72,7 @@ describe('automatic renewal concurrency across two instances (integration, W3-21
          start_date, end_date, renewal_date, notice_deadline, auto_renew, allows_mid_term_reduction,
          responsible_it_admin_employee_id, workspace_id, seat_counting, minimum_seats_total, updated_at)
        VALUES ($1, $2, $3, 'TERM'::"SubscriptionKind", 'ACTIVE'::"SubscriptionStatus", 14, 'ANNUAL'::"BillingCycle", 12,
-         $4::date, $5::date, $6::date, $7::date, true, false, $8, $9, 'FIXED'::"SeatCounting", 5, now())`,
+         $4::date, $5::date, $6::date, $7::date, true, false, $8, $9, 'FIXED', 5, now())`,
       [subId, h.seed.organizationId, planStdId, startDate, endDate, renewalOn, deadline, h.it1.employeeId, workspaceId],
     );
     await h.ctx.sql.query(
@@ -83,8 +83,8 @@ describe('automatic renewal concurrency across two instances (integration, W3-21
     );
     await h.ctx.sql.query(
       `INSERT INTO seat_changes (id, organization_id, subscription_line_id, effective_on, delta, reason, source, basis)
-       VALUES (gen_random_uuid(), $1, $2, $3::date, 12, 'INITIAL'::"SeatChangeReason", 'ADJUSTMENT'::"SeatChangeSource", 'NONE'::"SeatChangeBasis"),
-              (gen_random_uuid(), $1, $4, $3::date, 2, 'INITIAL'::"SeatChangeReason", 'ADJUSTMENT'::"SeatChangeSource", 'NONE'::"SeatChangeBasis")`,
+       VALUES (gen_random_uuid(), $1, $2, $3::date, 12, 'INITIAL', 'ADJUSTMENT', 'NONE'),
+              (gen_random_uuid(), $1, $4, $3::date, 2, 'INITIAL', 'ADJUSTMENT', 'NONE')`,
       [h.seed.organizationId, lineStdId, startDate, linePrmId],
     );
     for (const member of unit.members) {
