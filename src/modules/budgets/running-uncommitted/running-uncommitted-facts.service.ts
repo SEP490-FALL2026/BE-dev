@@ -29,12 +29,22 @@ export class RunningUncommittedFactsService {
   ) {}
 
   /** Running uncommitted minor per Cost Center id for `year` (`Y` or `Y+1`) on `today` (defaults to business today). */
-  async ofYear(year: number, today?: BusinessDate, tx?: DbTx): Promise<Map<string, bigint>> {
-    return (await this.ofYearWithFlags(year, today, tx)).totals;
+  async ofYear(
+    year: number,
+    today?: BusinessDate,
+    tx?: DbTx,
+    options?: { exceptRequestIds?: readonly string[] },
+  ): Promise<Map<string, bigint>> {
+    return (await this.ofYearWithFlags(year, today, tx, options)).totals;
   }
 
   /** Running uncommitted minor and internal `NO_PRICE` flags (`K-A2`, `D-17`) per Cost Center for `year`. */
-  async ofYearWithFlags(year: number, today?: BusinessDate, tx?: DbTx): Promise<RunningUncommittedResult> {
+  async ofYearWithFlags(
+    year: number,
+    today?: BusinessDate,
+    tx?: DbTx,
+    options?: { exceptRequestIds?: readonly string[] },
+  ): Promise<RunningUncommittedResult> {
     const empty: RunningUncommittedResult = { totals: new Map(), flagsByCostCenter: new Map() };
     const resolvedToday = today ?? (await this.organizationReads.businessToday(new Date(), tx));
     const todayYear = Number(resolvedToday.slice(0, 4));
@@ -71,6 +81,8 @@ export class RunningUncommittedFactsService {
     const runMonthsBySubscription = seats.length > 0 ? await this.runMonthsOf(year, tx) : new Map();
     const k1ReferencePriceByPlan = new Map(k1Seats.map((seat) => [seat.planId, seat.referenceMonthlyPriceMinor]));
 
+    const exceptRequestIds = toExceptSet(options);
+
     return runningUncommittedWithFlagsByCostCenter({
       year,
       today: resolvedToday,
@@ -80,6 +92,7 @@ export class RunningUncommittedFactsService {
       runMonthsBySubscription,
       k1UnrequestedSeats: mappedK1Seats,
       k1ReferencePriceByPlan,
+      ...(exceptRequestIds ? { exceptRequestIds } : {}),
     });
   }
 
@@ -189,4 +202,10 @@ export class RunningUncommittedFactsService {
 
     return bySub;
   }
+}
+
+function toExceptSet(options?: { exceptRequestIds?: readonly string[] }): Set<string> | undefined {
+  const ids = options?.exceptRequestIds;
+
+  return ids && ids.length > 0 ? new Set(ids) : undefined;
 }

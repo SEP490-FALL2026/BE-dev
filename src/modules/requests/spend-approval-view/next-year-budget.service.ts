@@ -51,15 +51,17 @@ export class NextYearBudgetService {
         (subject.nextYearAmountMinor ?? 0n) > 0n,
     );
     const costCenterIds = keeping.flatMap((subject) => (subject.costCenterId === null ? [] : [subject.costCenterId]));
-    const [approved, kept, runningUncommitted] = await Promise.all([
+    const [approved, kept] = await Promise.all([
       this.budgets.approvedBudgetsOfYear(costCenterIds, year),
       this.repo.keptByCostCenter(
         costCenterIds,
         year,
         subjects.map((subject) => subject.requestId),
       ),
-      this.budgets.runningUncommittedOfYear(costCenterIds, year),
     ]);
+    const runningUncommitted = await this.budgets.runningUncommittedOfYear(costCenterIds, year, {
+      exceptRequestIds: kept.requestIds,
+    });
 
     const result = new Map<string, NextYearBudgetWire | null>(subjects.map((subject) => [subject.requestId, null]));
     const formatters = new Map<string, Awaited<ReturnType<SpendWireViewService['formatter']>>>();
@@ -68,7 +70,7 @@ export class NextYearBudgetService {
       const figures = nextYearBudgetOf({
         year,
         approvedMinor: budget ? budget.baseMinor + budget.reserveMinor : null,
-        keptByOthersMinor: kept.get(subject.costCenterId as string) ?? 0n,
+        keptByOthersMinor: kept.totals.get(subject.costCenterId as string) ?? 0n,
         runningUncommittedMinor: runningUncommitted.get(subject.costCenterId as string) ?? 0n,
         thisMinor: subject.nextYearAmountMinor ?? 0n,
       });

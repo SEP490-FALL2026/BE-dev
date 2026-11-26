@@ -310,5 +310,22 @@ describe('runningUncommittedByCostCenter (SPEC-B1 W3-08)', () => {
 
       expect(result.size).toBe(0);
     });
+
+    it('FIX-W3 B-2: skips seats belonging to exceptRequestIds while keeping other uncommitted seats', () => {
+      const result = runningUncommittedByCostCenter({
+        year: 2028,
+        today: '2027-11-15',
+        seats: [
+          seat({ assignmentId: 'a-kept', source: 'REQUEST', requestId: 'req-kept' }),
+          seat({ assignmentId: 'a-other', source: 'REQUEST', requestId: 'req-other' }),
+        ],
+        periodBySubscription: new Map([['sub-1', period({ monthlyPriceMinor: 400_000n, startDate: '2027-01-01' })]]),
+        commitmentByRequest: new Map(),
+        runMonthsBySubscription: new Map(),
+        exceptRequestIds: new Set(['req-kept']),
+      });
+
+      expect(result.get(CC_TK)).toBe(4_800_000n);
+    });
   });
 });

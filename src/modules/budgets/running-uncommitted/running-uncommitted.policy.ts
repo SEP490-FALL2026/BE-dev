@@ -53,6 +53,7 @@ export interface RunningUncommittedInput {
   runMonthsBySubscription: ReadonlyMap<string, ReadonlySet<number>>;
   k1UnrequestedSeats?: readonly RunningUncommittedK1Seat[];
   k1ReferencePriceByPlan?: ReadonlyMap<string, bigint | null>;
+  exceptRequestIds?: ReadonlySet<string>;
 }
 
 const EMPTY_MONTHS: ReadonlySet<number> = new Set();
@@ -102,9 +103,12 @@ function seatMonthsLeft(
   return monthsLeft;
 }
 
+const isInForceOn = (seat: { heldFrom: BusinessDate; heldUntil: BusinessDate | null }, today: BusinessDate): boolean =>
+  seat.heldFrom <= today && (seat.heldUntil === null || today < seat.heldUntil);
+
 function seatUncommittedCost(seat: RunningUncommittedSeat, input: RunningUncommittedInput): bigint {
-  if (seat.costCenterId === null) return 0n;
-  if (seat.heldFrom > input.today || (seat.heldUntil !== null && input.today >= seat.heldUntil)) return 0n;
+  if (seat.costCenterId === null || !isInForceOn(seat, input.today)) return 0n;
+  if (seat.requestId !== null && input.exceptRequestIds?.has(seat.requestId)) return 0n;
   if (!isUncommittedSeat(seat, input.commitmentByRequest)) return 0n;
 
   const period = input.periodBySubscription.get(seat.subscriptionId);

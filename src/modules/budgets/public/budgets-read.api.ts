@@ -1,10 +1,17 @@
 import { Injectable } from '@nestjs/common';
+import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { BudgetFactsRepo } from '../budget/budget-facts.repo';
 import type { YearBudgetFacts } from './budgets.types';
 
 export interface RunningUncommittedReader {
   ofCostCenterYears(costCenterId: string, years: readonly number[], tx?: DbTx): Promise<Map<number, bigint>>;
+  ofYear(
+    year: number,
+    today?: BusinessDate,
+    tx?: DbTx,
+    options?: { exceptRequestIds?: readonly string[] },
+  ): Promise<Map<string, bigint>>;
 }
 
 /** Read-only budget figures for the shared three-outcome check; never grants or releases a commitment. */
@@ -42,13 +49,14 @@ export class BudgetsReadApi {
   async runningUncommittedOfYear(
     costCenterIds: readonly string[],
     year: number,
+    options?: { exceptRequestIds?: readonly string[] },
     tx?: DbTx,
   ): Promise<Map<string, bigint>> {
     const result = new Map<string, bigint>();
     if (costCenterIds.length === 0 || this.runningUncommitted === null) return result;
+    const byCostCenter = await this.runningUncommitted.ofYear(year, undefined, tx, options);
     for (const costCenterId of new Set(costCenterIds)) {
-      const byYear = await this.runningUncommitted.ofCostCenterYears(costCenterId, [year], tx);
-      const amount = byYear.get(year) ?? 0n;
+      const amount = byCostCenter.get(costCenterId) ?? 0n;
       if (amount > 0n) result.set(costCenterId, amount);
     }
 

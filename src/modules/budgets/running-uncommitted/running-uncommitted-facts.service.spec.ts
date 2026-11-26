@@ -252,4 +252,30 @@ describe('RunningUncommittedFactsService', () => {
     const decTotals = await service.ofYear(2027, '2027-12-01');
     expect(decTotals.get(CC_TK)).toBe(500_000n);
   });
+
+  it('FIX-W3 B-2: excludes seats of exceptRequestIds in ofYear', async () => {
+    const { service, licensing, periods, organizationReads } = buildService();
+    licensing.getSeatsInForceOn.mockResolvedValue([
+      inForceSeat({ assignmentId: 'a-kept', source: 'REQUEST', requestId: 'req-kept', employeeId: 'emp-1' }),
+      inForceSeat({ assignmentId: 'a-open', source: 'BASELINE', requestId: null, employeeId: 'emp-1' }),
+    ]);
+    organizationReads.getOwningUnits.mockResolvedValue(
+      new Map([
+        ['emp-1', { departmentId: 'd-tk', costCenter: { id: CC_TK, code: 'TK', name: 'TK', status: 'ACTIVE' } }],
+      ]),
+    );
+    periods.getPurchaseFacts.mockResolvedValue([
+      {
+        subscriptionId: 'sub-1',
+        status: 'ACTIVE',
+        kind: 'TERM',
+        provisioningType: 'K2',
+        monthlyPriceMinor: 400_000n,
+        startDate: '2027-01-01',
+      },
+    ]);
+
+    const filtered = await service.ofYear(2028, '2027-11-15', undefined, { exceptRequestIds: ['req-kept'] });
+    expect(filtered.get(CC_TK)).toBe(4_800_000n);
+  });
 });
