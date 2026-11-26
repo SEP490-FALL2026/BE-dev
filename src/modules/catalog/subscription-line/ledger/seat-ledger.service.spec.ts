@@ -51,6 +51,7 @@ function makeHarness(
   const lines = {
     lock: jest.fn().mockResolvedValue(makeLine()),
     openLedger: jest.fn().mockResolvedValue(true),
+    touchUpdatedAt: jest.fn().mockResolvedValue(undefined),
     periodFactsOf: jest.fn().mockResolvedValue({ billingCycle: 'ANNUAL', invoicedLater: false }),
     findManyWithPeriod: jest.fn().mockResolvedValue([]),
     ...overrides.lines,
@@ -300,5 +301,24 @@ describe('SeatLedgerService', () => {
     expect(result.get('line-1')?.get('2026-11-20')).toBe(10);
     expect(result.get('line-1')?.get('2026-11-21')).toBe(12);
     expect(result.get('line-2')?.get('2026-11-21')).toBe(4);
+  });
+
+  it('F-12: insertLedgerRow bumps subscription_lines.updated_at in the same tx across ledger writes', async () => {
+    const { service, lines } = makeHarness();
+    const touch = (lines as unknown as { touchUpdatedAt: jest.Mock }).touchUpdatedAt;
+
+    await service.recordVendor(tx, 'line-1', {
+      delta: 1,
+      effectiveOn: '2026-11-21',
+      note: 'Vendor added seat',
+      actor,
+    });
+    expect(touch).toHaveBeenCalledWith(tx, 'line-1');
+
+    touch.mockClear();
+    await service.buyForItems(tx, 'line-1', [{ requestId: 'req-1', beneficiaryEmployeeId: 'emp-1' }], '2026-11-21', {
+      actor,
+    });
+    expect(touch).toHaveBeenCalledWith(tx, 'line-1');
   });
 });

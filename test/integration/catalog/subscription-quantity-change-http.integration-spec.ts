@@ -111,4 +111,44 @@ describe('subscription quantity change rules (real PostgreSQL)', () => {
       quantityChangeReason: 'New onboarding cohort',
     });
   });
+
+  it('F-12: two seat-corrections with the same expectedUpdatedAt return 201 then 409 SUBSCRIPTION_LINE.STALE', async () => {
+    const id = await h.subscription(6, 'K2');
+    await h.ctx.sql.query(`UPDATE subscriptions SET responsible_it_admin_employee_id = $2 WHERE id = $1`, [
+      id,
+      h.it1.employeeId,
+    ]);
+    const lineRow = (
+      await h.ctx.sql.query<{ id: string; updated_at: Date; today: string }>(
+        `SELECT id, updated_at, (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date::text AS today
+           FROM subscription_lines WHERE subscription_id = $1`,
+        [id],
+      )
+    ).rows[0];
+    const seen = lineRow.updated_at.toISOString();
+
+    await request(h.server())
+      .post(`/api/v1/subscription-lines/${lineRow.id}/seat-corrections`)
+      .set(h.as(h.it1))
+      .send({
+        delta: 1,
+        effectiveOn: lineRow.today,
+        note: 'First vendor adjustment',
+        expectedUpdatedAt: seen,
+      })
+      .expect(201);
+
+    const stale = await request(h.server())
+      .post(`/api/v1/subscription-lines/${lineRow.id}/seat-corrections`)
+      .set(h.as(h.it1))
+      .send({
+        delta: 1,
+        effectiveOn: lineRow.today,
+        note: 'Second vendor adjustment with stale version',
+        expectedUpdatedAt: seen,
+      })
+      .expect(409);
+
+    expect(h.codeOf(stale)).toBe('SUBSCRIPTION_LINE.STALE');
+  });
 });

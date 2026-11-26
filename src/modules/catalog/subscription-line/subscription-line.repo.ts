@@ -379,4 +379,9 @@ export class SubscriptionLineRepo {
 
     return closed.count === 1;
   }
+
+  /** Bumps `updated_at = now()` inside the caller's transaction so concurrent/subsequent optimistic checks see ledger writes. */
+  async touchUpdatedAt(tx: DbTx, id: string): Promise<void> {
+    await tx.$executeRaw`UPDATE subscription_lines SET updated_at = now() WHERE id = ${id}::uuid`;
+  }
 }

@@ -407,7 +407,10 @@ export class SeatLedgerService {
 
   private async insertLedgerRow(tx: DbTx, input: NewSeatChange): Promise<SeatChangeRecord> {
     try {
-      return await this.ledger.insert(tx, input);
+      const inserted = await this.ledger.insert(tx, input);
+      await this.lines.touchUpdatedAt(tx, input.subscriptionLineId);
+
+      return inserted;
     } catch (error) {
       if (isCheckViolation(error, 'seat_changes_below_occupancy')) throw new SeatLedgerBelowOccupancyError();
       throw error;
