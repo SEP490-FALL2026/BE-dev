@@ -300,4 +300,34 @@ describe('subscription-renewal-lines.policy (W3-21 per-line target, shortfall, R
     );
     expect(lineAdjustmentLabelOf({ point: '2027-05-02', deadline: '2027-06-01' }, '2027-05-10', 11, 11)).toBeNull();
   });
+
+  it('F-13 Ca 2D: adds shortfall to lineDecisions.target on minimumTotalHolderLineId so vendor-forced seat is not counted as missed (KPI-4 / label 1)', () => {
+    const computed = computeLineTargets(
+      [
+        makeLine({ subscriptionLineId: 'line-std', seatsToday: 10, heldPastRenewal: 4 }),
+        makeLine({ subscriptionLineId: 'line-prm', planId: 'plan-prm', seatsToday: 2, heldPastRenewal: 0 }),
+      ],
+      5,
+    );
+    const verdict = validateProposeLines({
+      targets: computed.lines,
+      shortfall: computed.shortfall,
+      adjustment: { commitment: 'ANNUAL', deadline: '2027-06-01' },
+      today: '2027-05-02',
+      proposedLines: [
+        { subscriptionLineId: 'line-std', quantity: 5 },
+        { subscriptionLineId: 'line-prm', quantity: 0 },
+      ],
+      minimumTotalHolderLineId: 'line-std',
+      minimumTotalNote: 'Vendor minimum total 5 seats',
+    });
+
+    expect('accepted' in verdict).toBe(true);
+    if ('accepted' in verdict) {
+      expect(verdict.accepted.lineDecisions).toEqual([
+        { subscriptionLineId: 'line-std', seatsNeeded: 4, target: 5, recordedQuantity: 5 },
+        { subscriptionLineId: 'line-prm', seatsNeeded: 0, target: 0, recordedQuantity: 0 },
+      ]);
+    }
+  });
 });

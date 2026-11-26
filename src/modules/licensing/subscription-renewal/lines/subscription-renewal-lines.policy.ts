@@ -233,12 +233,17 @@ export function validateProposeLines(input: {
   if (refusal) return { refusal };
 
   const totalSeatsToday = input.targets.reduce((sum, line) => sum + line.seatsToday, 0);
-  const lineDecisions = input.targets.map((line) => ({
-    subscriptionLineId: line.subscriptionLineId,
-    seatsNeeded: line.need,
-    target: line.target,
-    recordedQuantity: byId.get(line.subscriptionLineId) ?? 0,
-  }));
+  const lineDecisions = input.targets.map((line) => {
+    const holderBonus =
+      input.shortfall > 0 && line.subscriptionLineId === input.minimumTotalHolderLineId ? input.shortfall : 0;
+
+    return {
+      subscriptionLineId: line.subscriptionLineId,
+      seatsNeeded: line.need,
+      target: line.target + holderBonus,
+      recordedQuantity: byId.get(line.subscriptionLineId) ?? 0,
+    };
+  });
   const totalQuantity = lineDecisions.reduce((sum, line) => sum + line.recordedQuantity, 0);
   const { choice, quantity } = deriveChoiceFromTotals(totalQuantity, totalSeatsToday);
 

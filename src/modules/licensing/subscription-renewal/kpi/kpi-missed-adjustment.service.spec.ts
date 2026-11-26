@@ -116,4 +116,23 @@ describe('KpiMissedAdjustmentService', () => {
     expect(seatLedger.linesOfSubscription).not.toHaveBeenCalled();
     expect(linesService.targetsOfLines).not.toHaveBeenCalled();
   });
+
+  it('F-13 Ca 2D: vendor-forced shortfall stored in prior target yields missedSeats = 0 and 0 KPI-4', async () => {
+    const { service, linesService, seatLedger, periods, assignments } = build();
+    periods.getPurchaseFacts.mockResolvedValue([period({ purchasedQuantity: 5 })]);
+    seatLedger.linesOfSubscription.mockResolvedValue([line()]);
+    linesService.targetsOfLines.mockResolvedValue([
+      { subscriptionLineId: 'prior-std', renewalOn: '2027-07-01', target: 5 },
+    ]);
+    const daily = new Map<string, number>();
+    for (let d = '2027-07-01'; d < '2027-08-01'; d = addDays(d, 1)) daily.set(d, 5);
+    seatLedger.seatsOnDays.mockResolvedValue(new Map([['line-std', daily]]));
+    assignments.seatsOfPlans.mockResolvedValue(held(4, '2027-07-01'));
+
+    const result = await service.kpi4ForSubscription('sub-1', ['2027-07-01']);
+
+    expect(result.lines[0].missedSeats).toBe(0);
+    expect(result.totalSeatMonths).toBe(0);
+    expect(result.totalAmountMinor).toBe(0n);
+  });
 });
