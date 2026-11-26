@@ -149,7 +149,7 @@ id`; đếm + trang cùng snapshot (`API-LIST-DETAIL.1`).
   2. FE cũ khai Claude Premium **không** `workspaceId`, Anthropic có một workspace ⟹ 201 vào "Anthropic"; thêm workspace "Anthropic EU" rồi
      khai lại không `workspaceId` ⟹ 422 `SUBSCRIPTION.WORKSPACE_REQUIRED` (`workspaceIds` 2 mục); hãng mới chưa workspace ⟹ 201, workspace mới
      tên hãng, phụ trách = người khai.
-  3. Slack Pro `MEMBERS` cam kết 1, `renewalDate` ngày 05 ⟹ 201, `subscriptionRenewalAdjustmentGet` `adjustment: null`, lý do `MEMBER_COUNTED`;
+  3. Slack Pro `MEMBERS` cam kết 1, `renewalDate` ngày 05 ⟹ 409 `SUBSCRIPTION_RENEWAL.NOT_RENEWABLE` kèm `details.reason = 'MEMBER_COUNTED'` (theo chốt Owner 26/11 D-14, đổi từ 201 `adjustment: null`);
      `MEMBERS` cam kết 12 ⟹ 422; `MEMBERS` không `renewalDate` ⟹ 422 `SUBSCRIPTION.MEMBERS_PAYMENT_DAY_REQUIRED`.
   4. Thuê bao cũ sau M4 có `workspace` của hãng; `seatCounting = FIXED`; `invoicedLater = false`.
 - **Test:** unit `subscription-pool.policy.spec.ts` (C4, payment day), `subscription-obligation.policy.spec.ts` (`hasAdjustmentPoint`);
