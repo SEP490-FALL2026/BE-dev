@@ -58,8 +58,8 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
     return unit;
   }
 
-  async function newK2Pool(priceMinor = STD): Promise<{ subscriptionId: string; planId: string }> {
-    const subscriptionId = await h.subscription(20, 'K2');
+  async function newK2Pool(priceMinor = STD, capacity = 50): Promise<{ subscriptionId: string; planId: string }> {
+    const subscriptionId = await h.subscription(capacity, 'K2');
     const planId = await h.planOf(subscriptionId);
     await h.ctx.sql.query(
       `UPDATE subscriptions
@@ -70,6 +70,12 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
               end_date = $4::date
         WHERE id = $1`,
       [subscriptionId, priceMinor.toString(), `${h.year}-01-01`, `${h.year}-12-31`],
+    );
+    await h.ctx.sql.query(
+      `UPDATE subscription_lines
+          SET monthly_unit_price_minor = $2
+        WHERE subscription_id = $1`,
+      [subscriptionId, priceMinor.toString()],
     );
     return { subscriptionId, planId };
   }
@@ -92,6 +98,12 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
       `UPDATE subscriptions
           SET unit_price_minor = $2, monthly_unit_price_minor = $2, price_reporting_minor = $2
         WHERE id = $1`,
+      [subscriptionId, priceMinor.toString()],
+    );
+    await h.ctx.sql.query(
+      `UPDATE subscription_lines
+          SET monthly_unit_price_minor = $2
+        WHERE subscription_id = $1`,
       [subscriptionId, priceMinor.toString()],
     );
   }
