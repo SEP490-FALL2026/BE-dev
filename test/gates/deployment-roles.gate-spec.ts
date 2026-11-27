@@ -456,6 +456,8 @@ describe('the production image carries the production dependencies only', () => 
       'bullmq',
       'ioredis',
       '@nest-lab/throttler-storage-redis',
+      '@bull-board/api',
+      '@bull-board/express',
     ];
 
     expect(needed.filter((name) => !(name in manifest.dependencies))).toEqual([]);

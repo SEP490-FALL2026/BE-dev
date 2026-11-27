@@ -67,6 +67,8 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1107.0",
     "@aws-sdk/s3-request-presigner": "^3.1107.0",
+    "@bull-board/api": "9.13.1",
+    "@bull-board/express": "9.13.1",
     "@nest-lab/throttler-storage-redis": "1.2.0",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.4",

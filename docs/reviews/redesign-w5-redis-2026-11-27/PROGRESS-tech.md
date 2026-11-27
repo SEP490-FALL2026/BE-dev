@@ -27,8 +27,8 @@ Tracker sống qua compact context. Người code đọc lại file này **đầ
 | T7  | notifications: điều kiện chung, `claimById`, M4                    | xong       | `4e97112b` | Tái hiện poll nhận lượt 6 trước sửa. Sau sửa unit 13/13 và email outbox integration 18/18. Typecheck, lint file sửa, arch:check, arch:capabilities notifications, rules:check và 340 gate đạt. OpenAPI không drift. | — | Jest báo QUERYWRAP từ SMTP fixture trên Windows, có ngay ở lượt đỏ; lệnh xanh kết thúc exit 0. |
 | T8  | queue + relay + công tắc                                           | xong       | `8c4d1baf` | Unit 12/12, integration timing PostgreSQL + Redis 3/3, typecheck, lint file sửa, arch:check, rules:check, discovery và 342 gate đạt. OpenAPI không drift. Audit sạch, một bản ioredis. | — | D-4, D-5. |
 | T9  | consumer mail                                                      | xong       | `10a87926` | Unit 18/18, integration Redis + PostgreSQL + SMTP 5/5, typecheck, lint file sửa, arch:check, rules:check và 342 gate đạt. OpenAPI không drift. | — | Đã kiểm mất Redis, job cũ, retry SMTP, shutdown, dedup stalled và dữ liệu Redis/log. |
-| T9b | R-11 job dọn đêm (Owner 27/11: C1–C4, 30 ngày, chạy khi khởi động) | xong       | commit T9b | Unit runner/scheduler/poll, integration bảo trì 2/2, mail regression 5/5, 343 gate, typecheck, lint, architecture/capabilities. | — | Một dòng mô tả OpenAPI cho `invitation.delivery`. |
-| T10 | Bull Board                                                         | chưa       |     |                                                 |               |                          |
+| T9b | R-11 job dọn đêm (Owner 27/11: C1–C4, 30 ngày, chạy khi khởi động) | xong       | `40df5dfd` | Unit runner/scheduler/poll, integration bảo trì 2/2, mail regression 5/5, 343 gate, typecheck, lint, architecture/capabilities. | — | Một dòng mô tả OpenAPI cho `invitation.delivery`. |
+| T10 | Bull Board                                                         | xong       | commit T10 | Unit 33/33 (gồm env), Redis integration 2/2 với `--detectOpenHandles`, Chrome, 81 gate tập trung, typecheck/lint, audit production sạch. | — | Một bản ioredis; CSP mặc định. |
 | T11 | chốt, ca diệt đột biến                                             | chưa       |     |                                                 |               |                          |
 | C2  | CI full toàn đợt                                                   | chưa       |     |                                                 |               |                          |
 
@@ -53,6 +53,7 @@ Trạng thái: `chưa` · `đang làm` · `xong` (chỉ sau khi đối chiếu t
 | T8 | R-03 (a)–(f) phần relay và R-05 (b)(c), hai transport, dedup, Redis hồi phục | `email-queue-relay.timing-spec.ts`, `outbox-relay.job.spec.ts`, `module-graph.gate-spec.ts` | `outbox-relay.job.ts:47`, `queue-producers.ts:20`, `worker.module.ts:34` |
 | T9 | R-03 (f), R-04 (a)–(j), R-05 (d), R-08 (c), worker gửi mail và chỉ lưu mã | `email-queue-delivery.integration-spec.ts`, `email-queue.job.spec.ts` | `email-queue.job.ts:41`, `email-queue.job.ts:55` |
 | T9b | R-11 (a)–(j), lịch Việt Nam, phục hồi Redis, chạy lúc khởi động, giới hạn lô và giữ lời mời mới nhất | `nightly-maintenance.integration-spec.ts`, `nightly-maintenance.job.spec.ts`, `nightly-maintenance.runner.spec.ts`, `email-delivery.api.spec.ts`, `module-graph.gate-spec.ts` | `nightly-maintenance.job.ts:86`, `nightly-maintenance.runner.ts:43`, `session.repo.ts:187`, `action-token.repo.ts:24`, `notifications.repo.ts:36` |
+| T10 | R-06 (a)–(i), dashboard chỉ đọc ngoài OpenAPI, xác thực và CSP | `queue-board-auth.spec.ts`, `queue-board.mount.spec.ts`, `queue-board.integration-spec.ts`, `env-matrix.spec.ts`, Chrome headless | `queue-board.mount.ts:19`, `queue-board.mount.ts:44`, `queue-board-auth.ts:15`, `redis.config.ts:104` |
 
 ## Trọng tâm review (PLAN) → test
 
@@ -62,7 +63,7 @@ Trạng thái: `chưa` · `đang làm` · `xong` (chỉ sau khi đối chiếu t
 | 2   | Redis đầy (OOM)                                     |      |         |
 | 3   | Job lạ trong hàng                                   |      |         |
 | 4   | `poll` rồi `bullmq`, job cũ của dòng đã `SENT`      |      |         |
-| 5   | Mật khẩu Bull Board có `:`/không ASCII, base64 hỏng |      |         |
+| 5   | Mật khẩu Bull Board có `:`/không ASCII, base64 hỏng | `queue-board-auth.spec.ts`, `queue-board.integration-spec.ts` | Xanh |
 
 ## Ca diệt đột biến (T1, T11)
 
@@ -80,10 +81,10 @@ Trạng thái: `chưa` · `đang làm` · `xong` (chỉ sau khi đối chiếu t
 
 | Việc                                                                       | Kết quả |
 | -------------------------------------------------------------------------- | ------- |
-| Bull Board trên trình duyệt, CSP mặc định, console sạch (T10)              |         |
+| Bull Board trên trình duyệt, CSP mặc định, console sạch (T10)              | Chrome headless đăng nhập qua Basic Auth, render `email-delivery`, API dashboard 200, 0 lỗi CSP ở console. |
 | `docker compose up -d --wait` local: `postgres`, `redis` healthy (T5)      | Cả hai healthy trong project kiểm thử. |
 | `--detectOpenHandles` cho I-1 (T4)                                         |         |
-| `--detectOpenHandles` cho I-4 board bật (T10)                              |         |
+| `--detectOpenHandles` cho I-4 board bật (T10)                              | 2/2, exit 0, không báo handle mở. |
 | `pnpm openapi:export` khi Redis tắt (T4)                                   |         |
 | ca `CLIENT PAUSE` ở `_serial` chạy trong job `integration-inband` (T4, C1) |         |
 
@@ -98,6 +99,7 @@ Trạng thái: `chưa` · `đang làm` · `xong` (chỉ sau khi đối chiếu t
 | D-5 | T8 | Gate yêu cầu chạy riêng test có ngưỡng thời gian. BullMQ 6.0.11 đặt client trên backend. | Dùng runner `.timing-spec.ts` và `getBackend().client` để quan sát client trong test. | Giữ ngưỡng 200/400 ms và kiểm cùng client khi Redis nối lại. | `email-queue-relay.timing-spec.ts` |
 | D-6 | T9b | Housekeeping cần repo token riêng trong đồ thị worker | Đăng ký repo token dưới token DI riêng và export đúng một facade, cập nhật gate phiên cho hai worker | Giữ repository private và kiểm kỹ facade chỉ có trong worker | `identity-access-housekeeping-facade.module.ts`, `module-graph.gate-spec.ts` |
 | D-7 | T9b | Review tái hiện worker treo khi shutdown trước Redis ready, lệnh ghi có thể treo trên socket im lặng, trùng log lỗi kết nối | Chỉ chạy khi BullMQ ready, đóng ngay worker chưa chạy, timeout lệnh ghi 1 giây và giữ log chuyển trạng thái cho lỗi retryable | Lượt gửi đang chạy vẫn hoàn tất trước khi đóng; vị trí timeout dùng chung relay và scheduler | `queue-worker-factory.ts`, `queue-producers.ts` |
+| D-8 | T10 | Bull Board 9.13.1 dùng PUT để xóa qua đường `clean`, còn đặc tả yêu cầu cả DELETE trả 405 | Adapter cấu hình chỉ đọc và middleware chỉ nhận GET/HEAD sau khi xác thực | Mọi phương thức ghi đều bị chặn, kể cả đường xóa tương thích đặc tả | `queue-board.mount.ts`, `queue-board.integration-spec.ts` |
 
 ## Điểm gộp đã gặp
 

@@ -41,6 +41,7 @@ import { NotificationsModule } from '../../src/modules/notifications/notificatio
 import { PayloadCipher } from '../../src/modules/notifications/email/payload-cipher.service';
 import { ObjectStorageModule } from '../../src/infrastructure/object-storage/object-storage.module';
 import { QueueInfrastructureModule } from '../../src/infrastructure/queue/queue-infrastructure.module';
+import { QueueBoardModule } from '../../src/infrastructure/queue/queue-board.module';
 import { EmailDispatchLoop } from '../../src/worker/email-dispatch.job';
 import { RequestWorkLoop } from '../../src/worker/request-work.job';
 import { RecoveryCliModule } from '../../src/cli/recover/recover-cli.module';
@@ -527,7 +528,13 @@ describe('module graph', () => {
         name,
         storage: modules.includes(ObjectStorageModule),
         queue: modules.includes(QueueInfrastructureModule),
-      }).toEqual({ name, storage: name === 'AppModule', queue: name === 'WorkerModule(bullmq)' });
+        board: modules.includes(QueueBoardModule),
+      }).toEqual({
+        name,
+        storage: name === 'AppModule',
+        queue: name === 'WorkerModule(bullmq)',
+        board: name === 'AppModule',
+      });
     }
   });
 
