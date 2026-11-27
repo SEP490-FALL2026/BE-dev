@@ -4,6 +4,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { SeatLedgerService } from './ledger/seat-ledger.service';
 import { SubscriptionLinePeriodStillDraftError } from './subscription-line.errors';
+import { compareLineOrder } from './subscription-line.policy';
 import { SubscriptionLineRepo } from './subscription-line.repo';
 import type { SubscriptionLineClosedReason, SubscriptionLineRecord } from './subscription-line.types';
 
@@ -105,7 +106,11 @@ export class SubscriptionPeriodLinesService {
     },
   ): Promise<void> {
     if (!input.workspaceId || input.resolved.length === 0) return;
-    const kept = input.resolved.filter((entry) => entry.quantity > 0);
+    // The lines are made in the order of the lines they renew (`created_at`, `id`), whatever the order the renewal named them in: the first
+    // line of the next renewal is the first of this order.
+    const kept = input.resolved
+      .filter((entry) => entry.quantity > 0)
+      .sort((a, b) => compareLineOrder(a.oldLine, b.oldLine));
     const created: { lineId: string; quantity: number }[] = [];
     for (const entry of kept) {
       const line = await this.lines.insert(tx, {

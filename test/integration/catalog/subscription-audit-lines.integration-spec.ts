@@ -65,13 +65,21 @@ describe('the lines of a period: renewal price, zero price, move, declarer and r
         [id],
       )
     ).rows[0];
-  const renew = async (period: PeriodWire, startDate: string, quantities: readonly number[] = []) => {
+  const renew = async (
+    period: PeriodWire,
+    startDate: string,
+    quantities: readonly number[] = [],
+    named: 'AS_READ' | 'REVERSED' = 'AS_READ',
+  ) => {
     const actor = await principalOf(h.ctx, h.it1.accessToken);
 
     return h.ctx.app.get(TransactionRunner).run((tx) =>
       h.ctx.app.get(SubscriptionPeriodApi).recordNextPeriod(tx, actor, {
         previousSubscriptionId: period.id,
-        lines: period.lines.map((line, index) => ({ previousLineId: line.id, quantity: quantities[index] ?? 2 })),
+        lines: (named === 'REVERSED' ? [...period.lines].reverse() : period.lines).map((line, index) => ({
+          previousLineId: line.id,
+          quantity: quantities[index] ?? 2,
+        })),
         billingCycle: 'ANNUAL',
         startDate,
         autoRenew: true,
@@ -127,6 +135,24 @@ describe('the lines of a period: renewal price, zero price, move, declarer and r
       const row = await periodRow(next.subscriptionId);
       expect(row).toMatchObject({ unit_price_minor: '9600000', plan_id: plans[0].planId });
       expect(row.monthly_unit_price_minor).toBe('800000');
+    });
+  });
+
+  describe('A-1: the order of the lines of a renewed period is the order of the period before, not the order the renewal named them in', () => {
+    it('prices the renewal after one that named the Premium line first by the Standard line, the first of the lines: 12 x 500.000', async () => {
+      const { plans } = await vendorPlans(2);
+      const declared = h.dataOf<PeriodWire>(
+        await declareLines(plans, ['500000', '800000'], { startDate: '2025-01-01', endDate: '2025-12-31' }).expect(201),
+      );
+
+      const first = await renew(await read(declared.id), '2026-01-01', [], 'REVERSED');
+      const second = await renew(await read(first.subscriptionId), '2027-01-01');
+
+      expect(await periodRow(first.subscriptionId)).toMatchObject({ unit_price_minor: '6000000' });
+      expect(await periodRow(second.subscriptionId)).toMatchObject({
+        unit_price_minor: '6000000',
+        monthly_unit_price_minor: '500000',
+      });
     });
   });
 

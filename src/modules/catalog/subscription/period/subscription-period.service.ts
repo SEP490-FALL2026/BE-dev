@@ -14,6 +14,7 @@ import type {
   RenewalPeriodFacts,
   SubscriptionPurchaseFacts,
 } from '../../public/subscription-period.types';
+import { compareLineOrder } from '../../subscription-line/subscription-line.policy';
 import { SubscriptionPeriodLinesService } from '../../subscription-line/subscription-period-lines.service';
 import type { SubscriptionLineRecord } from '../../subscription-line/subscription-line.types';
 import {
@@ -134,9 +135,7 @@ function scheduleOf(row: PaidTermRow): PaymentScheduleFacts | null {
 function firstLineOf<T extends { oldLine: Pick<SubscriptionLineRecord, 'id' | 'createdAt'> }>(
   entries: readonly T[],
 ): T | undefined {
-  return [...entries].sort(
-    (a, b) => a.oldLine.createdAt.getTime() - b.oldLine.createdAt.getTime() || (a.oldLine.id < b.oldLine.id ? -1 : 1),
-  )[0];
+  return [...entries].sort((a, b) => compareLineOrder(a.oldLine, b.oldLine))[0];
 }
 
 /**

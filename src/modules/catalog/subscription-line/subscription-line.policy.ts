@@ -36,7 +36,7 @@ export function isLineServingOn(line: ServingLineInput, day: BusinessDate, subsc
 }
 
 /** Compares two lines by creation time, then by id as a deterministic tie-breaker. */
-function compareLineOrder(
+export function compareLineOrder(
   a: Pick<LineCandidate, 'createdAt' | 'id'>,
   b: Pick<LineCandidate, 'createdAt' | 'id'>,
 ): number {

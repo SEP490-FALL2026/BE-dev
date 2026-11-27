@@ -102,6 +102,30 @@ describe('SubscriptionPeriodLinesService (P18 renewal close & continuation lines
     });
   });
 
+  it('createRenewedLines makes the lines in the order of the lines they renew (created_at, id), whatever order the renewal named them in', async () => {
+    const std = line({ id: 'line-std', planId: 'plan-std', createdAt: new Date('2026-01-01T00:00:00Z') });
+    const prm = line({ id: 'line-prm', planId: 'plan-prm', createdAt: new Date('2026-01-02T00:00:00Z') });
+    lines.insert.mockReset();
+    lines.insert.mockResolvedValueOnce(line({ id: 'next-1' })).mockResolvedValueOnce(line({ id: 'next-2' }));
+
+    await service.createRenewedLines(tx, {
+      organizationId: 'org-1',
+      nextSubscriptionId: 'sub-2',
+      workspaceId: 'ws-1',
+      startDate: '2027-01-01',
+      renewalId: null,
+      autoRecorded: false,
+      recordedByEmployeeId: 'emp-1',
+      resolved: [
+        { oldLine: prm, quantity: 2, monthlyUnitPriceMinor: 100000n },
+        { oldLine: std, quantity: 3, monthlyUnitPriceMinor: 50000n },
+      ],
+    });
+
+    const inserted = (lines.insert.mock.calls as unknown[][]).map((call) => (call[1] as { planId: string }).planId);
+    expect(inserted).toEqual(['plan-std', 'plan-prm']);
+  });
+
   it('F-2: hasPricedLines is true only when at least one line exists and every line has monthlyUnitPriceMinor > 0n', async () => {
     lines.ofSubscriptions.mockResolvedValueOnce(new Map());
     await expect(service.hasPricedLines('sub-1', tx)).resolves.toBe(false);
