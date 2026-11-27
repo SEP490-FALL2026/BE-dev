@@ -49,6 +49,9 @@ const PRODUCTION_ACTIVE = {
   SMTP_HOST: 'smtp.example.com',
   SMTP_FROM: 'no-reply@licenses.example.com',
   SMTP_TLS: 'true',
+  TRUST_PROXY_HOPS: '1',
+  REDIS_HOST: 'redis.internal',
+  REDIS_PASSWORD: 'matrix-redis-password',
 };
 
 const QUEUE_AND_STORAGE = {
@@ -65,6 +68,7 @@ describe('environment matrix by NODE_ENV (H6.3 characterization)', () => {
     const config = validateEnvironment({ NODE_ENV: 'test' });
 
     expect(missing({ NODE_ENV: 'test' })).toEqual([]);
+    expect(config).toMatchObject({ RATE_LIMIT_STORE: 'memory', BACKGROUND_JOBS_TRANSPORT: 'poll' });
     for (const key of SECRETS) expect(config[key as keyof typeof config]).toEqual(expect.any(String));
   });
 
@@ -103,7 +107,7 @@ describe('environment matrix by NODE_ENV (H6.3 characterization)', () => {
     },
   );
 
-  it('production: requires the database, auth, mail, outbox and license key vault settings, and nothing of the queue or storage (E2 = A)', () => {
+  it('production: requires the active settings and the Redis host (the defaults use Redis), nothing of the storage', () => {
     expect(missing({ NODE_ENV: 'production' })).toEqual(
       [
         'APP_PUBLIC_URL',
@@ -115,28 +119,67 @@ describe('environment matrix by NODE_ENV (H6.3 characterization)', () => {
         'LICENSE_KEY_VAULT_KEY_ID',
         'OUTBOX_PAYLOAD_KEY',
         'OUTBOX_PAYLOAD_KEY_ID',
+        'REDIS_HOST',
         'SMTP_FROM',
         'SMTP_HOST',
       ].sort(),
     );
   });
 
-  it('production: the validator boots on the active settings alone, without Redis or object storage keys (the storage module checks its own, ADR-0014)', () => {
+  it('production validates Redis settings and leaves object storage to its module', () => {
     const config = validateEnvironment(PRODUCTION_ACTIVE);
 
-    expect(Object.keys(config).filter((key) => /^(REDIS|OBJECT_STORAGE)_/.test(key))).toEqual([]);
-    // Supplied anyway (an env file shared with a future deployment), they are passed through unread and unvalidated.
-    expect(validateEnvironment({ ...PRODUCTION_ACTIVE, ...QUEUE_AND_STORAGE, REDIS_PORT: 'not-a-port' })).toMatchObject(
-      { REDIS_PORT: 'not-a-port', REDIS_HOST: 'redis.internal' },
-    );
+    expect(Object.keys(config).filter((key) => key.startsWith('OBJECT_STORAGE_'))).toEqual([]);
+    expect(config).toMatchObject({ REDIS_HOST: 'redis.internal' });
+  });
+
+  it.each([{}, { QUEUE_BOARD_ENABLED: 'false' }])(
+    'production can run without Redis when all Redis-backed features are off (%j)',
+    (board) => {
+      const { REDIS_HOST: _host, REDIS_PASSWORD: _password, ...active } = PRODUCTION_ACTIVE;
+      void [_host, _password];
+      expect(() =>
+        validateEnvironment({ ...active, RATE_LIMIT_STORE: 'memory', BACKGROUND_JOBS_TRANSPORT: 'poll', ...board }),
+      ).not.toThrow();
+    },
+  );
+
+  it.each(['development', 'production'])('%s defaults to Redis and BullMQ', (NODE_ENV) => {
+    expect(validateEnvironment({ ...PRODUCTION_ACTIVE, NODE_ENV })).toMatchObject({
+      RATE_LIMIT_STORE: 'redis',
+      BACKGROUND_JOBS_TRANSPORT: 'bullmq',
+    });
+  });
+
+  it.each([
+    [
+      'a short board password',
+      { QUEUE_BOARD_ENABLED: 'true', QUEUE_BOARD_USERNAME: 'ops', QUEUE_BOARD_PASSWORD: 'x'.repeat(19) },
+      'QUEUE_BOARD_PASSWORD',
+    ],
+    [
+      'matching board credentials',
+      { QUEUE_BOARD_ENABLED: 'true', QUEUE_BOARD_USERNAME: 'x'.repeat(20), QUEUE_BOARD_PASSWORD: 'x'.repeat(20) },
+      'QUEUE_BOARD_PASSWORD',
+    ],
+    ['an invalid Redis prefix', { REDIS_KEY_PREFIX: 'SLM' }, 'REDIS_KEY_PREFIX'],
+  ] as const)('production refuses %s', (_name, override, key) => {
+    const validate = () => validateEnvironment({ ...PRODUCTION_ACTIVE, ...override });
+    expect(validate).toThrow(EnvironmentValidationError);
+    expect(validate).toThrow(key);
   });
 
   it.each<[string, Record<string, string>, string]>([
     ['SMTP without TLS', { SMTP_TLS: 'false' }, 'SMTP_TLS'],
     ['an HTTP public URL', { APP_PUBLIC_URL: 'http://licenses.example.com' }, 'APP_PUBLIC_URL'],
     ['a wildcard CORS origin', { CORS_ORIGINS: '*' }, 'CORS_ORIGINS'],
+    ['an invalid Redis port', { REDIS_PORT: 'not-a-port' }, 'REDIS_PORT'],
+    ['a missing Redis password', { REDIS_PASSWORD: '' }, 'REDIS_PASSWORD'],
+    ['zero trusted proxy hops', { TRUST_PROXY_HOPS: '0' }, 'TRUST_PROXY_HOPS'],
   ])('production refuses %s', (_name, override, message) => {
-    expect(() => validateEnvironment({ ...PRODUCTION_ACTIVE, ...QUEUE_AND_STORAGE, ...override })).toThrow(message);
+    const validate = () => validateEnvironment({ ...PRODUCTION_ACTIVE, ...QUEUE_AND_STORAGE, ...override });
+    expect(validate).toThrow(EnvironmentValidationError);
+    expect(validate).toThrow(message);
   });
 
   it('installation: only the database settings, whatever NODE_ENV, and no secret is read', () => {

@@ -28,6 +28,13 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U ci_bootstrap -d postgres"
           --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - name: Check out dev
         uses: actions/checkout@v4
@@ -49,17 +56,20 @@ jobs:
       - name: Run every integration suite (parallel files)
         env:
           TEST_DATABASE_ADMIN_URL: postgresql://ci_integration:ci-integration-only@127.0.0.1:5432/postgres
+          TEST_REDIS_URL: redis://127.0.0.1:6379
           TEST_CLI_RUNTIME: dist
         run: pnpm test:integration --maxWorkers=2
 
       - name: Run integration tests that bound wall-clock time (in band)
         env:
           TEST_DATABASE_ADMIN_URL: postgresql://ci_integration:ci-integration-only@127.0.0.1:5432/postgres
+          TEST_REDIS_URL: redis://127.0.0.1:6379
         run: pnpm test:integration:timing
 
       - name: Run integration tests that share the cluster (in band)
         env:
           TEST_DATABASE_ADMIN_URL: postgresql://ci_integration:ci-integration-only@127.0.0.1:5432/postgres
+          TEST_REDIS_URL: redis://127.0.0.1:6379
           TEST_CLI_RUNTIME: dist
           TEST_DATABASE_BOOTSTRAP_URL: postgresql://ci_bootstrap:ci-bootstrap-only@127.0.0.1:5432/postgres
         run: pnpm test:integration:serial

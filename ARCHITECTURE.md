@@ -22,7 +22,7 @@ ba tiến trình chạy từ cùng một image. Ranh giới module, tầng và c
 | Tiến trình | Điểm vào (`dist/`)                       | Ghép ở                        | Làm gì                                                                                                       |
 | ---------- | ---------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | API        | `main.js`                                | `src/app/app.module.ts`       | HTTP `/api/v1/*`, các sweeper theo giờ ([ADR-0018](docs/decisions/0018-sweepers-stay-in-the-api-process.md)) |
-| Worker     | `worker.js`                              | `src/worker/worker.module.ts` | Gửi email từ outbox, xử lý bước mở của Request (thăm dò PostgreSQL, không Redis)                             |
+| Worker     | `worker.js`                              | `src/worker/worker.module.ts` | Gửi email từ outbox qua BullMQ hoặc polling, dọn đêm, thăm dò các bước mở của Request                        |
 | Lệnh       | `cli.js <lệnh>` (+ alias `<tên>-cli.js`) | `src/cli/commands.ts`         | Cài đặt, khôi phục, kiểm tra, preflight, role DB, seed local/VPS                                             |
 
 Alias `dist/<tên>-cli.js` sinh từ bảng lệnh lúc build. Ngoại lệ OD-S3: alias demo-dataset/dev-seed đã bỏ khi chuyển sang seed và dựng lại VPS demo; alias khác giữ ổn định.
@@ -34,14 +34,14 @@ Reset thuộc wrapper local/VPS, không thuộc Nest hay CI/CD; xem [seed](docs/
 
 ```text
 src/core            TypeScript thuần (ngày nghiệp vụ, tiền, extension point) — không phụ thuộc gì
-src/infrastructure  adapter kỹ thuật (config, database, HTTP, bảo mật, mail, storage, queue dự phòng) — chỉ dùng core
+src/infrastructure  adapter kỹ thuật (config, database, HTTP, bảo mật, mail, storage, Redis, queue) — chỉ dùng core
 src/modules/*       bounded context nghiệp vụ, xếp theo tầng dưới đây
 src/app, worker, cli  ghép tiến trình; chỉ chạm module qua public/ và *.module.ts
 ```
 
-`src/infrastructure/queue` (BullMQ/Redis) là **hạ tầng dự phòng, chưa có consumer** (Owner `OD-R5`: giữ cho tương lai). Chưa
-process nào mount `QueueInfrastructureModule`, nên API, worker và lệnh không cần Redis và không kiểm cấu hình Redis; module nào
-mount nó sau này mới có validation chặt (`REDIS_HOST`, `REDIS_PASSWORD` ở production).
+Worker `bullmq` dùng `QueueInfrastructureModule` cho `email-delivery` và `nightly-maintenance`. PostgreSQL giữ outbox và lease,
+còn Redis chuyển ID dòng tới consumer. API dùng Redis cho rate limit và có thể bật Bull Board chỉ đọc ở `/ops/queues`.
+Production yêu cầu `REDIS_HOST` và `REDIS_PASSWORD` khi dùng Redis. Xem [ADR-0020](docs/decisions/0020-redis-bullmq-outbox-relay-and-rate-limit.md).
 
 | Tầng | Module                                                          | Ý nghĩa                                                                                        |
 | ---- | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
@@ -136,7 +136,7 @@ job test xanh ([test guide](test/README.md)).
 
 - ADR: [docs/decisions](docs/decisions/) — 0001 monolith, 0005 ràng buộc DB, 0011 xác thực, 0013
   catalog/finance/licensing, 0015 requests, 0016 budgets, 0017 personnel, 0018 sweeper, 0019 tầng module và cửa công
-  khai.
+  khai, [0020 Redis, rate-limit và BullMQ](docs/decisions/0020-redis-bullmq-outbox-relay-and-rate-limit.md).
 - Quy ước theo chủ đề: [docs/rules](docs/rules/README.md). Tiến độ và trạng thái: [roadmap](docs/roadmap.md). Dev mới đọc
   [hướng dẫn dev mới](docs/guides/huong-dan-dev-moi.md) trước.
 - Ảnh chụp bản `ARCHITECTURE.md` trước 29/10/2026 (danh sách năng lực, bản đồ source cũ) nằm trong lịch sử git; nội dung

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigurationModule } from '../infrastructure/config/configuration.module';
 import { HealthModule } from '../infrastructure/health/health.module';
+import { QueueBoardModule } from '../infrastructure/queue/queue-board.module';
 import { DatabaseModule } from '../infrastructure/database/database.module';
 import { RuntimeDatabaseRoleModule } from '../infrastructure/database/runtime-role.module';
 import { SecurityModule } from '../infrastructure/security/security.module';
@@ -34,6 +35,7 @@ import { HttpInfrastructureModule } from '../infrastructure/http/http-infrastruc
     ObservabilityModule,
     HttpInfrastructureModule,
     HealthModule,
+    QueueBoardModule,
     DatabaseModule,
     RuntimeDatabaseRoleModule,
     AuditModule,

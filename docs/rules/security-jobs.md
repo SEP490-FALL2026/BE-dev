@@ -41,20 +41,21 @@
 - Never trust client-supplied privileges. A signed JWT alone does not establish
   current account status or resource permission.
 - Distinguish invalid credentials from unavailable dependencies. Do not log secrets.
-- Global rate limiting uses per-process memory, with a separate counter for each route and IP
-  (Owner decision 14/10/2026, R-07; pinned by `test/http/platform/rate-limit.http-spec.ts`).
+- Global rate limiting uses Redis for shared counters per route and IP, with per-process memory as a fallback.
+  `RATE_LIMIT_STORE=memory` selects the in-memory store directly.
   Login failure throttling is separately keyed by normalized email: only failed logins increase
   its failure counter, after the password check (Owner confirmed the existing spec, R-06).
-  See [G0/G1 remediation review](../reviews/g0-g1-remediation-2026-10-15/README.md). Redis is queue infrastructure.
-- Configure TRUST_PROXY_HOPS only for trusted ingress that overwrites client headers.
+  See [ADR-0020](../decisions/0020-redis-bullmq-outbox-relay-and-rate-limit.md).
+- Production requires `TRUST_PROXY_HOPS` of at least 1 and a trusted ingress that overwrites client headers.
 
 ## Storage and jobs
 
-- Only the API mounts the object storage (ADR-0014, contract files, signed links); the queue is mounted in no graph
-  (E2 = A) and has no processors. A slice that mounts either restores its production validation (Redis password,
-  HTTPS storage endpoint). A storage that cannot answer is a 503, never a 500 and never a successful write.
-  `EmailDispatchLoop` in the separate worker polls PostgreSQL `EmailOutbox` and sends via SMTP
-  outside the business transaction (ADR-0012, Proposed). Delivery is at-least-once. `RequestWorkLoop` also projects the audit
+- The API mounts object storage for contract files and signed links (ADR-0014). Production requires an HTTPS storage
+  endpoint. A storage outage returns 503. The BullMQ worker relays outbox IDs from PostgreSQL to Redis and delivers via
+  SMTP after commit (ADR-0012, ADR-0020). PostgreSQL owns the lease, retry count and schedule. Delivery is at-least-once.
+  `BACKGROUND_JOBS_TRANSPORT=poll` selects the PostgreSQL mail loop. Both modes run technical cleanup at Vietnam midnight
+  and on startup under a PostgreSQL advisory lock. Bull Board is an optional read-only API route with separate Basic Auth.
+  `RequestWorkLoop` also projects the audit
   events of requests into the in-app inbox: one transaction per batch locks the cursor (`FOR UPDATE SKIP LOCKED`), reads only
   events older than `DB_TRANSACTION_TIMEOUT_MS` plus five seconds (an event is stamped by the writing process when its insert is
   sent, before it commits), writes the notices and moves the cursor, so a failed pass writes nothing and a repeated one writes nothing twice.
@@ -276,8 +277,8 @@
 - Check permissions before issuing short-lived signed URLs; objects remain private.
 - Filenames, MIME, bytes, CSV/XLSX cells and queue payloads are untrusted input.
 - Imports need limits, ownership/purpose checks and idempotency defined by the US.
-- Retries must not duplicate business writes. PostgreSQL holds authoritative state;
-  Redis/job IDs do not replace constraints or durable deduplication.
+- Retries must preserve PostgreSQL constraints and leases. BullMQ carries only outbox IDs and safe outcome or
+  error codes. SMTP payloads and invitation tokens stay in the encrypted PostgreSQL outbox.
 - Mocks do not prove real storage access, revocation or worker retry behavior.
 
 [Architecture](../../ARCHITECTURE.md) ? [Tests](../../test/README.md).

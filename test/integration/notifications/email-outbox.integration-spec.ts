@@ -102,6 +102,60 @@ describe('email outbox and dispatcher (integration, PostgreSQL + in-process SMTP
   const rowOf = async (id: string) =>
     (await ctx.sql.query('SELECT * FROM email_outbox WHERE id = $1', [id])).rows[0] as Record<string, unknown>;
 
+  async function expireLastAttempt(id: string): Promise<void> {
+    await ctx.sql.query(
+      "UPDATE email_outbox SET status = 'SENDING', attempts = 5, lease_id = $2, lease_expires_at = now() - interval '1 minute', updated_at = now() - interval '2 minutes' WHERE id = $1",
+      [id, randomUUID()],
+    );
+  }
+
+  it.each(['poll', 'by ID'])('does not send a sixth attempt after its lease expires (%s)', async (mode) => {
+    const mail = await enqueue();
+    await expireLastAttempt(mail.id);
+    const previousUpdate = (await rowOf(mail.id)).updated_at as Date;
+    if (mode === 'poll') {
+      expect(await dispatcher.dispatchDue(usableAlways)).toBe(0);
+    } else {
+      expect(await dispatcher.deliverOne(mail.id, usableAlways)).toEqual({
+        outcome: 'FAILED',
+        failureCode: 'ATTEMPTS_EXHAUSTED',
+      });
+    }
+    const row = await rowOf(mail.id);
+    expect(row).toMatchObject({
+      status: 'FAILED',
+      attempts: 5,
+      last_error_code: 'ATTEMPTS_EXHAUSTED',
+      payload_key_id: null,
+      payload_ciphertext: null,
+      lease_id: null,
+      lease_expires_at: null,
+    });
+    expect((row.updated_at as Date).getTime()).toBeGreaterThan(previousUpdate.getTime());
+    expect(received).toHaveLength(0);
+  });
+
+  it('lists and claims the same due rows without retaking a live lease or an already sent row', async () => {
+    const due = await enqueue();
+    const leased = await enqueue();
+    const future = await enqueue();
+    await ctx.sql.query(
+      "UPDATE email_outbox SET status = 'SENDING', lease_id = $2, lease_expires_at = now() + interval '5 minutes' WHERE id = $1",
+      [leased.id, randomUUID()],
+    );
+    await ctx.sql.query("UPDATE email_outbox SET next_attempt_at = now() + interval '5 minutes' WHERE id = $1", [
+      future.id,
+    ]);
+
+    expect(await dispatcher.dueIds(10, new Date())).toEqual([due.id]);
+    expect(await dispatcher.deliverOne(leased.id, usableAlways)).toEqual({ outcome: 'NOT_CLAIMED' });
+    expect(await dispatcher.deliverOne(future.id, usableAlways)).toEqual({ outcome: 'NOT_CLAIMED' });
+    expect(await dispatcher.deliverOne(due.id, usableAlways)).toEqual({ outcome: 'SENT' });
+    expect(await dispatcher.dueIds(10, new Date())).toEqual([]);
+    expect(await dispatcher.deliverOne(due.id, usableAlways)).toEqual({ outcome: 'NOT_CLAIMED' });
+    expect(received).toHaveLength(1);
+  });
+
   it('stores the payload encrypted and rolls back with the business transaction', async () => {
     const mail = await enqueue('plain-token-value');
     const row = await rowOf(mail.id);

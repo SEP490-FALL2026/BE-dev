@@ -35,18 +35,20 @@ import { RecordSuperAdminEventCliModule } from '../../src/cli/record-super-admin
 import { IdentityAccessLocalSeedFacadeModule } from '../../src/modules/identity-access/identity-access-local-seed-facade.module';
 import { BudgetsLocalSeedFacadeModule } from '../../src/modules/budgets/budgets-local-seed-facade.module';
 import { IdentityAccessInspectionFacadeModule } from '../../src/modules/identity-access/identity-access-inspection-facade.module';
+import { IdentityAccessHousekeepingFacadeModule } from '../../src/modules/identity-access/identity-access-housekeeping-facade.module';
 import { DATABASE_SESSION_OPTIONS } from '../../src/infrastructure/database/read-only-session.module';
 import { NotificationsModule } from '../../src/modules/notifications/notifications.module';
 import { PayloadCipher } from '../../src/modules/notifications/email/payload-cipher.service';
 import { ObjectStorageModule } from '../../src/infrastructure/object-storage/object-storage.module';
 import { QueueInfrastructureModule } from '../../src/infrastructure/queue/queue-infrastructure.module';
+import { QueueBoardModule } from '../../src/infrastructure/queue/queue-board.module';
 import { EmailDispatchLoop } from '../../src/worker/email-dispatch.job';
 import { RequestWorkLoop } from '../../src/worker/request-work.job';
 import { RecoveryCliModule } from '../../src/cli/recover/recover-cli.module';
 import { WorkerModule } from '../../src/worker/worker.module';
 import { consumersOfExports, moduleFolders, outsideConsumers } from '../support/module-export-consumers';
 import { collectGraph, metadata, tokenName, tokenOf, type ModuleNode, type Token } from '../support/nest-module-graph';
-import { PROCESS_GRAPHS } from '../support/process-graphs';
+import { BullmqWorkerGraph, PROCESS_GRAPHS } from '../support/process-graphs';
 
 /**
  * What a business module may export for any module to use (docs/rules/module-structure.md): its facade, a port it implements for
@@ -100,6 +102,7 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   // G3 (ADR-0013): the finance facade, money in and the snapshot of the same currency out; the repos stay private.
   'FinanceModule: FinanceApi',
   'IdentityAccessFacadeModule: IdentityAccessApi',
+  'IdentityAccessHousekeepingFacadeModule: AuthHousekeepingApi',
   // D-S21 (qd93-remove-fallback-substitute-approvers): who can never ask for or be given access through a Request, one facade for every route that makes one.
   'IdentityAccessFacadeModule: RequestPartyEligibilityApi',
   // The licensing facades, one per topic of its type files (R4): the revocation of seats and the grant of a request, the renewal, the
@@ -317,6 +320,7 @@ describe('module graph', () => {
   const graphs: [string, Type<unknown>][] = [
     ['AppModule', AppModule],
     ['WorkerModule', WorkerModule],
+    ['WorkerModule(bullmq)', BullmqWorkerGraph],
     ['InstallationModule', InstallationModule],
     ['RecoveryCliModule', RecoveryCliModule],
     ['InspectionCliModule', InspectionCliModule],
@@ -340,7 +344,7 @@ describe('module graph', () => {
     expect(duplicated).toEqual([]);
   });
 
-  it('declares the account repositories, PasswordHasher and IdentityAccessApi once, and SessionRepo only in the API and the recovery command', () => {
+  it('declares the account repositories, PasswordHasher and IdentityAccessApi once, and SessionRepo only where it is used', () => {
     for (const [name, root] of graphs) {
       const graph = collectGraph(root);
       // The preflight (P28-01) reads the database only: no account is in its graph at all.
@@ -357,7 +361,7 @@ describe('module graph', () => {
       expect({ name, facade: declarationsOf(graph, IdentityAccessApi).length }).toEqual({ name, facade: once });
       expect({ name, sessionRepo: declarationsOf(graph, SessionRepo).length }).toEqual({
         name,
-        sessionRepo: name === 'AppModule' || name === 'RecoveryCliModule' ? 1 : 0,
+        sessionRepo: ['AppModule', 'RecoveryCliModule', 'WorkerModule', 'WorkerModule(bullmq)'].includes(name) ? 1 : 0,
       });
     }
   });
@@ -516,8 +520,7 @@ describe('module graph', () => {
     }
   });
 
-  // H6.4 (E2 = A, OD-R5, ADR-0014)
-  it('keeps the standby queue module (no consumer yet) out of every process graph today, and object storage only in the API, for the files of contracts', () => {
+  it('mounts queues only in the BullMQ worker and object storage only in the API', () => {
     for (const [name, root] of graphs) {
       const modules = collectGraph(root).map((node) => node.module);
 
@@ -525,21 +528,52 @@ describe('module graph', () => {
         name,
         storage: modules.includes(ObjectStorageModule),
         queue: modules.includes(QueueInfrastructureModule),
-      }).toEqual({ name, storage: name === 'AppModule', queue: false });
+        board: modules.includes(QueueBoardModule),
+      }).toEqual({
+        name,
+        storage: name === 'AppModule',
+        queue: name === 'WorkerModule(bullmq)',
+        board: name === 'AppModule',
+      });
     }
   });
 
-  // Describes today: the queue has no producer and no processor. The slice that adds the first consumer mounts
-  // QueueInfrastructureModule on purpose and changes this expectation (and the one above) with it.
-  // H6.4
-  it('delivers mail by polling PostgreSQL in the worker, with no BullMQ queue, producer or processor registered yet', () => {
+  it('keeps the polling worker and registers BullMQ processors through the direct BullMQ API', () => {
     const worker = collectGraph(WorkerModule);
     const tokens = worker.flatMap((node) => node.providers.map((provider) => tokenName(tokenOf(provider))));
 
     expect(declarationsOf(worker, EmailDispatchLoop)).toHaveLength(1);
+    expect(tokens).toEqual(expect.arrayContaining(['RequestWorkLoop', 'EmailDispatchLoop']));
+    expect(tokens).not.toContain('OutboxRelayLoop');
+    const bullmqTokens = collectGraph(BullmqWorkerGraph).flatMap((node) =>
+      node.providers.map((provider) => tokenName(tokenOf(provider))),
+    );
+    expect(bullmqTokens).toEqual(expect.arrayContaining(['RequestWorkLoop', 'OutboxRelayLoop']));
+    expect(bullmqTokens).not.toContain('EmailDispatchLoop');
     expect(tokens.filter((token) => token.startsWith('BullQueue_'))).toEqual([]);
     expect(sourceFilesDeclaring('registerQueue')).toEqual([]);
     expect(sourceFilesDeclaring('@Processor(')).toEqual([]);
+  });
+
+  it('exposes housekeeping only to the workers and selects one maintenance trigger per transport', () => {
+    for (const [name, root] of graphs) {
+      const graph = collectGraph(root);
+      const tokens = graph.flatMap((node) => node.providers.map((provider) => tokenName(tokenOf(provider))));
+      const worker = name === 'WorkerModule' || name === 'WorkerModule(bullmq)';
+      expect({
+        name,
+        facade: graph.some((node) => node.module === IdentityAccessHousekeepingFacadeModule),
+        api: tokens.filter((token) => token === 'AuthHousekeepingApi').length,
+        timer: tokens.includes('NightlyMaintenanceTimer'),
+        scheduler: tokens.includes('NightlyMaintenanceScheduler'),
+      }).toEqual({
+        name,
+        facade: worker,
+        api: Number(worker),
+        timer: name === 'WorkerModule',
+        scheduler: name === 'WorkerModule(bullmq)',
+      });
+    }
   });
 
   // G5

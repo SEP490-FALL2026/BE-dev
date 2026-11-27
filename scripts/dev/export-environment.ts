@@ -17,6 +17,7 @@ export const EXPORT_ONLY_SETTINGS = [
   'LICENSE_KEY_FINGERPRINT_PEPPER',
   'OBJECT_STORAGE_ACCESS_KEY_ID',
   'OBJECT_STORAGE_SECRET_ACCESS_KEY',
+  'RATE_LIMIT_STORE',
 ] as const;
 
 /** Fresh valid values, generated in memory for one export and never printed or written. */
@@ -31,6 +32,7 @@ function ephemeralSettings(): Record<(typeof EXPORT_ONLY_SETTINGS)[number], stri
     LICENSE_KEY_FINGERPRINT_PEPPER: randomBytes(32).toString('base64url'),
     OBJECT_STORAGE_ACCESS_KEY_ID: `export${randomBytes(6).toString('hex')}`,
     OBJECT_STORAGE_SECRET_ACCESS_KEY: randomBytes(24).toString('base64url'),
+    RATE_LIMIT_STORE: 'memory',
   };
 }
 

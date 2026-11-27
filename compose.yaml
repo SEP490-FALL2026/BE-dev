@@ -1,10 +1,7 @@
 name: software-license-management
 
-# Local development. "docker compose up -d --wait" starts PostgreSQL only: the API and the worker need nothing else
-# today, except the contract files, which the API keeps in object storage (ADR-0014): MinIO (profile "storage") serves
-# them locally. Redis (profile "queue") is optional standby infrastructure with no consumer yet, kept for a future slice
-# that mounts the queue (Owner decisions E2 = A and OD-R5):
-# "docker compose --profile queue --profile storage up -d --wait".
+# Local development. "docker compose up -d --wait" starts PostgreSQL and Redis on loopback.
+# Add "--profile storage" to start MinIO for local contract files (ADR-0014).
 services:
   postgres:
     image: postgres:17-alpine
@@ -23,11 +20,10 @@ services:
       retries: 10
 
   redis:
-    profiles: ['queue']
     image: redis:8-alpine
     ports:
       - '127.0.0.1:${REDIS_PORT:-6379}:6379'
-    command: ['redis-server', '--appendonly', 'yes']
+    command: ['redis-server', '--appendonly', 'yes', '--maxmemory-policy', 'noeviction']
     volumes:
       - redis-data:/data
     healthcheck:
@@ -43,7 +39,7 @@ services:
     # The credentials come from your shell or .env and are the API's OBJECT_STORAGE_ACCESS_KEY_ID and
     # OBJECT_STORAGE_SECRET_ACCESS_KEY: the API refuses MinIO's public default outside NODE_ENV=test (SEC-04), so MinIO
     # refuses to start without credentials of your own, with the public default, or with a key equal to its secret
-    # (P28-08). Nothing here is required by the default profile (PostgreSQL only).
+    # (P28-08). Nothing here is required by the default profile (PostgreSQL and Redis).
     entrypoint:
       - sh
       - -c

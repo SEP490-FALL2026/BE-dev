@@ -5,6 +5,8 @@
 **Proposed** — 28/10/2026, ghi bởi `g0-g6-final-business-baseline-remediation` (finding F53, quyết định `P03-D12` = A, mặc định khuyến
 nghị). Proposed chưa phải Accepted: chưa có sự kiện Owner review.
 
+Thay một phần bởi [ADR-0020](0020-redis-bullmq-outbox-relay-and-rate-limit.md).
+
 ## Bối cảnh
 
 Các sweeper chạy mỗi giờ để báo thay đổi tổ chức đã đến ngày, nhắc quá hạn, kết thúc quyền có ngày kết thúc và đóng năm tài chính

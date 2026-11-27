@@ -38,6 +38,7 @@ describe('validateEnvironment', () => {
     SMTP_HOST: 'smtp.example.com',
     SMTP_FROM: 'no-reply@licenses.example.com',
     SMTP_TLS: 'true',
+    TRUST_PROXY_HOPS: '1',
   };
 
   it('applies safe development defaults', () => {
@@ -114,7 +115,7 @@ describe('validateEnvironment', () => {
     expect(() => validateEnvironment({ NODE_ENV: 'production' })).toThrow('DATABASE_URL');
   });
 
-  it('neither requires nor reads the queue or object storage settings: the module that mounts them (the API, for the storage, ADR-0014) validates its own', () => {
+  it('validates Redis settings and leaves object storage validation to its module', () => {
     const {
       OBJECT_STORAGE_ENDPOINT: _endpoint,
       OBJECT_STORAGE_BUCKET: _bucket,
@@ -126,11 +127,25 @@ describe('validateEnvironment', () => {
     } = productionInfrastructure;
     void [_endpoint, _bucket, _accessKey, _secretKey, _host, _password];
 
-    const config = validateEnvironment({ NODE_ENV: 'production', ...active });
+    const config = validateEnvironment({
+      NODE_ENV: 'production',
+      ...active,
+      RATE_LIMIT_STORE: 'memory',
+      BACKGROUND_JOBS_TRANSPORT: 'poll',
+    });
 
-    expect(Object.keys(config).filter((key) => /^(REDIS|OBJECT_STORAGE)_/.test(key))).toEqual([]);
+    expect(Object.keys(config).filter((key) => key.startsWith('OBJECT_STORAGE_'))).toEqual([]);
+    expect(validateEnvironment({ NODE_ENV: 'production', ...productionInfrastructure })).toMatchObject({
+      REDIS_HOST: 'redis.internal',
+    });
     expect(() =>
-      validateEnvironment({ NODE_ENV: 'production', ...active, OBJECT_STORAGE_ENDPOINT: 'http://storage.example.com' }),
+      validateEnvironment({
+        NODE_ENV: 'production',
+        ...active,
+        REDIS_HOST: 'redis.internal',
+        REDIS_PASSWORD: 'redis-secret-password',
+        OBJECT_STORAGE_ENDPOINT: 'http://storage.example.com',
+      }),
     ).not.toThrow();
   });
 
@@ -209,6 +224,7 @@ describe('DATABASE_URL resolution through validateEnvironment', () => {
 describe('invitation email configuration', () => {
   const productionBase = {
     NODE_ENV: 'production',
+    TRUST_PROXY_HOPS: '1',
     CORS_ORIGINS: 'https://licenses.example.com',
     DATABASE_URL: 'postgresql://app:secret@database:5432/app',
     OBJECT_STORAGE_ENDPOINT: 'https://account-id.r2.cloudflarestorage.com',
@@ -543,7 +559,7 @@ describe('installation environment (database keys only)', () => {
   it('keeps the API and worker validator fail-closed on the same minimal environment', () => {
     let message = '';
     try {
-      validateEnvironment(minimal);
+      validateEnvironment({ ...minimal, REDIS_HOST: 'redis.internal', REDIS_PASSWORD: 'redis-secret-password' });
     } catch (error) {
       message = (error as Error).message;
     }

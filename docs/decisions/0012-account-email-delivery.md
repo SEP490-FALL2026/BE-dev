@@ -6,6 +6,8 @@ the BE developer's review. Slice 1b has since merged through PR #4 (`64073c4`), 
 gate still open. An AI assistant did the
 research and drafting; that is not a review or an approval.
 
+Thay một phần bởi [ADR-0020](0020-redis-bullmq-outbox-relay-and-rate-limit.md).
+
 ## Context
 
 Slice 1b ([spec](../workspace/items/us-01-account-invitation-activation/spec.md)) sends the

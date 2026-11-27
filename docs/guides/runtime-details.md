@@ -25,12 +25,10 @@ vai: 403 AUTHORIZATION.FORBIDDEN.
 Lỗi DB tạm thời sau khi guard đã thành công tại `/me` được controller ánh xạ thành 503 `SERVICE_UNAVAILABLE`; readiness
 thất bại cũng trả 503 với mã này. Lỗi không được nhận diện là tạm thời vẫn là 500, không bị che thành lỗi availability.
 
-Rate limit hiện dùng bộ nhớ của từng process, theo **từng route trên mỗi IP**, **không dùng Redis**. Đây là phạm vi
-Owner chốt giữ ([spec lát 1a](../workspace/items/us-01-bootstrap-login-session/spec.md));
-`test/http/platform/rate-limit.http-spec.ts` ghim hành vi này. Throttle đăng nhập theo email là cơ chế riêng: chỉ lần
-sai được tăng bộ đếm thất bại theo spec; bộ đếm tăng sau khi kiểm mật khẩu thất bại, trong một câu lệnh nguyên tử.
-TRUST_PROXY_HOPS chỉ cấu hình khi ingress đáng tin cậy; proxy phải thay header request ID do client gửi. Baseline chưa
-giải quyết rate limit phân tán.
+Rate limit dùng Redis để chia sẻ bộ đếm **theo từng route và IP** giữa các API. Nếu Redis lỗi, mỗi tiến trình dùng bộ
+đếm bộ nhớ và thử Redis lại sau 5 giây. `RATE_LIMIT_STORE=memory` chọn bộ nhớ trực tiếp. Throttle đăng nhập theo email
+tăng bộ đếm bằng một câu lệnh nguyên tử sau khi kiểm mật khẩu thất bại. Production yêu cầu `TRUST_PROXY_HOPS` ít nhất
+là 1. Caddy thay header request ID do client gửi.
 
 ## Persistence và hạ tầng
 
@@ -98,12 +96,13 @@ không làm mất dữ liệu (danh sách tài khoản trả 503). Băm/kiểm A
 tiết truy vấn candidates, tìm kiếm literal và thứ tự kiểm khi redeem ở
 [spec lát 1b](../workspace/items/us-01-account-invitation-activation/spec.md).
 
-Không đồ thị nào (API, worker, CLI khôi phục, CLI khởi tạo) mount `QueueInfrastructureModule` (Owner E2 = A, H6.4), và
-chỉ API mount `ObjectStorageModule`, qua `CatalogModule`, cho tệp của hợp đồng
-([ADR-0014](../decisions/0014-object-storage-mounted-for-contract-documents.md)); `module-graph.spec.ts` khóa cả hai.
+Worker `bullmq` mount `QueueInfrastructureModule` để chuyển ID outbox và hẹn job dọn đêm. API mount
+`ObjectStorageModule` qua `CatalogModule` cho tệp hợp đồng
+([ADR-0014](../decisions/0014-object-storage-mounted-for-contract-documents.md)). Gate `module-graph` kiểm tra
+chỗ gắn hai module này và Bull Board.
 Factory của module kho gọi validator riêng (`object-storage.config.ts`), nên production bắt buộc endpoint HTTPS kèm
-bucket và khóa truy cập, còn worker và các lệnh không đọc các biến đó; `queue.config.ts` giữ nguyên cho lát nào mount
-hàng đợi, và `env-schema.ts` không đọc các biến kho hay hàng đợi. WorkerModule cũng chạy `RequestWorkLoop`
+bucket và khóa truy cập. Worker và các lệnh không đọc các biến đó. `env-schema.ts` kiểm tra cấu hình Redis qua
+`src/infrastructure/redis/redis.config.ts`. WorkerModule cũng chạy `RequestWorkLoop`
 (`src/worker/request-work.job.ts`): vòng thăm dò PostgreSQL mỗi `REQUEST_WORK_INTERVAL_MS` (1 000–300 000, mặc định
 10 000) gọi `StepRedeterminationSweepService.sweep` của `requests` (thử giao lại bước đang chờ, lấy lại bước của người
 đã nghỉ việc, mỗi ngày một lần chạy bảng định tuyến trên mọi bước nhu cầu đang giữ), mỗi Request một transaction, một
@@ -118,13 +117,12 @@ giây cộng chu kỳ vòng; mỗi việc của lượt thử riêng nên việc
 `RequestsWorkFacadeModule` (không controller). Chạy một lượt bằng tay để kiểm: gọi
 `RequestStatusProjectorService.project(now)` từ test tích hợp (`test/support/status-harness.ts`),
 `StepSlaSweepService.sweep(now)` (`test/support/sla-harness.ts`, `sweepAt(now)`: `now` là tham số nên test dựng được
-ngày làm việc, cuối tuần và ngày nghỉ), hay khởi động worker. WorkerModule chạy `EmailDispatchLoop`
-(`src/worker/email-dispatch.job.ts`): vòng thăm dò PostgreSQL mỗi `OUTBOX_POLL_INTERVAL_MS` gửi thư trong EmailOutbox
-([ADR-0012](../decisions/0012-account-email-delivery.md), vẫn **Proposed**) — không cần Redis cho việc này. Vòng lặp là
-orchestration có chủ đích ở composition root vì nối hai module không được import nhau: `notifications` gửi thư qua hợp
-đồng công khai `EmailDeliveryService.dispatchDue` (tệp riêng `email-delivery.service.ts` từ ROOT-HARDEN.1, đăng ký ở
-`PUBLIC_CONTRACT_EXPORTS`), facade `IdentityAccessService.isActionLinkUsable` trả lời liên kết trong thư còn dùng được
-không. `EmailDispatcher`, repo, cipher và transport vẫn private (ROOT.1). Mọi lệnh (`src/cli/<lệnh>/`, bảng
+ngày làm việc, cuối tuần và ngày nghỉ), hay khởi động worker. `OutboxRelayLoop` đưa ID đã đến hạn lên BullMQ,
+`EmailQueueConsumer` lấy dòng qua `EmailDeliveryApi.deliverOne` và hỏi `IdentityAccessApi.isActionLinkUsable` trước khi
+gửi. Chế độ `poll` dùng `EmailDispatchLoop` gọi `EmailDeliveryApi.dispatchDue` mỗi `OUTBOX_POLL_INTERVAL_MS`.
+Cả hai dùng cùng lease PostgreSQL, giới hạn năm lần thử và kiểm tra liên kết. Job dọn đêm chạy lúc 00:00
+`Asia/Ho_Chi_Minh` và 60 giây sau khởi động, giữ khóa advisory và ghi số dòng đã xóa. Xem
+[ADR-0020](../decisions/0020-redis-bullmq-outbox-relay-and-rate-limit.md). Mọi lệnh (`src/cli/<lệnh>/`, bảng
 `src/cli/commands.ts`) dùng chung khung `src/cli/run-command.ts` để ghi lỗi, tắt
 log Nest và nhận `EnvironmentValidationError` bằng `instanceof`; gate cấu trúc quét cả root và infrastructure để chặn so
 khớp lỗi theo `error.name`.
@@ -155,8 +153,8 @@ dòng. `database-url.ts` không import gì để `prisma.config.ts` dùng cùng 
 schema đầy đủ. Secret theo Owner E3 = C: chỉ `NODE_ENV=test` có fallback công khai cho bốn secret; development phải tự
 khai, development và production từ chối mọi giá trị công khai trong repository.
 
-Compose local mặc định chỉ chạy PostgreSQL; Redis và MinIO chỉ chạy với profile `queue`/`storage`. Compose production
-không còn Redis. Production tách ba danh tính PostgreSQL (H7): API/worker dùng runtime role chỉ có DML và tự từ chối
+Compose local mặc định chạy PostgreSQL và Redis. Profile `storage` chạy MinIO. Compose production chạy Redis có mật khẩu
+trên mạng nội bộ. Production tách ba danh tính PostgreSQL (H7): API/worker dùng runtime role chỉ có DML và tự từ chối
 khởi động khi là superuser/owner (`RuntimeDatabaseRoleModule`, chỉ `AppModule`/`WorkerModule` import); backup,
 preflight, migration và `ops:db-roles reconcile` dùng deploy role sở hữu schema; superuser của cluster chỉ cho
 `ops:db-roles provision`. Dockerfile build runtime API/worker. Migrations chạy riêng trước rollout. Xem

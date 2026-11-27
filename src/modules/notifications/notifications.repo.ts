@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { DbTx } from '../../infrastructure/database/transaction-runner';
 import { ClaimedEmail, DeliveryState } from './public/notifications.types';
@@ -14,8 +15,33 @@ interface ClaimedRow {
   payload_key_id: string | null;
 }
 
+interface EmailLease {
+  now: Date;
+  leaseId: string;
+  leaseExpiresAt: Date;
+}
+
+export const MAX_EMAIL_ATTEMPTS = 5;
+export const EMAIL_ATTEMPTS_EXHAUSTED = 'ATTEMPTS_EXHAUSTED';
+
+function dueCondition(now: string): Prisma.Sql {
+  return Prisma.sql`((status = 'PENDING' AND next_attempt_at <= ${now}::timestamptz)
+    OR (status = 'SENDING' AND lease_expires_at <= ${now}::timestamptz))`;
+}
+
+const canClaim = Prisma.sql`(status <> 'SENDING' OR attempts < ${MAX_EMAIL_ATTEMPTS})`;
+
 @Injectable()
 export class NotificationsRepo {
+  purgeFinished(before: Date, limit: number): Promise<number> {
+    return this.prisma.$executeRaw`
+      DELETE FROM email_outbox WHERE id IN (
+        SELECT id FROM email_outbox
+        WHERE status IN ('SENT', 'CANCELLED', 'FAILED') AND updated_at < ${before.toISOString()}::timestamptz
+        LIMIT ${limit} FOR UPDATE SKIP LOCKED
+      )`;
+  }
+
   constructor(private readonly prisma: PrismaService) {}
 
   async insert(
@@ -54,22 +80,61 @@ export class NotificationsRepo {
    * and marks them SENDING under a lease. A SENDING row whose lease ran out is taken again.
    * Instants go to SQL as ISO strings with an offset (see the identity repo for why).
    */
-  async claimDue(
-    tx: DbTx,
-    input: { now: Date; leaseId: string; leaseExpiresAt: Date; limit: number },
-  ): Promise<ClaimedEmail[]> {
+  async claimDue(tx: DbTx, input: EmailLease & { limit: number }): Promise<ClaimedEmail[]> {
     const now = input.now.toISOString();
+    await this.failExhausted(tx, now);
+    return this.claim(
+      tx,
+      input,
+      Prisma.sql`
+      SELECT id FROM email_outbox
+      WHERE ${dueCondition(now)} AND ${canClaim}
+      ORDER BY next_attempt_at
+      LIMIT ${input.limit}::int
+      FOR UPDATE SKIP LOCKED`,
+    );
+  }
+
+  async claimById(tx: DbTx, input: EmailLease & { id: string }): Promise<ClaimedEmail | 'EXHAUSTED' | null> {
+    const now = input.now.toISOString();
+    if (await this.failExhausted(tx, now, input.id)) return 'EXHAUSTED';
+    const [row] = await this.claim(
+      tx,
+      input,
+      Prisma.sql`
+      SELECT id FROM email_outbox
+      WHERE id = ${input.id}::uuid AND ${dueCondition(now)} AND ${canClaim}
+      FOR UPDATE SKIP LOCKED`,
+    );
+    return row ?? null;
+  }
+
+  async dueIds(now: Date, limit: number): Promise<string[]> {
+    const rows = await this.prisma.$queryRaw<{ id: string }[]>`
+      SELECT id FROM email_outbox
+      WHERE ${dueCondition(now.toISOString())}
+      ORDER BY next_attempt_at, id
+      LIMIT ${limit}::int`;
+    return rows.map((row) => row.id);
+  }
+
+  private async failExhausted(tx: DbTx, now: string, id?: string): Promise<number> {
+    const rowFilter = id === undefined ? Prisma.empty : Prisma.sql`AND id = ${id}::uuid`;
+    return tx.$executeRaw`
+      UPDATE email_outbox SET status = 'FAILED', last_error_code = ${EMAIL_ATTEMPTS_EXHAUSTED},
+        lease_id = NULL, lease_expires_at = NULL, payload_ciphertext = NULL, payload_key_id = NULL, updated_at = now()
+      WHERE id IN (
+        SELECT id FROM email_outbox
+        WHERE ${dueCondition(now)} AND status = 'SENDING' AND attempts >= ${MAX_EMAIL_ATTEMPTS} ${rowFilter}
+        FOR UPDATE SKIP LOCKED)`;
+  }
+
+  private async claim(tx: DbTx, input: EmailLease, selection: Prisma.Sql): Promise<ClaimedEmail[]> {
     const leaseExpiresAt = input.leaseExpiresAt.toISOString();
     const rows = await tx.$queryRaw<ClaimedRow[]>`
       UPDATE email_outbox SET status = 'SENDING', lease_id = ${input.leaseId}::uuid,
         lease_expires_at = ${leaseExpiresAt}::timestamptz, attempts = attempts + 1, updated_at = now()
-      WHERE id IN (
-        SELECT id FROM email_outbox
-        WHERE (status = 'PENDING' AND next_attempt_at <= ${now}::timestamptz)
-           OR (status = 'SENDING' AND lease_expires_at <= ${now}::timestamptz)
-        ORDER BY next_attempt_at
-        LIMIT ${input.limit}::int
-        FOR UPDATE SKIP LOCKED)
+      WHERE id IN (${selection})
       RETURNING id, recipient, template, locale, action_token_hash, attempts, payload_ciphertext, payload_key_id`;
 
     return rows.map((row) => ({

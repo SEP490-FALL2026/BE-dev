@@ -83,7 +83,11 @@ const accountDetailSchema = accountSchema.extend({
           lastErrorCode: z.string().nullable(),
           sentAt: z.iso.datetime().nullable(),
         })
-        .nullable(),
+        .nullable()
+        .meta({
+          description:
+            'Delivery state of the latest invitation. Null when there is no outbox row, including after finished mail is purged at 30 days.',
+        }),
     })
     .nullable(),
 });
