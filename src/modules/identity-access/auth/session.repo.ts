@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { fromDateColumn } from '../../../core/business-date';
+import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import {
@@ -9,6 +10,12 @@ import {
   SessionSnapshot,
   ThrottleSnapshot,
 } from '../public/identity-access.types';
+
+function deadSession(before: Date): Prisma.Sql {
+  const cutoff = before.toISOString();
+  return Prisma.sql`(s.revoked_at < ${cutoff}::timestamptz
+    OR LEAST(s.absolute_expires_at, s.idle_expires_at) < ${cutoff}::timestamptz)`;
+}
 
 /** Owns AuthSession, RefreshToken and LoginThrottle. */
 @Injectable()
@@ -175,5 +182,36 @@ export class SessionRepo {
 
   async clearThrottle(tx: DbTx, organizationId: string, emailKeyHash: string): Promise<void> {
     await tx.loginThrottle.deleteMany({ where: { organizationId, emailKeyHash } });
+  }
+
+  purgeDeadSessionTokens(before: Date, limit: number): Promise<number> {
+    return this.prisma.$executeRaw`
+      DELETE FROM refresh_tokens WHERE token_hash IN (
+        SELECT rt.token_hash FROM refresh_tokens rt JOIN auth_sessions s ON s.id = rt.session_id
+        WHERE ${deadSession(before)}
+        LIMIT ${limit} FOR UPDATE OF rt SKIP LOCKED
+      )`;
+  }
+
+  purgeDeadSessions(before: Date, limit: number): Promise<number> {
+    return this.prisma.$executeRaw`
+      DELETE FROM auth_sessions WHERE id IN (
+        SELECT s.id FROM auth_sessions s
+        WHERE ${deadSession(before)}
+          AND NOT EXISTS (SELECT 1 FROM refresh_tokens rt WHERE rt.session_id = s.id)
+        LIMIT ${limit} FOR UPDATE OF s SKIP LOCKED
+      )`;
+  }
+
+  purgeIdleLoginThrottles(now: Date, limit: number): Promise<number> {
+    const instant = now.toISOString();
+    const cutoff = new Date(now.getTime() - 86_400_000).toISOString();
+    return this.prisma.$executeRaw`
+      DELETE FROM login_throttles WHERE (organization_id, email_key_hash) IN (
+        SELECT organization_id, email_key_hash FROM login_throttles
+        WHERE window_started_at < ${cutoff}::timestamptz
+          AND (blocked_until IS NULL OR blocked_until < ${instant}::timestamptz)
+        LIMIT ${limit} FOR UPDATE SKIP LOCKED
+      )`;
   }
 }

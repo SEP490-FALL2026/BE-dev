@@ -33,6 +33,15 @@ const canClaim = Prisma.sql`(status <> 'SENDING' OR attempts < ${MAX_EMAIL_ATTEM
 
 @Injectable()
 export class NotificationsRepo {
+  purgeFinished(before: Date, limit: number): Promise<number> {
+    return this.prisma.$executeRaw`
+      DELETE FROM email_outbox WHERE id IN (
+        SELECT id FROM email_outbox
+        WHERE status IN ('SENT', 'CANCELLED', 'FAILED') AND updated_at < ${before.toISOString()}::timestamptz
+        LIMIT ${limit} FOR UPDATE SKIP LOCKED
+      )`;
+  }
+
   constructor(private readonly prisma: PrismaService) {}
 
   async insert(

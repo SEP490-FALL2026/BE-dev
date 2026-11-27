@@ -66,6 +66,10 @@ export class EmailDispatcher {
     return this.repo.dueIds(now, limit);
   }
 
+  purgeFinished(before: Date, limit: number): Promise<number> {
+    return this.repo.purgeFinished(before, limit);
+  }
+
   async deliverOne(outboxId: string, isUsable: TokenUsability): Promise<DeliveryResult> {
     const now = new Date();
     const leaseId = randomUUID();

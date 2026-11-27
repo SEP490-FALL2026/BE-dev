@@ -21,6 +21,22 @@ const TOKEN_SELECT = {
 export class ActionTokenRepo {
   constructor(private readonly prisma: PrismaService) {}
 
+  purgeSpentActionTokens(before: Date, limit: number): Promise<number> {
+    const cutoff = before.toISOString();
+    return this.prisma.$executeRaw`
+      DELETE FROM account_action_tokens WHERE token_hash IN (
+        SELECT t.token_hash FROM account_action_tokens t
+        WHERE LEAST(t.expires_at, t.consumed_at, t.revoked_at) < ${cutoff}::timestamptz
+          AND (t.purpose <> 'INVITE' OR t.token_hash <> (
+            SELECT i.token_hash FROM account_action_tokens i
+            WHERE i.app_user_id = t.app_user_id AND i.purpose = 'INVITE'
+            ORDER BY i.created_at DESC
+            LIMIT 1
+          ))
+        LIMIT ${limit} FOR UPDATE OF t SKIP LOCKED
+      )`;
+  }
+
   async insertActionToken(
     tx: DbTx,
     input: {

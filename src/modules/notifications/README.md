@@ -17,8 +17,9 @@ organization, personnel, requests ([module-graph](../../../docs/generated/module
   - `holdForDepartment(tx, input)` — giữ thông báo cho phòng ban chưa có trưởng (F67, T-11).
   - `deliverHeldToHead(tx, input)` — giao mọi thông báo đang giữ cho trưởng phòng đầu tiên, một lần.
   - `cancelPendingForTokens(tx, hashes)`, `deliveryStates(hashes)` — hủy mail chưa gửi / đọc trạng thái gửi theo token.
-- `EmailDeliveryApi` ([public/email-delivery.api.ts](public/email-delivery.api.ts)): `dispatchDue(isUsable)` — gửi
-  một lô outbox đến hạn; chỉ vòng mail của worker gọi.
+- `EmailDeliveryApi` ([public/email-delivery.api.ts](public/email-delivery.api.ts)): `dispatchDue(isUsable)` gửi
+  một lô đến hạn cho `poll`. Job dọn đêm dùng `purgeFinished(before, limit)` để xóa mail đã kết thúc sau 30 ngày.
+  Khi mail lời mời đã được dọn, `invitation.delivery` có giá trị `null`.
 - `public/notifications.types.ts` — `EmailTemplate`, `IN_APP_NOTIFICATION_CODES` (bảng mã đóng; hai nhóm cuối là cảnh báo license
   của `a03-license-inbox-alerts` và mười mã `SUBSCRIPTION_*` của gia hạn thuê bao ở `a06-*`: `SUBSCRIPTION_RENEWAL_ALERT`,
   `_RENEWAL_RED_ALERT`, `_RENEWAL_KEPT`, `_RENEWAL_DATA_QUALITY`, `_RENEWAL_PROPOSED`, `_RENEWAL_DECIDED`, `_RENEWAL_LATE`,

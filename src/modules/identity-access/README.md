@@ -12,6 +12,9 @@ duy nhất được phép). Được dùng bởi: budgets, catalog, installation
 
 ## Public API (`public/`)
 
+- `AuthHousekeepingApi` ([public/auth-housekeeping.api.ts](public/auth-housekeeping.api.ts)) — facade riêng của worker
+  cho job dọn đêm. Xóa refresh token trước phiên đã chết, xóa token thao tác quá hạn lưu 30 ngày và giữ lời mời mới nhất.
+  Cửa sổ đăng nhập giữ ít nhất một ngày và được dọn sau khi hết chặn.
 - `IdentityAccessApi` ([public/identity-access.api.ts](public/identity-access.api.ts)):
   - `prepareCredential` — kiểm chính sách và băm mật khẩu; gọi trước khi mở transaction.
   - `createBootstrapSuperAdmin` — chỉ cho lệnh cài đặt (FR-9.8).

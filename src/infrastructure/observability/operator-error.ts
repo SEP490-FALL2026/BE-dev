@@ -50,12 +50,12 @@ const pair = (key: string, value: string | undefined): string | undefined =>
   value === undefined ? undefined : `${key}=${value}`;
 
 /** True when waiting and trying again can help: the database or a network connection was unavailable, not the data wrong. */
-function isRetryable(error: unknown): boolean {
+export function isRetryable(error: unknown): boolean {
   return (
     error instanceof TransientDatabaseError ||
     toTransientError(error) !== undefined ||
     error instanceof MaxRetriesPerRequestError ||
-    (error instanceof Error && error.message === 'Connection is closed.')
+    (error instanceof Error && ['Connection is closed.', 'Command timed out'].includes(error.message))
   );
 }
 

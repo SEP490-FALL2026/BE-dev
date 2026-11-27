@@ -35,6 +35,7 @@ import { RecordSuperAdminEventCliModule } from '../../src/cli/record-super-admin
 import { IdentityAccessLocalSeedFacadeModule } from '../../src/modules/identity-access/identity-access-local-seed-facade.module';
 import { BudgetsLocalSeedFacadeModule } from '../../src/modules/budgets/budgets-local-seed-facade.module';
 import { IdentityAccessInspectionFacadeModule } from '../../src/modules/identity-access/identity-access-inspection-facade.module';
+import { IdentityAccessHousekeepingFacadeModule } from '../../src/modules/identity-access/identity-access-housekeeping-facade.module';
 import { DATABASE_SESSION_OPTIONS } from '../../src/infrastructure/database/read-only-session.module';
 import { NotificationsModule } from '../../src/modules/notifications/notifications.module';
 import { PayloadCipher } from '../../src/modules/notifications/email/payload-cipher.service';
@@ -100,6 +101,7 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   // G3 (ADR-0013): the finance facade, money in and the snapshot of the same currency out; the repos stay private.
   'FinanceModule: FinanceApi',
   'IdentityAccessFacadeModule: IdentityAccessApi',
+  'IdentityAccessHousekeepingFacadeModule: AuthHousekeepingApi',
   // D-S21 (qd93-remove-fallback-substitute-approvers): who can never ask for or be given access through a Request, one facade for every route that makes one.
   'IdentityAccessFacadeModule: RequestPartyEligibilityApi',
   // The licensing facades, one per topic of its type files (R4): the revocation of seats and the grant of a request, the renewal, the
@@ -341,7 +343,7 @@ describe('module graph', () => {
     expect(duplicated).toEqual([]);
   });
 
-  it('declares the account repositories, PasswordHasher and IdentityAccessApi once, and SessionRepo only in the API and the recovery command', () => {
+  it('declares the account repositories, PasswordHasher and IdentityAccessApi once, and SessionRepo only where it is used', () => {
     for (const [name, root] of graphs) {
       const graph = collectGraph(root);
       // The preflight (P28-01) reads the database only: no account is in its graph at all.
@@ -358,7 +360,7 @@ describe('module graph', () => {
       expect({ name, facade: declarationsOf(graph, IdentityAccessApi).length }).toEqual({ name, facade: once });
       expect({ name, sessionRepo: declarationsOf(graph, SessionRepo).length }).toEqual({
         name,
-        sessionRepo: name === 'AppModule' || name === 'RecoveryCliModule' ? 1 : 0,
+        sessionRepo: ['AppModule', 'RecoveryCliModule', 'WorkerModule', 'WorkerModule(bullmq)'].includes(name) ? 1 : 0,
       });
     }
   });
@@ -544,6 +546,27 @@ describe('module graph', () => {
     expect(tokens.filter((token) => token.startsWith('BullQueue_'))).toEqual([]);
     expect(sourceFilesDeclaring('registerQueue')).toEqual([]);
     expect(sourceFilesDeclaring('@Processor(')).toEqual([]);
+  });
+
+  it('exposes housekeeping only to the workers and selects one maintenance trigger per transport', () => {
+    for (const [name, root] of graphs) {
+      const graph = collectGraph(root);
+      const tokens = graph.flatMap((node) => node.providers.map((provider) => tokenName(tokenOf(provider))));
+      const worker = name === 'WorkerModule' || name === 'WorkerModule(bullmq)';
+      expect({
+        name,
+        facade: graph.some((node) => node.module === IdentityAccessHousekeepingFacadeModule),
+        api: tokens.filter((token) => token === 'AuthHousekeepingApi').length,
+        timer: tokens.includes('NightlyMaintenanceTimer'),
+        scheduler: tokens.includes('NightlyMaintenanceScheduler'),
+      }).toEqual({
+        name,
+        facade: worker,
+        api: Number(worker),
+        timer: name === 'WorkerModule',
+        scheduler: name === 'WorkerModule(bullmq)',
+      });
+    }
   });
 
   // G5

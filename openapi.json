@@ -144587,6 +144587,7 @@
                     },
                     "required": ["status", "attempts", "lastErrorCode", "sentAt"],
                     "additionalProperties": false,
+                    "description": "Delivery state of the latest invitation. Null when there is no outbox row, including after finished mail is purged at 30 days.",
                     "nullable": true
                   }
                 },

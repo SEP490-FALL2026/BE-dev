@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bullmq';
 import type Redis from 'ioredis';
 import type { EnvironmentVariables } from '../config/env-schema';
-import { describeForOperator } from '../observability/operator-error';
+import { describeForOperator, isRetryable } from '../observability/operator-error';
 import { connectQuietly, createFailFastRedisClient } from '../redis/redis-client.factory';
 import { redisSettingsFrom } from '../redis/redis.config';
 import { QUEUE_NAMES, type QueueName } from './queue-registry';
@@ -21,7 +21,7 @@ export class QueueProducers implements OnApplicationBootstrap, OnModuleDestroy {
     if (existing) return existing;
 
     const settings = redisSettingsFrom(this.config);
-    this.client ??= createFailFastRedisClient(settings, 'queue-producers');
+    this.client ??= createFailFastRedisClient(settings, 'queue-producers', { commandTimeoutMs: 1_000 });
     // Keep the wrapper usable when the process starts before Redis is reachable.
     const queue = new Queue(name, {
       connection: this.client,
@@ -29,7 +29,9 @@ export class QueueProducers implements OnApplicationBootstrap, OnModuleDestroy {
       skipWaitingForReady: true,
       skipVersionCheck: true,
     });
-    queue.on('error', (error) => this.logger.debug(describeForOperator(error)));
+    queue.on('error', (error) => {
+      if (!isRetryable(error)) this.logger.debug(describeForOperator(error));
+    });
     this.queues.set(name, queue);
     return queue;
   }

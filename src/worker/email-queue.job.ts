@@ -45,13 +45,14 @@ export class EmailQueueConsumer implements OnApplicationBootstrap, OnModuleDestr
       (job) => this.process(job),
       this.config.get('EMAIL_QUEUE_CONCURRENCY', { infer: true }),
     );
-    void this.worker.run().catch((error: unknown) => {
+    void this.workers.run(this.worker).catch((error: unknown) => {
+      if (this.worker?.closing) return;
       this.logger.error(`Email queue worker stopped: ${describeForOperator(error)}`);
     });
   }
 
   async onModuleDestroy(): Promise<void> {
-    await this.worker?.close();
+    if (this.worker) await this.workers.close(this.worker);
   }
 
   async process(job: Job): Promise<{ outcome: DeliveryOutcome }> {
