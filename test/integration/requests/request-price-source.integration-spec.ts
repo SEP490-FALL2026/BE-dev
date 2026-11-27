@@ -1,5 +1,6 @@
 import type { Department, Person } from '../../support/request-harness';
 import { declareSubscription } from '../../support/builders/catalog.builder';
+import { pretendBusinessToday } from '../../support/pretend-today';
 import { SpendHarness } from '../../support/spend-harness';
 
 /**
@@ -15,12 +16,15 @@ describe('what a request is priced by (integration, real PostgreSQL)', () => {
 
   beforeAll(async () => {
     await h.start();
+    pretendBusinessToday(h.ctx.app, '2026-06-01');
+    jest.spyOn(h, 'today').mockReturnValue('2026-06-01');
     // 1 000 000 VND per seat per month, billed monthly, bought for the seeded department: the harness gives every department of the
     // suite a subscription of the same plan at the same price (the pool is shared: no department owns a copy), and a test changes the one it is about.
     pricedPlan = await h.planOf(await h.subscription(10));
   }, 240000);
 
   afterAll(async () => {
+    jest.restoreAllMocks();
     await h.stop();
   });
 
@@ -36,9 +40,15 @@ describe('what a request is priced by (integration, real PostgreSQL)', () => {
   const setUnitPrice = async (planId: string, amountMinor: number | null): Promise<void> => {
     await h.ctx.sql.query(
       `UPDATE subscriptions
-          SET unit_price_minor = $2::bigint, unit_price_currency = CASE WHEN $2::bigint IS NULL THEN NULL ELSE 'VND' END,
+          SET unit_price_minor = $2::bigint,
+              monthly_unit_price_minor = $2::bigint,
+              unit_price_currency = CASE WHEN $2::bigint IS NULL THEN NULL ELSE 'VND' END,
               price_recorded_on = CASE WHEN $2::bigint IS NULL THEN NULL ELSE current_date END
         WHERE plan_id = $1`,
+      [planId, amountMinor],
+    );
+    await h.ctx.sql.query(
+      `UPDATE subscription_lines SET monthly_unit_price_minor = COALESCE($2::bigint, 0) WHERE plan_id = $1`,
       [planId, amountMinor],
     );
   };

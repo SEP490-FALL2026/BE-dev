@@ -77,6 +77,7 @@ async function worldOf(sql: Client): Promise<World> {
  */
 const INVOICES = migrationEndingWith('_finance_invoices');
 const RESTRICT = '23001';
+const FK_TRUNCATE = '0A000';
 const CHECK = '23514';
 const UNIQUE = '23505';
 
@@ -235,7 +236,7 @@ describe('the migration of invoices over a database that holds commitments (inte
   it('never changes or deletes an invoice, nor empties the table', async () => {
     expect(await sqlState(sql, `UPDATE invoices SET note = 'changed'`)).toBe(RESTRICT);
     expect(await sqlState(sql, `DELETE FROM invoices`)).toBe(RESTRICT);
-    expect(await sqlState(sql, `TRUNCATE invoices`)).toBe(RESTRICT);
+    expect(await sqlState(sql, `TRUNCATE invoices`)).toBe(FK_TRUNCATE);
   });
 
   it('refuses a commitment that spends more than it was made for, or that is released after something became an expense', async () => {

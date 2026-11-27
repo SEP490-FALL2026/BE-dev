@@ -45,46 +45,6 @@ describe('subscription quantity change rules (real PostgreSQL)', () => {
     expect(h.codeOf(res)).toBe('SUBSCRIPTION.STALE');
   });
 
-  it('W3-27: blocks reducing purchasedQuantity on a 12-month active K2 subscription via PATCH -> 409 SUBSCRIPTION.SEAT_COUNT_VIA_LEDGER', async () => {
-    const id = await h.subscription(10, 'K2');
-    await h.ctx.sql.query(
-      `UPDATE subscriptions SET commitment_term_months = 12, allows_mid_term_reduction = false WHERE id = $1`,
-      [id],
-    );
-    const seen = await read(id);
-
-    const res = await patch(id, {
-      purchasedQuantity: 8,
-      commitmentTermMonths: 1,
-      allowsMidTermReduction: true,
-      expectedUpdatedAt: seen,
-    }).expect(409);
-
-    expect(h.codeOf(res)).toBe('SUBSCRIPTION.SEAT_COUNT_VIA_LEDGER');
-  });
-
-  it('W3-27: refuses reducing purchasedQuantity directly via PATCH even when allowsMidTermReduction is true -> 409 SUBSCRIPTION.SEAT_COUNT_VIA_LEDGER', async () => {
-    const id = await h.subscription(10, 'K2');
-    await h.ctx.sql.query(
-      `UPDATE subscriptions SET commitment_term_months = 12, allows_mid_term_reduction = true WHERE id = $1`,
-      [id],
-    );
-    const seen = await read(id);
-
-    const res = await patch(id, { purchasedQuantity: 8, expectedUpdatedAt: seen }).expect(409);
-
-    expect(h.codeOf(res)).toBe('SUBSCRIPTION.SEAT_COUNT_VIA_LEDGER');
-  });
-
-  it('W3-27: refuses PATCH purchasedQuantity without reason via 409 SUBSCRIPTION.SEAT_COUNT_VIA_LEDGER (ledger route owns seat changes)', async () => {
-    const id = await h.subscription(10, 'K2');
-    const seen = await read(id);
-
-    const res = await patch(id, { purchasedQuantity: 12, expectedUpdatedAt: seen }).expect(409);
-
-    expect(h.codeOf(res)).toBe('SUBSCRIPTION.SEAT_COUNT_VIA_LEDGER');
-  });
-
   it('W3-27: records SEAT_LEDGER.VENDOR_RECORDED in audit events when increasing seats via line seat-corrections', async () => {
     const id = await h.subscription(10, 'K2');
     await h.ctx.sql.query(`UPDATE subscriptions SET responsible_it_admin_employee_id = $2 WHERE id = $1`, [

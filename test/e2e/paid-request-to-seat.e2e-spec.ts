@@ -1,4 +1,5 @@
 import request from 'supertest';
+import { pretendBusinessToday } from '../support/pretend-today';
 import type { TaskWire } from '../support/provisioning-harness';
 import type { AccessRequestWire } from '../support/request-harness';
 import type { Unit } from '../support/spend-harness';
@@ -25,6 +26,8 @@ describe('a paid request from the employee to the seat (e2e, D-1)', () => {
 
   beforeAll(async () => {
     await h.start();
+    pretendBusinessToday(h.ctx.app, '2026-06-01');
+    jest.spyOn(h, 'today').mockReturnValue('2026-06-01');
     // The spending approver, named by the Super Admin: nobody takes their place (QĐ-93c).
     await h.withApprover();
     // A plan of the catalog at 1 000 000 VND per seat per month; the department of the request owns a subscription of it.
@@ -35,6 +38,7 @@ describe('a paid request from the employee to the seat (e2e, D-1)', () => {
   }, 180000);
 
   afterAll(async () => {
+    jest.restoreAllMocks();
     await h.stop();
   });
 

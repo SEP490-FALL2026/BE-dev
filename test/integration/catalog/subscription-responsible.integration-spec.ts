@@ -56,7 +56,7 @@ describe('the IT Admin who answers for a subscription over HTTP (integration, re
   const subscription = async (): Promise<SubscriptionWire> => {
     const application = await declareApplication(ctx, it1.accessToken, {
       name: unique('Software'),
-      kind: 'LICENSED',
+      kind: 'SAAS',
       vendorName: unique('Vendor'),
       dataSensitivity: 'LOW',
     });
@@ -64,7 +64,7 @@ describe('the IT Admin who answers for a subscription over HTTP (integration, re
       await request(server())
         .post('/api/v1/plans')
         .set(as(it1))
-        .send({ applicationId: application, name: unique('Perpetual'), provisioningType: 'K4', controlLevel: 'FULL' })
+        .send({ applicationId: application, name: unique('Plan'), provisioningType: 'K2', controlLevel: 'FULL' })
         .expect(201),
     );
 
@@ -74,10 +74,14 @@ describe('the IT Admin who answers for a subscription over HTTP (integration, re
         .set(as(it1))
         .send({
           planId: plan.id,
-          kind: 'PERPETUAL',
+          kind: 'TERM',
           purchasedQuantity: 3,
           unitPrice: { amount: '2000000', currency: 'VND' },
+          billingCycle: 'MONTHLY',
+          commitmentTermMonths: 1,
           startDate: '2026-03-15',
+          endDate: '2026-04-14',
+          autoRenew: false,
           responsibleItAdminEmployeeId: it1.employeeId,
         })
         .expect(201),

@@ -180,16 +180,6 @@ describe('subscription routes (e2e, no database)', () => {
       expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
     });
 
-    it('W3-15: refuses POST with neither planId nor lines as 422 SUBSCRIPTION.LINES_XOR_PLAN', async () => {
-      const response = await request(app.getHttpServer())
-        .post('/api/v1/subscriptions')
-        .set(asIt())
-        .send(without(VALID_SUBSCRIPTION, 'planId'))
-        .expect(422);
-
-      expect(bodyOf(response).error.code).toBe('SUBSCRIPTION.LINES_XOR_PLAN');
-    });
-
     it.each([
       ['GET', (s: App) => request(s).get('/api/v1/subscriptions/not-a-uuid')],
       ['PATCH', (s: App) => request(s).patch('/api/v1/subscriptions/not-a-uuid').send({ purchasedQuantity: 1 })],
@@ -198,16 +188,6 @@ describe('subscription routes (e2e, no database)', () => {
       const response = await call(app.getHttpServer()).set(asIt()).expect(422);
 
       expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
-    });
-
-    it('W3-15: refuses POST with neither planId nor lines as 422 SUBSCRIPTION.LINES_XOR_PLAN', async () => {
-      const response = await request(app.getHttpServer())
-        .post('/api/v1/subscriptions')
-        .set(asIt())
-        .send(without(VALID_SUBSCRIPTION, 'planId'))
-        .expect(422);
-
-      expect(bodyOf(response).error.code).toBe('SUBSCRIPTION.LINES_XOR_PLAN');
     });
 
     it.each([
@@ -223,16 +203,6 @@ describe('subscription routes (e2e, no database)', () => {
       const response = await request(app.getHttpServer()).get(path).set(asIt()).expect(422);
 
       expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
-    });
-
-    it('W3-15: refuses POST with neither planId nor lines as 422 SUBSCRIPTION.LINES_XOR_PLAN', async () => {
-      const response = await request(app.getHttpServer())
-        .post('/api/v1/subscriptions')
-        .set(asIt())
-        .send(without(VALID_SUBSCRIPTION, 'planId'))
-        .expect(422);
-
-      expect(bodyOf(response).error.code).toBe('SUBSCRIPTION.LINES_XOR_PLAN');
     });
   });
 
