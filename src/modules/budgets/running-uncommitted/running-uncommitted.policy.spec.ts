@@ -327,5 +327,37 @@ describe('runningUncommittedByCostCenter (SPEC-B1 W3-08)', () => {
 
       expect(result.get(CC_TK)).toBe(4_800_000n);
     });
+
+    it('H-2: clamps open seats starting mid-year by placementStart when placementStart is later than heldFrom', () => {
+      const result = runningUncommittedByCostCenter({
+        year: 2027,
+        today: '2027-11-26',
+        seats: [
+          seat({
+            assignmentId: 'a-k2-moved',
+            heldFrom: '2027-07-01',
+            heldUntil: null,
+            placementStart: '2027-11-26',
+          }),
+        ],
+        k1UnrequestedSeats: [
+          {
+            assignmentId: 'a-k1-moved',
+            planId: 'plan-k1',
+            costCenterId: CC_TK,
+            heldFrom: '2027-07-01',
+            heldUntil: null,
+            billingAnchorOn: null,
+            placementStart: '2027-11-26',
+          },
+        ],
+        k1ReferencePriceByPlan: new Map([['plan-k1', 200_000n]]),
+        periodBySubscription: new Map([['sub-1', period({ monthlyPriceMinor: 375_000n, startDate: '2027-07-01' })]]),
+        commitmentByRequest: new Map(),
+        runMonthsBySubscription: new Map(),
+      });
+
+      expect(result.get(CC_TK)).toBe((375_000n + 200_000n) * 2n);
+    });
   });
 });

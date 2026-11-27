@@ -9,6 +9,7 @@ export interface RunningUncommittedSeat {
   costCenterId: string | null;
   heldFrom: BusinessDate;
   heldUntil: BusinessDate | null;
+  placementStart?: BusinessDate | null;
 }
 
 /** Active K2 subscription period pricing and start date. */
@@ -31,6 +32,7 @@ export interface RunningUncommittedK1Seat {
   heldFrom: BusinessDate;
   heldUntil: BusinessDate | null;
   billingAnchorOn?: BusinessDate | null;
+  placementStart?: BusinessDate | null;
 }
 
 export interface RunningUncommittedFlag {
@@ -84,7 +86,11 @@ function seatMonthsLeft(
 ): number {
   const yearStart = `${year}-01-01`;
   const yearEnd = `${year}-12-31`;
-  const effectiveStart = maxDate(seat.heldFrom, maxDate(periodStartDate ?? seat.heldFrom, yearStart));
+  const placementFloor = seat.placementStart ?? yearStart;
+  const effectiveStart = maxDate(
+    seat.heldFrom,
+    maxDate(periodStartDate ?? seat.heldFrom, maxDate(yearStart, placementFloor)),
+  );
   if (effectiveStart > yearEnd) return 0;
 
   // `heldUntil` is exclusive (the first day the seat is no longer held), so the last held day is `heldUntil - 1`.
@@ -153,7 +159,8 @@ function k1MonthsLeftInYear(
   yearEnd: BusinessDate,
 ): number {
   if (seat.heldFrom > today || (seat.heldUntil !== null && today >= seat.heldUntil)) return 0;
-  const effectiveStart = maxDate(seat.heldFrom, minMonthDay);
+  const placementFloor = seat.placementStart ?? minMonthDay;
+  const effectiveStart = maxDate(seat.heldFrom, maxDate(minMonthDay, placementFloor));
   if (effectiveStart > yearEnd) return 0;
   const lastHeldDay = seat.heldUntil === null ? yearEnd : addDays(seat.heldUntil, -1);
   if (lastHeldDay < effectiveStart) return 0;

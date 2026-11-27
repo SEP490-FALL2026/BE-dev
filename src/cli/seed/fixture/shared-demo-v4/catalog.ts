@@ -242,7 +242,7 @@ function withReferencePrices(
 
         return {
           ...plan,
-          referencePrice: String(subscription.billingCycle === 'ANNUAL' ? (amount + 11n) / 12n : amount),
+          referencePrice: String(subscription.billingCycle === 'ANNUAL' ? (amount + 6n) / 12n : amount),
         };
       }
     }

@@ -96,7 +96,7 @@ async function expectCompanyMachines(sql: HttpTestApp['sql']): Promise<void> {
            (SELECT count(*)::int FROM device_activations a WHERE a.license_key_id = k.id AND a.origin = 'OPERATION') AS operations,
            (SELECT count(*)::int FROM device_activations a WHERE a.license_key_id = k.id AND a.deactivated_at IS NULL) AS open,
            (SELECT count(*)::int FROM device_activations a WHERE a.license_key_id = k.id AND a.origin = 'INITIAL') AS initial_rows
-      FROM license_keys k JOIN subscriptions s ON s.id = k.subscription_id JOIN plans p ON p.id = s.plan_id
+      FROM license_keys k JOIN license_lots l ON l.id = k.license_lot_id JOIN plans p ON p.id = l.plan_id
      WHERE p.key_binding = 'DEVICE_KEY'`);
   expect(key.max_activations).toBe(30);
   expect(key.initial + key.operations).toBe(12);

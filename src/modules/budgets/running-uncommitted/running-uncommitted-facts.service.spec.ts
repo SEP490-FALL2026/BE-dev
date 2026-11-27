@@ -2,6 +2,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { CatalogPricingApi } from '../../catalog/public/catalog-pricing.api';
 import type { LicensingSeatMonthApi } from '../../licensing/public/licensing-seat-month.api';
 import type { SeatInForce, UnrequestedK1SeatInForce } from '../../licensing/public/licensing-seat-month.types';
+import type { OrganizationHistoryApi } from '../../organization/public/organization-history.api';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { SharedPoolLineRepo } from '../shared-pool-line/shared-pool-line.repo';
 import type { RunningUncommittedRepo } from './running-uncommitted.repo';
@@ -43,6 +44,9 @@ function buildService() {
     getOwningUnits: jest.fn().mockResolvedValue(new Map()),
     getUnitCostCenterIds: jest.fn().mockResolvedValue(new Map()),
   };
+  const organizationHistory = {
+    getPlacementsBetween: jest.fn().mockResolvedValue([]),
+  };
   const commitments = {
     commitmentsOfRequestsInYear: jest.fn().mockResolvedValue(new Map()),
   };
@@ -54,11 +58,12 @@ function buildService() {
     licensing as unknown as LicensingSeatMonthApi,
     periods as unknown as CatalogPricingApi,
     organizationReads as unknown as OrganizationReadApi,
+    organizationHistory as unknown as OrganizationHistoryApi,
     commitments as unknown as RunningUncommittedRepo,
     poolRepo as unknown as SharedPoolLineRepo,
   );
 
-  return { service, licensing, periods, organizationReads, commitments, poolRepo };
+  return { service, licensing, periods, organizationReads, organizationHistory, commitments, poolRepo };
 }
 
 describe('RunningUncommittedFactsService', () => {
@@ -277,5 +282,48 @@ describe('RunningUncommittedFactsService', () => {
 
     const filtered = await service.ofYear(2028, '2027-11-15', undefined, { exceptRequestIds: ['req-kept'] });
     expect(filtered.get(CC_TK)).toBe(4_800_000n);
+  });
+
+  it('H-2: clamps open mid-year seats by today department placement validFrom (both K2 and unrequested K1)', async () => {
+    const { service, licensing, periods, organizationReads, organizationHistory } = buildService();
+    licensing.getSeatsInForceOn.mockResolvedValue([
+      inForceSeat({ assignmentId: 'a-k2', subscriptionId: 'sub-1', heldFrom: '2027-07-01', heldUntil: null }),
+    ]);
+    licensing.getUnrequestedK1SeatsInForceOn.mockResolvedValue([
+      {
+        assignmentId: 'a-k1',
+        planId: 'plan-k1',
+        source: 'BASELINE',
+        employeeId: 'emp-1',
+        kind: 'PERSONAL',
+        owningDepartmentId: null,
+        heldFrom: '2027-07-01',
+        heldUntil: null,
+        billingAnchorOn: null,
+        referenceMonthlyPriceMinor: 300_000n,
+      },
+    ]);
+    organizationReads.getOwningUnits.mockResolvedValue(
+      new Map([
+        ['emp-1', { departmentId: 'd-tk', costCenter: { id: CC_TK, code: 'TK', name: 'TK', status: 'ACTIVE' } }],
+      ]),
+    );
+    organizationHistory.getPlacementsBetween.mockResolvedValue([
+      { employeeId: 'emp-1', departmentId: 'd-other', validFrom: '2027-01-01', validTo: '2027-11-26' },
+      { employeeId: 'emp-1', departmentId: 'd-tk', validFrom: '2027-11-26', validTo: null },
+    ]);
+    periods.getPurchaseFacts.mockResolvedValue([
+      {
+        subscriptionId: 'sub-1',
+        status: 'ACTIVE',
+        kind: 'TERM',
+        provisioningType: 'K2',
+        monthlyPriceMinor: 500_000n,
+        startDate: '2027-07-01',
+      },
+    ]);
+
+    const totals = await service.ofYear(2027, '2027-11-26');
+    expect(totals.get(CC_TK)).toBe((500_000n + 300_000n) * 2n);
   });
 });

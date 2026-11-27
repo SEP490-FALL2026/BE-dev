@@ -4,7 +4,7 @@ import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
 import type { DemoBudget, DemoNextYear } from '../fixture/demo-fixture.types';
 import { yesChecklist } from './checklist-kit';
 import { proposalFile, versionFile } from './budget-files';
-import { baseFor } from './budget-targets';
+import { baseFor, tightBaseFor } from './budget-targets';
 import { uploadBudgetFile } from './file-kit';
 import { financePerson, money } from './finance-kit';
 
@@ -246,7 +246,11 @@ async function runYearPlans(ctx: DemoRunContext, year: number, entries: readonly
  */
 export function yearPlanOf(ctx: DemoRunContext, plan: DemoBudget): { base: string; label: string } {
   const choice = baseFor(ctx.fixture, plan.department, ctx.today);
-  if (!choice) return { base: plan.base, label: '' };
+  if (!choice) {
+    const tight = tightBaseFor(ctx.fixture, plan.department, ctx.today);
+
+    return { base: tight === null ? plan.base : String(tight), label: '' };
+  }
   const label = choice.reachable
     ? ` (đèn ${choice.wanted})`
     : ` (đèn ${choice.wanted} chưa đạt được ở ngày này, ra ${choice.light})`;

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { SHARED_DEMO_V4 as F } from '../fixture/shared-demo-v4';
-import { baseFor, expectedOf, lastClosedMonth, roundUpTo } from './budget-targets';
+import { baseFor, expectedOf, lastClosedMonth, roundUpTo, tightBaseFor } from './budget-targets';
 
 /*
  * The rules of the light, copied from `budget-review.policy.ts` (the seed cannot import a module: arch:check). The copy in this file judges what the copy of
@@ -27,7 +27,8 @@ it('covers both provisional group lines before the spending approver rejects one
     const group = F.requests.find((request) => request.key === 'R49')!;
     const subscription = F.subscriptions.find((subscription) => subscription.plan === group.plan)!;
     const months = 12 - Number(today.slice(5, 7)) + 1;
-    const provisional = Math.ceil(Number(subscription.unitPrice!.amount) / 12) * months * group.beneficiaries!.length;
+    const provisional =
+      Math.floor((Number(subscription.unitPrice!.amount) + 6) / 12) * months * group.beneficiaries!.length;
     const choice = baseFor(F, 'BOD', today)!;
     const { pending } = expectedOf(F, 'BOD', today);
     expect(choice.reservePercent).toBe(10);
@@ -52,8 +53,9 @@ it('reads per-line monthly prices from lines[] when estimating requests on multi
     ],
   });
 
-  expect(expectedOf(multi('claude-team-standard'), 'ENG', '2026-11-17').committed).toBe(500_000);
-  expect(expectedOf(multi('claude-team-premium'), 'ENG', '2026-11-17').committed).toBe(2_500_000);
+  expect(expectedOf(multi('claude-team-standard'), 'ENG', '2026-11-01').committed).toBe(500_000);
+  expect(expectedOf(multi('claude-team-standard'), 'ENG', '2026-11-17').committed).toBe(1_000_000);
+  expect(expectedOf(multi('claude-team-premium'), 'ENG', '2026-11-01').committed).toBe(2_500_000);
 });
 
 const DAYS = ['2026-11-17', '2026-10-01', '2026-12-31'];
@@ -108,9 +110,10 @@ const request = (key: string, requester: string, target: 'COMPLETED' | 'AWAITING
   reason: 'x',
 });
 const headedBy = (code: string) => F.people.find((person) => person.code === code)?.department;
-/** The fixture as it was before T12: no request of the Board or of Finance, so those two have nothing counted yet. */
+/** The fixture as it was before T12: no request or baseline seat of the Board or Finance, so those two have nothing counted yet. */
 const WITHOUT_BOARD_AND_FINANCE = {
   ...F,
+  seats: F.seats.filter((seat) => !['BOD', 'FIN'].includes(headedBy(seat.holder) ?? '')),
   requests: F.requests.filter((candidate) => !['BOD', 'FIN'].includes(headedBy(candidate.requester) ?? '')),
 };
 const WITH_BOARD_AND_FINANCE = {
@@ -129,7 +132,9 @@ describe('the base counted for the light a department must show (baseFor, SPEC S
   const lightAt = (fixture: typeof F, department: string, today: string) => {
     const choice = baseFor(fixture, department, today)!;
     const expected = expectedOf(fixture, department, today);
-    const forecast = BigInt(expected.spentThrough + expected.committed + expected.pending);
+    const forecast = BigInt(
+      expected.spentThrough + expected.runningUncommitted + expected.committed + expected.pending,
+    );
     const base = BigInt(choice.base);
     const reserve = (base * BigInt(choice.reservePercent)) / 100n;
 
@@ -201,10 +206,11 @@ describe('the base counted for the light a department must show (baseFor, SPEC S
         },
       ],
     });
-    const price = Math.ceil(3_800_000 / 12);
+    const price = Math.floor((3_800_000 + 6) / 12);
 
-    expect(expectedOf(group(), 'BOD', '2026-11-17').committed).toBe(price * 2);
-    expect(expectedOf(group(['NV-BOD2']), 'BOD', '2026-11-17').committed).toBe(price);
+    expect(expectedOf(group(), 'BOD', '2026-11-01').committed).toBe(price * 2);
+    expect(expectedOf(group(['NV-BOD2']), 'BOD', '2026-11-01').committed).toBe(price);
+    expect(expectedOf(group(['NV-BOD2']), 'BOD', '2026-11-17').committed).toBe(price * 2);
   });
 
   it('asks the reserve of Finance at 60 % and the others at the default, and asks nothing of a department it does not count', () => {
@@ -228,7 +234,7 @@ describe('the base counted for the light a department must show (baseFor, SPEC S
     for (const today of DAYS) {
       const choice = baseFor(F, 'ENG', today)!;
       const expected = expectedOf(F, 'ENG', today);
-      const forecast = expected.spentThrough + expected.committed + expected.pending;
+      const forecast = expected.spentThrough + expected.runningUncommitted + expected.committed + expected.pending;
       const monthsLeft = 12 - Number(today.slice(5, 7)) + 1;
 
       expect(choice.base).toBeGreaterThanOrEqual(185_000_000);
@@ -241,7 +247,7 @@ describe('the base counted for the light a department must show (baseFor, SPEC S
     for (const today of DAYS) {
       const choice = baseFor(WITH_BOARD_AND_FINANCE, 'FIN', today)!;
       const expected = expectedOf(WITH_BOARD_AND_FINANCE, 'FIN', today);
-      const forecast = expected.spentThrough + expected.committed + expected.pending;
+      const forecast = expected.spentThrough + expected.runningUncommitted + expected.committed + expected.pending;
 
       expect(forecast).toBeGreaterThan(choice.base);
       expect(forecast).toBeLessThanOrEqual(choice.base * 1.6);
@@ -265,6 +271,29 @@ describe('the base counted for the light a department must show (baseFor, SPEC S
         .sort(),
     ).toEqual(['BOD', 'ENG', 'FIN', 'ITO']);
     expect(F.budgets.find((budget) => budget.department === 'FIN')!.reserve).toMatchObject({ percent: 60 });
+  });
+
+  it('H-2: sizes MKT and DES reserve bases inside (forecast / 1.1, forecast) across calendar months and baseline seats, leaving SAL blocked', () => {
+    for (const today of ['2026-10-01', '2026-11-26', '2026-12-31']) {
+      for (const department of ['MKT', 'DES'] as const) {
+        const base = tightBaseFor(F, department, today)!;
+        const expected = expectedOf(F, department, today);
+        const forecast = expected.spentThrough + expected.runningUncommitted + expected.committed + expected.pending;
+
+        expect(base).toBeGreaterThan(0);
+        expect(forecast).toBeGreaterThan(base);
+        expect(forecast).toBeLessThanOrEqual(Math.floor(base * 1.1));
+      }
+      expect(tightBaseFor(F, 'SAL', today)).toBeNull();
+      const totalWithReserve = F.budgets.reduce((sum, entry) => {
+        const chosen =
+          baseFor(F, entry.department, today)?.base ?? tightBaseFor(F, entry.department, today) ?? Number(entry.base);
+        const pct = entry.reserve?.percent ?? 10;
+
+        return sum + BigInt(chosen) + (BigInt(chosen) * BigInt(pct)) / 100n;
+      }, 0n);
+      expect(totalWithReserve).toBeLessThanOrEqual(BigInt(F.cycle.annualCeiling) - BigInt(F.cycle.sharedPoolReserve));
+    }
   });
 });
 

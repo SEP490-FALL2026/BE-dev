@@ -50,7 +50,7 @@ describe('the recorded subscription adjustments', () => {
           {
             subscriptionLineId: 'line-1',
             quantity: 4,
-            monthlyUnitPrice: { amount: '1833334', currency: 'VND' },
+            monthlyUnitPrice: { amount: '1833333', currency: 'VND' },
           },
         ],
         startDate: '2026-11-26',

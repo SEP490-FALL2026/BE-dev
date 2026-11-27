@@ -7,6 +7,7 @@ import type { RunningUncommittedRepo } from '../../budgets/running-uncommitted/r
 import type { SharedPoolLineRepo } from '../../budgets/shared-pool-line/shared-pool-line.repo';
 import type { CatalogPricingApi } from '../../catalog/public/catalog-pricing.api';
 import type { LicensingSeatMonthApi } from '../../licensing/public/licensing-seat-month.api';
+import type { OrganizationHistoryApi } from '../../organization/public/organization-history.api';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { SpendWireViewService } from '../spend/spend-wire-view.service';
 import { NextYearBudgetRepo } from './next-year-budget.repo';
@@ -63,6 +64,7 @@ describe('NextYearBudgetService (FIX-B1 F7 / D-10)', () => {
         ]),
       } as unknown as CatalogPricingApi,
       organizationReads,
+      { getPlacementsBetween: jest.fn().mockResolvedValue([]) } as unknown as OrganizationHistoryApi,
       {
         commitmentsOfRequestsInYear: jest.fn().mockResolvedValue(new Map()),
       } as unknown as RunningUncommittedRepo,
@@ -162,6 +164,7 @@ describe('NextYearBudgetService (FIX-B1 F7 / D-10)', () => {
         ]),
       } as unknown as CatalogPricingApi,
       organizationReads,
+      { getPlacementsBetween: jest.fn().mockResolvedValue([]) } as unknown as OrganizationHistoryApi,
       {
         commitmentsOfRequestsInYear: jest.fn().mockResolvedValue(new Map()),
       } as unknown as RunningUncommittedRepo,

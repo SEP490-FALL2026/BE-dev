@@ -15,13 +15,13 @@ export function subscriptionPrimaryPlan(subscription: DemoSubscription): string 
   return subscription.plan ?? subscription.lines?.[0]?.plan ?? '';
 }
 
-/** Monthly unit price in dong for `planKey` on `subscription` (`lines[]` first, else `unitPrice` divided by 12 for annual). */
+/** Monthly unit price in dong for `planKey` on `subscription` (`lines[]` first, else `unitPrice` divided by 12 half-away for annual). */
 export function subscriptionMonthlyPriceOf(subscription: DemoSubscription, planKey?: string): number {
   const line = planKey ? subscription.lines?.find((candidate) => candidate.plan === planKey) : subscription.lines?.[0];
   if (line) return Number(line.monthlyUnitPrice.amount);
   const amount = Number(subscription.unitPrice?.amount ?? 0);
 
-  return subscription.billingCycle === 'ANNUAL' ? Math.ceil(amount / 12) : amount;
+  return subscription.billingCycle === 'ANNUAL' ? Math.floor((amount + 6) / 12) : amount;
 }
 
 interface ApplicationRow {

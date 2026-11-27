@@ -11,7 +11,7 @@ jest.mock('./checklist-kit', () => ({
 
 import type { DemoRunContext } from '../demo-run.types';
 import { SHARED_DEMO_V4 as F } from '../fixture/shared-demo-v4';
-import { baseFor } from './budget-targets';
+import { baseFor, tightBaseFor } from './budget-targets';
 import { budgetSteps, yearPlanOf } from './budget.steps';
 
 const budget = (department: string) => F.budgets.find((candidate) => candidate.department === department)!;
@@ -19,13 +19,17 @@ const budget = (department: string) => F.budgets.find((candidate) => candidate.d
 describe('the base of the budget of the year (T9b)', () => {
   const ctx = { fixture: F, today: '2026-11-17' } as unknown as DemoRunContext;
 
-  it('is counted from the day of the seed for the four departments that carry a light, and written once for the others', () => {
+  it('is counted from the day of the seed for the four departments that carry a light, tightBaseFor for MKT/DES, and static for SAL', () => {
     for (const department of ['ENG', 'ITO', 'BOD', 'FIN']) {
       expect(yearPlanOf(ctx, budget(department)).base).toBe(String(baseFor(F, department, '2026-11-17')!.base));
     }
-    for (const department of ['MKT', 'SAL', 'DES']) {
-      expect(yearPlanOf(ctx, budget(department))).toEqual({ base: budget(department).base, label: '' });
+    for (const department of ['MKT', 'DES']) {
+      expect(yearPlanOf(ctx, budget(department))).toEqual({
+        base: String(tightBaseFor(F, department, '2026-11-17')),
+        label: '',
+      });
     }
+    expect(yearPlanOf(ctx, budget('SAL'))).toEqual({ base: budget('SAL').base, label: '' });
   });
 
   it('keeps ENG at the 185 million of its BM-10 lines and names the light in the label; a day too early says the light is not reached', () => {
