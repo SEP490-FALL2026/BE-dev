@@ -276,6 +276,7 @@ model AccessRequest {
   returnsFromHere      ReturnRequest[]              @relation("ReturnRequestOrigin")
   replacesAssignment   LicenseAssignment?           @relation("RequestReplacesAssignment", fields: [replacesAssignmentId], references: [id], onDelete: Restrict)
   ticket               RequestTicket?               @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  replies              AccessRequestReply[]
 
   @@unique([ticketId, ticketPosition])
   @@index([ticketId])
@@ -307,6 +308,32 @@ model RequestTicket {
 
   @@index([requesterEmployeeId, submittedAt(sort: Desc), id])
   @@map("request_tickets")
+}
+
+enum AccessRequestReplyKind {
+  REQUESTER_RESUBMISSION
+  HEAD_RESUBMISSION
+}
+
+// Append-only reply note attached when a requester resubmits or a department head re-submits after a human return (QĐ-114q, QĐ-116f).
+model AccessRequestReply {
+  id               String                 @id @default(uuid()) @db.Uuid
+  organizationId   String                 @map("organization_id") @db.Uuid
+  requestId        String                 @map("request_id") @db.Uuid
+  kind             AccessRequestReplyKind
+  returnedStepId   String?                @map("returned_step_id") @db.Uuid
+  note             String
+  authorEmployeeId String                 @map("author_employee_id") @db.Uuid
+  createdAt        DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  request      AccessRequest      @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  returnedStep AccessRequestStep? @relation(fields: [returnedStepId], references: [id], onDelete: Restrict)
+  author       Employee           @relation("AccessRequestReplyAuthor", fields: [authorEmployeeId], references: [id], onDelete: Restrict)
+
+  @@index([requestId, createdAt(sort: Desc), id])
+  @@index([returnedStepId])
+  @@map("access_request_replies")
 }
 
 // A person the request is for. One row today; a request for a group has a row for each person.
@@ -466,6 +493,7 @@ model AccessRequestStep {
   budgetInformation    BudgetInformationRequest[]
   reserveConfirmation  RequestReserveConfirmation?
   controlledWaitAlerts ControlledWaitAlert[]
+  replies              AccessRequestReply[]
 
   @@unique([requestId, sequence])
   @@index([assigneeEmployeeId, state])

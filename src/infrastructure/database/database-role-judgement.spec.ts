@@ -110,8 +110,8 @@ describe('judgeSeparation', () => {
         },
       ]);
     }
-    // Append-only seat ledger, invoice allocations and request tickets (W4 M1): runtime role holds INSERT and SELECT only.
-    for (const name of ['seat_changes', 'invoice_allocations', 'request_tickets'] as const) {
+    // Append-only seat ledger, invoice allocations, request tickets (W4 M1) and access request replies (W4 M2): runtime role holds INSERT and SELECT only.
+    for (const name of ['seat_changes', 'invoice_allocations', 'request_tickets', 'access_request_replies'] as const) {
       expect(RUNTIME_TABLE_EXCEPTIONS[name]).toEqual(['INSERT', 'SELECT']);
       const withTable = (privileges: string[]): SeparationFacts => ({
         ...healthy(),

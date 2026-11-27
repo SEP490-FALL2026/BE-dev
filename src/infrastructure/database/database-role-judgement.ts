@@ -44,6 +44,8 @@ export const RUNTIME_TABLE_EXCEPTIONS: Readonly<Record<string, readonly string[]
   invoice_allocations: ['INSERT', 'SELECT'],
   // Multi-item request tickets (QĐ-115aa): added to and never changed or deleted (its trigger refuses UPDATE/DELETE first).
   request_tickets: ['INSERT', 'SELECT'],
+  // Reply notes on resubmission (QĐ-114q, QĐ-116f): append-only (its trigger refuses UPDATE/DELETE first).
+  access_request_replies: ['INSERT', 'SELECT'],
 };
 
 /** Sequence privileges the runtime role holds on every sequence of `public`: drawing numbers (`nextval`) and `currval`. */
