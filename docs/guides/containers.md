@@ -121,10 +121,13 @@ Keep `QUEUE_BOARD_ENABLED=false` unless operators need the dashboard. To enable 
 and `QUEUE_BOARD_PASSWORD` and open `/ops/queues` through HTTPS. The production password must be at least
 20 characters and differ from the username.
 
-Before the first rollout that includes Redis, set `REDIS_PASSWORD` in the VPS `.env`. If an earlier deploy left an
-orphan named `slm-redis`, verify its container and volume names with `docker inspect slm-redis`. The Owner can stop and
-remove that exact container and remove its old volume by exact name after confirming it is disposable. The deploy script
-never deletes orphans. To reset rate-limit counters, scan only `<REDIS_KEY_PREFIX>:rl:*` in batches and delete those
+Before the first rollout that includes Redis, set `REDIS_PASSWORD` in the VPS `.env` and clear any old Redis
+container. This is **required**: run `docker inspect slm-redis`. If a container named `slm-redis` exists that is not the
+Redis of this Compose project (an orphan of an earlier deploy, possibly without `--requirepass`), stop it and remove it
+by exact name (`docker stop slm-redis && docker rm slm-redis`), and remove its old volume by exact name once the Owner
+confirms it is disposable. `scripts/ops/deploy-release.sh` enforces this: it stops, before pulling or changing anything,
+when such an orphan exists, and again when the Redis service of the project runs without `--requirepass` in its command.
+It never deletes anything itself. To reset rate-limit counters, scan only `<REDIS_KEY_PREFIX>:rl:*` in batches and delete those
 matching keys. The namespace `<REDIS_KEY_PREFIX>:bull:*` holds jobs and schedules.
 
 Request size: the API refuses a JSON or URL-encoded body over **100 KiB** with 413 `HTTP_PAYLOAD_TOO_LARGE` (one limit in

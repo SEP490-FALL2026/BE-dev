@@ -275,12 +275,47 @@ describe('email delivery through BullMQ, PostgreSQL and SMTP', () => {
       const jobs = await waitForJobs('completed', attempt);
       expect(jobs.every((job) => JSON.stringify(job.returnvalue) === '{"outcome":"RESCHEDULED"}')).toBe(true);
       expect(await rowOf(mail.id)).toMatchObject({ status: 'PENDING', attempts: attempt, last_error_code: 'SMTP_421' });
-      await db.sql.query('UPDATE email_outbox SET next_attempt_at = now() WHERE id = $1', [mail.id]);
+      // Due a minute ago: the PostgreSQL clock may run a few ms ahead of this process (test/README.md, Đồng hồ).
+      await db.sql.query("UPDATE email_outbox SET next_attempt_at = now() - interval '1 minute' WHERE id = $1", [
+        mail.id,
+      ]);
     }
     await relay.tick();
     const [failed] = await waitForJobs('failed', 1);
     expect(failed).toMatchObject({ failedReason: 'ATTEMPTS_EXHAUSTED', attemptsMade: 1 });
     expect(await rowOf(mail.id)).toMatchObject({ status: 'FAILED', attempts: 5, last_error_code: 'SMTP_421' });
+    expect(received).toEqual([]);
+  });
+
+  it('sends on the third attempt after two transient failures', async () => {
+    responseCode = 421;
+    const mail = await enqueue();
+    await startConsumer();
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      await relay.tick();
+      await waitForJobs('completed', attempt);
+      expect(await rowOf(mail.id)).toMatchObject({ status: 'PENDING', attempts: attempt, last_error_code: 'SMTP_421' });
+      // Due a minute ago: the PostgreSQL clock may run a few ms ahead of this process (test/README.md, Đồng hồ).
+      await db.sql.query("UPDATE email_outbox SET next_attempt_at = now() - interval '1 minute' WHERE id = $1", [
+        mail.id,
+      ]);
+    }
+    responseCode = undefined;
+    await relay.tick();
+    const jobs = await waitForJobs('completed', 3);
+    expect(jobs.some((job) => JSON.stringify(job.returnvalue) === '{"outcome":"SENT"}')).toBe(true);
+    expect(await rowOf(mail.id)).toMatchObject({ status: 'SENT', attempts: 3, payload_ciphertext: null });
+    expect(received).toEqual([RECIPIENT]);
+  });
+
+  it('fails an unknown template once with its own code and sends nothing', async () => {
+    const mail = await enqueue();
+    await db.sql.query("UPDATE email_outbox SET template = 'NOT_A_TEMPLATE' WHERE id = $1", [mail.id]);
+    await relay.tick();
+    await startConsumer();
+    const [failed] = await waitForJobs('failed', 1);
+    expect(failed).toMatchObject({ failedReason: 'TEMPLATE_UNKNOWN', attemptsMade: 1 });
+    expect(await rowOf(mail.id)).toMatchObject({ status: 'FAILED', last_error_code: 'TEMPLATE_UNKNOWN' });
     expect(received).toEqual([]);
   });
 

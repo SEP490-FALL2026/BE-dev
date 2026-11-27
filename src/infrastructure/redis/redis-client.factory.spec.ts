@@ -18,14 +18,16 @@ function loggerForTest() {
 
 describe('Redis client connections', () => {
   it('leaves connection errors to the transition logger and reports unexpected queue errors safely', () => {
-    const logger = { debug: jest.fn() };
+    const logger = { debug: jest.fn(), warn: jest.fn() };
     factory.logRedisQueueError(logger, new Error('WRONGPASS invalid credentials'));
     factory.logRedisQueueError(logger, new Error('NOAUTH Authentication required.'));
     factory.logRedisQueueError(logger, Object.assign(new Error('connect refused'), { code: 'ECONNREFUSED' }));
     expect(logger.debug).not.toHaveBeenCalled();
+    expect(logger.warn).not.toHaveBeenCalled();
 
     factory.logRedisQueueError(logger, new Error('Unexpected error with a private Redis value'));
-    expect(logger.debug).toHaveBeenCalledWith('Error retryable=false');
+    expect(logger.warn).toHaveBeenCalledWith('Error retryable=false');
+    expect(logger.debug).not.toHaveBeenCalled();
   });
 
   it('creates the blocking BullMQ worker client without lazy connect or a key prefix', () => {

@@ -1,5 +1,12 @@
 export type DeliveryOutcome =
-  'SENT' | 'CANCELLED' | 'FAILED' | 'RESCHEDULED' | 'LEASE_LOST_BEFORE_SEND' | 'LEASE_LOST_AFTER_SEND' | 'NOT_CLAIMED';
+  | 'SENT'
+  | 'CANCELLED'
+  | 'FAILED'
+  | 'RESCHEDULED'
+  | 'LEASE_LOST_BEFORE_SEND'
+  | 'LEASE_LOST_AFTER_SEND'
+  | 'LEASE_LOST_AFTER_FAILURE'
+  | 'NOT_CLAIMED';
 
 export interface DeliveryResult {
   outcome: DeliveryOutcome;
