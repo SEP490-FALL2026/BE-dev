@@ -117,6 +117,14 @@ describe('plans and workspace profiles over HTTP (integration, real PostgreSQL)'
         [resourceId],
       )
     ).rows;
+  /** The workspace of the vendor of the plan: the profile of the plan is the admins of this workspace (W3-13), and its audit is written on it. */
+  const workspaceOfPlan = async (planId: string): Promise<string> =>
+    (
+      await ctx.sql.query<{ id: string }>(
+        `SELECT w.id FROM plans p JOIN applications a ON a.id = p.application_id JOIN workspaces w ON w.vendor_id = a.vendor_id WHERE p.id = $1`,
+        [planId],
+      )
+    ).rows[0].id;
   const profileBody = (extra: object = {}) => ({
     primaryOwnerEmployeeId: it1.employeeId,
     members: [
@@ -493,11 +501,11 @@ describe('plans and workspace profiles over HTTP (integration, real PostgreSQL)'
       );
       const detail = dataOf<PlanWire>(await getPlan(k2Plan.id).expect(200));
       expect(detail.workspaceProfile?.primaryOwner.employeeId).toBe(it1.employeeId);
-      expect((await auditOf(k2Plan.id)).map((event) => event.action)).toEqual([
-        'PLAN.CREATED',
-        'PLAN.WORKSPACE_PROFILE_SET',
-      ]);
-      expect(JSON.stringify(await auditOf(k2Plan.id))).not.toMatch(/password/i);
+      // The profile is the admins of the workspace of the vendor (W3-13): the change is audited on the workspace, not on the plan.
+      expect((await auditOf(k2Plan.id)).map((event) => event.action)).toEqual(['PLAN.CREATED']);
+      const workspaceId = await workspaceOfPlan(k2Plan.id);
+      expect((await auditOf(workspaceId)).map((event) => event.action)).toContain('WORKSPACE.ADMINS_SET');
+      expect(JSON.stringify(await auditOf(workspaceId))).not.toMatch(/password/i);
 
       expect(codeOf(await putProfile(k2Plan.id, profileBody({ password: 'hunter2' })).expect(422))).toBe(
         'VALIDATION_ERROR',
@@ -653,16 +661,15 @@ describe('plans and workspace profiles over HTTP (integration, real PostgreSQL)'
         [`${it2.employeeId}:OWNER`, `${it1.employeeId}:ADMIN`].sort(),
       );
       expect(replaced.emergencyAccount).toBeNull();
-      const events = await auditOf(k2Plan.id);
-      expect(events.map((event) => event.action)).toEqual([
-        'PLAN.CREATED',
-        'PLAN.WORKSPACE_PROFILE_SET',
-        'PLAN.WORKSPACE_PROFILE_SET',
-      ]);
-      expect(events[2].before).toMatchObject({ primaryOwnerEmployeeId: it1.employeeId });
-      expect(events[2].after).toMatchObject({ primaryOwnerEmployeeId: it2.employeeId, emergencyIdentity: null });
+      expect((await auditOf(k2Plan.id)).map((event) => event.action)).toEqual(['PLAN.CREATED']);
+      const workspaceId = await workspaceOfPlan(k2Plan.id);
+      // The first write and the replacement are audited on the workspace; the repeat of the same profile between them is not.
+      const events = (await auditOf(workspaceId)).filter((event) => event.action === 'WORKSPACE.ADMINS_SET');
+      expect(events).toHaveLength(2);
+      expect(events[1].before).toMatchObject({ primaryOwnerEmployeeId: it1.employeeId });
+      expect(events[1].after).toMatchObject({ primaryOwnerEmployeeId: it2.employeeId });
       expect(
-        (await ctx.sql.query(`SELECT 1 FROM plan_workspace_admins WHERE plan_id = $1`, [k2Plan.id])).rowCount,
+        (await ctx.sql.query(`SELECT 1 FROM workspace_admins WHERE workspace_id = $1`, [workspaceId])).rowCount,
       ).toBe(2);
     });
 

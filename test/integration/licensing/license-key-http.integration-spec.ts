@@ -98,7 +98,16 @@ describe('the vault of license keys over HTTP (integration, real PostgreSQL)', (
     expect(result).toEqual({
       imported: 50,
       errors: [],
-      summary: { purchased: 50, usableKeys: 50, capacity: 50, warning: null },
+      // The summary of a lot also says how many licenses are free, how many keys are on an account, and how the plan binds its keys (W3-24).
+      summary: {
+        purchased: 50,
+        usableKeys: 50,
+        capacity: 50,
+        warning: null,
+        free: 50,
+        occupied: 0,
+        keyBinding: 'ACCOUNT',
+      },
     });
     const page = await listed(subscriptionId);
     expect(page.items).toHaveLength(50);
@@ -169,12 +178,18 @@ describe('the vault of license keys over HTTP (integration, real PostgreSQL)', (
     expect(JSON.stringify(response.body)).not.toContain(row.fingerprint);
     // BR-MF1-09 (K4 key pool): a key also names the seat it is assigned to and whether it was withdrawn from the store, with why.
     expect(Object.keys(h.dataOf<ListData>(response).items[0]).sort()).toEqual([
+      'activationsUsed',
       'assignmentId',
+      'capReached',
       'id',
       'importedAt',
+      'licenseLot',
       'masked',
+      'maxActivations',
+      'openActivations',
       'status',
       'subscriptionId',
+      'updatedAt',
       'withdrawalReason',
       'withdrawnAt',
     ]);
@@ -192,10 +207,17 @@ describe('the vault of license keys over HTTP (integration, real PostgreSQL)', (
     const [secret] = keys(1, 'AUD');
     await imported(subscriptionId, [secret, 'short', secret]);
 
-    const events = await h.auditOf('Subscription', subscriptionId);
+    // The keys belong to the lot born from the purchase (the lot has its id), and the import is audited on the lot (W3-24).
+    const events = await h.auditOf('LicenseLot', subscriptionId);
     const event = events.find((e) => e.action === 'LICENSE_KEY.IMPORTED');
 
-    expect(event?.after).toEqual({ subscriptionId, imported: 1, rejected: 2 });
+    expect(event?.after).toEqual({
+      licenseLotId: subscriptionId,
+      imported: 1,
+      rejected: 2,
+      maxActivations: 1,
+      initialActivationsUsed: 0,
+    });
     expect(JSON.stringify(events)).not.toContain(secret);
   });
 
@@ -344,9 +366,10 @@ describe('the vault of license keys over HTTP (integration, real PostgreSQL)', (
     const before = await keyCount();
     const [one] = keys(1, 'PLAN');
 
+    // Only a K4 plan has lots, and keys go to a lot: the subscription of seats or of an account is no lot (W3-24).
     for (const subscriptionId of [k2, k1]) {
-      const response = await importKeys(subscriptionId, [one]).expect(422);
-      expect(h.codeOf(response)).toBe('LICENSE_KEY.PLAN_NOT_K4');
+      const response = await importKeys(subscriptionId, [one]).expect(404);
+      expect(h.codeOf(response)).toBe('LICENSE_LOT.NOT_FOUND');
     }
     expect(await keyCount()).toBe(before);
 
@@ -377,21 +400,26 @@ describe('the vault of license keys over HTTP (integration, real PostgreSQL)', (
         })
         .expect(201),
     ).id;
-    const perpetual = h.dataOf<{ id: string }>(
+    // What is bought once is a lot (W3-24): the keys go to the lot, and the subscription route no longer takes a perpetual purchase.
+    const lot = h.dataOf<{ id: string }>(
       await request(h.server())
-        .post('/api/v1/subscriptions')
+        .post('/api/v1/license-lots')
         .set(h.as(h.it1))
         .send({
           planId,
-          kind: 'PERPETUAL',
-          purchasedQuantity: 3,
+          purchasedOn: '2026-01-05',
+          licenseCount: 3,
           unitPrice: { amount: '5000000', currency: 'VND' },
-          startDate: '2026-01-05',
-          responsibleItAdminEmployeeId: h.it1.employeeId,
+          purpose: 'REPLACEMENT',
         })
         .expect(201),
-    ).id;
-    expect(await imported(perpetual, keys(3, 'PERP'))).toMatchObject({
+    );
+    const stored = await request(h.server())
+      .post(`/api/v1/license-lots/${lot.id}/keys`)
+      .set(h.as(h.it1))
+      .send({ keys: keys(3, 'PERP') })
+      .expect(201);
+    expect(h.dataOf<ImportData>(stored)).toMatchObject({
       imported: 3,
       summary: { purchased: 3, usableKeys: 3, capacity: 3, warning: null },
     });
@@ -417,7 +445,7 @@ describe('the vault of license keys over HTTP (integration, real PostgreSQL)', (
     const missing = randomUUID();
     const before = await keyCount();
 
-    expect(h.codeOf(await importKeys(missing, keys(1, 'NF')).expect(404))).toBe('SUBSCRIPTION.NOT_FOUND');
+    expect(h.codeOf(await importKeys(missing, keys(1, 'NF')).expect(404))).toBe('LICENSE_LOT.NOT_FOUND');
     expect(h.codeOf(await listKeys(`subscriptionId=${missing}`).expect(404))).toBe('SUBSCRIPTION.NOT_FOUND');
     expect(await keyCount()).toBe(before);
   });
@@ -430,18 +458,21 @@ describe('the vault of license keys over HTTP (integration, real PostgreSQL)', (
       usableKeys: 48,
       capacity: 48,
       warning: 'KEY_COUNT_DIFFERS',
+      free: 48,
+      occupied: 0,
+      keyBinding: 'ACCOUNT',
     });
-    expect((await imported(subscriptionId, keys(4, 'CAP'))).summary).toEqual({
-      purchased: 50,
-      usableKeys: 52,
-      capacity: 50,
-      warning: 'KEY_COUNT_DIFFERS',
-    });
+    // A lot holds no more keys than its licenses (W3-24): the four keys that would make 52 of 50 are refused whole, and the summary stays.
+    const over = await importKeys(subscriptionId, keys(4, 'CAP')).expect(422);
+    expect(h.codeOf(over)).toBe('LICENSE_LOT.KEYS_EXCEED_LICENSES');
     expect((await listed(subscriptionId)).summary).toEqual({
       purchased: 50,
-      usableKeys: 52,
-      capacity: 50,
+      usableKeys: 48,
+      capacity: 48,
       warning: 'KEY_COUNT_DIFFERS',
+      free: 48,
+      occupied: 0,
+      keyBinding: 'ACCOUNT',
     });
   });
 
@@ -458,7 +489,15 @@ describe('the vault of license keys over HTTP (integration, real PostgreSQL)', (
 
     const page = await listed(subscriptionId);
 
-    expect(page.summary).toEqual({ purchased: 50, usableKeys: 48, capacity: 48, warning: 'KEY_COUNT_DIFFERS' });
+    expect(page.summary).toEqual({
+      purchased: 50,
+      usableKeys: 48,
+      capacity: 48,
+      warning: 'KEY_COUNT_DIFFERS',
+      free: 48,
+      occupied: 0,
+      keyBinding: 'ACCOUNT',
+    });
     expect((await listed(subscriptionId, '&withdrawn=true')).items).toHaveLength(2);
     expect((await listed(subscriptionId, '&withdrawn=false')).items).toHaveLength(48);
     expect((await listed(subscriptionId, '&status=IN_STORE')).items).toHaveLength(50);
@@ -467,13 +506,17 @@ describe('the vault of license keys over HTTP (integration, real PostgreSQL)', (
     );
   });
 
-  it('US-04-12 AC-12: while the seats bought are not known the capacity is 0 and the warning says so', async () => {
-    const subscriptionId = await h.subscription(null, 'K4');
+  it('US-04-12 AC-12: a lot always knows the licenses bought (at least one) and holds no more keys than that, so the capacity is never 0 for want of the number', async () => {
+    // The database holds a lot to at least one license (`license_lots_license_count_check`), so a purchase with no number is no lot: QUANTITY_UNKNOWN cannot arise (W3-24).
+    const subscriptionId = await h.subscription(1, 'K4');
 
-    const result = await imported(subscriptionId, keys(5, 'UNK'));
+    const over = await importKeys(subscriptionId, keys(5, 'UNK')).expect(422);
+    expect(h.codeOf(over)).toBe('LICENSE_LOT.KEYS_EXCEED_LICENSES');
 
-    expect(result.imported).toBe(5);
-    expect(result.summary).toEqual({ purchased: null, usableKeys: 5, capacity: 0, warning: 'QUANTITY_UNKNOWN' });
+    const result = await imported(subscriptionId, keys(1, 'UNK'));
+
+    expect(result.imported).toBe(1);
+    expect(result.summary).toMatchObject({ purchased: 1, usableKeys: 1, capacity: 1, warning: null });
   });
 
   it('lists the keys of a purchase page by page, the oldest first, and refuses a page that is not a page', async () => {
