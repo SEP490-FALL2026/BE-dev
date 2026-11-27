@@ -142,7 +142,7 @@ export class EmailDispatcher {
     const failure = error instanceof MailSendError ? error : new MailSendError('SMTP_ERROR', false);
     if (failure.permanent || email.attempts >= MAX_EMAIL_ATTEMPTS) {
       const failed = await this.repo.markFailed(email.id, leaseId, failure.code);
-      return failed ? { outcome: 'FAILED', failureCode: failure.code } : { outcome: 'LEASE_LOST_AFTER_SEND' };
+      return failed ? { outcome: 'FAILED', failureCode: failure.code } : { outcome: 'LEASE_LOST_AFTER_FAILURE' };
     }
     const rescheduled = await this.repo.reschedule(
       email.id,
@@ -150,6 +150,8 @@ export class EmailDispatcher {
       failure.code,
       new Date(Date.now() + backoffMs(email.attempts)),
     );
-    return rescheduled ? { outcome: 'RESCHEDULED', failureCode: failure.code } : { outcome: 'LEASE_LOST_AFTER_SEND' };
+    return rescheduled
+      ? { outcome: 'RESCHEDULED', failureCode: failure.code }
+      : { outcome: 'LEASE_LOST_AFTER_FAILURE' };
   }
 }

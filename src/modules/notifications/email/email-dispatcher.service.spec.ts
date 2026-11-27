@@ -125,4 +125,17 @@ describe('EmailDispatcher.deliverOne', () => {
     await expect(dispatcher.deliverOne(email.id, () => Promise.resolve(usable))).resolves.toEqual(expected);
     expect(transport.send).toHaveBeenCalledTimes(sends);
   });
+
+  it.each([
+    ['permanent failure', new MailSendError('SMTP_550', true), 'markFailed'],
+    ['transient failure', new MailSendError('SMTP_421', false), 'reschedule'],
+  ] as const)('reports a lost lease after a %s as not sent', async (_name, error, recordedBy) => {
+    const { dispatcher, repo, transport } = fixture(email);
+    repo.markSent.mockResolvedValue(false);
+    repo[recordedBy].mockResolvedValue(false);
+    transport.send.mockRejectedValueOnce(error);
+    await expect(dispatcher.deliverOne(email.id, () => Promise.resolve(true))).resolves.toEqual({
+      outcome: 'LEASE_LOST_AFTER_FAILURE',
+    });
+  });
 });

@@ -30,6 +30,7 @@ describe('email queue processor', () => {
     'RESCHEDULED',
     'LEASE_LOST_BEFORE_SEND',
     'LEASE_LOST_AFTER_SEND',
+    'LEASE_LOST_AFTER_FAILURE',
     'NOT_CLAIMED',
   ] as const)('completes %s with only its outcome', async (outcome) => {
     const { consumer, email } = fixture({ outcome });
