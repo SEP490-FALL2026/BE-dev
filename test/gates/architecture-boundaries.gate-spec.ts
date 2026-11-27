@@ -123,6 +123,8 @@ const PRISMA_MODEL_OWNER: Readonly<Record<string, string>> = {
   LicenseKeyRevealWindow: 'licensing',
   DeviceActivation: 'licensing',
   AccessRequest: 'requests',
+  RequestTicket: 'requests',
+  AccessRequestReply: 'requests',
   AccessRequestBeneficiary: 'requests',
   AccessRequestLine: 'requests',
   AccessRequestLineDecision: 'requests',
