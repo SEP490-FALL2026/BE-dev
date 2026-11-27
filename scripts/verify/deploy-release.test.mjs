@@ -165,6 +165,13 @@ case "$*" in
     echo "$generation" > "$state/generation" ;;
   *" up -d --no-deps --force-recreate worker") : > "$state/started-worker-$generation" ;;
   *" up -d --no-deps --force-recreate caddy") : > "$state/started-caddy-$generation" ;;
+  *" ps -a -q redis")
+    # FAKE_REDIS: orphan = slm-redis exists but not in the project; nopass/ok = the project's Redis (without/with --requirepass).
+    case "\${FAKE_REDIS:-}" in nopass|ok) echo fake-redis-x ;; esac ;;
+  "inspect --format {{.Id}} slm-redis")
+    case "\${FAKE_REDIS:-}" in orphan) echo orphan-redis ;; nopass|ok) echo fake-redis-x ;; *) exit 1 ;; esac ;;
+  "inspect --format {{json .Config.Cmd}} "*)
+    if [ "\${FAKE_REDIS:-}" = nopass ]; then echo '["redis-server","--appendonly","yes"]'; else echo '["redis-server","--requirepass","secret"]'; fi ;;
   *" ps -a -q "*)
     # Daemon stops answering Compose listings after a candidate exec stalls. Recovery's new generation works.
     if [ -e "$state/exec-stalled-$generation" ]; then exit 124; fi
@@ -330,6 +337,7 @@ function host({
   fresh = false,
   preH7 = false,
   noFlock = false,
+  redis = false,
 } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'slm-deploy-release-'));
   created.push(root);
@@ -346,7 +354,10 @@ function host({
   writeFileSync(join(app, '.env'), H7_ENV);
   if (preH7) writeFileSync(join(app, '.env.pre-h7'), PRE_H7_ENV);
   if (appEnv !== null) writeFileSync(join(app, '.env.app'), appEnv);
-  writeFileSync(join(release, 'docker-compose.prod.yml'), CANDIDATE.compose);
+  writeFileSync(
+    join(release, 'docker-compose.prod.yml'),
+    redis ? `${CANDIDATE.compose}services:\n  redis:\n    image: redis:8-alpine\n` : CANDIDATE.compose,
+  );
   writeFileSync(join(release, 'Caddyfile'), CANDIDATE.caddy);
   writeFileSync(join(bin, 'docker'), FAKE_DOCKER);
   writeFileSync(join(bin, 'mv'), FAKE_MV);
@@ -391,7 +402,7 @@ const argumentsFor = (target, { attempt = ATTEMPT, extra = [], release = RELEASE
 
 function environmentFor(target, options, log) {
   const { fail, failCode, once, mvFail, runningImage, badNew, badOld, oldNeedsPreH7, gen0Stopped } = options;
-  const { pause, mvPause, barrier, linger } = options;
+  const { pause, mvPause, barrier, linger, fakeRedis } = options;
   // P04-CPE-04: the labels of the previous image, what the fake database holds and how the release writes.
   const { labelsOld, absentImage, nullRows, candidateWrites, writeDuringJudge, noHistory, judgeFailsAfterRecreate } =
     options;
@@ -426,6 +437,7 @@ function environmentFor(target, options, log) {
     ...(writeDuringJudge ? { FAKE_WRITE_DURING_JUDGE: '1' } : {}),
     ...(noHistory ? { FAKE_NO_HISTORY: '1' } : {}),
     ...(judgeFailsAfterRecreate ? { FAKE_JUDGE_FAILS_AFTER_RECREATE: '1' } : {}),
+    ...(fakeRedis ? { FAKE_REDIS: fakeRedis } : {}),
   };
 }
 
@@ -808,6 +820,36 @@ describe('deploy-release.sh (H7-OPS-02, H7-OPS-RV-01..07)', () => {
       assert.equal(result.output.includes(SECRET), false);
     });
   }
+
+  for (const [what, fakeRedis, message] of [
+    [
+      'an orphan container named slm-redis exists',
+      'orphan',
+      /does not belong to this Compose project.*Before the first rollout/,
+    ],
+    ['the running Redis service has no --requirepass', 'nopass', /no --requirepass in its command/],
+  ]) {
+    it(`stops before the application changes when ${what} (Redis hardening)`, () => {
+      const target = host({ redis: true });
+      const result = deploy(target, { fakeRedis });
+
+      assert.notEqual(result.status, 0, result.output);
+      assert.match(result.output, message);
+      assert.deepEqual(live(target), LIVE);
+      assert.equal(recreations(result).length, 0, result.calls.join('\n'));
+      assert.equal(step(result, / pull api worker$/), -1, 'pulled after the Redis check failed');
+    });
+  }
+
+  it('goes on past the Redis checks when slm-redis is the project container and requires a password', () => {
+    const target = host({ redis: true });
+    const result = deploy(target, { fakeRedis: 'ok', fail: 'pull api worker' });
+
+    assert.notEqual(result.status, 0);
+    assert.doesNotMatch(result.output, /slm-redis|--requirepass/);
+    assert.ok(step(result, / up -d --no-recreate postgres redis$/) >= 0, result.calls.join('\n'));
+    assert.ok(step(result, / pull api worker$/) >= 0, result.calls.join('\n'));
+  });
 
   for (const [what, mvFail] of [
     ['the first rename (docker-compose.prod.yml)', '.docker-compose.prod.yml.promote'],

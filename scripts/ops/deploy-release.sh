@@ -182,8 +182,22 @@ candidate run --rm --no-deps -T caddy caddy validate --config /etc/caddy/Caddyfi
 REDIS_RELEASE=0
 if compose_has_redis "$RELEASE_DIR/docker-compose.prod.yml"; then
   REDIS_RELEASE=1
+  # Redis hardening (runbook "Before the first rollout"): a container named slm-redis that this project does not own is an
+  # orphan of an earlier deploy. Compose cannot adopt it and it may run without a password, so it must be removed first.
+  orphan_id="$(docker inspect --format '{{.Id}}' slm-redis 2> /dev/null)" || orphan_id=''
+  if [ -n "$orphan_id" ]; then
+    owned_id="$(candidate ps -a -q redis 2> /dev/null)" || owned_id=''
+    [ "$owned_id" = "$orphan_id" ] ||
+      fail 'a container named slm-redis exists that does not belong to this Compose project (an orphan of an earlier deploy). Check it with: docker inspect slm-redis. After confirming it is disposable, stop and remove that exact container by hand (docs/guides/containers.md, Before the first rollout), then deploy again. Nothing was changed.'
+  fi
   echo '📦 Starting PostgreSQL and Redis without recreating existing containers...'
   candidate up -d --no-recreate postgres redis || fail 'cannot start PostgreSQL and Redis; the application was not changed.'
+  redis_id="$(candidate ps -a -q redis 2> /dev/null)" || redis_id=''
+  redis_command="$([ -n "$redis_id" ] && docker inspect --format '{{json .Config.Cmd}}' "$redis_id" 2> /dev/null)" || redis_command=''
+  case "$redis_command" in
+    *'"--requirepass"'*) ;;
+    *) fail 'the running Redis service has no --requirepass in its command (created by an earlier release?). Stop and remove that Redis container (keep its volume), then deploy again so Compose recreates it with REDIS_PASSWORD. Nothing was changed.' ;;
+  esac
 fi
 
 echo "🚀 Pulling $API_IMAGE..."
