@@ -102,25 +102,24 @@ describe('the activations of the license keys (integration, real PostgreSQL)', (
   const purchaseOf = async (planId: string, licenses: number): Promise<string> =>
     dataOf<{ id: string }>(
       await request(server())
-        .post('/api/v1/subscriptions')
+        .post('/api/v1/license-lots')
         .set(as(it1))
         .send({
           planId,
-          kind: 'PERPETUAL',
-          purchasedQuantity: licenses,
+          purpose: 'STOCK',
+          licenseCount: licenses,
           unitPrice: { amount: '2000000', currency: 'VND' },
-          startDate: '2026-03-15',
-          responsibleItAdminEmployeeId: it1.employeeId,
+          purchasedOn: '2026-03-15',
         })
         .expect(201),
     ).id;
-  const importKeys = (subscriptionId: string, keys: string[], extra: object = {}) =>
+  const importKeys = (lotId: string, keys: string[], extra: object = {}) =>
     request(server())
-      .post('/api/v1/license-keys/imports')
+      .post(`/api/v1/license-lots/${lotId}/keys`)
       .set(as(it1))
-      .send({ subscriptionId, keys, ...extra });
-  const listKeys = (subscriptionId: string, query = '') =>
-    request(server()).get(`/api/v1/license-keys?subscriptionId=${subscriptionId}${query}`).set(as(it1));
+      .send({ keys, ...extra });
+  const listKeys = (lotId: string, query = '') =>
+    request(server()).get(`/api/v1/license-keys?licenseLotId=${lotId}${query}`).set(as(it1));
   const patchKey = (id: string, body: object, account: ApiAccount = it1) =>
     request(server()).patch(`/api/v1/license-keys/${id}`).set(as(account)).send(body);
   const activate = async (planId: string, keyId: string, origin: 'OPERATION' | 'INITIAL'): Promise<void> => {
@@ -235,19 +234,21 @@ describe('the activations of the license keys (integration, real PostgreSQL)', (
       expect(dataOf<PageWire>(await listKeys(unlimitedPurchase).expect(200)).items[0].maxActivations).toBe(1);
     });
 
-    it('refuses a plan bundled with the machine: it has no keys (422)', async () => {
+    it('refuses a plan bundled with the machine: it has no lots or keys (422)', async () => {
       const plan = await planOf('DEVICE_BUNDLED');
-      // A purchase of such a plan cannot be declared any more; one that an older release made is read straight from the table.
-      const purchase = randomUUID();
-      await ctx.sql.query(
-        `INSERT INTO subscriptions (id, organization_id, plan_id, kind, status, purchased_quantity)
-         SELECT $1, organization_id, id, 'PERPETUAL', 'DRAFT', 3 FROM plans WHERE id = $2`,
-        [purchase, plan],
-      );
+      const refused = await request(server())
+        .post('/api/v1/license-lots')
+        .set(as(it1))
+        .send({
+          planId: plan,
+          purpose: 'STOCK',
+          licenseCount: 3,
+          unitPrice: { amount: '2000000', currency: 'VND' },
+          purchasedOn: '2026-03-15',
+        })
+        .expect(422);
 
-      const refused = await importKeys(purchase, keysOf(1)).expect(422);
-
-      expect(codeOf(refused)).toBe('LICENSE_KEY.PLAN_HAS_NO_KEYS');
+      expect(codeOf(refused)).toBe('LICENSE_LOT.PLAN_NOT_K4');
     });
 
     it('refuses a cap outside 1 to 100000 and activations used outside 0 to 100000 (422)', async () => {

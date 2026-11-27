@@ -18,7 +18,6 @@ describe('device activations licensing facade & S-6 lot occupancy (integration, 
   const server = () => ctx.app.getHttpServer();
   const as = (account: ApiAccount) => ({ Authorization: `Bearer ${account.accessToken}` });
   const dataOf = <T>(res: request.Response): T => (res.body as { data: T }).data;
-  const codeOf = (res: request.Response): string => (res.body as { error: { code: string } }).error.code;
   const unique = (prefix: string): string => `${prefix} ${(seq += 1)}`;
 
   const planOf = async (binding: 'DEVICE_KEY' | 'DEVICE_BUNDLED'): Promise<string> => {
@@ -44,28 +43,26 @@ describe('device activations licensing facade & S-6 lot occupancy (integration, 
     ).id;
   };
 
-  const purchaseOf = async (planId: string, purchasedQuantity: number): Promise<string> =>
+  const purchaseOf = async (planId: string, licenseCount: number): Promise<string> =>
     dataOf<{ id: string }>(
       await request(server())
-        .post('/api/v1/subscriptions')
+        .post('/api/v1/license-lots')
         .set(as(it1))
         .send({
           planId,
-          kind: 'PERPETUAL',
-          purchasedQuantity,
+          purpose: 'STOCK',
+          licenseCount,
           unitPrice: { amount: '2000000', currency: 'VND' },
-          startDate: '2026-03-15',
-          responsibleItAdminEmployeeId: it1.employeeId,
+          purchasedOn: '2026-03-15',
         })
         .expect(201),
     ).id;
 
-  const importKey = async (subscriptionId: string, maxActivations: number): Promise<string> => {
+  const importKey = async (lotId: string, maxActivations: number): Promise<string> => {
     await request(server())
-      .post('/api/v1/license-keys/imports')
+      .post(`/api/v1/license-lots/${lotId}/keys`)
       .set(as(it1))
       .send({
-        subscriptionId,
         keys: [`KEY-${randomUUID().replace(/-/g, '').slice(0, 20).toUpperCase()}`],
         maxActivations,
       })
@@ -73,8 +70,8 @@ describe('device activations licensing facade & S-6 lot occupancy (integration, 
 
     return (
       await ctx.sql.query<{ id: string }>(
-        `SELECT id FROM license_keys WHERE subscription_id = $1 ORDER BY imported_at DESC, id DESC LIMIT 1`,
-        [subscriptionId],
+        `SELECT id FROM license_keys WHERE license_lot_id = $1 ORDER BY imported_at DESC, id DESC LIMIT 1`,
+        [lotId],
       )
     ).rows[0].id;
   };
@@ -157,22 +154,11 @@ describe('device activations licensing facade & S-6 lot occupancy (integration, 
       ),
     ).rejects.toBeInstanceOf(DeviceActivationLotFullError);
 
-    // (f) & S-6: GET /subscriptions/:id/seat-usage shows 2 occupied, PATCH below occupied fails with 422 QUANTITY_BELOW_OCCUPIED.
-    const usage = dataOf<{ occupied: number }>(
-      await request(server()).get(`/api/v1/subscriptions/${subId}/seat-usage`).set(as(it1)).expect(200),
+    // (f) & S-6: GET /license-lots/:id shows 2 assigned and 0 free.
+    const lot = dataOf<{ assigned: number; free: number }>(
+      await request(server()).get(`/api/v1/license-lots/${subId}`).set(as(it1)).expect(200),
     );
-    expect(usage.occupied).toBe(2);
-
-    const detail = dataOf<{ updatedAt: string }>(
-      await request(server()).get(`/api/v1/subscriptions/${subId}`).set(as(it1)).expect(200),
-    );
-
-    const reduceRes = await request(server())
-      .patch(`/api/v1/subscriptions/${subId}`)
-      .set(as(it1))
-      .send({ expectedUpdatedAt: detail.updatedAt, purchasedQuantity: 1 })
-      .expect(422);
-    expect(codeOf(reduceRes)).toBe('SUBSCRIPTION.QUANTITY_BELOW_OCCUPIED');
+    expect(lot).toMatchObject({ assigned: 2, free: 0 });
   });
 
   it('W2-19 (d): serializes concurrent opens racing for the last lot license without 40P01 deadlock', async () => {
@@ -263,9 +249,9 @@ describe('device activations licensing facade & S-6 lot occupancy (integration, 
       }),
     );
 
-    const sub = dataOf<{ occupied: number }>(
-      await request(server()).get(`/api/v1/subscriptions/${subId}/seat-usage`).set(as(it1)).expect(200),
+    const lot = dataOf<{ assigned: number }>(
+      await request(server()).get(`/api/v1/license-lots/${subId}`).set(as(it1)).expect(200),
     );
-    expect(sub.occupied).toBe(2);
+    expect(lot.assigned).toBe(2);
   });
 });

@@ -200,29 +200,28 @@ describe('device return task list, completion, device detail, and dashboard (int
         })
         .expect(201),
     ).id;
-    const subId = h.dataOf<{ id: string }>(
+    const lotId = h.dataOf<{ id: string }>(
       await request(h.server())
-        .post('/api/v1/subscriptions')
+        .post('/api/v1/license-lots')
         .set(h.as(h.it1))
         .send({
           planId,
-          kind: 'PERPETUAL',
-          purchasedQuantity: 2,
+          purpose: 'STOCK',
+          licenseCount: 2,
           unitPrice: { amount: '1000000', currency: 'VND' },
-          startDate: '2026-01-01',
-          responsibleItAdminEmployeeId: h.it1.employeeId,
+          purchasedOn: '2026-01-01',
         })
         .expect(201),
     ).id;
     await request(h.server())
-      .post('/api/v1/license-keys/imports')
+      .post(`/api/v1/license-lots/${lotId}/keys`)
       .set(h.as(h.it1))
-      .send({ subscriptionId: subId, keys: [`RTK-${randomUUID().slice(0, 12).toUpperCase()}`], maxActivations: 5 })
+      .send({ keys: [`RTK-${randomUUID().slice(0, 12).toUpperCase()}`], maxActivations: 5 })
       .expect(201);
     const keyId = (
       await h.ctx.sql.query<{ id: string }>(
-        `SELECT id FROM license_keys WHERE subscription_id = $1 ORDER BY imported_at DESC, id DESC LIMIT 1`,
-        [subId],
+        `SELECT id FROM license_keys WHERE license_lot_id = $1 ORDER BY imported_at DESC, id DESC LIMIT 1`,
+        [lotId],
       )
     ).rows[0].id;
     const actId = h.dataOf<{ activation: { id: string } }>(

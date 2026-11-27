@@ -52,25 +52,23 @@ describe('device initial records & onboarding checklist step 6 (W2-13, integrati
         })
         .expect(201),
     ).id;
-    const subscriptionId = h.dataOf<{ id: string }>(
+    const lotId = h.dataOf<{ id: string }>(
       await request(server())
-        .post('/api/v1/subscriptions')
+        .post('/api/v1/license-lots')
         .set(as(h.it1))
         .send({
           planId,
-          kind: 'PERPETUAL',
-          purchasedQuantity,
+          purpose: 'STOCK',
+          licenseCount: purchasedQuantity,
           unitPrice: { amount: '1500000', currency: 'VND' },
-          startDate: '2025-01-01',
-          responsibleItAdminEmployeeId: h.it1.employeeId,
+          purchasedOn: '2025-01-01',
         })
         .expect(201),
     ).id;
     await request(server())
-      .post('/api/v1/license-keys/imports')
+      .post(`/api/v1/license-lots/${lotId}/keys`)
       .set(as(h.it1))
       .send({
-        subscriptionId,
         keys: [`ACAD-${randomUUID().replace(/-/g, '').slice(0, 16).toUpperCase()}`],
         maxActivations: 10,
         initialActivationsUsed,
@@ -78,12 +76,12 @@ describe('device initial records & onboarding checklist step 6 (W2-13, integrati
       .expect(201);
     const keyId = (
       await h.ctx.sql.query<{ id: string }>(
-        `SELECT id FROM license_keys WHERE subscription_id = $1 ORDER BY imported_at DESC, id DESC LIMIT 1`,
-        [subscriptionId],
+        `SELECT id FROM license_keys WHERE license_lot_id = $1 ORDER BY imported_at DESC, id DESC LIMIT 1`,
+        [lotId],
       )
     ).rows[0].id;
 
-    return { planId, subscriptionId, keyId };
+    return { planId, lotId, keyId };
   };
 
   beforeAll(async () => {
@@ -121,7 +119,7 @@ describe('device initial records & onboarding checklist step 6 (W2-13, integrati
   });
 
   it('W2-13 (a, b, e): records legacy initial device with past handover and INITIAL key activation without changing activationsUsed, rejects generated format, and completes step 6 after BM-06 signature', async () => {
-    const { subscriptionId, keyId } = await createK4KeyPlan(5, 3);
+    const { lotId, keyId } = await createK4KeyPlan(5, 3);
 
     // (b) Rejects generated format as legacy code (422 DEVICE.ASSET_CODE_INVALID)
     const badCode = await postInitial({
@@ -174,7 +172,7 @@ describe('device initial records & onboarding checklist step 6 (W2-13, integrati
 
     // activationsUsed of the key stays unchanged at initialActivationsUsed (3)
     const keysPage = h.dataOf<{ items: Array<{ id: string; activationsUsed: number; openActivations: number }> }>(
-      await request(server()).get(`/api/v1/license-keys?subscriptionId=${subscriptionId}`).set(as(h.it1)).expect(200),
+      await request(server()).get(`/api/v1/license-keys?licenseLotId=${lotId}`).set(as(h.it1)).expect(200),
     );
     expect(keysPage.items.find((k) => k.id === keyId)).toMatchObject({ activationsUsed: 3, openActivations: 1 });
 
