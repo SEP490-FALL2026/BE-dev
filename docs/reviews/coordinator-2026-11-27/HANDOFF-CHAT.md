@@ -62,3 +62,13 @@ Như handoff 25/11 §3, thêm: Opus mặc định cho spec/review/docs (Fable ch
 Owner sau reviewer độc lập; mọi prompt code có LUẬT CỨNG + Skill Preflight theo bước; Docs commit thẳng `main`, không push; push nhánh
 feature/int được; merge `dev`/`main`, deploy chỉ Owner; `dev` chỉ nhận squash, PR tách từ `dev`; commit không co-author AI. Handoff
 điều phối luôn ở BE `docs/reviews/coordinator-<ngày>/HANDOFF-CHAT.md` (nhánh docs từ `origin/dev`, PR).
+
+## 6. Bổ sung sau khi viết (Owner 27/11)
+
+- **Đợt 6:** mở lại 4 operation "nên tách" của V5 (kiểm `subscriptionRenewalPropose` sau P18 đợt 3) cùng 6 operation bắt buộc; **không**
+  giữ route cũ `deprecated` — FE tự sửa sau khi đợt 6 deploy ⟹ route cũ xóa luôn (DECISIONS "Phạm vi đợt 6", W6-SCOPE-1/2). Ghi QĐ sửa
+  `QĐ-118b`(4) khi viết spec đợt 6.
+- **Prompt 4+6 (cuối):** ngoài review sâu, có một mục **dọn code thừa**: tìm và xóa code/route/DTO/repo/test/tài liệu của flow cũ không
+  còn dùng (công cụ: `ts-prune`/`knip` hoặc grep tham chiếu, `arch:capabilities`, đồ thị module; đối chiếu SPEC các đợt), đưa danh sách
+  cho Owner duyệt trước khi xóa; chạy CI đầy đủ sau khi xóa. Đợt 8 đã có phần xóa test/flow cũ (`project_wave8_test_cleanup`) — Prompt
+  4+6 rà phần code `src/` còn sót.
