@@ -24,6 +24,7 @@ import {
   type SeatAllocation,
   shouldSuggestRenewal,
   subscriptionCost,
+  subscriptionCostByPlan,
 } from './baseline.policy';
 import type { BaselineSubscription } from '../../catalog/public/catalog.types';
 import type { BaselineWire } from './cycle.dto';
@@ -35,6 +36,10 @@ type Reading = {
   today: BusinessDate;
   /** The seats the people of the department hold, by subscription. */
   seats: ReadonlyMap<string, number>;
+  /** The same seats by subscription and the plan of the seat: each is charged the line of its own plan. */
+  seatPlans: ReadonlyMap<string, ReadonlyMap<string, number>>;
+  /** The monthly price of a seat of a plan on a period (the line that serves the plan); null when it has none. */
+  priceOf: (subscriptionId: string, planId: string) => bigint | null;
   /** The subscriptions the company has decided to end: they are not renewed (`Q-162`). */
   ending: ReadonlySet<string>;
   /** `KPI-3` in percent by plan, for the plans that have one. */
@@ -42,6 +47,20 @@ type Reading = {
   spent: bigint;
   format: (minor: bigint) => { amount: string; currency: string };
 };
+
+/** What the seats of the department of one subscription cost, each seat at the line of its own plan. */
+function costByPlanOf(subscription: BaselineSubscription, reading: Reading, terminated: boolean) {
+  const { year, today, seatPlans, priceOf } = reading;
+
+  return subscriptionCostByPlan(
+    year,
+    today,
+    seatPlans.get(subscription.subscriptionId) ?? new Map<string, number>(),
+    (planId) => priceOf(subscription.subscriptionId, planId),
+    subscription,
+    terminated,
+  );
+}
 
 /**
  * One department of the baseline (`QĐ-103k`): the subscriptions its people hold seats of, those seats, and what the year is estimated to
@@ -67,11 +86,8 @@ export function departmentOf(
   for (const subscription of subscriptions) {
     const held = seats.get(subscription.subscriptionId) ?? 0;
     const terminated = ending.has(subscription.subscriptionId);
-    const {
-      monthlyMinor: monthly,
-      months,
-      costMinor: cost,
-    } = subscriptionCost(year, today, held, subscription, terminated);
+    const monthly = subscription.monthlyPriceMinor;
+    const { months, costMinor: cost } = costByPlanOf(subscription, reading, terminated);
     total += cost ?? 0n;
     unknown ||= cost === null;
     // The seats of a period that a later one follows are the later one's too (the same people): they are counted once.
@@ -191,13 +207,14 @@ export class BaselineService {
 
     const inYear = await this.organizationReads.getActiveDepartmentIds(year);
     const wanted = listedDepartments(inYear, departmentId);
-    const [briefs, costCenters, history, subscriptions, format] = await Promise.all([
+    const [briefs, costCenters, history, pricing, format] = await Promise.all([
       this.organizationReads.getDepartmentBriefs(wanted),
       this.organizationReads.getUnitCostCenterIds(wanted),
       this.organizationReads.getUnitCostCenterHistory(wanted),
       this.catalog.subscriptions(),
       this.facts.formatter(cycle.currency),
     ]);
+    const { subscriptions, priceOf } = pricing;
     const { allocation, ending } = await this.seatsOf(subscriptions, today);
     const kpi3ByPlan = await this.catalog.kpi3Of([...new Set(subscriptions.map((one) => one.planId))]);
     const spentOf = await this.spentByDepartment(history, today);
@@ -207,12 +224,13 @@ export class BaselineService {
     const carriedOf = await this.flags.of(costCenterIds, year, cycleStateOf(cycle, today) === 'LOCKED');
     const departments = inOrderOf(wanted, briefs).map((brief) => {
       const seats = allocation.byDepartment.get(brief.id) ?? new Map<string, number>();
+      const seatPlans = allocation.byDepartmentPlan.get(brief.id) ?? new Map<string, Map<string, number>>();
 
       return departmentOf(
         brief,
         costCenters.get(brief.id) ?? null,
         subscriptions.filter((subscription) => (seats.get(subscription.subscriptionId) ?? 0) > 0),
-        { year, today, seats, ending, kpi3ByPlan, spent: spentOf(brief.id), format },
+        { year, today, seats, seatPlans, priceOf, ending, kpi3ByPlan, spent: spentOf(brief.id), format },
         carriedOf(costCenters.get(brief.id) ?? ''),
       );
     });

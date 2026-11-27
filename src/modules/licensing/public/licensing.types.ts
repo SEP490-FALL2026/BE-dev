@@ -119,9 +119,11 @@ export interface SeatHolder {
   seats: number;
 }
 
-/** How many seats of one subscription one person holds (or answers for, a service account): what the baseline charges to their department (`QĐ-103k`). */
+/** How many seats of one plan of one subscription one person holds (or answers for, a service account): what the baseline charges to their department (`QĐ-103k`). */
 export interface SeatHolding {
   subscriptionId: string;
+  /** The plan the seat was granted on: a period with several plans prices each seat by the line of its own plan. */
+  planId: string;
   employeeId: string;
   seats: number;
 }

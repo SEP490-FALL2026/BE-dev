@@ -13,6 +13,8 @@ import { PurchaseInvoiceRefusedError } from '../purchase-invoice.errors';
 import type { PurchaseInvoiceRepo } from '../purchase-invoice.repo';
 import type { LinkFacts, PoolExpectationFacts } from '../purchase-invoice.types';
 import { expectedPoolAmountOf, type PoolInvoiceExpectationSource } from './purchase-invoice-pool-expectation.policy';
+import { pricingOf } from '../purchase-invoice-charge.policy';
+import type { SeatPricing } from '../purchase-invoice.types';
 import { servingMonthlyPriceMinor } from './serving-line-price.policy';
 
 /**
@@ -149,6 +151,20 @@ export class PurchaseInvoicePoolService {
       endDate: period?.endDate ?? null,
       purchaseDates,
     };
+  }
+
+  /**
+   * The price a seat of `planId` of this period is judged by (the ceiling of an invoice of the pool): the line of the period that serves the
+   * plan, the price columns of the period only when it has no line.
+   */
+  async seatPricingOf(period: SubscriptionPurchaseFacts, planId: string, tx?: DbTx): Promise<SeatPricing> {
+    const lines =
+      (await this.periods.linesOfSubscriptions([period.subscriptionId], tx)).get(period.subscriptionId) ?? [];
+
+    return pricingOf({
+      ...period,
+      monthlyPriceMinor: servingMonthlyPriceMinor(lines, planId, period.monthlyPriceMinor),
+    });
   }
 
   async isPoolExpectedMissing(

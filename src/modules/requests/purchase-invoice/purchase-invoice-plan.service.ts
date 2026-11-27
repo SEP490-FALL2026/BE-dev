@@ -22,7 +22,6 @@ import {
   chargedCostCenterOf,
   holderDayOf,
   isOverApprovedInvoice,
-  pricingOf,
   takesInvoice,
 } from './purchase-invoice-charge.policy';
 import { PurchaseInvoiceRefusedError } from './purchase-invoice.errors';
@@ -195,7 +194,7 @@ export class PurchaseInvoicePlanService {
 
     return {
       id,
-      pricing: facts ? pricingOf(facts) : null,
+      pricing: facts ? await this.pool.seatPricingOf(facts, planId, tx) : null,
       poolSource: await this.pool.topUpSource(facts, planId, null, tx),
     };
   }
@@ -274,7 +273,7 @@ export class PurchaseInvoicePlanService {
       requestId: null,
       holderBound: false,
       poolSubscriptionId: null,
-      seatPricing: pricingOf(period),
+      seatPricing: await this.pool.seatPricingOf(period, period.planId, tx),
       poolSource,
       renewedAssignmentId: null,
       licenseLotId: null,

@@ -6,6 +6,7 @@ import {
   listedDepartments,
   shouldSuggestRenewal,
   subscriptionCost,
+  subscriptionCostByPlan,
   willRenew,
 } from './baseline.policy';
 
@@ -217,5 +218,47 @@ describe('the departments a read lists', () => {
       { id: 'a' },
       { id: 'c' },
     ]);
+  });
+});
+
+describe('the cost of a period with several plans (W3-08, B-1)', () => {
+  const period = { startDate: '2026-01-01', endDate: null };
+  const prices = new Map<string, bigint | null>([
+    ['standard', 500_000n],
+    ['premium', 800_000n],
+    ['none', null],
+  ]);
+  const priceOf = (planId: string) => prices.get(planId) ?? null;
+
+  it('charges each seat the price of its own plan: one Standard and one Premium seat run twelve months at 500.000 + 800.000', () => {
+    const seats = new Map([
+      ['standard', 1],
+      ['premium', 1],
+    ]);
+
+    expect(subscriptionCostByPlan(2027, '2026-11-09', seats, priceOf, period)).toEqual({
+      months: 12,
+      costMinor: 15_600_000n,
+    });
+  });
+
+  it('counts only the months it runs when the company ordered it to end', () => {
+    const seats = new Map([['premium', 2]]);
+
+    expect(
+      subscriptionCostByPlan(2027, '2026-11-09', seats, priceOf, { ...period, endDate: '2027-03-31' }, true),
+    ).toEqual({
+      months: 3,
+      costMinor: 4_800_000n,
+    });
+  });
+
+  it('knows no cost when a plan that has seats has no price, however priced the others are', () => {
+    const seats = new Map([
+      ['standard', 1],
+      ['none', 1],
+    ]);
+
+    expect(subscriptionCostByPlan(2027, '2026-11-09', seats, priceOf, period).costMinor).toBeNull();
   });
 });

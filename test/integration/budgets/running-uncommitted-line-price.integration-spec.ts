@@ -7,7 +7,13 @@ const h = new SpendHarness();
 interface BaselineWire {
   departments: {
     departmentId: string;
-    software: { subscriptionId: string; monthlyUnitPrice: { amount: string } | null }[];
+    estimatedAnnualCost: { amount: string };
+    software: {
+      subscriptionId: string;
+      monthsRunning: number;
+      monthlyUnitPrice: { amount: string } | null;
+      estimatedAnnualCost: { amount: string } | null;
+    }[];
   }[];
 }
 
@@ -128,5 +134,14 @@ describe('price of a seat of a period with lines in the running uncommitted cost
     expect(await priceOf()).toBe('500000');
     await patchLinePrice(standardLineId, '450000');
     expect(await priceOf()).toBe('450000');
+  });
+
+  it('charges the year of a period with two plans the line of each plan: one seat at 450.000 and one at 850.000, twelve months', async () => {
+    const department = (await baselineOf()).departments.find((row) => row.departmentId === unit.department.id);
+    const entry = department?.software.find((row) => row.subscriptionId === subscriptionId);
+
+    expect(entry?.monthsRunning).toBe(12);
+    expect(entry?.estimatedAnnualCost?.amount).toBe('15600000');
+    expect(department?.estimatedAnnualCost.amount).toBe('15600000');
   });
 });

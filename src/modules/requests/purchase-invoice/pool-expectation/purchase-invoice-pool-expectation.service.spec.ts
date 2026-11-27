@@ -93,3 +93,31 @@ describe('PurchaseInvoicePoolService.topUpSource (a period with lines is priced 
     });
   });
 });
+
+describe('PurchaseInvoicePoolService.seatPricingOf (the ceiling of an invoice of the pool is judged by the line)', () => {
+  const priced = { ...period, cycleMonths: 1 } as unknown as SubscriptionPurchaseFacts;
+  const standard = line({});
+  const premium = line({ planId: 'premium', monthlyUnitPriceMinor: 800_000n });
+
+  it('prices a seat of the Premium plan at the Premium line and keeps the cycle and renewal day of the period', async () => {
+    const { service } = serviceWith([standard, premium]);
+
+    expect(await service.seatPricingOf(priced, 'premium')).toEqual({
+      monthlyMinor: 800_000n,
+      cycleMonths: 1,
+      renewalDate: '2027-07-01',
+    });
+  });
+
+  it('knows no price for a plan that has no line on a period that has lines', async () => {
+    const { service } = serviceWith([standard]);
+
+    expect((await service.seatPricingOf(priced, 'premium')).monthlyMinor).toBeNull();
+  });
+
+  it('uses the column of the period only when it has no line', async () => {
+    const { service } = serviceWith([]);
+
+    expect((await service.seatPricingOf(priced, 'standard')).monthlyMinor).toBe(1_000_000n);
+  });
+});

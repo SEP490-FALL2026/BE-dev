@@ -305,26 +305,33 @@ export class AssignmentRepo {
   }
 
   /**
-   * The seats of these purchases held as of `day` (`HOLDING`), by the person who holds each or answers for it (a service account), in one
-   * statement: what charges a seat to the department of its holder (`QĐ-103k`).
+   * The seats of these purchases held as of `day` (`HOLDING`), by the person who holds each or answers for it (a service account) and by
+   * the plan of the seat, in one statement: what charges a seat to the department of its holder (`QĐ-103k`) at the price of its plan.
    */
   async countHoldingByHolder(
     ids: readonly string[],
     day: BusinessDate,
     tx?: DbTx,
-  ): Promise<{ subscriptionId: string; employeeId: string; seats: number }[]> {
+  ): Promise<{ subscriptionId: string; planId: string; employeeId: string; seats: number }[]> {
     if (ids.length === 0) return [];
     const rows = await (tx ?? this.prisma).licenseAssignment.groupBy({
-      by: ['subscriptionId', 'employeeId'],
+      by: ['subscriptionId', 'planId', 'employeeId'],
       where: { subscriptionId: { in: [...ids] }, ...HOLDING(day) },
       _count: { _all: true },
-      orderBy: [{ subscriptionId: 'asc' }, { employeeId: 'asc' }],
+      orderBy: [{ subscriptionId: 'asc' }, { planId: 'asc' }, { employeeId: 'asc' }],
     });
 
     return rows.flatMap((row) =>
       row.subscriptionId === null
         ? []
-        : [{ subscriptionId: row.subscriptionId, employeeId: row.employeeId, seats: row._count._all }],
+        : [
+            {
+              subscriptionId: row.subscriptionId,
+              planId: row.planId,
+              employeeId: row.employeeId,
+              seats: row._count._all,
+            },
+          ],
     );
   }
 

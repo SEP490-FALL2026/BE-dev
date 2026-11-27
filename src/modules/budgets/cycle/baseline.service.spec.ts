@@ -21,6 +21,7 @@ const subscription = (index: number, patch: Partial<BaselineSubscription> = {}):
 
 const format = (minor: bigint) => ({ amount: String(minor), currency: 'VND' });
 const reading = (
+  subscriptions: readonly BaselineSubscription[],
   seats: Map<string, number>,
   ending: ReadonlySet<string> = new Set(),
   kpi3ByPlan: ReadonlyMap<string, number> = new Map(),
@@ -28,6 +29,12 @@ const reading = (
   year: 2027,
   today: '2026-11-09',
   seats,
+  // One plan per subscription, priced as the subscription is: what a period with a single plan costs.
+  seatPlans: new Map(
+    subscriptions.map((one) => [one.subscriptionId, new Map([[one.planId, seats.get(one.subscriptionId) ?? 0]])]),
+  ),
+  priceOf: (subscriptionId: string) =>
+    subscriptions.find((one) => one.subscriptionId === subscriptionId)?.monthlyPriceMinor ?? null,
   ending,
   kpi3ByPlan,
   spent: 0n,
@@ -39,7 +46,12 @@ describe('one department of the baseline', () => {
     const subscriptions = Array.from({ length: SOFTWARE_LISTED_MAX + 1 }, (_, index) => subscription(index));
     const seats = new Map(subscriptions.map((one) => [one.subscriptionId, 2]));
 
-    const department = departmentOf({ id: 'dep', code: 'D', name: 'Dep' }, 'cc', subscriptions, reading(seats));
+    const department = departmentOf(
+      { id: 'dep', code: 'D', name: 'Dep' },
+      'cc',
+      subscriptions,
+      reading(subscriptions, seats),
+    );
 
     expect(department.software).toHaveLength(SOFTWARE_LISTED_MAX);
     expect(department.softwareTotal).toBe(SOFTWARE_LISTED_MAX + 1);
@@ -56,7 +68,7 @@ describe('one department of the baseline', () => {
       { id: 'dep', code: 'D', name: 'Dep' },
       'cc',
       [stopped],
-      reading(seats, new Set([stopped.subscriptionId])),
+      reading([stopped], seats, new Set([stopped.subscriptionId])),
     ).software;
 
     expect(only).toMatchObject({ monthsRunning: 3, suggestRenewal: false });
@@ -69,13 +81,38 @@ describe('one department of the baseline', () => {
       { id: 'mkt', code: 'MKT', name: 'Marketing' },
       'cc',
       [pool],
-      reading(new Map([[pool.subscriptionId, 8]])),
+      reading([pool], new Map([[pool.subscriptionId, 8]])),
     );
 
     // 8 seats held by Marketing × 100 a month × 12; the 2 idle seats are the pool's line.
     expect(department.estimatedAnnualCost).toEqual(format(9_600n));
     expect(department.software[0]).toMatchObject({ seatsPurchased: 10, seatsAssigned: 8 });
     expect(department.software[0]).not.toHaveProperty('seatsIdle');
+  });
+
+  it('W3-08 B-1: charges the seats of a period with two plans the line of each plan, not the price of the first plan', () => {
+    const period = subscription(1, { planId: 'standard', monthlyPriceMinor: 500_000n });
+    const prices = new Map([
+      ['standard', 500_000n],
+      ['premium', 800_000n],
+    ]);
+
+    const department = departmentOf({ id: 'dep', code: 'D', name: 'Dep' }, 'cc', [period], {
+      ...reading([period], new Map([[period.subscriptionId, 2]])),
+      seatPlans: new Map([
+        [
+          period.subscriptionId,
+          new Map([
+            ['standard', 1],
+            ['premium', 1],
+          ]),
+        ],
+      ]),
+      priceOf: (_subscriptionId: string, planId: string) => prices.get(planId) ?? null,
+    });
+
+    expect(department.estimatedAnnualCost).toEqual(format(15_600_000n));
+    expect(department.software[0]).toMatchObject({ seatsAssigned: 2, monthlyUnitPrice: format(500_000n) });
   });
 
   it('AF-08 KPI-3: tells the KPI-3 of the plan when usage was assessed, null otherwise', () => {
@@ -87,6 +124,7 @@ describe('one department of the baseline', () => {
       'cc',
       [used, unknown],
       reading(
+        [used, unknown],
         new Map([
           [used.subscriptionId, 1],
           [unknown.subscriptionId, 1],
@@ -146,9 +184,9 @@ describe('BR-MF4-01 QĐ-103k: a seat is charged to the department of its holder'
   it('splits the seats of one subscription between the departments of the people who hold them', () => {
     const allocation = allocateSeats(
       [
-        { subscriptionId: 'figma', employeeId: 'anna', seats: 1 },
-        { subscriptionId: 'figma', employeeId: 'binh', seats: 1 },
-        { subscriptionId: 'figma', employeeId: 'chi', seats: 1 },
+        { subscriptionId: 'figma', planId: 'team', employeeId: 'anna', seats: 1 },
+        { subscriptionId: 'figma', planId: 'team', employeeId: 'binh', seats: 1 },
+        { subscriptionId: 'figma', planId: 'team', employeeId: 'chi', seats: 1 },
       ],
       new Map([
         ['anna', 'mkt'],
@@ -162,8 +200,33 @@ describe('BR-MF4-01 QĐ-103k: a seat is charged to the department of its holder'
     expect(allocation.held.get('figma')).toBe(3);
   });
 
+  it('keeps the seats of a department apart by the plan of the seat', () => {
+    const allocation = allocateSeats(
+      [
+        { subscriptionId: 'figma', planId: 'standard', employeeId: 'anna', seats: 1 },
+        { subscriptionId: 'figma', planId: 'premium', employeeId: 'anna', seats: 2 },
+        { subscriptionId: 'figma', planId: 'premium', employeeId: 'binh', seats: 1 },
+      ],
+      new Map([
+        ['anna', 'mkt'],
+        ['binh', 'mkt'],
+      ]),
+    );
+
+    expect(allocation.byDepartmentPlan.get('mkt')?.get('figma')).toEqual(
+      new Map([
+        ['standard', 1],
+        ['premium', 3],
+      ]),
+    );
+    expect(allocation.byDepartment.get('mkt')?.get('figma')).toBe(4);
+  });
+
   it('counts the seat of a holder placed in no department as held, in no department', () => {
-    const allocation = allocateSeats([{ subscriptionId: 'figma', employeeId: 'nobody', seats: 1 }], new Map());
+    const allocation = allocateSeats(
+      [{ subscriptionId: 'figma', planId: 'team', employeeId: 'nobody', seats: 1 }],
+      new Map(),
+    );
 
     expect(allocation.held.get('figma')).toBe(1);
     expect(allocation.byDepartment.size).toBe(0);
