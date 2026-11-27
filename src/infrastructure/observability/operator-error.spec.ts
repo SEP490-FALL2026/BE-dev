@@ -1,3 +1,4 @@
+import { MaxRetriesPerRequestError } from 'ioredis/built/errors';
 import { Prisma } from '../../generated/prisma/client';
 import { JsonColumnShapeError } from '../database/json-column.errors';
 import { TransientDatabaseError } from '../database/transaction-runner';
@@ -23,6 +24,22 @@ class AccessRequestNotFoundError extends Error {
 }
 
 describe('describeForOperator', () => {
+  it.each([
+    ['refused', Object.assign(new Error('connect ECONNREFUSED host:6379'), { code: 'ECONNREFUSED' }), true],
+    ['timed out', Object.assign(new Error('connect ETIMEDOUT host:6379'), { code: 'ETIMEDOUT' }), true],
+    ['retry budget', Object.assign(new MaxRetriesPerRequestError(1), { message: 'retry budget spent' }), true],
+    ['closed', new Error('Connection is closed.'), true],
+    [
+      'wrong credentials',
+      Object.assign(new Error('WRONGPASS invalid username-password pair'), { name: 'ReplyError' }),
+      false,
+    ],
+  ] as const)('classifies Redis connectivity without logging its message (%s)', (_reason, error, retryable) => {
+    const description = describeForOperator(error);
+    expect(description).toContain(`retryable=${retryable}`);
+    expect(description).not.toContain(error.message);
+  });
+
   it('names a deadlock the database reported: kind, SQLSTATE, that it can be retried, and what Prisma said', () => {
     const error = new TransientDatabaseError('40P01', adapterRefusal('40P01'));
 

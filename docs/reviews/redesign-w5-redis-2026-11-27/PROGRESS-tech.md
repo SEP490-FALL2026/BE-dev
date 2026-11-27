@@ -17,8 +17,8 @@ Tracker sống qua compact context. Người code đọc lại file này **đầ
 
 | Gói | Mục                                                                | Trạng thái | sha | Lệnh kiểm + kết quả (unit, integration của gói) | FIX-TEST thêm | Ghi chú / chưa kiểm được |
 | --- | ------------------------------------------------------------------ | ---------- | --- | ----------------------------------------------- | ------------- | ------------------------ |
-| T1  | R-01 cấu hình, env, `no-redis-in-modules`                          | xong       | commit T1 | Đỏ 10/20 ca env trước khi sửa. Unit 130/130. Recovery CLI integration 6/6. Typecheck, lint, arch:check, rules:check và 335/335 gate đạt. OpenAPI export bằng Node 22 không drift. | — | D-1 đã duyệt. |
-| T2  | R-01 client, R-08 (a)(b)                                           | chưa       |     |                                                 |               |                          |
+| T1  | R-01 cấu hình, env, `no-redis-in-modules`                          | xong       | `7420b554` | Đỏ 10/20 ca env trước khi sửa. Unit 130/130. Recovery CLI integration 6/6. Typecheck, lint, arch:check, rules:check và 335/335 gate đạt. OpenAPI export bằng Node 22 không drift. | — | D-1 đã duyệt. |
+| T2  | R-01 client, R-08 (a)(b)                                           | xong       | commit T2 | Unit 29/29. Redis Docker trả PONG cho 3 kiểu client. Typecheck, lint file sửa, arch:check, rules:check, 335 gate, OpenAPI không drift. Audit production sạch, một bản ioredis. | — | Client cấp cho BullMQ kết nối ngay. |
 | T3  | R-09 CI + harness                                                  | chưa       |     |                                                 |               |                          |
 | T4  | R-02 rate-limit Redis                                              | chưa       |     |                                                 |               |                          |
 | T5  | R-07 compose, deploy, gate                                         | chưa       |     |                                                 |               |                          |
@@ -41,6 +41,8 @@ Trạng thái: `chưa` · `đang làm` · `xong` (chỉ sau khi đối chiếu t
 | T1 | R-01 (a), mặc định theo môi trường và ràng buộc proxy | `env-matrix.spec.ts` | `redis.config.ts:47`, `env-schema.ts:183` |
 | T1 | R-01 (b)(c), host/mật khẩu production và tùy chọn vận hành không Redis | `env-matrix.spec.ts`, `env-example.spec.ts`, `redis.config.spec.ts` | `redis.config.ts:74`, `env-schema.ts:189` |
 | T1 | R-01 (f), cấm module import thư viện Redis | `pnpm arch:check` và ca diệt đột biến | `.dependency-cruiser.cjs:39` |
+| T2 | R-01 client chặn và không chặn | `redis-client.factory.spec.ts` và Redis Docker | `redis-client.factory.ts:24` |
+| T2 | R-08 (a)(b), log một lần mỗi trạng thái và phân loại retry | `redis-client.factory.spec.ts`, `operator-error.spec.ts` | `redis-client.factory.ts:49`, `operator-error.ts:55` |
 
 ## Trọng tâm review (PLAN) → test
 

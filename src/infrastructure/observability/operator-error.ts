@@ -1,3 +1,4 @@
+import { MaxRetriesPerRequestError } from 'ioredis/built/errors';
 import { Prisma } from '../../generated/prisma/client';
 import { JsonColumnShapeError } from '../database/json-column.errors';
 import { TransientDatabaseError, readSqlState, toTransientError } from '../database/transaction-runner';
@@ -50,7 +51,12 @@ const pair = (key: string, value: string | undefined): string | undefined =>
 
 /** True when waiting and trying again can help: the database or a network connection was unavailable, not the data wrong. */
 function isRetryable(error: unknown): boolean {
-  return error instanceof TransientDatabaseError || toTransientError(error) !== undefined;
+  return (
+    error instanceof TransientDatabaseError ||
+    toTransientError(error) !== undefined ||
+    error instanceof MaxRetriesPerRequestError ||
+    (error instanceof Error && error.message === 'Connection is closed.')
+  );
 }
 
 /**

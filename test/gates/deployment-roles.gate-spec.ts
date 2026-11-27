@@ -407,6 +407,7 @@ describe('the production image carries the production dependencies only', () => 
       '@node-rs/argon2',
       'dotenv',
       'bullmq',
+      'ioredis',
       '@nestjs/bullmq',
     ];
 
