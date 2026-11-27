@@ -54,7 +54,10 @@ export const deviceActivationSchema = z.strictObject({
   deviceId: z.uuid(),
   planId: z.uuid(),
   licenseKeyId: z.uuid().nullable(),
-  subscriptionId: z.uuid().nullable(),
+  subscriptionId: z.uuid().nullable().meta({
+    description:
+      'License lot identifier when the key belongs to a license lot, or legacy subscription identifier for pre-lot records.',
+  }),
   keyMasked: z.string().nullable(),
   keyWithdrawn: z.boolean(),
   origin: z.enum(DEVICE_ACTIVATION_ORIGINS),

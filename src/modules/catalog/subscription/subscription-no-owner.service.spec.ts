@@ -118,7 +118,11 @@ describe('QĐ-113g: no owning department on a subscription', () => {
       audit,
       runner,
       guard,
-      { activatePeriod: jest.fn(), syncDraftUpdate: jest.fn() } as unknown as SubscriptionPeriodLinesService,
+      {
+        activatePeriod: jest.fn(),
+        syncDraftUpdate: jest.fn(),
+        hasLines: jest.fn().mockResolvedValue(false),
+      } as unknown as SubscriptionPeriodLinesService,
     );
 
     await service.update(actor, 'sub-1', { autoRenew: true }, stored().updatedAt);

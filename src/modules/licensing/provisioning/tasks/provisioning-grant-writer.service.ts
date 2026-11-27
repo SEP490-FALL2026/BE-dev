@@ -271,7 +271,12 @@ export class ProvisioningGrantWriter {
     if (plan.provisioningType !== 'K4') return;
     const lockedLotId = target.licenseLotId ?? target.subscriptionId;
     if (lockedLotId === null) return;
-    await this.sharedPool.assertK4LotGrantable(tx, { planId: plan.planId, lotId: lockedLotId, requestId });
+    await this.sharedPool.assertK4LotGrantable(tx, {
+      planId: plan.planId,
+      lotId: lockedLotId,
+      requestId,
+      afterKeyAssigned: false,
+    });
   }
 
   private async requireGrantable(tx: DbTx, plan: SeatTarget, named: string | undefined, today: string): Promise<void> {

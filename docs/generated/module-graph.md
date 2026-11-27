@@ -52,7 +52,7 @@ flowchart BT
   budgets -->|11| licensing
   budgets -->|13| notifications
   budgets -->|4| operating_parameters
-  budgets -->|27| organization
+  budgets -->|26| organization
   budgets -->|8| policies
   catalog -->|35| audit
   catalog -->|12| finance

@@ -1,10 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { addDays, type BusinessDate } from '../../../core/business-date';
+import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { CatalogPricingApi } from '../../catalog/public/catalog-pricing.api';
 import { LicensingSeatMonthApi } from '../../licensing/public/licensing-seat-month.api';
 import type { SeatInForce, UnrequestedK1SeatInForce } from '../../licensing/public/licensing-seat-month.types';
-import { OrganizationHistoryApi } from '../../organization/public/organization-history.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { SharedPoolLineRepo } from '../shared-pool-line/shared-pool-line.repo';
 import { RunningUncommittedRepo } from './running-uncommitted.repo';
@@ -25,7 +24,6 @@ export class RunningUncommittedFactsService {
     private readonly licensing: LicensingSeatMonthApi,
     private readonly periods: CatalogPricingApi,
     private readonly organizationReads: OrganizationReadApi,
-    private readonly orgHistory: OrganizationHistoryApi,
     private readonly commitments: RunningUncommittedRepo,
     private readonly poolRepo: SharedPoolLineRepo,
   ) {}
@@ -57,7 +55,6 @@ export class RunningUncommittedFactsService {
     if (seats.length === 0 && k1Seats.length === 0) return empty;
 
     const ccByEntity = await this.resolveSeatCostCenters([...seats, ...k1Seats], resolvedToday, tx);
-    const placementStartByEmployee = await this.placementStartsOf([...seats, ...k1Seats], resolvedToday, tx);
     const mappedSeats = seats.map((seat) => ({
       assignmentId: seat.assignmentId,
       subscriptionId: seat.subscriptionId,
@@ -66,7 +63,6 @@ export class RunningUncommittedFactsService {
       costCenterId: ccByEntity.get(seat.assignmentId) ?? null,
       heldFrom: seat.heldFrom,
       heldUntil: seat.heldUntil,
-      placementStart: seat.kind === 'SERVICE' ? null : (placementStartByEmployee.get(seat.employeeId) ?? null),
     }));
     const mappedK1Seats: RunningUncommittedK1Seat[] = k1Seats.map((seat) => ({
       assignmentId: seat.assignmentId,
@@ -75,7 +71,6 @@ export class RunningUncommittedFactsService {
       heldFrom: seat.heldFrom,
       heldUntil: seat.heldUntil,
       billingAnchorOn: seat.billingAnchorOn,
-      placementStart: seat.kind === 'SERVICE' ? null : (placementStartByEmployee.get(seat.employeeId) ?? null),
     }));
     const periodBySubscription = seats.length > 0 ? await this.periodsOf(seats, tx) : new Map();
     const requestIds = [...new Set(seats.flatMap((seat) => (seat.requestId === null ? [] : [seat.requestId])))];
@@ -219,24 +214,6 @@ export class RunningUncommittedFactsService {
     }
 
     return bySub;
-  }
-
-  private async placementStartsOf(
-    seats: readonly Pick<SeatInForce | UnrequestedK1SeatInForce, 'kind' | 'employeeId'>[],
-    today: BusinessDate,
-    tx?: DbTx,
-  ): Promise<Map<string, BusinessDate>> {
-    const personalIds = [...new Set(seats.filter((s) => s.kind !== 'SERVICE').map((s) => s.employeeId))];
-    if (personalIds.length === 0) return new Map();
-    const spans = await this.orgHistory.getPlacementsBetween(personalIds, today, addDays(today, 1), tx);
-    const byEmployee = new Map<string, BusinessDate>();
-    for (const span of spans) {
-      if (span.validFrom <= today && (span.validTo === null || today < span.validTo)) {
-        byEmployee.set(span.employeeId, span.validFrom);
-      }
-    }
-
-    return byEmployee;
   }
 }
 

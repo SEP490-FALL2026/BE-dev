@@ -134,13 +134,28 @@ describe('the commitments of 01/01 over PostgreSQL (BR-MF1-09e, FR-5.8a, QĐ-109
     period: { endsOn: string; nextFrom: string; unitPrice: bigint },
   ): Promise<void> => {
     await h.ctx.sql.query(`UPDATE subscriptions SET end_date = $2 WHERE id = $1`, [subscriptionId, period.endsOn]);
+    const nextSubId = (
+      await h.ctx.sql.query<{ id: string }>(
+        `INSERT INTO subscriptions
+         SELECT (jsonb_populate_record(NULL::subscriptions, to_jsonb(s) || jsonb_build_object(
+                   'id', gen_random_uuid(), 'renewed_from_id', s.id, 'start_date', $2::date, 'end_date', NULL,
+                   'unit_price_minor', $3::bigint, 'monthly_unit_price_minor', $3::bigint,
+                   'is_primary_for_plan', false, 'created_at', now(), 'updated_at', now()))).*
+           FROM subscriptions s WHERE s.id = $1
+         RETURNING id`,
+        [subscriptionId, period.nextFrom, period.unitPrice.toString()],
+      )
+    ).rows[0].id;
     await h.ctx.sql.query(
-      `INSERT INTO subscriptions
-       SELECT (jsonb_populate_record(NULL::subscriptions, to_jsonb(s) || jsonb_build_object(
-                 'id', gen_random_uuid(), 'renewed_from_id', s.id, 'start_date', $2::date, 'end_date', NULL,
-                 'unit_price_minor', $3::bigint, 'is_primary_for_plan', false, 'created_at', now(), 'updated_at', now()))).*
-         FROM subscriptions s WHERE s.id = $1`,
-      [subscriptionId, period.nextFrom, period.unitPrice.toString()],
+      `UPDATE subscription_lines SET closed_on = $2::date, closed_reason = 'RENEWED' WHERE subscription_id = $1 AND closed_on IS NULL`,
+      [subscriptionId, period.endsOn],
+    );
+    await h.ctx.sql.query(
+      `INSERT INTO subscription_lines
+         (id, organization_id, subscription_id, workspace_id, plan_id, monthly_unit_price_minor, ledger_opened_on, renewed_from_line_id)
+       SELECT gen_random_uuid(), l.organization_id, $2::uuid, l.workspace_id, l.plan_id, $3::bigint, $4::date, l.id
+         FROM subscription_lines l WHERE l.subscription_id = $1`,
+      [subscriptionId, nextSubId, period.unitPrice.toString(), period.nextFrom],
     );
   };
   const rows = async (requestId: string, year = h.next) =>
@@ -388,9 +403,10 @@ describe('the commitments of 01/01 over PostgreSQL (BR-MF1-09e, FR-5.8a, QĐ-109
       const id = await approved(await unit(), await h.planOf(subscription));
       // 20 USD a month, even with a rate entered for 01/01 in an older release: nothing reads it.
       await h.ctx.sql.query(
-        `UPDATE subscriptions SET unit_price_minor = 2000, unit_price_currency = 'USD' WHERE id = $1`,
+        `UPDATE subscriptions SET unit_price_minor = 2000, unit_price_currency = 'USD', monthly_unit_price_minor = NULL WHERE id = $1`,
         [subscription],
       );
+      await h.ctx.sql.query(`DELETE FROM subscription_lines WHERE subscription_id = $1`, [subscription]);
 
       await passOn();
 

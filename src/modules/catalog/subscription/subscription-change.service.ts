@@ -8,6 +8,7 @@ import { PlanFactsService } from '../plan/plan-facts.service';
 import {
   SubscriptionNotFoundError,
   SubscriptionPlanNotFoundError,
+  SubscriptionPriceOnLinesError,
   SubscriptionStaleError,
   SubscriptionStillDraftError,
   SubscriptionSeatCountingFixedError,
@@ -131,6 +132,9 @@ export class SubscriptionChangeService {
   ): Promise<SubscriptionRecord> {
     const { input, sentUnit, sentMonthly, originalPrice, organizationId, expectedUpdatedAt } = change;
     const { current, plan } = await this.lockForChange(tx, id, input, expectedUpdatedAt);
+    if ((sentUnit !== undefined || sentMonthly !== undefined) && (await this.periodLines.hasLines(current.id, tx))) {
+      throw new SubscriptionPriceOnLinesError();
+    }
     const quantityChangeReason = this.quantityReasonOf(current, input);
     await this.guard.assertNotBelowOccupied(tx, id, current.purchasedQuantity, input.purchasedQuantity);
 

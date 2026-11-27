@@ -3,6 +3,7 @@ import {
   ApprovalRoleChangeListeners,
   SpendingApproverGrantChecks,
 } from '../modules/identity-access/public/identity-access.extension-points';
+import { NotificationNameContributions } from '../modules/notifications/public/notifications.extension-points';
 import { OrganizationChangeListeners } from '../modules/organization/public/organization.extension-points';
 import { EmailDispatchLoop } from './email-dispatch.job';
 import { RequestWorkLoop } from './request-work.job';
@@ -26,6 +27,7 @@ describe('WorkerModule DI graph', () => {
       expect(moduleRef.get(OrganizationChangeListeners).names().length).toBeGreaterThan(0);
       expect(moduleRef.get(ApprovalRoleChangeListeners).names().length).toBeGreaterThan(0);
       expect(moduleRef.get(SpendingApproverGrantChecks).names().length).toBeGreaterThan(0);
+      expect(Array.isArray(moduleRef.get(NotificationNameContributions).names())).toBe(true);
     } finally {
       emailBootstrap.mockRestore();
       requestBootstrap.mockRestore();

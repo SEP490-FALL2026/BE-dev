@@ -2,7 +2,7 @@ import { CURRENT_POLICY_VERSION, type RequestPolicy } from '../access-request/ac
 import type { AccessRequestState } from '../access-request/access-request.types';
 import type { Money } from '../../../core/money/money';
 import type { AssessmentFields, Quote } from '../access-request/assessment-record.types';
-import { ceilMonthlyPriceOf } from '../access-request/pricing.policy';
+import { roundHalfAway } from '../../../core/seat-month-cost';
 
 /**
  * The rules of the assessment the IT Admin completes for software that is not in the catalog (`US-05-06`, `BM-02`), as
@@ -197,6 +197,15 @@ export function registeredShapeOf(
   };
 }
 
+const QUOTE_CYCLE_MONTHS: Readonly<Record<Exclude<Quote['billingCycle'], 'OTHER'>, bigint>> = {
+  MONTHLY: 1n,
+  QUARTERLY: 3n,
+  ANNUAL: 12n,
+};
+
 export function monthlyPriceOfQuote(quote: Pick<Quote, 'unitPrice' | 'billingCycle'>): Money {
-  return ceilMonthlyPriceOf(quote.unitPrice, quote.billingCycle);
+  return {
+    amountMinor: roundHalfAway(quote.unitPrice.amountMinor, QUOTE_CYCLE_MONTHS[quote.billingCycle]),
+    currency: quote.unitPrice.currency,
+  };
 }

@@ -309,4 +309,39 @@ describe('BR-MF1-09: a K4 key back to the store and withdrawn from it (integrati
 
     expect(h.codeOf(response)).toBe('LICENSE_LOT.PRICE_LOCKED');
   });
+
+  it('T-5 (J-3): revoking a key on a 1-license K4 lot immediately frees the lot so re-granting the returned key same day succeeds', async () => {
+    const subscriptionId = await h.subscription(1, 'K4');
+    await importKeys(subscriptionId, 1);
+    const planId = await h.planOf(subscriptionId);
+    const [key] = await keysOf(subscriptionId);
+
+    const firstGrant: TaskWire = await h.granted(await person(), planId);
+    await h.claim(firstGrant.id).expect(200);
+    await h.complete(firstGrant.id, { evidence: 'granted first', licenseKeyId: key.id }).expect(200);
+
+    const rev = await h.open(firstGrant.assignmentId, 'RETURN');
+    await h.claim(rev.taskId).expect(200);
+    await h
+      .revoked(rev.taskId, {
+        completion: 'KEY_DEACTIVATED',
+        evidence: 'Deactivated same day',
+        keyDisposition: 'RETURN_TO_STORE',
+      })
+      .expect(200);
+
+    const afterRevoke = h.dataOf<{ assigned: number; free: number; grantable: number | null }>(
+      await request(h.server()).get(`/api/v1/license-lots/${subscriptionId}`).set(h.as(h.it1)).expect(200),
+    );
+    expect(afterRevoke).toMatchObject({ assigned: 0, free: 1, grantable: 1 });
+
+    const secondGrant: TaskWire = await h.granted(await person(), planId);
+    await h.claim(secondGrant.id).expect(200);
+    await h.complete(secondGrant.id, { evidence: 're-granted same day', licenseKeyId: key.id }).expect(200);
+
+    const afterRegrant = h.dataOf<{ assigned: number; free: number; grantable: number | null }>(
+      await request(h.server()).get(`/api/v1/license-lots/${subscriptionId}`).set(h.as(h.it1)).expect(200),
+    );
+    expect(afterRegrant).toMatchObject({ assigned: 1, free: 0, grantable: 0 });
+  });
 });

@@ -254,4 +254,36 @@ describe('device activations licensing facade & S-6 lot occupancy (integration, 
     );
     expect(lot.assigned).toBe(2);
   });
+
+  it('R-2: refuses changing licenseCount on a license lot via PATCH /license-lots/:id with 422 VALIDATION_ERROR', async () => {
+    const planId = await planOf('DEVICE_KEY');
+    const lotId = await purchaseOf(planId, 2);
+    const keyId = await importKey(lotId, 5);
+    const [d1, d2] = await Promise.all([createDevice('LAP'), createDevice('PC')]);
+    for (const deviceId of [d1, d2]) {
+      await runner.run((tx) =>
+        activations.open(tx, {
+          organizationId: seed.organizationId,
+          deviceId,
+          planId,
+          licenseKeyId: keyId,
+          origin: 'OPERATION',
+          on: '2026-11-24',
+          by: actor(),
+        }),
+      );
+    }
+
+    const detail = dataOf<{ updatedAt: string; assigned: number; free: number }>(
+      await request(server()).get(`/api/v1/license-lots/${lotId}`).set(as(it1)).expect(200),
+    );
+    expect(detail).toMatchObject({ assigned: 2, free: 0 });
+
+    const patchRes = await request(server())
+      .patch(`/api/v1/license-lots/${lotId}`)
+      .set(as(it1))
+      .send({ expectedUpdatedAt: detail.updatedAt, licenseCount: 1 })
+      .expect(422);
+    expect((patchRes.body as { error: { code: string } }).error.code).toBe('VALIDATION_ERROR');
+  });
 });

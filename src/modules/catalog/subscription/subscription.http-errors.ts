@@ -27,6 +27,7 @@ import {
   SubscriptionApplicationRetiredError,
   SubscriptionPriceMismatchError,
   SubscriptionPriceNotVndError,
+  SubscriptionPriceOnLinesError,
   SubscriptionBillingCycleUnsupportedError,
   SubscriptionBillingLongerThanCommitmentError,
   SubscriptionCommitmentTermNotAllowedError,
@@ -94,6 +95,13 @@ export function toSubscriptionApiException(error: unknown): unknown {
   }
   if (error instanceof SubscriptionPrimaryRetiredError) {
     return refuse(UNPROCESSABLE, 'SUBSCRIPTION.PRIMARY_RETIRED', error.message);
+  }
+  if (error instanceof SubscriptionPriceOnLinesError) {
+    return refuse(
+      HttpStatus.CONFLICT,
+      'SUBSCRIPTION.PRICE_ON_LINES',
+      'This subscription period is priced per line: change the price via PATCH /subscription-lines/{id}.',
+    );
   }
   if (error instanceof SubscriptionK1HasNoSubscriptionError) {
     return refuse(UNPROCESSABLE, 'SUBSCRIPTION.K1_HAS_NO_SUBSCRIPTION', error.message);
@@ -250,6 +258,7 @@ export const SUBSCRIPTION_ERROR_EXAMPLES = {
   QUANTITY_BELOW_OCCUPIED: example(new SubscriptionQuantityBelowOccupiedError(3, 2)),
   STILL_DRAFT: example(new SubscriptionStillDraftError(['UNIT_PRICE'])),
   PRICE_NOT_VND: example(new SubscriptionPriceNotVndError('USD')),
+  PRICE_ON_LINES: example(new SubscriptionPriceOnLinesError()),
   PRICE_MISMATCH: example(new SubscriptionPriceMismatchError(6_000_000n)),
   COMMITMENT_TERM_REQUIRED: example(new SubscriptionCommitmentTermRequiredError()),
   COMMITMENT_TERM_NOT_ALLOWED: example(new SubscriptionCommitmentTermNotAllowedError()),

@@ -342,7 +342,12 @@ describe('SharedPoolService (ledger seats & chooseLine)', () => {
     const service = k4PoolService(lotStock, gate);
 
     await expect(
-      service.assertK4LotGrantable(tx, { planId: 'plan-cad', lotId: 'lot-duc', requestId: 'req-minh' }),
+      service.assertK4LotGrantable(tx, {
+        planId: 'plan-cad',
+        lotId: 'lot-duc',
+        requestId: 'req-minh',
+        afterKeyAssigned: false,
+      }),
     ).rejects.toBeInstanceOf(LicenseLotReservedForRequestError);
     expect(reservedForRequestLots).toHaveBeenCalledWith(
       [
@@ -368,14 +373,13 @@ describe('SharedPoolService (ledger seats & chooseLine)', () => {
 
   it('G-4: lotReservationsOf fails loudly when GrantRequestGateHook is unbound', async () => {
     const { GrantRequestGateHook: HookClass } = await import('../public/licensing.extension-points');
-    const unboundGate = new HookClass();
     const service = new SharedPoolService(
       {} as unknown as CatalogApi,
       {} as unknown as SharedPoolCapacityRepo,
       {} as unknown as SharedPoolAvoidedCostRepo,
       {} as unknown as SeatLedgerApi,
       {} as unknown as LicenseLotStockApi,
-      unboundGate,
+      new HookClass(),
     );
     const c = {
       id: 'lot-duc',

@@ -134,13 +134,14 @@ const DUPLICATE_PLAN_CONFLICT = {
 const UPDATE_CONFLICT = {
   status: HttpStatus.CONFLICT,
   description:
-    'The unique index of the flag that makes a subscription the primary one of its plan refuses the loser of a race (SUBSCRIPTION.PRIMARY_CONFLICT); the plan is locked for the write, so it normally does not fire. When expectedUpdatedAt is sent and the subscription was changed since (by another edit, or by a seat bought for a grant), nothing is written (SUBSCRIPTION.STALE, details.currentUpdatedAt): read it again and redo the edit. Reducing purchasedQuantity on a 12-month active K2 subscription without mid-term reduction enabled is refused (SUBSCRIPTION.MID_TERM_REDUCTION_NOT_ALLOWED).' +
+    'The unique index of the flag that makes a subscription the primary one of its plan refuses the loser of a race (SUBSCRIPTION.PRIMARY_CONFLICT); the plan is locked for the write, so it normally does not fire. When expectedUpdatedAt is sent and the subscription was changed since (by another edit, or by a seat bought for a grant), nothing is written (SUBSCRIPTION.STALE, details.currentUpdatedAt): read it again and redo the edit. Reducing purchasedQuantity on a 12-month active K2 subscription without mid-term reduction enabled is refused (SUBSCRIPTION.MID_TERM_REDUCTION_NOT_ALLOWED). Changing the price of a period that has plan lines is refused (SUBSCRIPTION.PRICE_ON_LINES): update each line via PATCH /subscription-lines/{id} instead.' +
     SEAT_LEDGER_NOTE,
   examples: [
     SUBSCRIPTION_ERROR_EXAMPLES.PRIMARY_CONFLICT,
     SUBSCRIPTION_ERROR_EXAMPLES.STALE,
     SUBSCRIPTION_ERROR_EXAMPLES.MID_TERM_REDUCTION_NOT_ALLOWED,
     SUBSCRIPTION_ERROR_EXAMPLES.SEAT_COUNT_VIA_LEDGER,
+    SUBSCRIPTION_ERROR_EXAMPLES.PRICE_ON_LINES,
   ],
 } as const;
 

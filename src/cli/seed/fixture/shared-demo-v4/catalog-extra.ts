@@ -254,13 +254,16 @@ const seatsOf = (subscription: string, holders: string[], extra: Partial<DemoSea
  * HubSpot) are old enough to be judged. Two seats ended already and are still held: the queue of rights that ended shows them.
  */
 export const EXTRA_SEATS: DemoSeat[] = [
-  ...seatsOf('m365-basic', ['NV-FINH', 'NV-DEP', 'NV-ITOH']),
+  ...seatsOf('m365-basic', ['NV-DEP', 'NV-ITOH']),
+  ...seatsOf('m365-basic', ['NV-FINH'], { grantedDaysAgo: 0 }),
   ...seatsOf('m365-basic', ['NV-DEV5', 'NV-ITO1', 'NV-BOD1'], { grantedDaysAgo: 300 }),
   ...seatsOf('m365-basic', ['NV-DEV6', 'NV-ITO2', 'NV-BOD2'], { grantedDaysAgo: 240 }),
-  ...seatsOf('m365-basic', ['NV-FIN2', 'NV-BOD3'], { grantedDaysAgo: 180 }),
+  ...seatsOf('m365-basic', ['NV-BOD3'], { grantedDaysAgo: 180 }),
+  ...seatsOf('m365-basic', ['NV-FIN2'], { grantedDaysAgo: 0 }),
   ...seatsOf('m365-basic', ['NV-OPS2'], { grantedDaysAgo: 120 }),
   ...seatsOf('m365-basic', ['NV-DEV7'], { grantedDaysAgo: 60 }),
-  ...seatsOf('m365-standard', ['NV-FINH', 'NV-DEP']),
+  ...seatsOf('m365-standard', ['NV-DEP']),
+  ...seatsOf('m365-standard', ['NV-FINH'], { grantedDaysAgo: 0 }),
   ...seatsOf('zoom-pro', ['NV-SAL3'], { grantedDaysAgo: 180 }),
   ...seatsOf('zoom-pro', ['NV-BOD4'], { grantedDaysAgo: 120 }),
   ...seatsOf('zoom-pro', ['NV-BOD1'], { grantedDaysAgo: 60 }),

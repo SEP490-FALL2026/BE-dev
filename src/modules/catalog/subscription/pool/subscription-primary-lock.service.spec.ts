@@ -90,7 +90,11 @@ describe('Subscription primary lock order', () => {
         audit,
         runner,
         makeGuard(),
-        { activatePeriod: jest.fn(), syncDraftUpdate: jest.fn() } as unknown as SubscriptionPeriodLinesService,
+        {
+          activatePeriod: jest.fn(),
+          syncDraftUpdate: jest.fn(),
+          hasLines: jest.fn().mockResolvedValue(false),
+        } as unknown as SubscriptionPeriodLinesService,
       );
 
       await expect(service.update(actor, 'sub-1', { isPrimaryForPlan: true }, updatedAt)).rejects.toBeInstanceOf(
@@ -114,7 +118,11 @@ describe('Subscription primary lock order', () => {
         audit,
         runner,
         makeGuard(),
-        { activatePeriod: jest.fn(), syncDraftUpdate: jest.fn() } as unknown as SubscriptionPeriodLinesService,
+        {
+          activatePeriod: jest.fn(),
+          syncDraftUpdate: jest.fn(),
+          hasLines: jest.fn().mockResolvedValue(false),
+        } as unknown as SubscriptionPeriodLinesService,
       );
 
       await service.update(actor, 'sub-1', { autoRenew: true }, stored().updatedAt);

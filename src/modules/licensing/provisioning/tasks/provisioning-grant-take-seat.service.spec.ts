@@ -351,6 +351,7 @@ describe('ProvisioningGrantWriter.takeSeat (W3-18 K2 shortcut + K1 legacy)', () 
       planId: 'plan-1',
       lotId: 'lot-duc',
       requestId: 'req-minh',
+      afterKeyAssigned: false,
     });
     expect(createFromRequest).not.toHaveBeenCalled();
   });

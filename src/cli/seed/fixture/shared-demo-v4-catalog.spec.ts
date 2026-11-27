@@ -54,6 +54,7 @@ describe('shared dataset v4: restored catalog, baseline seat & cycle coverage', 
     expect(F.lots.find((lot) => lot.key === 'sublime-license')).toMatchObject({ licenseCount: 2 });
     expect(subscriptionOf('adobe-cc-teams').responsible).toBe('NV-ITA2');
     expect(subscriptionOf('notion-business').responsible).toBe('NV-ITA2');
+    expect(subscriptionOf('slack-pro').originalPrice).toEqual({ amount: '7.25', currency: 'USD' });
     for (const declared of F.subscriptions.slice(11)) {
       if (!declared.lines) expect(declared.key).toBe(declared.plan);
     }

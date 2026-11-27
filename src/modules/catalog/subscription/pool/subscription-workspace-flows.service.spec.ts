@@ -117,7 +117,11 @@ describe('SubscriptionChangeService: the workspace of a subscription (W3-11, W3-
       { record: jest.fn() } as unknown as AuditApi,
       runner,
       guard,
-      { activatePeriod: jest.fn(), syncDraftUpdate: jest.fn() } as unknown as SubscriptionPeriodLinesService,
+      {
+        activatePeriod: jest.fn(),
+        syncDraftUpdate: jest.fn(),
+        hasLines: jest.fn().mockResolvedValue(false),
+      } as unknown as SubscriptionPeriodLinesService,
     );
 
     return {

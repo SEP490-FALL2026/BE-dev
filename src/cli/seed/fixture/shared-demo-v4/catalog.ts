@@ -138,7 +138,11 @@ const SUBSCRIPTIONS: DemoSubscription[] = [
     seatCounting: 'MEMBERS',
     invoicedLater: true,
   },
-  { ...monthly('slack', 'slack-pro', '180000', 'NV-ITA1', 6), renewalInDays: 20 },
+  {
+    ...monthly('slack', 'slack-pro', '180000', 'NV-ITA1', 6),
+    renewalInDays: 20,
+    originalPrice: { amount: '7.25', currency: 'USD' },
+  },
   { ...monthly('github', 'github-team', '100000', 'NV-ITA1', 5), renewalInDays: 20 },
   { ...monthly('onepassword', 'onepassword-business', '200000', 'NV-ITA1', 0), renewalInDays: 20 },
   { ...monthly('postman', 'postman-professional', '300000', 'NV-ITA1', 5), renewalInDays: 20 },
@@ -205,7 +209,8 @@ const SEATS: DemoSeat[] = [
   ...seat('figma', ['NV-DES9'], { grantedDaysAgo: 30 }),
   ...seat('figma', ['NV-DES10'], { endInDays: 20 }),
   ...seat('figma', ['NV-DES12'], { endInDays: 35 }),
-  ...seat('slack', ['NV-ENGH', 'NV-FINH']),
+  ...seat('slack', ['NV-ENGH']),
+  ...seat('slack', ['NV-FINH'], { grantedDaysAgo: 0 }),
   // The seat of the bot that posts the alerts of IT in Slack, held by an IT Admin: marked a machine account, never a ghost seat (DEMO-8).
   ...seat('slack', ['NV-ITA3']),
   // A right that ends in 7 days: its holder asked to carry it on, the request waits for the head (DEMO-5, R33).

@@ -300,7 +300,7 @@ export class SharedPoolService {
    */
   async assertK4LotGrantable(
     tx: DbTx,
-    input: { planId: string; lotId: string; requestId?: string | null; afterKeyAssigned?: boolean },
+    input: { planId: string; lotId: string; requestId?: string | null; afterKeyAssigned: boolean },
   ): Promise<void> {
     const raw = await this.lotStock.accountLotCandidates(input.planId, undefined, tx);
     const match = raw.find((l) => l.id === input.lotId || l.legacySubscriptionId === input.lotId);

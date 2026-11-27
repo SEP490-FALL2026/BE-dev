@@ -337,6 +337,7 @@ describe('the money held for a seat goes back by the day (RV-07, M-06, M-10; int
   });
 
   it('the same right taken back in the middle of its term gives back the months that had not begun and the days of the month it is taken back in, not the whole commitment', async () => {
+    pretendBusinessToday(h.ctx.app, `${h.year}-01-15`);
     const id = await approvedWithTerm(await unit(), 3);
     await setSeatMonthly(id, MONTHLY);
     const task = revocationOf(id, {
@@ -369,6 +370,7 @@ describe('the money held for a seat goes back by the day (RV-07, M-06, M-10; int
   });
 
   it('B-C1: a long-term request (no months of use) keeps counting to December, whatever end its seat has', async () => {
+    pretendBusinessToday(h.ctx.app, `${h.year}-01-15`);
     const id = await approved(await unit(), 12);
     await setSeatMonthly(id, MONTHLY);
 

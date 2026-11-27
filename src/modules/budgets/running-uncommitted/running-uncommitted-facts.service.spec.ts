@@ -2,7 +2,6 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { CatalogPricingApi } from '../../catalog/public/catalog-pricing.api';
 import type { LicensingSeatMonthApi } from '../../licensing/public/licensing-seat-month.api';
 import type { SeatInForce, UnrequestedK1SeatInForce } from '../../licensing/public/licensing-seat-month.types';
-import type { OrganizationHistoryApi } from '../../organization/public/organization-history.api';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { SharedPoolLineRepo } from '../shared-pool-line/shared-pool-line.repo';
 import type { RunningUncommittedRepo } from './running-uncommitted.repo';
@@ -44,9 +43,6 @@ function buildService() {
     getOwningUnits: jest.fn().mockResolvedValue(new Map()),
     getUnitCostCenterIds: jest.fn().mockResolvedValue(new Map()),
   };
-  const organizationHistory = {
-    getPlacementsBetween: jest.fn().mockResolvedValue([]),
-  };
   const commitments = {
     commitmentsOfRequestsInYear: jest.fn().mockResolvedValue(new Map()),
   };
@@ -58,12 +54,11 @@ function buildService() {
     licensing as unknown as LicensingSeatMonthApi,
     periods as unknown as CatalogPricingApi,
     organizationReads as unknown as OrganizationReadApi,
-    organizationHistory as unknown as OrganizationHistoryApi,
     commitments as unknown as RunningUncommittedRepo,
     poolRepo as unknown as SharedPoolLineRepo,
   );
 
-  return { service, licensing, periods, organizationReads, organizationHistory, commitments, poolRepo };
+  return { service, licensing, periods, organizationReads, commitments, poolRepo };
 }
 
 describe('RunningUncommittedFactsService', () => {
@@ -284,8 +279,8 @@ describe('RunningUncommittedFactsService', () => {
     expect(filtered.get(CC_TK)).toBe(4_800_000n);
   });
 
-  it('clamps open mid-year seats by today department placement validFrom (both K2 and unrequested K1)', async () => {
-    const { service, licensing, periods, organizationReads, organizationHistory } = buildService();
+  it('counts open mid-year seats from max(heldFrom, periodStartDate, yearStart) per SPEC W3-08 without placement clamping', async () => {
+    const { service, licensing, periods, organizationReads } = buildService();
     licensing.getSeatsInForceOn.mockResolvedValue([
       inForceSeat({ assignmentId: 'a-k2', subscriptionId: 'sub-1', heldFrom: '2027-07-01', heldUntil: null }),
     ]);
@@ -308,10 +303,6 @@ describe('RunningUncommittedFactsService', () => {
         ['emp-1', { departmentId: 'd-tk', costCenter: { id: CC_TK, code: 'TK', name: 'TK', status: 'ACTIVE' } }],
       ]),
     );
-    organizationHistory.getPlacementsBetween.mockResolvedValue([
-      { employeeId: 'emp-1', departmentId: 'd-other', validFrom: '2027-01-01', validTo: '2027-11-26' },
-      { employeeId: 'emp-1', departmentId: 'd-tk', validFrom: '2027-11-26', validTo: null },
-    ]);
     periods.getPurchaseFacts.mockResolvedValue([
       {
         subscriptionId: 'sub-1',
@@ -324,6 +315,7 @@ describe('RunningUncommittedFactsService', () => {
     ]);
 
     const totals = await service.ofYear(2027, '2027-11-26');
-    expect(totals.get(CC_TK)).toBe((500_000n + 300_000n) * 2n);
+    // K2 counts un-run Jul..Dec (6 months); unrequested K1 counts Nov..Dec (2 months).
+    expect(totals.get(CC_TK)).toBe(500_000n * 6n + 300_000n * 2n);
   });
 });

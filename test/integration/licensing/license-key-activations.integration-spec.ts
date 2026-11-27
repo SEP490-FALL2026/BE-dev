@@ -234,7 +234,7 @@ describe('the activations of the license keys (integration, real PostgreSQL)', (
       expect(dataOf<PageWire>(await listKeys(unlimitedPurchase).expect(200)).items[0].maxActivations).toBe(1);
     });
 
-    it('refuses a plan bundled with the machine: it has no lots or keys (422)', async () => {
+    it('refuses a plan bundled with the machine: it has no lots or keys (422, SPEC-B3.md:149,669)', async () => {
       const plan = await planOf('DEVICE_BUNDLED');
       const refused = await request(server())
         .post('/api/v1/license-lots')

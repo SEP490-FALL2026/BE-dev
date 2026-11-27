@@ -1,7 +1,12 @@
 import { addMonths, dayOffset, daysBetween } from '../demo-dates';
 import type { DemoFixture, DemoRequestScenario, DemoSubscription } from '../fixture/demo-fixture.types';
 import { grantedOnOf } from './baseline.steps';
-import { subscriptionHasPlan, subscriptionMonthlyPriceOf, subscriptionPrimaryPlan } from './catalog.steps';
+import {
+  subscriptionHasPlan,
+  subscriptionMonthlyPriceOf,
+  subscriptionPrimaryPlan,
+  subscriptionStartDate,
+} from './catalog.steps';
 
 /**
  * The base of the budget of a department, counted from the day of the seed (SPEC S24 item 1, Q-C): the light a head or Finance sees at the close
@@ -104,29 +109,33 @@ function k2SeatInfo(
 function seatRunningUncommitted(
   fixture: Basis,
   today: Day,
+  yearStart: Day,
   yearEnd: Day,
-  startMonth: number,
   department: string,
   seat: Basis['seats'][number],
 ): number {
   const info = k2SeatInfo(fixture, department, seat);
   if (!info) return 0;
+  const heldFrom = grantedOnOf({ fixture: fixture as DemoFixture, today }, seat);
   const lastHeld = seat.endInDays === undefined ? yearEnd : dayOffset(today, seat.endInDays - 1);
-  if (lastHeld < today) return 0;
+  if (heldFrom > today || lastHeld < today) return 0;
+  const periodStart = info.subscription.withoutDates ? heldFrom : subscriptionStartDate({ today }, info.subscription);
+  const effectiveStart = [heldFrom, periodStart, yearStart].reduce((latest, day) => (day > latest ? day : latest));
+  if (effectiveStart > yearEnd || lastHeld < effectiveStart) return 0;
   const capped = lastHeld < yearEnd ? lastHeld : yearEnd;
-  const months = Number(capped.slice(5, 7)) - startMonth + 1;
+  const months = Number(capped.slice(5, 7)) - Number(effectiveStart.slice(5, 7)) + 1;
 
   return months > 0 ? monthlyPriceOf(info.subscription, info.planKey) * months : 0;
 }
 
-/** Remaining calendar months in `year` from `today` through the end of each open baseline K2 seat. */
+/** Remaining un-run calendar months in `year` from `max(heldFrom, periodStart, yearStart)` through the end of each open baseline K2 seat. */
 function runningUncommittedOf(fixture: Basis, today: Day, department: string): number {
   const year = Number(today.slice(0, 4));
+  const yearStart = `${year}-01-01`;
   const yearEnd = `${year}-12-31`;
-  const startMonth = Number(today.slice(5, 7));
 
   return fixture.seats.reduce(
-    (total, seat) => total + seatRunningUncommitted(fixture, today, yearEnd, startMonth, department, seat),
+    (total, seat) => total + seatRunningUncommitted(fixture, today, yearStart, yearEnd, department, seat),
     0,
   );
 }

@@ -15,8 +15,11 @@ import {
 } from '../modules/identity-access/public/identity-access.extension-points';
 import {
   GrantRequestGateHook,
+  RenewalFinancialContributions,
   RenewalHoldHook,
+  RenewalUsageContributions,
   RevocationListeners,
+  SeatBaselineClosedListeners,
 } from '../modules/licensing/public/licensing.extension-points';
 import { NotificationNameContributions } from '../modules/notifications/public/notifications.extension-points';
 import {
@@ -91,8 +94,11 @@ describe('AppModule DI graph', () => {
       for (const registry of registries) {
         expect(registry.names().length).toBeGreaterThan(0);
       }
-      // RequestOutcomeListeners is exported for Personnel/Catalog subscribers when attached; currently 0 listeners register.
+      // Extension points wired in AppModule that currently carry zero subscribers.
       expect(moduleRef.get(RequestOutcomeListeners).names()).toEqual([]);
+      expect(moduleRef.get(RenewalFinancialContributions).names()).toEqual([]);
+      expect(moduleRef.get(RenewalUsageContributions).names()).toEqual([]);
+      expect(moduleRef.get(SeatBaselineClosedListeners).names()).toEqual([]);
     } finally {
       await moduleRef.close();
     }

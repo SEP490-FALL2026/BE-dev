@@ -46,8 +46,21 @@ describe('a month of the seats of a K2 pool is charged to the departments of the
   async function newPool(): Promise<string> {
     const pool = await takeOwnerOff(h, await h.subscription(10, 'K2'));
     await h.ctx.sql.query(
-      `UPDATE subscriptions SET unit_price_minor = 400000, price_reporting_minor = 400000 WHERE id = $1`,
+      `UPDATE subscriptions
+          SET unit_price_minor = 400000, price_reporting_minor = 400000, monthly_unit_price_minor = 400000
+        WHERE id = $1`,
       [pool],
+    );
+    await h.ctx.sql.query(
+      `UPDATE subscription_lines
+          SET monthly_unit_price_minor = 400000, ledger_opened_on = $2
+        WHERE subscription_id = $1`,
+      [pool, `${h.year}-01-01`],
+    );
+    await h.ctx.sql.query(
+      `UPDATE seat_changes SET effective_on = $2
+        WHERE subscription_line_id IN (SELECT id FROM subscription_lines WHERE subscription_id = $1)`,
+      [pool, `${h.year}-01-01`],
     );
 
     return pool;
@@ -362,9 +375,19 @@ describe('a month of the seats of a K2 pool is charged to the departments of the
     const planId = await h.planOf(pool);
     const vendorId = (await h.vendorOf(planId)).id;
     await h.ctx.sql.query(
-      `UPDATE subscriptions SET unit_price_minor = 3600000, price_reporting_minor = 3600000, billing_cycle = 'ANNUAL',
-         purchased_quantity = 10, start_date = $2, end_date = $3 WHERE id = $1`,
+      `UPDATE subscriptions SET unit_price_minor = 3600000, price_reporting_minor = 3600000,
+          monthly_unit_price_minor = 300000, billing_cycle = 'ANNUAL',
+          purchased_quantity = 10, start_date = $2, end_date = $3 WHERE id = $1`,
       [pool, `${h.year}-07-01`, `${h.year + 1}-06-30`],
+    );
+    await h.ctx.sql.query(
+      `UPDATE subscription_lines SET monthly_unit_price_minor = 300000, ledger_opened_on = $2 WHERE subscription_id = $1`,
+      [pool, `${h.year}-07-01`],
+    );
+    await h.ctx.sql.query(
+      `UPDATE seat_changes SET effective_on = $2
+        WHERE subscription_line_id IN (SELECT id FROM subscription_lines WHERE subscription_id = $1)`,
+      [pool, `${h.year}-07-01`],
     );
     const unit = await department();
     for (let index = 0; index < 8; index += 1) {

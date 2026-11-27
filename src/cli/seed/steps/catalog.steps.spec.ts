@@ -81,6 +81,8 @@ describe('the body of a subscription the dataset declares', () => {
       unitPrice: { amount: '255000', currency: 'VND' },
     });
     expect(jira).not.toHaveProperty('originalPrice');
+    const slack = subscriptionBody(ctx, subscription('slack'), 'plan-1');
+    expect(slack).toMatchObject({ originalPrice: { amount: '7.25', currency: 'USD' } });
     const m365Annual = subscriptionBody(ctx, subscription('m365-standard'), 'plan-1');
     expect(m365Annual).toMatchObject({ monthlyUnitPrice: { amount: '316667', currency: 'VND' } });
     expect(m365Annual).not.toHaveProperty('unitPrice');

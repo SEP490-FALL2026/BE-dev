@@ -1,4 +1,3 @@
-import type { OrganizationHistoryApi } from '../../organization/public/organization-history.api';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { CatalogPricingApi } from '../../catalog/public/catalog-pricing.api';
 import type { LicensingSeatMonthApi } from '../../licensing/public/licensing-seat-month.api';
@@ -286,7 +285,6 @@ describe('BR-MF4-05 BudgetTableViewService.summary', () => {
       licensing,
       {} as CatalogPricingApi,
       organization,
-      { getPlacementsBetween: jest.fn().mockResolvedValue([]) } as unknown as OrganizationHistoryApi,
       {} as RunningUncommittedRepo,
       {} as SharedPoolLineRepo,
     );

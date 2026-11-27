@@ -193,4 +193,28 @@ describe('a hook of a personnel file and the transaction of the write (integrati
     expect(await h.caseCount(person.employeeId)).toBe(1);
     expect(await h.auditEventsOf('OFFBOARDING_CASE.RECORDED', wire.id)).toHaveLength(1);
   });
+
+  it('R-9 (H-5): it_admin_handovers CHECK rejects 0/0/0/0 counts and accepts workspace-only and license-lot-only handovers', async () => {
+    const makeCaseId = async () => (await h.recordedCase(await leaver())).id;
+    const insertHandover = async (counts: { subs: number; apps: number; workspaces: number; lots: number }) => {
+      const caseId = await makeCaseId();
+      try {
+        await h.ctx.sql.query(
+          `INSERT INTO it_admin_handovers
+             (id, organization_id, offboarding_case_id, subscriptions_at_record, applications_at_record,
+              workspaces_at_record, license_lots_at_record)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [randomUUID(), h.seed.organizationId, caseId, counts.subs, counts.apps, counts.workspaces, counts.lots],
+        );
+        return null;
+      } catch (error) {
+        const pgCode = error as { code?: string; driverAdapterError?: { cause?: { originalCode?: string } } };
+        return pgCode.driverAdapterError?.cause?.originalCode ?? pgCode.code ?? 'ERR';
+      }
+    };
+
+    expect(await insertHandover({ subs: 0, apps: 0, workspaces: 0, lots: 0 })).toBe('23514');
+    expect(await insertHandover({ subs: 0, apps: 0, workspaces: 1, lots: 0 })).toBeNull();
+    expect(await insertHandover({ subs: 0, apps: 0, workspaces: 0, lots: 1 })).toBeNull();
+  });
 });

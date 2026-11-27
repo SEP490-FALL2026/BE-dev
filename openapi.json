@@ -28900,7 +28900,7 @@
             }
           },
           "409": {
-            "description": "The unique index of the flag that makes a subscription the primary one of its plan refuses the loser of a race (SUBSCRIPTION.PRIMARY_CONFLICT); the plan is locked for the write, so it normally does not fire. When expectedUpdatedAt is sent and the subscription was changed since (by another edit, or by a seat bought for a grant), nothing is written (SUBSCRIPTION.STALE, details.currentUpdatedAt): read it again and redo the edit. Reducing purchasedQuantity on a 12-month active K2 subscription without mid-term reduction enabled is refused (SUBSCRIPTION.MID_TERM_REDUCTION_NOT_ALLOWED). The number of seats is no longer written here: a seat is bought or reduced on the lines of the period (SUBSCRIPTION.SEAT_COUNT_VIA_LEDGER, details.routes).",
+            "description": "The unique index of the flag that makes a subscription the primary one of its plan refuses the loser of a race (SUBSCRIPTION.PRIMARY_CONFLICT); the plan is locked for the write, so it normally does not fire. When expectedUpdatedAt is sent and the subscription was changed since (by another edit, or by a seat bought for a grant), nothing is written (SUBSCRIPTION.STALE, details.currentUpdatedAt): read it again and redo the edit. Reducing purchasedQuantity on a 12-month active K2 subscription without mid-term reduction enabled is refused (SUBSCRIPTION.MID_TERM_REDUCTION_NOT_ALLOWED). Changing the price of a period that has plan lines is refused (SUBSCRIPTION.PRICE_ON_LINES): update each line via PATCH /subscription-lines/{id} instead. The number of seats is no longer written here: a seat is bought or reduced on the lines of the period (SUBSCRIPTION.SEAT_COUNT_VIA_LEDGER, details.routes).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -28947,6 +28947,17 @@
                         "code": "SUBSCRIPTION.SEAT_COUNT_VIA_LEDGER",
                         "message": "The seats of a subscription are not edited: buy, correct or reduce them on its lines.",
                         "details": { "routes": ["subscriptionLineSeatPurchase"] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.PRICE_ON_LINES": {
+                    "summary": "This subscription period is priced per line: change the price via PATCH /subscription-lines/{id}.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.PRICE_ON_LINES",
+                        "message": "This subscription period is priced per line: change the price via PATCH /subscription-lines/{id}.",
                         "requestId": "req_example"
                       }
                     }
@@ -146843,7 +146854,12 @@
                   "deviceId": { "type": "string", "format": "uuid" },
                   "planId": { "type": "string", "format": "uuid" },
                   "licenseKeyId": { "type": "string", "format": "uuid", "nullable": true },
-                  "subscriptionId": { "type": "string", "format": "uuid", "nullable": true },
+                  "subscriptionId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "License lot identifier when the key belongs to a license lot, or legacy subscription identifier for pre-lot records.",
+                    "nullable": true
+                  },
                   "keyMasked": { "type": "string", "nullable": true },
                   "keyWithdrawn": { "type": "boolean" },
                   "origin": { "type": "string", "enum": ["OPERATION", "INITIAL"] },
@@ -147038,7 +147054,12 @@
               "deviceId": { "type": "string", "format": "uuid" },
               "planId": { "type": "string", "format": "uuid" },
               "licenseKeyId": { "type": "string", "format": "uuid", "nullable": true },
-              "subscriptionId": { "type": "string", "format": "uuid", "nullable": true },
+              "subscriptionId": {
+                "type": "string",
+                "format": "uuid",
+                "description": "License lot identifier when the key belongs to a license lot, or legacy subscription identifier for pre-lot records.",
+                "nullable": true
+              },
               "keyMasked": { "type": "string", "nullable": true },
               "keyWithdrawn": { "type": "boolean" },
               "origin": { "type": "string", "enum": ["OPERATION", "INITIAL"] },

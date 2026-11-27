@@ -68,7 +68,14 @@ describe('W1-17 edge cases: (d) blocked re-check, (e) Case B IT assessment, (i) 
           { taxType: 'GTGT', ratePercent: '10', deductible: true },
         ])
         .expect(200);
-      await h.ctx.sql.query(`UPDATE subscriptions SET unit_price_minor = 120000000 WHERE id = $1`, [subId]);
+      await h.ctx.sql.query(
+        `UPDATE subscriptions SET unit_price_minor = 120000000, monthly_unit_price_minor = 120000000 WHERE id = $1`,
+        [subId],
+      );
+      await h.ctx.sql.query(
+        `UPDATE subscription_lines SET monthly_unit_price_minor = 120000000 WHERE subscription_id = $1`,
+        [subId],
+      );
       const u = await unit(50 * M, 0);
       const sent = await h.sent(u.member, expensivePlan, { termMonths: 1 });
       const needStep = await h.stepOf(sent.id, 'NEED');

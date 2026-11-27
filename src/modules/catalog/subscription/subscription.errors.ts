@@ -303,6 +303,14 @@ export class SubscriptionLinesXorPlanError extends Error {
   }
 }
 
+/** A subscription whose period already has plan lines keeps its price per line: change the price on the line instead. */
+export class SubscriptionPriceOnLinesError extends Error {
+  constructor() {
+    super('This subscription period is priced per line: change the price on the line instead.');
+    this.name = 'SubscriptionPriceOnLinesError';
+  }
+}
+
 export class SubscriptionWorkspaceNotFoundError extends Error {
   constructor() {
     super('The workspace does not exist.');

@@ -8,6 +8,7 @@ import {
   SubscriptionK1HasNoSubscriptionError,
   SubscriptionPerpetualIsLicenseLotError,
   SubscriptionPriceMismatchError,
+  SubscriptionPriceOnLinesError,
   SubscriptionPrimaryRetiredError,
   SubscriptionSeatCountViaLedgerError,
   SubscriptionStaleError,
@@ -144,6 +145,19 @@ describe('W3-02 & W3-03 catalog HTTP contract cases (e2e, no database)', () => {
       code: 'SUBSCRIPTION.SEAT_COUNT_VIA_LEDGER',
       details: { routes: ['subscriptionLineSeatPurchase', 'subscriptionLineSeatCorrection'] },
     });
+  });
+
+  it('PATCH /subscriptions/:id on a lined period answers 409 SUBSCRIPTION.PRICE_ON_LINES', async () => {
+    update.mockRejectedValueOnce(new SubscriptionPriceOnLinesError());
+
+    const response = await request(app.getHttpServer())
+      .patch(`/api/v1/subscriptions/${ID}`)
+      .set('Authorization', bearer(principal(['IT_ADMIN'])))
+      .send({ monthlyUnitPrice: { amount: '500000', currency: 'VND' }, expectedUpdatedAt: '2026-11-25T09:00:00.000Z' })
+      .expect(409);
+
+    expect(bodyOf(response).error.code).toBe('SUBSCRIPTION.PRICE_ON_LINES');
+    expect(bodyOf(response).error.message).toContain('/subscription-lines/{id}');
   });
 
   it('PATCH /subscriptions/:id with isPrimaryForPlan true answers 422 SUBSCRIPTION.PRIMARY_RETIRED', async () => {

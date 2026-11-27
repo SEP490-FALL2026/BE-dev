@@ -5,6 +5,7 @@ import type { LockedPlan } from '../../plan/plan-facts.service';
 import type { SubscriptionPeriodLinesService } from '../../subscription-line/subscription-period-lines.service';
 import { SubscriptionChangeService } from '../subscription-change.service';
 import {
+  SubscriptionPriceOnLinesError,
   SubscriptionPrimaryRetiredError,
   SubscriptionStillDraftError,
   SubscriptionUpdateEmptyError,
@@ -135,6 +136,7 @@ function makeSut(stored: SubscriptionRecord = makeRecord()) {
   const periodLines = {
     activatePeriod: jest.fn().mockResolvedValue(undefined),
     syncDraftUpdate: jest.fn().mockResolvedValue(undefined),
+    hasLines: jest.fn().mockResolvedValue(false),
   };
 
   const service = new SubscriptionChangeService(
@@ -148,7 +150,7 @@ function makeSut(stored: SubscriptionRecord = makeRecord()) {
     periodLines as unknown as SubscriptionPeriodLinesService,
   );
 
-  return { service, subscriptions, plans, recordAudit, runner, guard };
+  return { service, subscriptions, plans, pricing, periodLines, recordAudit, runner, guard };
 }
 
 describe('SubscriptionChangeService', () => {
@@ -235,5 +237,39 @@ describe('SubscriptionChangeService', () => {
     expect((toSubscriptionApiException(err) as { getResponse?: () => unknown }).getResponse?.()).toMatchObject({
       code: 'SUBSCRIPTION.STILL_DRAFT',
     });
+  });
+
+  it('refuses unitPrice or monthlyUnitPrice on a period that has lines with 409 SUBSCRIPTION.PRICE_ON_LINES, while allowing non-price edits and unlined price edits', async () => {
+    const { service, periodLines, pricing, subscriptions } = makeSut();
+    pricing.read.mockImplementation((money: { amount?: string; currency?: string }) =>
+      Promise.resolve({ amountMinor: BigInt(money.amount ?? '300000'), currency: money.currency ?? 'VND' }),
+    );
+    periodLines.hasLines.mockResolvedValue(true);
+
+    for (const body of [
+      { monthlyUnitPrice: { amount: '300000', currency: 'VND' } },
+      { unitPrice: { amount: '3600000', currency: 'VND' } },
+    ] satisfies UpdateSubscriptionInput[]) {
+      const err = await service.update(actor, 'sub-1', body, baseDate).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(SubscriptionPriceOnLinesError);
+      expect((toSubscriptionApiException(err) as { getStatus: () => number }).getStatus()).toBe(409);
+      expect((toSubscriptionApiException(err) as { getResponse?: () => unknown }).getResponse?.()).toMatchObject({
+        code: 'SUBSCRIPTION.PRICE_ON_LINES',
+      });
+    }
+    expect(subscriptions.update).not.toHaveBeenCalled();
+
+    // Non-price update on a lined period succeeds.
+    await expect(service.update(actor, 'sub-1', { endDate: '2027-01-31' }, baseDate)).resolves.toBeDefined();
+
+    // Unlined period allows price update.
+    periodLines.hasLines.mockResolvedValue(false);
+    pricing.priceToday.mockResolvedValue({
+      unitPrice: makeRecord().unitPrice,
+      priceSnapshot: makeRecord().priceSnapshot,
+    });
+    await expect(
+      service.update(actor, 'sub-1', { monthlyUnitPrice: { amount: '300000', currency: 'VND' } }, baseDate),
+    ).resolves.toBeDefined();
   });
 });

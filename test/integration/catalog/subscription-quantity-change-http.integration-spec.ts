@@ -183,4 +183,84 @@ describe('subscription quantity change rules (real PostgreSQL)', () => {
       .expect(201);
     expect(h.dataOf<{ outOfProcess: boolean }>(res2).outOfProcess).toBe(false);
   });
+
+  it('R-3: refuses missing or blank note on seat-corrections and seat-reductions with 422 VALIDATION_ERROR', async () => {
+    const id = await h.subscription(10, 'K2');
+    await h.ctx.sql.query(
+      `UPDATE subscriptions
+          SET responsible_it_admin_employee_id = $2,
+              commitment_term_months = 12,
+              allows_mid_term_reduction = true
+        WHERE id = $1`,
+      [id, h.it1.employeeId],
+    );
+    const lineRow = (
+      await h.ctx.sql.query<{ id: string; updated_at: Date; today: string }>(
+        `SELECT id, updated_at, (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date::text AS today
+           FROM subscription_lines WHERE subscription_id = $1`,
+        [id],
+      )
+    ).rows[0];
+    const purchaseRes = await request(h.server())
+      .post(`/api/v1/subscription-lines/${lineRow.id}/seat-purchases`)
+      .set(h.as(h.it1))
+      .send({
+        kind: 'TOP_UP',
+        quantity: 2,
+        purchasedOn: lineRow.today,
+        invoiceObligation: 'NONE',
+        expectedUpdatedAt: lineRow.updated_at.toISOString(),
+      })
+      .expect(201);
+    const updatedAt = h.dataOf<{ line: { updatedAt: string }; entry: { id: string } }>(purchaseRes);
+
+    for (const badNote of [undefined, '', '   ']) {
+      const corrRes = await request(h.server())
+        .post(`/api/v1/subscription-lines/${lineRow.id}/seat-corrections`)
+        .set(h.as(h.it1))
+        .send({
+          delta: 1,
+          effectiveOn: lineRow.today,
+          ...(badNote === undefined ? {} : { note: badNote }),
+          expectedUpdatedAt: updatedAt.line.updatedAt,
+        })
+        .expect(422);
+      expect(h.codeOf(corrRes)).toBe('VALIDATION_ERROR');
+
+      const redRes = await request(h.server())
+        .post(`/api/v1/subscription-lines/${lineRow.id}/seat-reductions`)
+        .set(h.as(h.it1))
+        .send({
+          refundedSeatChangeId: updatedAt.entry.id,
+          quantity: 1,
+          effectiveOn: lineRow.today,
+          ...(badNote === undefined ? {} : { note: badNote }),
+          expectedUpdatedAt: updatedAt.line.updatedAt,
+        })
+        .expect(422);
+      expect(h.codeOf(redRes)).toBe('VALIDATION_ERROR');
+    }
+  });
+
+  it('R-5: K2 PER_SEAT draft created without purchasedQuantity returns status DRAFT and missing QUANTITY on POST and GET', async () => {
+    const planId = await h.plan('K2', 'PER_SEAT');
+    const createdRes = await request(h.server())
+      .post('/api/v1/subscriptions')
+      .set(h.as(h.it1))
+      .send({
+        planId,
+        kind: 'TERM',
+        monthlyUnitPrice: { amount: '500000', currency: 'VND' },
+        billingCycle: 'MONTHLY',
+        startDate: '2026-01-05',
+      })
+      .expect(201);
+    const created = h.dataOf<{ id: string; status: string; missing: string[] }>(createdRes);
+    expect(created).toMatchObject({ status: 'DRAFT', missing: ['QUANTITY'] });
+
+    const fetched = h.dataOf<{ id: string; status: string; missing: string[] }>(
+      await request(h.server()).get(`/api/v1/subscriptions/${created.id}`).set(h.as(h.it1)).expect(200),
+    );
+    expect(fetched).toMatchObject({ id: created.id, status: 'DRAFT', missing: ['QUANTITY'] });
+  });
 });
