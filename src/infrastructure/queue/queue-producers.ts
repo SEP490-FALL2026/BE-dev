@@ -3,8 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bullmq';
 import type Redis from 'ioredis';
 import type { EnvironmentVariables } from '../config/env-schema';
-import { describeForOperator, isRetryable } from '../observability/operator-error';
-import { connectQuietly, createFailFastRedisClient } from '../redis/redis-client.factory';
+import { connectQuietly, createFailFastRedisClient, logRedisQueueError } from '../redis/redis-client.factory';
 import { redisSettingsFrom } from '../redis/redis.config';
 import { QUEUE_NAMES, type QueueName } from './queue-registry';
 
@@ -29,9 +28,7 @@ export class QueueProducers implements OnApplicationBootstrap, OnModuleDestroy {
       skipWaitingForReady: true,
       skipVersionCheck: true,
     });
-    queue.on('error', (error) => {
-      if (!isRetryable(error)) this.logger.debug(describeForOperator(error));
-    });
+    queue.on('error', (error) => logRedisQueueError(this.logger, error));
     this.queues.set(name, queue);
     return queue;
   }

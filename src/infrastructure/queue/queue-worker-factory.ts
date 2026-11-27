@@ -2,8 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Worker, type Processor } from 'bullmq';
 import type { EnvironmentVariables } from '../config/env-schema';
-import { describeForOperator, isRetryable } from '../observability/operator-error';
-import { createBlockingRedisClient, watchConnection } from '../redis/redis-client.factory';
+import { createBlockingRedisClient, logRedisQueueError, watchConnection } from '../redis/redis-client.factory';
 import { redisSettingsFrom } from '../redis/redis.config';
 import type { QueueName } from './queue-registry';
 
@@ -24,18 +23,26 @@ export class QueueWorkerFactory {
       concurrency,
       autorun: false,
     });
-    worker.on('error', (error) => {
-      if (!isRetryable(error)) this.logger.debug(describeForOperator(error));
-    });
+    worker.on('error', (error) => logRedisQueueError(this.logger, error));
     worker.once('closed', () => client.disconnect());
     return worker;
   }
 
   async run(worker: Worker): Promise<void> {
-    await worker.waitUntilReady();
     if (worker.closing) return;
-    this.running.add(worker);
-    await worker.run();
+    let stopWaiting!: () => void;
+    const stopped = new Promise<false>((resolve) => {
+      stopWaiting = () => resolve(false);
+    });
+    worker.once('closing', stopWaiting);
+    try {
+      const ready = await Promise.race([worker.waitUntilReady().then(() => true), stopped]);
+      if (!ready || worker.closing) return;
+      this.running.add(worker);
+      await worker.run();
+    } finally {
+      worker.off('closing', stopWaiting);
+    }
   }
 
   close(worker: Worker): Promise<void> {

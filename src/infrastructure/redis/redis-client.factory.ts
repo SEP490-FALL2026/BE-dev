@@ -1,6 +1,6 @@
 import type { LoggerService } from '@nestjs/common';
 import Redis, { type RedisOptions } from 'ioredis';
-import { describeForOperator } from '../observability/operator-error';
+import { describeForOperator, isRetryable } from '../observability/operator-error';
 import type { RedisSettings } from './redis.config';
 
 interface FailFastRedisOptions {
@@ -45,6 +45,12 @@ export function createFailFastRedisClient(
 }
 
 const connectionFailures = new WeakMap<Redis, (error?: Error) => void>();
+
+export function logRedisQueueError(logger: Pick<LoggerService, 'debug'>, error: Error): void {
+  // BullMQ forwards connection errors that the client watcher has already reported.
+  if (isRetryable(error) || /^(?:WRONGPASS|NOAUTH)\b/.test(error.message)) return;
+  logger.debug?.(describeForOperator(error));
+}
 
 export function watchConnection(client: Redis, logger: LoggerService, name: string): void {
   if (connectionFailures.has(client)) return;

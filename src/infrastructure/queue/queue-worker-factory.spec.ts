@@ -1,4 +1,5 @@
 import { ConfigService } from '@nestjs/config';
+import { setTimeout as delay } from 'node:timers/promises';
 import type { EnvironmentVariables } from '../config/env-schema';
 import * as redisFactory from '../redis/redis-client.factory';
 import { QueueWorkerFactory } from './queue-worker-factory';
@@ -22,6 +23,21 @@ describe('queue worker factory', () => {
     } finally {
       await worker.close(true);
     }
+  });
+
+  it('settles interrupted startup when BullMQ leaves its readiness promise pending', async () => {
+    const config = new ConfigService<EnvironmentVariables, true>({
+      REDIS_HOST: '127.0.0.1',
+      REDIS_PORT: 1,
+      REDIS_KEY_PREFIX: 'fixture',
+    });
+    const factory = new QueueWorkerFactory(config);
+    const worker = factory.create('email-delivery', () => Promise.resolve(), 1);
+    jest.spyOn(worker, 'waitUntilReady').mockReturnValue(new Promise(() => undefined));
+
+    const running = factory.run(worker);
+    await factory.close(worker);
+    expect(await Promise.race([running.then(() => true), delay(25, false)])).toBe(true);
   });
 
   it('creates a blocking client and leaves starting the worker to its owner', async () => {

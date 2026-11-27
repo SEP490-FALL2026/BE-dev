@@ -29,8 +29,8 @@ Tracker sống qua compact context. Người code đọc lại file này **đầ
 | T9  | consumer mail                                                      | xong       | `10a87926` | Unit 18/18, integration Redis + PostgreSQL + SMTP 5/5, typecheck, lint file sửa, arch:check, rules:check và 342 gate đạt. OpenAPI không drift. | — | Đã kiểm mất Redis, job cũ, retry SMTP, shutdown, dedup stalled và dữ liệu Redis/log. |
 | T9b | R-11 job dọn đêm (Owner 27/11: C1–C4, 30 ngày, chạy khi khởi động) | xong       | `40df5dfd` | Unit runner/scheduler/poll, integration bảo trì 2/2, mail regression 5/5, 343 gate, typecheck, lint, architecture/capabilities. | — | Một dòng mô tả OpenAPI cho `invitation.delivery`. |
 | T10 | Bull Board                                                         | xong       | `3fbcf5dc` | Unit 33/33 (gồm env), Redis integration 2/2 với `--detectOpenHandles`, Chrome, 81 gate tập trung, typecheck/lint, audit production sạch. | — | Một bản ioredis; CSP mặc định. |
-| T11 | chốt, ca diệt đột biến                                             | xong       | commit T11 | Sáu đột biến làm test đỏ. Sau phục hồi: 53 unit, 27 integration, 3 timing, 343 gate, rules check/format, arch docs, discovery và kiểm OpenAPI. | — | `arch:graph` và `arch:routes` không có diff nội dung. |
-| C2  | CI full toàn đợt                                                   | chưa       |     |                                                 |               |                          |
+| T11 | chốt, ca diệt đột biến                                             | xong       | `72b3e607` | Sáu đột biến làm test đỏ. Sau phục hồi: 53 unit, 27 integration, 3 timing, 343 gate, rules check/format, arch docs, discovery và kiểm OpenAPI. | — | `arch:graph` và `arch:routes` không có diff nội dung. |
+| C2  | CI full toàn đợt                                                   | đang làm   |     | Phát hiện lặp log và chờ readiness khi Redis từ chối xác thực. Sau sửa: 32 unit với detectOpenHandles, 9 integration, Redis WRONGPASS thật, lint và typecheck xanh. | — | D-9. |
 
 Trạng thái: `chưa` · `đang làm` · `xong` (chỉ sau khi đối chiếu từng tiêu chí — LUẬT CỨNG 6) · `dừng hỏi`.
 
@@ -101,6 +101,7 @@ Trạng thái: `chưa` · `đang làm` · `xong` (chỉ sau khi đối chiếu t
 | D-6 | T9b | Housekeeping cần repo token riêng trong đồ thị worker | Đăng ký repo token dưới token DI riêng và export đúng một facade, cập nhật gate phiên cho hai worker | Giữ repository private và kiểm kỹ facade chỉ có trong worker | `identity-access-housekeeping-facade.module.ts`, `module-graph.gate-spec.ts` |
 | D-7 | T9b | Review tái hiện worker treo khi shutdown trước Redis ready, lệnh ghi có thể treo trên socket im lặng, trùng log lỗi kết nối | Chỉ chạy khi BullMQ ready, đóng ngay worker chưa chạy, timeout lệnh ghi 1 giây và giữ log chuyển trạng thái cho lỗi retryable | Lượt gửi đang chạy vẫn hoàn tất trước khi đóng; vị trí timeout dùng chung relay và scheduler | `queue-worker-factory.ts`, `queue-producers.ts` |
 | D-8 | T10 | Bull Board 9.13.1 dùng PUT để xóa qua đường `clean`, còn đặc tả yêu cầu cả DELETE trả 405 | Adapter cấu hình chỉ đọc và middleware chỉ nhận GET/HEAD sau khi xác thực | Mọi phương thức ghi đều bị chặn, kể cả đường xóa tương thích đặc tả | `queue-board.mount.ts`, `queue-board.integration-spec.ts` |
+| D-9 | C2 | Redis thật trả WRONGPASS làm BullMQ lặp log và có thể giữ promise chờ ready sau shutdown | Watcher ghi lỗi xác thực theo chuyển trạng thái; kết thúc chờ ready khi worker đóng | Từ 24 log debug trong 1,1 giây xuống 0, mỗi client vẫn ghi một cảnh báo, shutdown hoàn tất | `redis-client.factory.ts`, `queue-worker-factory.ts` |
 
 ## Điểm gộp đã gặp
 

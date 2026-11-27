@@ -8,8 +8,7 @@ import { Queue } from 'bullmq';
 import type { Application, RequestHandler } from 'express';
 import type Redis from 'ioredis';
 import type { EnvironmentVariables } from '../config/env-schema';
-import { describeForOperator, isRetryable } from '../observability/operator-error';
-import { createFailFastRedisClient, watchConnection } from '../redis/redis-client.factory';
+import { createFailFastRedisClient, logRedisQueueError, watchConnection } from '../redis/redis-client.factory';
 import { redisSettingsFrom } from '../redis/redis.config';
 import { credentialsMatch, QUEUE_BOARD_PATH, type QueueBoardCredentials } from './queue-board-auth';
 import { QUEUE_NAMES } from './queue-registry';
@@ -60,9 +59,7 @@ export class QueueBoardMount implements OnModuleInit, OnModuleDestroy {
         skipVersionCheck: true,
         skipMetasUpdate: true,
       });
-      queue.on('error', (error) => {
-        if (!isRetryable(error)) this.logger.debug(describeForOperator(error));
-      });
+      queue.on('error', (error) => logRedisQueueError(this.logger, error));
       this.queues.push(queue);
     }
     createBullBoard({
