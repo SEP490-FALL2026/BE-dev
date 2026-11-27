@@ -230,6 +230,13 @@ jobs:
     timeout-minutes: 70
     services:
       postgres: *postgres
+      redis: &redis
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -250,6 +257,7 @@ jobs:
         env:
           PATHS: ${{ needs.select.outputs.paths }}
           TEST_DATABASE_ADMIN_URL: postgresql://ci_integration:ci-integration-only@127.0.0.1:5432/postgres
+          TEST_REDIS_URL: redis://127.0.0.1:6379
           TEST_CLI_RUNTIME: dist
         run: |
           if [ "$PATHS" = "ALL" ]; then pnpm test:integration --maxWorkers=2 --shard=${{ matrix.shard }}/3 --passWithNoTests; else pnpm test:integration --maxWorkers=2 --shard=${{ matrix.shard }}/3 --passWithNoTests $PATHS; fi
@@ -270,6 +278,7 @@ jobs:
     timeout-minutes: 70
     services:
       postgres: *postgres
+      redis: *redis
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -292,6 +301,7 @@ jobs:
         env:
           PATHS: ${{ needs.select.outputs.paths }}
           TEST_DATABASE_ADMIN_URL: postgresql://ci_integration:ci-integration-only@127.0.0.1:5432/postgres
+          TEST_REDIS_URL: redis://127.0.0.1:6379
         run: |
           if [ "$PATHS" = "ALL" ]; then pnpm test:integration:timing; else pnpm test:integration:timing $PATHS; fi
 
@@ -299,6 +309,7 @@ jobs:
         if: needs.select.outputs.serial == 'SERIAL'
         env:
           TEST_DATABASE_ADMIN_URL: postgresql://ci_integration:ci-integration-only@127.0.0.1:5432/postgres
+          TEST_REDIS_URL: redis://127.0.0.1:6379
           TEST_CLI_RUNTIME: dist
           # H7: the role-separation suites play the cluster administrator of the disposable service container only.
           TEST_DATABASE_BOOTSTRAP_URL: postgresql://ci_bootstrap:ci-bootstrap-only@127.0.0.1:5432/postgres
