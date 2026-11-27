@@ -5,9 +5,11 @@ import { CatalogPricingApi } from '../../catalog/public/catalog-pricing.api';
 import { LicensingSeatMonthApi } from '../../licensing/public/licensing-seat-month.api';
 import type { SeatInForce, UnrequestedK1SeatInForce } from '../../licensing/public/licensing-seat-month.types';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { servingMonthlyPriceMinor } from '../budget/serving-line-price.policy';
 import { SharedPoolLineRepo } from '../shared-pool-line/shared-pool-line.repo';
 import { RunningUncommittedRepo } from './running-uncommitted.repo';
 import {
+  periodKeyOf,
   runningUncommittedWithFlagsByCostCenter,
   type RunningUncommittedK1Seat,
   type RunningUncommittedPeriod,
@@ -58,6 +60,7 @@ export class RunningUncommittedFactsService {
     const mappedSeats = seats.map((seat) => ({
       assignmentId: seat.assignmentId,
       subscriptionId: seat.subscriptionId,
+      planId: seat.planId,
       requestId: seat.requestId,
       source: seat.source,
       costCenterId: ccByEntity.get(seat.assignmentId) ?? null,
@@ -72,7 +75,7 @@ export class RunningUncommittedFactsService {
       heldUntil: seat.heldUntil,
       billingAnchorOn: seat.billingAnchorOn,
     }));
-    const periodBySubscription = seats.length > 0 ? await this.periodsOf(seats, tx) : new Map();
+    const periodBySubscriptionPlan = seats.length > 0 ? await this.periodsOf(seats, tx) : new Map();
     const requestIds = [...new Set(seats.flatMap((seat) => (seat.requestId === null ? [] : [seat.requestId])))];
     const commitmentByRequest =
       requestIds.length > 0 ? await this.commitments.commitmentsOfRequestsInYear(requestIds, year, tx) : new Map();
@@ -85,7 +88,7 @@ export class RunningUncommittedFactsService {
       year,
       today: resolvedToday,
       seats: mappedSeats,
-      periodBySubscription,
+      periodBySubscriptionPlan,
       commitmentByRequest,
       runMonthsBySubscription,
       k1UnrequestedSeats: mappedK1Seats,
@@ -183,16 +186,29 @@ export class RunningUncommittedFactsService {
     );
   }
 
+  /**
+   * The period each seat is priced on, by subscription and plan: a seat of a period with lines is priced by the line that serves its plan
+   * (`servingMonthlyPriceMinor`), the columns of the period only when it has no line.
+   */
   private async periodsOf(seats: readonly SeatInForce[], tx?: DbTx): Promise<Map<string, RunningUncommittedPeriod>> {
     const subscriptionIds = [...new Set(seats.map((seat) => seat.subscriptionId))];
     const facts = await this.periods.getPurchaseFacts(subscriptionIds, tx);
+    const linesOf = await this.periods.linesOfSubscriptions(subscriptionIds, tx);
     const map = new Map<string, RunningUncommittedPeriod>();
     for (const fact of facts) {
       if (fact.status !== 'ACTIVE' || fact.kind !== 'TERM' || fact.provisioningType !== 'K2') continue;
-      map.set(fact.subscriptionId, {
-        monthlyPriceMinor: fact.monthlyPriceMinor,
-        startDate: fact.startDate,
-      });
+      for (const planId of new Set(
+        seats.filter((seat) => seat.subscriptionId === fact.subscriptionId).map((seat) => seat.planId),
+      )) {
+        map.set(periodKeyOf(fact.subscriptionId, planId), {
+          monthlyPriceMinor: servingMonthlyPriceMinor(
+            linesOf.get(fact.subscriptionId) ?? [],
+            planId,
+            fact.monthlyPriceMinor,
+          ),
+          startDate: fact.startDate,
+        });
+      }
     }
 
     return map;

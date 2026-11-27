@@ -33,6 +33,7 @@ function buildService() {
       .mockResolvedValue([]),
   };
   const periods = {
+    linesOfSubscriptions: jest.fn().mockResolvedValue(new Map()),
     getPurchaseFacts: jest.fn().mockResolvedValue([]),
   };
   const organizationReads = {

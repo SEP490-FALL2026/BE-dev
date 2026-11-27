@@ -196,7 +196,7 @@ export class PurchaseInvoicePlanService {
     return {
       id,
       pricing: facts ? pricingOf(facts) : null,
-      poolSource: this.pool.topUpSource(facts, null),
+      poolSource: await this.pool.topUpSource(facts, planId, null, tx),
     };
   }
 
@@ -365,7 +365,7 @@ export class PurchaseInvoicePlanService {
       isK2: true,
       poolSubscriptionId,
       timeZone,
-      source: this.pool.topUpSource(period, purchaseDates),
+      source: await this.pool.topUpSource(period, request.planId, purchaseDates, tx),
     };
   }
 

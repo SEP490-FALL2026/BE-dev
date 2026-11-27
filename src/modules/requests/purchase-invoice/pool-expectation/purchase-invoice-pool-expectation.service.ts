@@ -13,6 +13,7 @@ import { PurchaseInvoiceRefusedError } from '../purchase-invoice.errors';
 import type { PurchaseInvoiceRepo } from '../purchase-invoice.repo';
 import type { LinkFacts, PoolExpectationFacts } from '../purchase-invoice.types';
 import { expectedPoolAmountOf, type PoolInvoiceExpectationSource } from './purchase-invoice-pool-expectation.policy';
+import { servingMonthlyPriceMinor } from './serving-line-price.policy';
 
 /**
  * Aggregates subscription-line, seat-purchase, and prior-month `NONE` purchase facts from `catalog` and `licensing`
@@ -126,14 +127,24 @@ export class PurchaseInvoicePoolService {
     };
   }
 
-  topUpSource(
+  /**
+   * What a request's top-up of seats is expected to cost, priced at the line of the period that serves the plan of the request: the price
+   * columns of a period with lines are only a record, so they price the top-up only when the period has no line.
+   */
+  async topUpSource(
     period: SubscriptionPurchaseFacts | undefined,
+    planId: string,
     purchaseDates: BusinessDate[] | null,
-  ): Extract<PoolExpectationFacts, { isK2: true }>['source'] {
+    tx?: DbTx,
+  ): Promise<Extract<PoolExpectationFacts, { isK2: true }>['source']> {
+    const lines = period
+      ? ((await this.periods.linesOfSubscriptions([period.subscriptionId], tx)).get(period.subscriptionId) ?? [])
+      : [];
+
     return {
       kind: 'REQUEST_TOP_UP',
       billingCycle: period?.billingCycle ?? null,
-      monthlyPriceMinor: period?.monthlyPriceMinor ?? null,
+      monthlyPriceMinor: period ? servingMonthlyPriceMinor(lines, planId, period.monthlyPriceMinor) : null,
       renewalDate: period?.renewalDate ?? null,
       endDate: period?.endDate ?? null,
       purchaseDates,

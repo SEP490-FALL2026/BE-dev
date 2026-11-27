@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { CatalogApi } from '../../catalog/public/catalog.api';
 import { LicensingApi } from '../../licensing/public/licensing.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import {
@@ -10,6 +9,7 @@ import {
   BudgetCycleNotFoundError,
   BudgetNotYourCostCenterError,
 } from '../budget/budget.errors';
+import { BaselineCatalogReads } from './baseline-catalog-reads.service';
 import { BaselineFlags, type BaselineCarried } from './baseline-flags.service';
 import { BudgetFactsService } from '../budget/budget-facts.service';
 import { CommitmentRepo, heldKey } from '../budget/commitment.repo';
@@ -174,7 +174,7 @@ export class BaselineService {
     private readonly facts: BudgetFactsService,
     private readonly cycles: CycleRepo,
     private readonly organizationReads: OrganizationReadApi,
-    private readonly catalog: CatalogApi,
+    private readonly catalog: BaselineCatalogReads,
     private readonly licensing: LicensingApi,
     private readonly commitments: CommitmentRepo,
     private readonly proposals: ProposalRepo,
@@ -195,11 +195,11 @@ export class BaselineService {
       this.organizationReads.getDepartmentBriefs(wanted),
       this.organizationReads.getUnitCostCenterIds(wanted),
       this.organizationReads.getUnitCostCenterHistory(wanted),
-      this.catalog.getBaselineSubscriptions(),
+      this.catalog.subscriptions(),
       this.facts.formatter(cycle.currency),
     ]);
     const { allocation, ending } = await this.seatsOf(subscriptions, today);
-    const kpi3ByPlan = await this.catalog.getPlanKpi3([...new Set(subscriptions.map((one) => one.planId))]);
+    const kpi3ByPlan = await this.catalog.kpi3Of([...new Set(subscriptions.map((one) => one.planId))]);
     const spentOf = await this.spentByDepartment(history, today);
 
     const costCenterIds = [...costCenters.values()];

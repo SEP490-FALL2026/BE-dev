@@ -51,6 +51,7 @@ describe('NextYearBudgetService (FIX-B1 F7 / D-10)', () => {
         getUnrequestedK1SeatsInForceOn: jest.fn().mockResolvedValue([]),
       } as unknown as LicensingSeatMonthApi,
       {
+        linesOfSubscriptions: jest.fn().mockResolvedValue(new Map()),
         getPurchaseFacts: jest.fn().mockResolvedValue([
           {
             subscriptionId: 'sub-1',
@@ -150,6 +151,7 @@ describe('NextYearBudgetService (FIX-B1 F7 / D-10)', () => {
         getUnrequestedK1SeatsInForceOn: jest.fn().mockResolvedValue([]),
       } as unknown as LicensingSeatMonthApi,
       {
+        linesOfSubscriptions: jest.fn().mockResolvedValue(new Map()),
         getPurchaseFacts: jest.fn().mockResolvedValue([
           {
             subscriptionId: 'sub-1',

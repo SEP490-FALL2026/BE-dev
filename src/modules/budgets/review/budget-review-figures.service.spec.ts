@@ -63,6 +63,7 @@ function buildW308Service() {
       getUnrequestedK1SeatsInForceOn: jest.fn().mockResolvedValue([]),
     } as unknown as LicensingSeatMonthApi,
     {
+      linesOfSubscriptions: jest.fn().mockResolvedValue(new Map()),
       getPurchaseFacts: jest.fn().mockResolvedValue([
         {
           subscriptionId: 'sub-figma',

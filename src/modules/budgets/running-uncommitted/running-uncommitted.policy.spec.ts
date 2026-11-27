@@ -1,5 +1,6 @@
 import type { BusinessDate } from '../../../core/business-date';
 import {
+  periodKeyOf,
   runningUncommittedByCostCenter,
   type RunningUncommittedCommitment,
   type RunningUncommittedPeriod,
@@ -12,6 +13,7 @@ const CC_KT = 'cc-kt';
 const seat = (over: Partial<RunningUncommittedSeat> = {}): RunningUncommittedSeat => ({
   assignmentId: 'asg-1',
   subscriptionId: 'sub-1',
+  planId: 'plan-1',
   requestId: null,
   source: 'BASELINE',
   costCenterId: CC_TK,
@@ -48,7 +50,7 @@ describe('runningUncommittedByCostCenter (SPEC-B1 W3-08)', () => {
       year: 2027,
       today: '2027-07-08',
       seats: [seat({ assignmentId: 'a1' }), seat({ assignmentId: 'a2' })],
-      periods: [['sub-1', period()]],
+      periods: [[periodKeyOf('sub-1', 'plan-1'), period()]],
       commitments: [],
       runs: [['sub-1', months(6)]],
       expected: { [CC_TK]: 4_500_000n },
@@ -58,7 +60,7 @@ describe('runningUncommittedByCostCenter (SPEC-B1 W3-08)', () => {
       year: 2027,
       today: '2027-08-01',
       seats: [seat({ assignmentId: 'a1' }), seat({ assignmentId: 'a2' })],
-      periods: [['sub-1', period()]],
+      periods: [[periodKeyOf('sub-1', 'plan-1'), period()]],
       commitments: [],
       runs: [['sub-1', months(6)]],
       expected: { [CC_TK]: 4_500_000n },
@@ -68,7 +70,7 @@ describe('runningUncommittedByCostCenter (SPEC-B1 W3-08)', () => {
       year: 2027,
       today: '2027-08-02',
       seats: [seat({ assignmentId: 'a1' }), seat({ assignmentId: 'a2' })],
-      periods: [['sub-1', period()]],
+      periods: [[periodKeyOf('sub-1', 'plan-1'), period()]],
       commitments: [],
       runs: [['sub-1', months(7)]],
       expected: { [CC_TK]: 3_750_000n },
@@ -78,7 +80,7 @@ describe('runningUncommittedByCostCenter (SPEC-B1 W3-08)', () => {
       year: 2027,
       today: '2027-07-08',
       seats: [seat({ assignmentId: 'a1' }), seat({ assignmentId: 'a2', heldUntil: '2027-10-16' })],
-      periods: [['sub-1', period()]],
+      periods: [[periodKeyOf('sub-1', 'plan-1'), period()]],
       commitments: [],
       runs: [['sub-1', months(6)]],
       expected: { [CC_TK]: 3_750_000n },
@@ -88,7 +90,7 @@ describe('runningUncommittedByCostCenter (SPEC-B1 W3-08)', () => {
       year: 2027,
       today: '2027-07-08',
       seats: [seat({ assignmentId: 'a1' }), seat({ assignmentId: 'a2', heldUntil: '2027-11-02' })],
-      periods: [['sub-1', period()]],
+      periods: [[periodKeyOf('sub-1', 'plan-1'), period()]],
       commitments: [],
       runs: [['sub-1', months(6)]],
       expected: { [CC_TK]: 4_125_000n },
@@ -98,7 +100,7 @@ describe('runningUncommittedByCostCenter (SPEC-B1 W3-08)', () => {
       year: 2028,
       today: '2028-01-01',
       seats: [seat({ assignmentId: 'a1' }), seat({ assignmentId: 'a2' })],
-      periods: [['sub-1', period()]],
+      periods: [[periodKeyOf('sub-1', 'plan-1'), period()]],
       commitments: [],
       runs: [],
       expected: { [CC_TK]: 9_000_000n },
@@ -111,7 +113,7 @@ describe('runningUncommittedByCostCenter (SPEC-B1 W3-08)', () => {
         seat({ assignmentId: 'a1', source: 'HANDOVER', heldFrom: '2027-09-01' }),
         seat({ assignmentId: 'a2', source: 'HANDOVER', heldFrom: '2027-09-01' }),
       ],
-      periods: [['sub-1', period({ startDate: '2027-09-01' })]],
+      periods: [[periodKeyOf('sub-1', 'plan-1'), period({ startDate: '2027-09-01' })]],
       commitments: [],
       runs: [],
       expected: { [CC_TK]: 3_000_000n },
@@ -124,7 +126,7 @@ describe('runningUncommittedByCostCenter (SPEC-B1 W3-08)', () => {
         seat({ assignmentId: 'a1', source: 'RENEWAL_CARRY', heldFrom: '2027-07-01' }),
         seat({ assignmentId: 'a2', source: 'RENEWAL_CARRY', heldFrom: '2027-07-01' }),
       ],
-      periods: [['sub-1', period({ startDate: '2027-07-01' })]],
+      periods: [[periodKeyOf('sub-1', 'plan-1'), period({ startDate: '2027-07-01' })]],
       commitments: [],
       runs: [],
       expected: { [CC_TK]: 4_500_000n },
@@ -137,7 +139,7 @@ describe('runningUncommittedByCostCenter (SPEC-B1 W3-08)', () => {
         seat({ assignmentId: 'a1', heldFrom: '2027-04-01' }),
         seat({ assignmentId: 'a2', heldFrom: '2027-04-01' }),
       ],
-      periods: [['sub-1', period({ startDate: '2027-01-01' })]],
+      periods: [[periodKeyOf('sub-1', 'plan-1'), period({ startDate: '2027-01-01' })]],
       commitments: [],
       runs: [['sub-1', new Set([1, 4, 5, 6])]],
       expected: { [CC_TK]: 4_500_000n },
@@ -155,7 +157,7 @@ describe('runningUncommittedByCostCenter (SPEC-B1 W3-08)', () => {
           heldUntil: '2027-04-01',
         }),
       ],
-      periods: [['sub-1', period({ monthlyPriceMinor: 500_000n, startDate: '2027-01-01' })]],
+      periods: [[periodKeyOf('sub-1', 'plan-1'), period({ monthlyPriceMinor: 500_000n, startDate: '2027-01-01' })]],
       commitments: [['req-1', { state: 'RELEASED', costCenterId: CC_KT }]],
       runs: [['sub-1', months(2)]],
       expected: { [CC_TK]: 500_000n },
@@ -165,7 +167,7 @@ describe('runningUncommittedByCostCenter (SPEC-B1 W3-08)', () => {
       year: 2027,
       today: '2027-03-26',
       seats: [seat({ assignmentId: 'a1', source: 'REQUEST', requestId: 'req-1', heldFrom: '2027-01-01' })],
-      periods: [['sub-1', period({ monthlyPriceMinor: 550_000n, startDate: '2027-01-01' })]],
+      periods: [[periodKeyOf('sub-1', 'plan-1'), period({ monthlyPriceMinor: 550_000n, startDate: '2027-01-01' })]],
       commitments: [['req-1', { state: 'HELD', costCenterId: CC_TK }]],
       runs: [['sub-1', months(2)]],
       expected: {},
@@ -175,7 +177,7 @@ describe('runningUncommittedByCostCenter (SPEC-B1 W3-08)', () => {
       year: 2027,
       today: '2027-07-08',
       seats: [seat({ assignmentId: 'a1', source: 'REQUEST', requestId: 'req-1' })],
-      periods: [['sub-1', period()]],
+      periods: [[periodKeyOf('sub-1', 'plan-1'), period()]],
       commitments: [['req-1', { state: 'HELD', costCenterId: CC_TK }]],
       runs: [['sub-1', months(6)]],
       expected: {},
@@ -185,7 +187,7 @@ describe('runningUncommittedByCostCenter (SPEC-B1 W3-08)', () => {
       year: 2027,
       today: '2027-07-08',
       seats: [seat({ assignmentId: 'a1', source: 'REQUEST', requestId: 'req-1', costCenterId: CC_TK })],
-      periods: [['sub-1', period()]],
+      periods: [[periodKeyOf('sub-1', 'plan-1'), period()]],
       commitments: [['req-1', { state: 'HELD', costCenterId: CC_KT }]],
       runs: [['sub-1', months(6)]],
       expected: { [CC_TK]: 2_250_000n },
@@ -198,7 +200,7 @@ describe('runningUncommittedByCostCenter (SPEC-B1 W3-08)', () => {
         seat({ assignmentId: 'a1', source: 'BASELINE' }),
         seat({ assignmentId: 'a2', source: 'MACHINE_ACCOUNT_CONVERSION' }),
       ],
-      periods: [['sub-1', period()]],
+      periods: [[periodKeyOf('sub-1', 'plan-1'), period()]],
       commitments: [],
       runs: [['sub-1', months(6)]],
       expected: { [CC_TK]: 4_500_000n },
@@ -208,7 +210,7 @@ describe('runningUncommittedByCostCenter (SPEC-B1 W3-08)', () => {
       year,
       today,
       seats,
-      periodBySubscription: new Map(periods),
+      periodBySubscriptionPlan: new Map(periods),
       commitmentByRequest: new Map(commitments),
       runMonthsBySubscription: new Map(runs),
     });
@@ -222,7 +224,7 @@ describe('runningUncommittedByCostCenter (SPEC-B1 W3-08)', () => {
         year: 2027,
         today: '2027-07-08',
         seats: [seat({ heldUntil: '2027-11-01' })],
-        periodBySubscription: new Map([['sub-1', period()]]),
+        periodBySubscriptionPlan: new Map([[periodKeyOf('sub-1', 'plan-1'), period()]]),
         commitmentByRequest: new Map(),
         runMonthsBySubscription: new Map([['sub-1', months(6)]]),
       });
@@ -239,7 +241,7 @@ describe('runningUncommittedByCostCenter (SPEC-B1 W3-08)', () => {
           seat({ assignmentId: 'ended', heldUntil: '2027-07-08' }),
           seat({ assignmentId: 'no-cc', costCenterId: null }),
         ],
-        periodBySubscription: new Map([['sub-1', period()]]),
+        periodBySubscriptionPlan: new Map([[periodKeyOf('sub-1', 'plan-1'), period()]]),
         commitmentByRequest: new Map(),
         runMonthsBySubscription: new Map([['sub-1', months(6)]]),
       });
@@ -253,7 +255,7 @@ describe('runningUncommittedByCostCenter (SPEC-B1 W3-08)', () => {
           year,
           today: '2027-07-08',
           seats: [seat()],
-          periodBySubscription: new Map([['sub-1', period()]]),
+          periodBySubscriptionPlan: new Map([[periodKeyOf('sub-1', 'plan-1'), period()]]),
           commitmentByRequest: new Map(),
           runMonthsBySubscription: new Map(),
         });
@@ -276,7 +278,9 @@ describe('runningUncommittedByCostCenter (SPEC-B1 W3-08)', () => {
             heldUntil: '2027-12-31',
           }),
         ],
-        periodBySubscription: new Map([['sub-1', period({ monthlyPriceMinor: 500_000n, startDate: '2027-01-01' })]]),
+        periodBySubscriptionPlan: new Map([
+          [periodKeyOf('sub-1', 'plan-1'), period({ monthlyPriceMinor: 500_000n, startDate: '2027-01-01' })],
+        ]),
         commitmentByRequest: new Map(),
         runMonthsBySubscription: new Map(),
       });
@@ -290,7 +294,7 @@ describe('runningUncommittedByCostCenter (SPEC-B1 W3-08)', () => {
         year: 2027,
         today: '2027-07-08',
         seats: [seat({ heldUntil: '2028-03-01' })],
-        periodBySubscription: new Map([['sub-1', period()]]),
+        periodBySubscriptionPlan: new Map([[periodKeyOf('sub-1', 'plan-1'), period()]]),
         commitmentByRequest: new Map(),
         runMonthsBySubscription: new Map([['sub-1', months(6)]]),
       });
@@ -303,7 +307,40 @@ describe('runningUncommittedByCostCenter (SPEC-B1 W3-08)', () => {
         year: 2027,
         today: '2027-07-08',
         seats: [seat({ subscriptionId: 'no-price' })],
-        periodBySubscription: new Map([['no-price', period({ monthlyPriceMinor: null })]]),
+        periodBySubscriptionPlan: new Map([[periodKeyOf('no-price', 'plan-1'), period({ monthlyPriceMinor: null })]]),
+        commitmentByRequest: new Map(),
+        runMonthsBySubscription: new Map(),
+      });
+
+      expect(result.size).toBe(0);
+    });
+
+    it('prices each seat of a period with two plans at the price of its own plan (SPEC W3-08: 2 x 375.000 x 6 and 800.000 x 6)', () => {
+      const result = runningUncommittedByCostCenter({
+        year: 2027,
+        today: '2027-07-08',
+        seats: [
+          seat({ assignmentId: 'a1', planId: 'standard' }),
+          seat({ assignmentId: 'a2', planId: 'standard' }),
+          seat({ assignmentId: 'a3', planId: 'premium' }),
+        ],
+        periodBySubscriptionPlan: new Map([
+          [periodKeyOf('sub-1', 'standard'), period({ monthlyPriceMinor: 375_000n })],
+          [periodKeyOf('sub-1', 'premium'), period({ monthlyPriceMinor: 800_000n })],
+        ]),
+        commitmentByRequest: new Map(),
+        runMonthsBySubscription: new Map([['sub-1', months(6)]]),
+      });
+
+      expect(result.get(CC_TK)).toBe(4_500_000n + 4_800_000n);
+    });
+
+    it('counts no cost for a seat whose plan has no price on its period', () => {
+      const result = runningUncommittedByCostCenter({
+        year: 2027,
+        today: '2027-07-08',
+        seats: [seat({ planId: 'premium' })],
+        periodBySubscriptionPlan: new Map([[periodKeyOf('sub-1', 'standard'), period()]]),
         commitmentByRequest: new Map(),
         runMonthsBySubscription: new Map(),
       });
@@ -319,7 +356,9 @@ describe('runningUncommittedByCostCenter (SPEC-B1 W3-08)', () => {
           seat({ assignmentId: 'a-kept', source: 'REQUEST', requestId: 'req-kept' }),
           seat({ assignmentId: 'a-other', source: 'REQUEST', requestId: 'req-other' }),
         ],
-        periodBySubscription: new Map([['sub-1', period({ monthlyPriceMinor: 400_000n, startDate: '2027-01-01' })]]),
+        periodBySubscriptionPlan: new Map([
+          [periodKeyOf('sub-1', 'plan-1'), period({ monthlyPriceMinor: 400_000n, startDate: '2027-01-01' })],
+        ]),
         commitmentByRequest: new Map(),
         runMonthsBySubscription: new Map(),
         exceptRequestIds: new Set(['req-kept']),
@@ -350,7 +389,9 @@ describe('runningUncommittedByCostCenter (SPEC-B1 W3-08)', () => {
           },
         ],
         k1ReferencePriceByPlan: new Map([['plan-k1', 200_000n]]),
-        periodBySubscription: new Map([['sub-1', period({ monthlyPriceMinor: 375_000n, startDate: '2027-07-01' })]]),
+        periodBySubscriptionPlan: new Map([
+          [periodKeyOf('sub-1', 'plan-1'), period({ monthlyPriceMinor: 375_000n, startDate: '2027-07-01' })],
+        ]),
         commitmentByRequest: new Map(),
         runMonthsBySubscription: new Map(),
       });
