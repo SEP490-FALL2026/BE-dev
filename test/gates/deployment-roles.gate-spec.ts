@@ -69,6 +69,53 @@ const service = (name: string): string => {
 
 const ADMIN_CREDENTIALS = /POSTGRES_USER|POSTGRES_PASSWORD|DATABASE_DEPLOY_|DATABASE_BOOTSTRAP_/;
 
+describe('production Redis deployment', () => {
+  it('requires authenticated persistent Redis on the private Compose network', () => {
+    const redis = service('redis');
+    expect(list(redis, 'command')).toEqual([
+      'redis-server',
+      '--requirepass',
+      '${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}',
+      '--appendonly',
+      'yes',
+      '--appendfsync',
+      'everysec',
+      '--maxmemory',
+      '128mb',
+      '--maxmemory-policy',
+      'noeviction',
+    ]);
+    expect(list(redis, 'ports')).toBeUndefined();
+    expect(list(redis, 'volumes')).toEqual(['redis-data:/data']);
+    expect(list(redis, 'networks')).toEqual(['slm-network']);
+    expect(setting(redis, 'REDISCLI_AUTH')).toBe('${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}');
+    expect(list(redis, 'test')).toEqual(['CMD', 'redis-cli', 'ping']);
+  });
+
+  it.each(['api', 'worker'])('gives %s the authenticated Redis endpoint', (name) => {
+    const process = service(name);
+    expect(setting(process, 'REDIS_HOST')).toBe('redis');
+    expect(setting(process, 'REDIS_PASSWORD')).toBe('${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}');
+    expect(process).toMatch(/redis:\s+condition: service_started/);
+  });
+
+  it('gives the worker time to shut down and overwrites the request ID at the trusted proxy', () => {
+    expect(setting(service('worker'), 'stop_grace_period')).toBe('40s');
+    expect(setting(service('api'), 'TRUST_PROXY_HOPS')).toBe('1');
+    expect(read('Caddyfile')).toContain('header_up X-Request-Id {http.request.uuid}');
+  });
+
+  it('starts Redis with PostgreSQL before pulling the application image, and checks Redis in a live Redis release', () => {
+    const script = read('scripts/ops/deploy-release.sh');
+    const start = script.indexOf('candidate up -d --no-recreate postgres redis');
+    const pull = script.indexOf('candidate pull api worker');
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(pull).toBeGreaterThan(start);
+    expect(script).toContain('services="api worker caddy redis"');
+    expect(script).toContain('look "$expected" "$services"');
+  });
+});
+
 // H7: F-15, DB-04, Q9
 describe('production PostgreSQL identities', () => {
   it.each(['api', 'worker'])('gives %s the runtime role only, and none of the administration credentials', (name) => {

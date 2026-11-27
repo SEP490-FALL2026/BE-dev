@@ -20,8 +20,8 @@ Tracker sống qua compact context. Người code đọc lại file này **đầ
 | T1  | R-01 cấu hình, env, `no-redis-in-modules`                          | xong       | `7420b554` | Đỏ 10/20 ca env trước khi sửa. Unit 130/130. Recovery CLI integration 6/6. Typecheck, lint, arch:check, rules:check và 335/335 gate đạt. OpenAPI export bằng Node 22 không drift. | — | D-1 đã duyệt. |
 | T2  | R-01 client, R-08 (a)(b)                                           | xong       | `b69f737d` | Unit 29/29. Redis Docker trả PONG cho 3 kiểu client. Typecheck, lint file sửa, arch:check, rules:check, 335 gate, OpenAPI không drift. Audit production sạch, một bản ioredis. | — | Client cấp cho BullMQ kết nối ngay. |
 | T3  | R-09 CI + harness                                                  | đang làm    | `6511f4fc` | Integration Redis Docker 3/3, typecheck, lint file sửa, arch:check, rules:check, rules:format, 335 gate, OpenAPI không drift. | — | Run GitHub `45971009063` đang chạy để xác minh R-09 (b). |
-| T4  | R-02 rate-limit Redis                                              | đang làm   | commit T4 | Unit 5/5, integration 4/4 và serial 1/1 trên Docker, không open handle. Typecheck, lint file sửa, arch:check, rules:check, 335 gate đạt. OpenAPI export khi Redis tắt không drift. Audit sạch, một bản ioredis. | — | Chờ chạy lại rate-limit HTTP spec ở C1. |
-| T5  | R-07 compose, deploy, gate                                         | chưa       |     |                                                 |               |                          |
+| T4  | R-02 rate-limit Redis                                              | đang làm   | `d06578dd` | Unit 5/5, integration 4/4 và serial 1/1 trên Docker, không open handle. Typecheck, lint file sửa, arch:check, rules:check, 335 gate đạt. OpenAPI export khi Redis tắt không drift. Audit sạch, một bản ioredis. | — | Chờ chạy lại rate-limit HTTP spec ở C1. |
+| T5  | R-07 compose, deploy, gate                                         | xong       | commit T5 | 5 ca gate đỏ trước khi sửa, 340 gate xanh sau. Typecheck, lint file sửa, arch:check, rules:check, rules:format, OpenAPI không drift. Regression deploy trên Linux xanh. Compose config local/prod đạt, thiếu mật khẩu bị từ chối. | — | PostgreSQL và Redis local healthy. Redis production fixture chạy UID 999. |
 | T6  | ADR-0020 + tài liệu nhóm 1                                         | chưa       |     |                                                 |               |                          |
 | C1  | CI full nhóm 1                                                     | chưa       |     |                                                 |               |                          |
 | T7  | notifications: điều kiện chung, `claimById`, M4                    | chưa       |     |                                                 |               |                          |
@@ -45,6 +45,7 @@ Trạng thái: `chưa` · `đang làm` · `xong` (chỉ sau khi đối chiếu t
 | T2 | R-08 (a)(b), log một lần mỗi trạng thái và phân loại retry | `redis-client.factory.spec.ts`, `operator-error.spec.ts` | `redis-client.factory.ts:49`, `operator-error.ts:55` |
 | T3 | R-09 (a)(c), Redis ở integration, in-band và nightly; CI thiếu URL báo lỗi | `redis-harness.integration-spec.ts` và tự rà workflow | `.github/workflows/ci.yml:233`, `.github/workflows/nightly.yml:31`, `redis-harness.ts:7` |
 | T4 | R-02 (a)–(f), (h), (i), chia sẻ bộ đếm, dự phòng, hồi phục, tắt êm, OpenAPI | `fallback-throttler.storage.spec.ts`, `redis-rate-limit.integration-spec.ts`, `redis-client-pause.integration-spec.ts` | `rate-limit.options.ts:25`, `fallback-throttler.storage.ts:28`, `scripts/dev/export-environment.ts:20` |
+| T5 | R-07, Redis local và production, proxy, thứ tự deploy và kiểm trạng thái tiến trình | `deployment-roles.gate-spec.ts`, `deploy-release.test.mjs`, Docker Compose | `docker-compose.prod.yml:44`, `deploy-release.sh:183`, `Caddyfile:45` |
 
 ## Trọng tâm review (PLAN) → test
 
@@ -73,7 +74,7 @@ Trạng thái: `chưa` · `đang làm` · `xong` (chỉ sau khi đối chiếu t
 | Việc                                                                       | Kết quả |
 | -------------------------------------------------------------------------- | ------- |
 | Bull Board trên trình duyệt, CSP mặc định, console sạch (T10)              |         |
-| `docker compose up -d --wait` local: `postgres`, `redis` healthy (T5)      |         |
+| `docker compose up -d --wait` local: `postgres`, `redis` healthy (T5)      | Cả hai healthy trong project kiểm thử. |
 | `--detectOpenHandles` cho I-1 (T4)                                         |         |
 | `--detectOpenHandles` cho I-4 board bật (T10)                              |         |
 | `pnpm openapi:export` khi Redis tắt (T4)                                   |         |
@@ -84,6 +85,8 @@ Trạng thái: `chưa` · `đang làm` · `xong` (chỉ sau khi đối chiếu t
 | D-n | Gói | Điểm | Chọn | Vì sao | File |
 | --- | --- | ---- | ---- | ------ | ---- |
 | D-1 | T1 | Fixture production cũ thiếu khóa Redis và proxy | Owner duyệt bổ sung khóa fixture, giữ nguyên assertion | SPEC yêu cầu cấu hình production hợp lệ trước khi kiểm tra guard quản trị DB hoặc lỗi kết nối của recovery CLI | `database-administration-credentials.spec.ts`, `recovery-cli.integration-spec.ts` |
+| D-2 | T5 | Worker dùng chung validator production; cần giữ rollback của bản cũ | Đặt `TRUST_PROXY_HOPS=1` trong worker. Xác định có kiểm Redis dựa trên Compose release. | Worker khởi động với đúng schema; bản cũ vẫn rollback được dù Compose chưa có Redis | `docker-compose.prod.yml`, `deploy-release.sh` |
+| D-3 | T5 | ESLint hết heap ở run T3 | Tăng heap Node của bước `pnpm check` từ 4096 lên 6144 MiB | Runner GitHub chất lượng có 8 GB RAM đối với repo riêng; mọi lệnh và kỳ vọng kiểm thử giữ nguyên | `.github/workflows/ci.yml` |
 
 ## Điểm gộp đã gặp
 
