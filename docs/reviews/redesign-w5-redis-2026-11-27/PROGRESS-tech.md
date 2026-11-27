@@ -30,7 +30,7 @@ Tracker sống qua compact context. Người code đọc lại file này **đầ
 | T9b | R-11 job dọn đêm (Owner 27/11: C1–C4, 30 ngày, chạy khi khởi động) | xong       | `40df5dfd` | Unit runner/scheduler/poll, integration bảo trì 2/2, mail regression 5/5, 343 gate, typecheck, lint, architecture/capabilities. | — | Một dòng mô tả OpenAPI cho `invitation.delivery`. |
 | T10 | Bull Board                                                         | xong       | `3fbcf5dc` | Unit 33/33 (gồm env), Redis integration 2/2 với `--detectOpenHandles`, Chrome, 81 gate tập trung, typecheck/lint, audit production sạch. | — | Một bản ioredis; CSP mặc định. |
 | T11 | chốt, ca diệt đột biến                                             | xong       | `72b3e607` | Sáu đột biến làm test đỏ. Sau phục hồi: 53 unit, 27 integration, 3 timing, 343 gate, rules check/format, arch docs, discovery và kiểm OpenAPI. | — | `arch:graph` và `arch:routes` không có diff nội dung. |
-| C2  | CI full toàn đợt                                                   | đang làm   |     | Phát hiện lặp log và chờ readiness khi Redis từ chối xác thực. Sau sửa: 32 unit với detectOpenHandles, 9 integration, Redis WRONGPASS thật, lint và typecheck xanh. | — | D-9. |
+| C2  | CI full toàn đợt                                                   | dừng hỏi   | `d0e658b1` | Hai lượt CI hoàn tất. Lượt cuối 9 265 unit, 343 gate, HTTP 2 688, timing 31, in-band serial 98 và E2E smoke xanh. Các suite Redis và outbox của đợt xanh. | Có | D-9. Ba shard đỏ đúng cùng 113 suite với C1. |
 
 Trạng thái: `chưa` · `đang làm` · `xong` (chỉ sau khi đối chiếu từng tiêu chí — LUẬT CỨNG 6) · `dừng hỏi`.
 
@@ -99,7 +99,7 @@ Trạng thái: `chưa` · `đang làm` · `xong` (chỉ sau khi đối chiếu t
 | D-4 | T8 | Nest ghép providers tĩnh vào DynamicModule; extension gate áp ngoại lệ theo tên tiến trình | BullMQ có metatype riêng, hai biến thể dùng chung quy tắc wiring của WorkerModule. Gate module-graph gọi riêng biến thể BullMQ. | Graph poll giữ đầy đủ providers cũ. Graph BullMQ có relay và không kéo poller theo. Registry ngoại lệ giữ nguyên. | `worker.module.ts`, `process-graphs.ts` |
 | D-5 | T8 | Gate yêu cầu chạy riêng test có ngưỡng thời gian. BullMQ 6.0.11 đặt client trên backend. | Dùng runner `.timing-spec.ts` và `getBackend().client` để quan sát client trong test. | Giữ ngưỡng 200/400 ms và kiểm cùng client khi Redis nối lại. | `email-queue-relay.timing-spec.ts` |
 | D-6 | T9b | Housekeeping cần repo token riêng trong đồ thị worker | Đăng ký repo token dưới token DI riêng và export đúng một facade, cập nhật gate phiên cho hai worker | Giữ repository private và kiểm kỹ facade chỉ có trong worker | `identity-access-housekeeping-facade.module.ts`, `module-graph.gate-spec.ts` |
-| D-7 | T9b | Review tái hiện worker treo khi shutdown trước Redis ready, lệnh ghi có thể treo trên socket im lặng, trùng log lỗi kết nối | Chỉ chạy khi BullMQ ready, đóng ngay worker chưa chạy, timeout lệnh ghi 1 giây và giữ log chuyển trạng thái cho lỗi retryable | Lượt gửi đang chạy vẫn hoàn tất trước khi đóng; vị trí timeout dùng chung relay và scheduler | `queue-worker-factory.ts`, `queue-producers.ts` |
+| D-7 | T9b | Review tái hiện worker treo khi shutdown trước Redis ready, lệnh ghi có thể treo trên socket im lặng, trùng log lỗi kết nối | Chỉ chạy khi BullMQ ready, đóng ngay worker chưa chạy, timeout lệnh ghi 1 giây và giữ log chuyển trạng thái cho lỗi retryable | Lượt gửi đang chạy hoàn tất trước khi đóng. Khi proxy giữ kết nối và ngừng chuyển dữ liệu, `addBulk` trả lỗi sau 1 019 ms. | `queue-worker-factory.ts`, `queue-producers.ts` |
 | D-8 | T10 | Bull Board 9.13.1 dùng PUT để xóa qua đường `clean`, còn đặc tả yêu cầu cả DELETE trả 405 | Adapter cấu hình chỉ đọc và middleware chỉ nhận GET/HEAD sau khi xác thực | Mọi phương thức ghi đều bị chặn, kể cả đường xóa tương thích đặc tả | `queue-board.mount.ts`, `queue-board.integration-spec.ts` |
 | D-9 | C2 | Redis thật trả WRONGPASS làm BullMQ lặp log và có thể giữ promise chờ ready sau shutdown | Watcher ghi lỗi xác thực theo chuyển trạng thái; kết thúc chờ ready khi worker đóng | Từ 24 log debug trong 1,1 giây xuống 0, mỗi client vẫn ghi một cảnh báo, shutdown hoàn tất | `redis-client.factory.ts`, `queue-worker-factory.ts` |
 
@@ -107,6 +107,8 @@ Trạng thái: `chưa` · `đang làm` · `xong` (chỉ sau khi đối chiếu t
 
 | GP  | Khi nào | Làm gì | Commit |
 | --- | ------- | ------ | ------ |
+| GP-2 | Khi tích hợp đợt 3 | Giữ cả mục export `AuthHousekeepingApi` của T9b trong danh sách contract tĩnh và mục export mới của đợt 3 tại cùng vùng. | `40df5dfd` |
+| GP-3 | Khi tích hợp đợt 3 | Giữ heap quality 6144 MiB và cấu hình Redis của các job integration. | `173b0f11` |
 | GP-6 | Khi tích hợp đợt 3 | Rà `src/app/app.module.spec.ts` nếu đồ thị của đợt 3 có assertion về danh sách module tĩnh. T10 gắn `QueueBoardModule` vào API. | `3fbcf5dc` |
 
 ## Bàn giao (đợt 5 phần 2 / Owner)
@@ -123,3 +125,9 @@ Trạng thái: `chưa` · `đang làm` · `xong` (chỉ sau khi đối chiếu t
 | ------ | -------- | ------- | ---- | ------------------- | ------ | --------- | ------- |
 | `6511f4fc` | [45971009063](https://github.com/SEP490-FALL2026/BE-dev/actions/runs/45971009063) | đỏ, ESLint OOM | xanh | đỏ / đỏ / đỏ | xanh | xanh | Redis harness xanh. Ca 403 đã tái hiện trên nền, xem [FIX-TEST-tech](FIX-TEST-tech.md). |
 | `b80936a7` | [45974186752](https://github.com/SEP490-FALL2026/BE-dev/actions/runs/45974186752) | xanh | xanh | đỏ / đỏ / đỏ | xanh | xanh | C1. Cả ba spec Redis xanh. [Nợ kiểm thử](FIX-TEST-tech.md). |
+| `72b3e607` | [45981006981](https://github.com/SEP490-FALL2026/BE-dev/actions/runs/45981006981) | xanh | xanh | đỏ / đỏ / đỏ | xanh | xanh | C2 lượt đầu. Cùng 113 suite lỗi với C1, không thêm suite lỗi. Các spec Redis và outbox của đợt đều xanh. |
+| `d0e658b1` | [45981659449](https://github.com/SEP490-FALL2026/BE-dev/actions/runs/45981659449) | xanh | xanh | đỏ / đỏ / đỏ | xanh | xanh | C2 sau D-9. Cùng 113 suite lỗi với C1, không thêm suite lỗi. Redis harness, rate-limit, CLIENT PAUSE, email outbox, relay, consumer, dọn đêm và board đều chạy và xanh. Deploy skipped. |
+
+Full test chỉ chạy trên CI GitHub. C2 kiểm cả Prisma, Compose production, OpenAPI xuất lại và audit dependency.
+So với `origin/dev` `8c6ce1ff`, OpenAPI chỉ thêm mô tả cho `invitation.delivery`. Không có thay đổi Prisma.
+`NightlyMaintenanceScheduler` đã đăng ký mốc 17:00 UTC trên Redis thật và để job kế ở trạng thái delayed.
