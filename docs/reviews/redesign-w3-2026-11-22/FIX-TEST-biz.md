@@ -32,3 +32,8 @@ Danh sách các test http / integration / flow cũ khẳng định hành vi cũ,
 
 - `src/modules/catalog/subscription/subscription.service.ts:204`: kiểm `requireItAdmin(responsible)` ngoài tx khi khai thuê bao.
 - `src/modules/budgets/review/budget-review-snapshot.service.ts:56-60`: đọc `pool`/`companyMinor` ngoài tx của writer.
+
+## Nợ vòng 2 audit đợt 3 (Owner 27/11, dời đợt 8)
+
+- `test/integration/catalog/subscription-seat-increase-http.integration-spec.ts` (các ca "báo tăng seat", `:65-161`): gọi **trực tiếp** `SubscriptionChangeGuard.tellSeatIncrease`, không qua route — sau W3-27 không còn đường HTTP nào tới nhánh này. Xóa **cùng** code chết R5 (`subscription-change.service.ts`, `subscription-change-guard.service.ts`, `seat-increase/*`, mock `tellSeatIncrease` trong 4 spec unit) ở đợt 8; không xóa riêng test.
+- Ca "người khai không còn là IT Admin dùng được" (`shared-pool-subscription-http`): giữ ca `ON_LONG_LEAVE` ⟹ 422 `SUBSCRIPTION.RESPONSIBLE_NOT_IT_ADMIN` (người khai là người phụ trách, `QĐ-118f`). Nhánh `LOCKED` của người **ứng dụng chỉ định** (mặc định "IT phụ trách ứng dụng") đã bỏ cùng A-4 nên không còn hành vi để kiểm; người khai bị khóa không đăng nhập được ⟹ không có lời khai.
