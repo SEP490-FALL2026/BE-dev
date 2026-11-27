@@ -423,16 +423,17 @@ describe('the layers of requests, as the command prints them and as the module c
   // catalog-link left assessment (FIX-B2a, B2A-R1: the folder was at the 25 files of the cap): 42; purchase-invoice (PI-1) made 43, and invoice-discrepancy with
   // invoice-discrepancy-queue (RC-1: the case is opened by the signature of purchase-invoice, a capability with a controller, so it has none) made 45;
   // assessment-decision (PL-2.4: the checklist of the assessment of a proposal, an L2 the module card already lists) made 46.
-  test('prints one line with a layer for each of the 46 capabilities, every one in exactly one layer', () => {
+  // Redesign W4 Gate A (A-POL1): request-reply (L0, isolated until B-REPLY) and request-ticket (L1) made 48.
+  test('prints one line with a layer for each of the 48 capabilities, every one in exactly one layer', () => {
     assert.equal(printed.status, 0);
-    assert.equal(lines.length, 46);
-    assert.equal(new Set(lines.map(([, , name]) => name)).size, 46);
+    assert.equal(lines.length, 48);
+    assert.equal(new Set(lines.map(([, , name]) => name)).size, 48);
   });
 
   test('marks as isolated, and only as such, the capability that imports nothing and that nothing imports', () => {
     assert.deepEqual(
       [...printed.stdout.matchAll(/^ {2}L0 \(cô lập\) +(\S+) /gm)].map(([, name]) => name),
-      ['status'],
+      ['request-reply', 'status'],
     );
   });
 
