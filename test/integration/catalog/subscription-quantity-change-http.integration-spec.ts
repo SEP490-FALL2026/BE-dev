@@ -202,7 +202,7 @@ describe('subscription quantity change rules (real PostgreSQL)', () => {
       )
     ).rows[0];
     const purchaseRes = await request(h.server())
-      .post(`/api/v1/subscription-lines/${lineRow.id}/seat-purchases`)
+      .post(`/api/v1/subscription-lines/${lineRow.id}/purchases`)
       .set(h.as(h.it1))
       .send({
         kind: 'TOP_UP',

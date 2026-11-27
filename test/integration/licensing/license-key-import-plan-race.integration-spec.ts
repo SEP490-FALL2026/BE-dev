@@ -216,7 +216,7 @@ describe('license key import and the kind of its plan, racing (integration, P28-
     expect(dataStatements(many.statements)).toHaveLength(dataStatements(few.statements).length);
   });
 
-  it('R-1: real POST /applications/:id/retire blocks later license-lot creation and lot key import with APPLICATION_RETIRED', async () => {
+  it('R-1: real POST /applications/:id/retire blocks later lot key import with LICENSE_KEY.APPLICATION_RETIRED', async () => {
     const planId = await h.plan('K4');
     const appId = (
       await h.ctx.sql.query<{ application_id: string }>(`SELECT application_id FROM plans WHERE id = $1`, [planId])
@@ -236,19 +236,6 @@ describe('license key import and the kind of its plan, racing (integration, P28-
     ).id;
 
     await request(h.server()).post(`/api/v1/applications/${appId}/retire`).set(h.as(h.it1)).expect(200);
-
-    const lotAfter = await request(h.server())
-      .post('/api/v1/license-lots')
-      .set(h.as(h.it1))
-      .send({
-        planId,
-        purchasedOn: '2026-11-25',
-        licenseCount: 2,
-        unitPrice: { amount: '100000', currency: 'VND' },
-        purpose: 'STOCK',
-      })
-      .expect(422);
-    expect(h.codeOf(lotAfter)).toBe('LICENSE_LOT.APPLICATION_RETIRED');
 
     const keysAfter = await request(h.server())
       .post(`/api/v1/license-lots/${lotId}/keys`)

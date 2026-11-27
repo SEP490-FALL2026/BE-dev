@@ -37,7 +37,7 @@ describe('a subscription still priced in a foreign currency (B1A-03, QĐ-111an)'
     const id = await h.subscription(10, type);
     const { rows } = await h.ctx.sql.query<{ plan_id: string }>(
       `UPDATE subscriptions
-          SET unit_price_currency = 'USD', unit_price_minor = 2000, monthly_unit_price_minor = NULL
+          SET unit_price_currency = 'USD', unit_price_minor = 2000
         WHERE id = $1
         RETURNING plan_id`,
       [id],

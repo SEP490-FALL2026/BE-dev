@@ -335,10 +335,7 @@ describe('the baseline and the package of a budget cycle (integration, real Post
   it('says when a subscription is paid in a cycle the baseline cannot price by the month, and leaves its cost out of the total (F-074)', async () => {
     const unit = await department();
     await holdSeats(unit, 2);
-    await h.ctx.sql.query(
-      `UPDATE subscriptions SET billing_cycle = 'OTHER', monthly_unit_price_minor = NULL WHERE id = $1`,
-      [unit.subscription],
-    );
+    await h.ctx.sql.query(`UPDATE subscriptions SET billing_cycle = 'OTHER' WHERE id = $1`, [unit.subscription]);
 
     const wire = h.dataOf<BaselineWire>(await baseline().expect(200));
 

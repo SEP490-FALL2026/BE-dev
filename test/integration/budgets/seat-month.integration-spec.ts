@@ -53,14 +53,9 @@ describe('a month of the seats of a K2 pool is charged to the departments of the
     );
     await h.ctx.sql.query(
       `UPDATE subscription_lines
-          SET monthly_unit_price_minor = 400000, ledger_opened_on = $2
+          SET monthly_unit_price_minor = 400000
         WHERE subscription_id = $1`,
-      [pool, `${h.year}-01-01`],
-    );
-    await h.ctx.sql.query(
-      `UPDATE seat_changes SET effective_on = $2
-        WHERE subscription_line_id IN (SELECT id FROM subscription_lines WHERE subscription_id = $1)`,
-      [pool, `${h.year}-01-01`],
+      [pool],
     );
 
     return pool;
@@ -381,13 +376,8 @@ describe('a month of the seats of a K2 pool is charged to the departments of the
       [pool, `${h.year}-07-01`, `${h.year + 1}-06-30`],
     );
     await h.ctx.sql.query(
-      `UPDATE subscription_lines SET monthly_unit_price_minor = 300000, ledger_opened_on = $2 WHERE subscription_id = $1`,
-      [pool, `${h.year}-07-01`],
-    );
-    await h.ctx.sql.query(
-      `UPDATE seat_changes SET effective_on = $2
-        WHERE subscription_line_id IN (SELECT id FROM subscription_lines WHERE subscription_id = $1)`,
-      [pool, `${h.year}-07-01`],
+      `UPDATE subscription_lines SET monthly_unit_price_minor = 300000 WHERE subscription_id = $1`,
+      [pool],
     );
     const unit = await department();
     for (let index = 0; index < 8; index += 1) {

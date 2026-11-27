@@ -403,7 +403,7 @@ describe('the commitments of 01/01 over PostgreSQL (BR-MF1-09e, FR-5.8a, QĐ-109
       const id = await approved(await unit(), await h.planOf(subscription));
       // 20 USD a month, even with a rate entered for 01/01 in an older release: nothing reads it.
       await h.ctx.sql.query(
-        `UPDATE subscriptions SET unit_price_minor = 2000, unit_price_currency = 'USD', monthly_unit_price_minor = NULL WHERE id = $1`,
+        `UPDATE subscriptions SET unit_price_minor = 2000, unit_price_currency = 'USD' WHERE id = $1`,
         [subscription],
       );
       await h.ctx.sql.query(`DELETE FROM subscription_lines WHERE subscription_id = $1`, [subscription]);
