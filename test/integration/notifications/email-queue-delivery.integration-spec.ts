@@ -275,7 +275,10 @@ describe('email delivery through BullMQ, PostgreSQL and SMTP', () => {
       const jobs = await waitForJobs('completed', attempt);
       expect(jobs.every((job) => JSON.stringify(job.returnvalue) === '{"outcome":"RESCHEDULED"}')).toBe(true);
       expect(await rowOf(mail.id)).toMatchObject({ status: 'PENDING', attempts: attempt, last_error_code: 'SMTP_421' });
-      await db.sql.query('UPDATE email_outbox SET next_attempt_at = now() WHERE id = $1', [mail.id]);
+      // Due a minute ago: the PostgreSQL clock may run a few ms ahead of this process (test/README.md, Đồng hồ).
+      await db.sql.query("UPDATE email_outbox SET next_attempt_at = now() - interval '1 minute' WHERE id = $1", [
+        mail.id,
+      ]);
     }
     await relay.tick();
     const [failed] = await waitForJobs('failed', 1);
