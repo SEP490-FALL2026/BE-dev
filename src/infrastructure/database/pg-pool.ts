@@ -1,4 +1,5 @@
 import { Client, type ClientConfig, Pool, type PoolConfig } from 'pg';
+import { namedByConstraint } from './constraint-name';
 
 /** What node-postgres reports when `query_timeout` fires (pg 8.23, lib/client.js). */
 const CLIENT_QUERY_TIMEOUT = 'Query read timeout';
@@ -74,14 +75,14 @@ export class RetireOnTimeoutClient extends Client {
         if (!(result instanceof Promise)) return result;
         return result.then(undefined, (error: unknown) => {
           if (isReadTimeout(error)) this.retire();
-          throw error;
+          throw namedByConstraint(error);
         });
       }
 
       const callback = args[position] as QueryCallback;
       args[position] = (error: Error | null, result?: unknown): void => {
         if (isReadTimeout(error)) this.retire();
-        callback(error, result);
+        callback(namedByConstraint(error), result);
       };
       // pg stores the callback on a config object it is given; a copy keeps the caller's object reusable.
       if (typeof first === 'object' && first !== null) args[0] = { ...first };
