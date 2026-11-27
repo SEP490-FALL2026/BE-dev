@@ -117,7 +117,6 @@ import { SeatLedgerRepo } from './subscription-line/ledger/seat-ledger.repo';
 import { SeatLedgerService } from './subscription-line/ledger/seat-ledger.service';
 import { SeatPurchaseRepo } from './subscription-line/purchase/seat-purchase.repo';
 import { SeatPurchaseService } from './subscription-line/purchase/seat-purchase.service';
-import { SubscriptionLineRepo } from './subscription-line/subscription-line.repo';
 import { SubscriptionLineSeatsService } from './subscription-line/subscription-line-seats.service';
 import { SeatChangeQueryService } from './subscription-line/seat-change-query.service';
 import { SubscriptionLineService } from './subscription-line/subscription-line.service';
@@ -203,7 +202,6 @@ import { WorkspacesController } from './workspace/workspaces.controller';
     WorkspaceViewService,
     WorkspaceForSubscriptionService,
     WorkspaceRepo,
-    SubscriptionLineRepo,
     SubscriptionLineSeatsService,
     SubscriptionLineService,
     SubscriptionLineCorrectionService,

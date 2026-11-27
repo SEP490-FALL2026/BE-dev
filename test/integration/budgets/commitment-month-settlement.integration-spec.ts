@@ -483,13 +483,28 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
     const s3 = await settlements().settleMonth(h.seed.organizationId, `${h.year}-03-01`, NOW);
     expect(s3.releasedMinor).toBe(50_000n);
 
-    // Ca K & F3: re-charge month 3 at 350k -> real SeatMonthSubscriptionService.giveBack reverses 100k on slice 3 -> next settle releases 100k, third pass = 0
+    // Ca D2 (Q-1): month 3 is charged again after the price fell to 350k -> the seat that has its row keeps 450k: nothing more is released.
     await setPoolPrice(subscriptionId, 350_000n);
     await seatMonths().chargeMonth(`${h.year}-03-01`, NOW);
+    expect((await commitmentSnapshot(cD.commitmentId)).monthRows[1].appliedMinor).toBe(450_000n);
+    expect((await settlements().settleMonth(h.seed.organizationId, `${h.year}-03-01`, NOW)).releasedMinor).toBe(0n);
+
+    // Ca K & F3: the seat is now held to 22/03 (valid_until is the first day it is not held; 22 of 31 days at the recorded 450k = 319.355) -> month 3 charged again, real
+    // SeatMonthSubscriptionService.giveBack reverses 130.645 on slice 3 -> next settle releases 130.645, third pass = 0
+    await h.ctx.sql.query(`UPDATE license_assignments SET valid_until = $2::date WHERE subscription_id = $1`, [
+      subscriptionId,
+      `${h.year}-03-23`,
+    ]);
+    await seatMonths().chargeMonth(`${h.year}-03-01`, NOW);
+    expect((await commitmentSnapshot(cD.commitmentId)).monthRows[1].appliedMinor).toBe(319_355n);
     expect((await settlements().settleMonth(h.seed.organizationId, `${h.year}-03-01`, NOW)).releasedMinor).toBe(
-      100_000n,
+      130_645n,
     );
     expect((await settlements().settleMonth(h.seed.organizationId, `${h.year}-03-01`, NOW)).releasedMinor).toBe(0n);
+    await h.ctx.sql.query(`UPDATE license_assignments SET valid_until = $2::date WHERE subscription_id = $1`, [
+      subscriptionId,
+      `${h.year}-04-30`,
+    ]);
 
     // Ca E: price rise 500k -> 550k on month 4 still caps applied at 500k share
     await setPoolPrice(subscriptionId, 550_000n);
@@ -593,7 +608,7 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
       }
       for (const id of [cA.commitmentId, cB.commitmentId]) {
         const snap = await commitmentSnapshot(id);
-        expect(snap.row.appliedMinor + snap.row.releasedMinor).toBeLessThanOrEqual(STD);
+        expect(snap.row.appliedMinor + snap.row.releasedMinor).toBe(STD);
       }
     }
 

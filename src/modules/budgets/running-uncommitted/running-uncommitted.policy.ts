@@ -4,6 +4,8 @@ import { addDays, type BusinessDate } from '../../../core/business-date';
 export interface RunningUncommittedSeat {
   assignmentId: string;
   subscriptionId: string;
+  /** The plan of the seat: the line of the period that serves this plan prices it. */
+  planId: string;
   requestId: string | null;
   source: 'BASELINE' | 'HANDOVER' | 'REQUEST' | 'RENEWAL_CARRY' | 'MACHINE_ACCOUNT_CONVERSION';
   costCenterId: string | null;
@@ -11,7 +13,10 @@ export interface RunningUncommittedSeat {
   heldUntil: BusinessDate | null;
 }
 
-/** Active K2 subscription period pricing and start date. */
+/** The key of the period a seat is priced on: the subscription and the plan of the seat (a period with lines has a price for each plan). */
+export const periodKeyOf = (subscriptionId: string, planId: string): string => `${subscriptionId}:${planId}`;
+
+/** Active K2 subscription period start date and the monthly price of a seat of one plan on it. */
 export interface RunningUncommittedPeriod {
   monthlyPriceMinor: bigint | null;
   startDate: BusinessDate | null;
@@ -48,7 +53,8 @@ export interface RunningUncommittedInput {
   year: number;
   today: BusinessDate;
   seats: readonly RunningUncommittedSeat[];
-  periodBySubscription: ReadonlyMap<string, RunningUncommittedPeriod>;
+  /** The period each seat is priced on, by `periodKeyOf(subscriptionId, planId)`. */
+  periodBySubscriptionPlan: ReadonlyMap<string, RunningUncommittedPeriod>;
   commitmentByRequest: ReadonlyMap<string, RunningUncommittedCommitment>;
   runMonthsBySubscription: ReadonlyMap<string, ReadonlySet<number>>;
   k1UnrequestedSeats?: readonly RunningUncommittedK1Seat[];
@@ -111,7 +117,7 @@ function seatUncommittedCost(seat: RunningUncommittedSeat, input: RunningUncommi
   if (seat.requestId !== null && input.exceptRequestIds?.has(seat.requestId)) return 0n;
   if (!isUncommittedSeat(seat, input.commitmentByRequest)) return 0n;
 
-  const period = input.periodBySubscription.get(seat.subscriptionId);
+  const period = input.periodBySubscriptionPlan.get(periodKeyOf(seat.subscriptionId, seat.planId));
   if (!period || period.monthlyPriceMinor === null || period.monthlyPriceMinor <= 0n) return 0n;
 
   const runMonths = input.runMonthsBySubscription.get(seat.subscriptionId) ?? EMPTY_MONTHS;
