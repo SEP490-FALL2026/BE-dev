@@ -446,7 +446,7 @@ describe('the production image carries the production dependencies only', () => 
   });
 
   // OD-R5
-  it('keeps in dependencies what the image runs: the Prisma CLI of `migrate deploy`, the client, the native hash, and the standby queue', () => {
+  it('keeps in dependencies what the image runs: the Prisma CLI, the client, the native hash, and the queue', () => {
     const needed = [
       'prisma',
       '@prisma/client',
@@ -456,10 +456,10 @@ describe('the production image carries the production dependencies only', () => 
       'bullmq',
       'ioredis',
       '@nest-lab/throttler-storage-redis',
-      '@nestjs/bullmq',
     ];
 
     expect(needed.filter((name) => !(name in manifest.dependencies))).toEqual([]);
+    expect('@nestjs/bullmq' in manifest.dependencies).toBe(false);
     expect('prisma' in manifest.devDependencies).toBe(false);
   });
 

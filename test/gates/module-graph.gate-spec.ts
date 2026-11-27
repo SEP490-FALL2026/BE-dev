@@ -46,7 +46,7 @@ import { RecoveryCliModule } from '../../src/cli/recover/recover-cli.module';
 import { WorkerModule } from '../../src/worker/worker.module';
 import { consumersOfExports, moduleFolders, outsideConsumers } from '../support/module-export-consumers';
 import { collectGraph, metadata, tokenName, tokenOf, type ModuleNode, type Token } from '../support/nest-module-graph';
-import { PROCESS_GRAPHS } from '../support/process-graphs';
+import { BullmqWorkerGraph, PROCESS_GRAPHS } from '../support/process-graphs';
 
 /**
  * What a business module may export for any module to use (docs/rules/module-structure.md): its facade, a port it implements for
@@ -317,6 +317,7 @@ describe('module graph', () => {
   const graphs: [string, Type<unknown>][] = [
     ['AppModule', AppModule],
     ['WorkerModule', WorkerModule],
+    ['WorkerModule(bullmq)', BullmqWorkerGraph],
     ['InstallationModule', InstallationModule],
     ['RecoveryCliModule', RecoveryCliModule],
     ['InspectionCliModule', InspectionCliModule],
@@ -516,8 +517,7 @@ describe('module graph', () => {
     }
   });
 
-  // H6.4 (E2 = A, OD-R5, ADR-0014)
-  it('keeps the standby queue module (no consumer yet) out of every process graph today, and object storage only in the API, for the files of contracts', () => {
+  it('mounts queues only in the BullMQ worker and object storage only in the API', () => {
     for (const [name, root] of graphs) {
       const modules = collectGraph(root).map((node) => node.module);
 
@@ -525,18 +525,22 @@ describe('module graph', () => {
         name,
         storage: modules.includes(ObjectStorageModule),
         queue: modules.includes(QueueInfrastructureModule),
-      }).toEqual({ name, storage: name === 'AppModule', queue: false });
+      }).toEqual({ name, storage: name === 'AppModule', queue: name === 'WorkerModule(bullmq)' });
     }
   });
 
-  // Describes today: the queue has no producer and no processor. The slice that adds the first consumer mounts
-  // QueueInfrastructureModule on purpose and changes this expectation (and the one above) with it.
-  // H6.4
-  it('delivers mail by polling PostgreSQL in the worker, with no BullMQ queue, producer or processor registered yet', () => {
+  it('keeps the polling worker and registers BullMQ processors through the direct BullMQ API', () => {
     const worker = collectGraph(WorkerModule);
     const tokens = worker.flatMap((node) => node.providers.map((provider) => tokenName(tokenOf(provider))));
 
     expect(declarationsOf(worker, EmailDispatchLoop)).toHaveLength(1);
+    expect(tokens).toEqual(expect.arrayContaining(['RequestWorkLoop', 'EmailDispatchLoop']));
+    expect(tokens).not.toContain('OutboxRelayLoop');
+    const bullmqTokens = collectGraph(BullmqWorkerGraph).flatMap((node) =>
+      node.providers.map((provider) => tokenName(tokenOf(provider))),
+    );
+    expect(bullmqTokens).toEqual(expect.arrayContaining(['RequestWorkLoop', 'OutboxRelayLoop']));
+    expect(bullmqTokens).not.toContain('EmailDispatchLoop');
     expect(tokens.filter((token) => token.startsWith('BullQueue_'))).toEqual([]);
     expect(sourceFilesDeclaring('registerQueue')).toEqual([]);
     expect(sourceFilesDeclaring('@Processor(')).toEqual([]);
