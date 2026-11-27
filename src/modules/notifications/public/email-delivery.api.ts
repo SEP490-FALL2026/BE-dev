@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { EmailDispatcher } from '../email/email-dispatcher.service';
+import type { DeliveryResult } from './email-delivery.types';
 import { TokenUsability } from './notifications.types';
 
 /**
@@ -15,5 +16,13 @@ export class EmailDeliveryApi {
   /** Returns how many rows this call took (whether or not they were delivered). */
   dispatchDue(isUsable: TokenUsability): Promise<number> {
     return this.dispatcher.dispatchDue(isUsable);
+  }
+
+  dueIds(limit: number, now: Date): Promise<string[]> {
+    return this.dispatcher.dueIds(limit, now);
+  }
+
+  deliverOne(outboxId: string, isUsable: TokenUsability): Promise<DeliveryResult> {
+    return this.dispatcher.deliverOne(outboxId, isUsable);
   }
 }
