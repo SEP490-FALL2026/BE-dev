@@ -249,6 +249,8 @@ function context(
         input.accounts.create(facts.organizationId, specs, input.secrets.demoAccountPassword, attribution),
       lockBudgetCycle: (year, lockedDeadline) =>
         input.accounts.lockBudgetCycle(facts.organizationId, year, lockedDeadline, attribution),
+      markClosedSeatMonths: (year, upToMonth, subscriptionIds) =>
+        input.accounts.markClosedSeatMonths(facts.organizationId, year, upToMonth, subscriptionIds),
     },
   };
 }

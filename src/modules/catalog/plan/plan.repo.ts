@@ -368,6 +368,25 @@ export class PlanRepo {
   }
 
   /**
+   * Locks the application `FOR SHARE` first, then the plan `FOR SHARE` (`applications` before `plans`, matching
+   * `ApplicationRetirementService` so retirement and lot creation serialize without deadlocking); returns null when absent.
+   */
+  async lockSharedWithApplicationLookup(tx: DbTx, id: string): Promise<PlanLookup | null> {
+    const lockedApp = await tx.$queryRaw<{ id: string }[]>`
+      SELECT a.id
+        FROM applications a
+        JOIN plans p ON p.application_id = a.id
+       WHERE p.id = ${id}::uuid
+       FOR SHARE OF a
+    `;
+    if (lockedApp.length === 0) return null;
+    const locked = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM plans WHERE id = ${id}::uuid FOR SHARE`;
+    if (locked.length === 0) return null;
+
+    return this.findLookup(id, tx);
+  }
+
+  /**
    * The same, locked `FOR UPDATE` for the rest of the transaction: two writers that decide something across the subscriptions of a
    * plan (which one prices it) take turns, and a reader that holds the plan `FOR SHARE` waits for them.
    */

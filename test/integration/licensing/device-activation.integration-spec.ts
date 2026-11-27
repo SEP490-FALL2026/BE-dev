@@ -255,11 +255,11 @@ describe('device activations licensing facade & S-6 lot occupancy (integration, 
     expect(lot.assigned).toBe(2);
   });
 
-  it('R-2: refuses changing licenseCount on a license lot via PATCH /license-lots/:id with 422 VALIDATION_ERROR', async () => {
+  it('R-2: PATCH /license-lots/:id has no licenseCount mutation (SPEC-B3:670, strict DTO 422), while DB capacity trigger blocks activations above license_count', async () => {
     const planId = await planOf('DEVICE_KEY');
     const lotId = await purchaseOf(planId, 2);
     const keyId = await importKey(lotId, 5);
-    const [d1, d2] = await Promise.all([createDevice('LAP'), createDevice('PC')]);
+    const [d1, d2, d3] = await Promise.all([createDevice('LAP'), createDevice('PC'), createDevice('LAP')]);
     for (const deviceId of [d1, d2]) {
       await runner.run((tx) =>
         activations.open(tx, {
@@ -285,5 +285,19 @@ describe('device activations licensing facade & S-6 lot occupancy (integration, 
       .send({ expectedUpdatedAt: detail.updatedAt, licenseCount: 1 })
       .expect(422);
     expect((patchRes.body as { error: { code: string } }).error.code).toBe('VALIDATION_ERROR');
+
+    // Database-level capacity invariant: direct INSERT exceeding lot license_count is refused by device_activations_check_lot_capacity.
+    let dbError: { code?: string; constraint?: string } | undefined;
+    try {
+      await ctx.sql.query(
+        `INSERT INTO device_activations
+           (id, organization_id, device_id, plan_id, license_key_id, origin, activated_on, activated_at, activated_by_app_user_id)
+         VALUES ($1, $2, $3, $4, $5, 'OPERATION'::"DeviceActivationOrigin", '2026-11-24', now(), $6)`,
+        [randomUUID(), seed.organizationId, d3, planId, keyId, it1.appUserId],
+      );
+    } catch (error) {
+      dbError = error as { code?: string; constraint?: string };
+    }
+    expect(dbError).toMatchObject({ code: '23514', constraint: 'device_activations_lot_capacity' });
   });
 });

@@ -10,6 +10,7 @@ import { SeatBaselinePhaseHook } from '../public/catalog.extension-points';
 import type { CreateLicenseLotInput } from '../public/license-lot.types';
 import { WorkspaceForSubscriptionService } from '../workspace/workspace-for-subscription.service';
 import { assertCreatable, assertLotVendorAdminsRecorded } from './license-lot.policy';
+import { LicenseLotApplicationRetiredError } from './license-lot.errors';
 import { LicenseLotRepo } from './license-lot.repo';
 import { LicenseLotPriceService } from './license-lot-price.service';
 import type { LicenseLotRecord } from './license-lot.types';
@@ -100,9 +101,9 @@ export class LicenseLotCreateService {
     );
   }
 
-  /** The plan held for sharing (7), and judged again as it stands under the lock: a change of its kind waits for this write. */
+  /** The plan's application `FOR SHARE` then the plan `FOR SHARE` (7): waits behind application retirement and plan changes alike. */
   private async lockPlan(tx: DbTx, input: CreateLicenseLotInput): Promise<LockedPlan> {
-    const plan = await this.plans.lockShared(tx, input.planId);
+    const plan = await this.plans.lockSharedWithApplication(tx, input.planId);
     this.assertFits(plan, input);
 
     return plan as LockedPlan;
@@ -133,6 +134,7 @@ export class LicenseLotCreateService {
       keyBinding: plan?.keyBinding ?? null,
       requestId: input.requestId,
     });
+    if (plan?.applicationStatus === 'RETIRED') throw new LicenseLotApplicationRetiredError();
   }
 
   private recordCreated(

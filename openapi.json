@@ -19448,7 +19448,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR), the plan is not a plan of keys bought once, the purpose does not fit the plan, a lot for a request has no open grant task, the workspace has fewer than two working IT Admins once the seat baseline is closed, or the workspace, the contract or the price does not fit (LICENSE_LOT.PLAN_NOT_K4, LICENSE_LOT.PURPOSE_NOT_AVAILABLE, LICENSE_LOT.REQUEST_REQUIRED, LICENSE_LOT.VENDOR_ADMINS_REQUIRED, LICENSE_LOT.WORKSPACE_REQUIRED, LICENSE_LOT.CONTRACT_VENDOR_MISMATCH).",
+            "description": "The request is invalid (VALIDATION_ERROR), the application is retired, the plan is not a plan of keys bought once, the purpose does not fit the plan, a lot for a request has no open grant task, the workspace has fewer than two working IT Admins once the seat baseline is closed, or the workspace, the contract or the price does not fit (LICENSE_LOT.APPLICATION_RETIRED, LICENSE_LOT.PLAN_NOT_K4, LICENSE_LOT.PURPOSE_NOT_AVAILABLE, LICENSE_LOT.REQUEST_REQUIRED, LICENSE_LOT.VENDOR_ADMINS_REQUIRED, LICENSE_LOT.WORKSPACE_REQUIRED, LICENSE_LOT.CONTRACT_VENDOR_MISMATCH).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -19472,6 +19472,17 @@
                       "error": {
                         "code": "LICENSE_LOT.REQUEST_REQUIRED",
                         "message": "A lot for a request needs a grant task of that request that is still open for the plan.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "LICENSE_LOT.APPLICATION_RETIRED": {
+                    "summary": "The application of this plan has been retired: no new license lot can be bought for it.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "LICENSE_LOT.APPLICATION_RETIRED",
+                        "message": "The application of this plan has been retired: no new license lot can be bought for it.",
                         "requestId": "req_example"
                       }
                     }

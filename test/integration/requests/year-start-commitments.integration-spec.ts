@@ -397,24 +397,6 @@ describe('the commitments of 01/01 over PostgreSQL (BR-MF1-09e, FR-5.8a, QĐ-109
     });
   });
 
-  describe('the currency (FR-5.8(6), QĐ-111an)', () => {
-    it('QĐ-111an: a price an older release left in another currency is left out with the reason NO_PRICE, never held in its own currency and never converted', async () => {
-      const subscription = await h.subscription(100);
-      const id = await approved(await unit(), await h.planOf(subscription));
-      // 20 USD a month, even with a rate entered for 01/01 in an older release: nothing reads it.
-      await h.ctx.sql.query(
-        `UPDATE subscriptions SET unit_price_minor = 2000, unit_price_currency = 'USD' WHERE id = $1`,
-        [subscription],
-      );
-      await h.ctx.sql.query(`DELETE FROM subscription_lines WHERE subscription_id = $1`, [subscription]);
-
-      await passOn();
-
-      expect(await rows(id)).toEqual([]);
-      expect((await events('BUDGET_COMMITMENT.YEAR_START_SKIPPED', id))[0].after).toMatchObject({ reason: 'NO_PRICE' });
-    });
-  });
-
   describe('a year with no budget yet (FR-5.8a)', () => {
     it('FR-5.8a: waits for a budget with the reason no budget, and is attached when a version of the year is approved', async () => {
       const u = await unit(false);

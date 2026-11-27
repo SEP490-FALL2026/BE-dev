@@ -33,6 +33,8 @@ export interface DemoAccountsPort {
   create(specs: readonly DemoAccountSpec[]): Promise<DemoAccountPlanItem[]>;
   /** Moves the submission deadline of the cycle of `year` to a day that has passed and leaves it there. */
   lockBudgetCycle(year: number, lockedDeadline: string): Promise<void>;
+  /** Records idempotent `seat_month_runs` marks for closed months `1..upToMonth` before request spend checks. */
+  markClosedSeatMonths?(year: number, upToMonth: number, subscriptionIds: readonly string[]): Promise<number>;
 }
 
 /** The ids the steps find or create, by the fixture's keys and codes. */

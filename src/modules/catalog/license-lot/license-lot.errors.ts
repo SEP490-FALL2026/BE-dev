@@ -131,3 +131,11 @@ export class LicenseLotVendorAdminsRequiredError extends Error {
     this.name = 'LicenseLotVendorAdminsRequiredError';
   }
 }
+
+/** The application of the plan has been retired: no new license lot can be bought for it (`Q-1`). */
+export class LicenseLotApplicationRetiredError extends Error {
+  constructor() {
+    super('The application of this plan has been retired: no new license lot can be bought for it.');
+    this.name = 'LicenseLotApplicationRetiredError';
+  }
+}

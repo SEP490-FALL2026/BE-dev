@@ -97,6 +97,28 @@ describe('what a department is expected to have spent, held and waiting (expecte
     expect(withRequests.committed + withRequests.pending).toBeGreaterThan(none.committed + none.pending);
     expect(none.committed + none.pending).toBe(0);
   });
+
+  it('L-2: counts only months after lastClosedMonth for runningUncommitted of a K2 seat held from January (W3-08)', () => {
+    const subscription = F.subscriptions.find(
+      (candidate) => candidate.key === 'jira-standard' || candidate.plan === 'jira-standard',
+    )!;
+    const price = Number(subscription.unitPrice!.amount);
+    const sample = {
+      ...F,
+      requests: [],
+      seats: [
+        {
+          holder: 'NV-DEV5',
+          subscription: subscription.key,
+          grantedDaysAgo: 400,
+        },
+      ],
+    };
+
+    expect(expectedOf(sample, 'ENG', '2026-11-17').runningUncommitted).toBe(price * 2);
+    expect(expectedOf(sample, 'ENG', '2026-10-01').runningUncommitted).toBe(price * 3);
+    expect(expectedOf(sample, 'ENG', '2026-01-05').runningUncommitted).toBe(price * 12);
+  });
 });
 
 /** Requests of the Board and of Finance of the kind T12 brings, so the lights of those two can be counted for. */

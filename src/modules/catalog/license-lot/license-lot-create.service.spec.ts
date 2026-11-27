@@ -3,7 +3,7 @@ import type { ApiException } from '../../../infrastructure/http/errors/api.excep
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { LockedPlan } from '../plan/plan-facts.service';
 import type { CreateLicenseLotInput } from '../public/license-lot.types';
-import { LicenseLotVendorAdminsRequiredError } from './license-lot.errors';
+import { LicenseLotApplicationRetiredError, LicenseLotVendorAdminsRequiredError } from './license-lot.errors';
 import { toLicenseLotApiException } from './license-lot.http-errors';
 import { LicenseLotCreateService } from './license-lot-create.service';
 
@@ -23,7 +23,7 @@ const baseInput: CreateLicenseLotInput = {
   workspaceId: 'ws-1',
 };
 
-const makePlan = (hasAdminConsole: boolean): LockedPlan => ({
+const makePlan = (hasAdminConsole: boolean, applicationStatus: 'APPROVED' | 'RETIRED' = 'APPROVED'): LockedPlan => ({
   id: 'plan-k4',
   name: 'JetBrains All Products',
   provisioningType: 'K4',
@@ -35,12 +35,13 @@ const makePlan = (hasAdminConsole: boolean): LockedPlan => ({
   applicationId: 'app-1',
   applicationName: 'JetBrains',
   applicationKind: 'LICENSED',
-  applicationStatus: 'APPROVED',
+  applicationStatus,
   applicationVendorId: 'vendor-1',
 });
 
 function setup(options: {
   hasAdminConsole: boolean;
+  applicationStatus?: 'APPROVED' | 'RETIRED';
   bound?: boolean;
   closed?: boolean;
   workingCount?: number;
@@ -48,7 +49,7 @@ function setup(options: {
 }) {
   const tx = { tag: 'tx' } as unknown as DbTx;
   const order: string[] = [];
-  const plan = makePlan(options.hasAdminConsole);
+  const plan = makePlan(options.hasAdminConsole, options.applicationStatus ?? 'APPROVED');
   const insert = jest.fn().mockImplementation(() =>
     Promise.resolve({
       id: 'lot-1',
@@ -77,7 +78,7 @@ function setup(options: {
     return Promise.resolve(options.resolvedWorkspaceId === undefined ? 'ws-1' : options.resolvedWorkspaceId);
   });
   const workingAdminCount = jest.fn().mockResolvedValue(options.workingCount ?? 0);
-  const lockShared = jest.fn().mockImplementation(() => {
+  const lockSharedWithApplication = jest.fn().mockImplementation(() => {
     order.push('lockPlan:7');
 
     return Promise.resolve(plan);
@@ -94,7 +95,7 @@ function setup(options: {
 
   const service = new LicenseLotCreateService(
     { insert } as never,
-    { lookups: jest.fn().mockResolvedValue([plan]), lockShared } as never,
+    { lookups: jest.fn().mockResolvedValue([plan]), lockSharedWithApplication } as never,
     { resolveAndLock, workingAdminCount } as never,
     {
       readUnitPrice: jest.fn().mockResolvedValue({ amountMinor: 12_000_000n, currency: 'VND' }),
@@ -106,7 +107,16 @@ function setup(options: {
     baselinePhase as never,
   );
 
-  return { service, insert, resolveAndLock, workingAdminCount, lockShared, isClosed, baselinePhase, order };
+  return {
+    service,
+    insert,
+    resolveAndLock,
+    workingAdminCount,
+    lockSharedWithApplication,
+    isClosed,
+    baselinePhase,
+    order,
+  };
 }
 
 describe('LicenseLotCreateService workspace >= 2 working admin gate (W3-12, W3-24)', () => {
@@ -212,5 +222,23 @@ describe('LicenseLotCreateService workspace >= 2 working admin gate (W3-12, W3-2
     );
     expect(workingAdminCount).not.toHaveBeenCalled();
     expect(insert).not.toHaveBeenCalled();
+  });
+
+  it('refuses with 422 LICENSE_LOT.APPLICATION_RETIRED when the plan application is RETIRED (Q-1)', async () => {
+    const { service, insert } = setup({ hasAdminConsole: false, applicationStatus: 'RETIRED' });
+
+    let thrown: unknown;
+    try {
+      await service.create(actor, baseInput);
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(LicenseLotApplicationRetiredError);
+    expect(insert).not.toHaveBeenCalled();
+
+    const httpError = toLicenseLotApiException(thrown) as ApiException;
+    expect(httpError.getStatus()).toBe(422);
+    expect(httpError.getResponse()).toMatchObject({ code: 'LICENSE_LOT.APPLICATION_RETIRED' });
   });
 });

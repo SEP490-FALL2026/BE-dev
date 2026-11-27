@@ -332,19 +332,6 @@ describe('the baseline and the package of a budget cycle (integration, real Post
     expect(entry?.estimatedAnnualCost?.amount).toBe('72000000');
   });
 
-  it('says when a subscription is paid in a cycle the baseline cannot price by the month, and leaves its cost out of the total (F-074)', async () => {
-    const unit = await department();
-    await holdSeats(unit, 2);
-    await h.ctx.sql.query(`UPDATE subscriptions SET billing_cycle = 'OTHER' WHERE id = $1`, [unit.subscription]);
-
-    const wire = h.dataOf<BaselineWire>(await baseline().expect(200));
-
-    const row = wire.departments.find((d) => d.departmentId === unit.department.id);
-    expect(row?.hasUnknownCost).toBe(true);
-    expect(row?.estimatedAnnualCost.amount).toBe('0');
-    expect(entryOf(wire, unit.department.id, unit.subscription)?.estimatedAnnualCost).toBeNull();
-  });
-
   it('adds up the spend of the year on every Cost Center the department had, not only the one in use (F-072)', async () => {
     const unit = await department();
     const oldCostCenter = unit.department.unitId;

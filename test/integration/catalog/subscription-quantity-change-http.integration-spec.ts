@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { SeatHarness } from '../../support/seat-baseline-harness';
 
@@ -201,18 +202,7 @@ describe('subscription quantity change rules (real PostgreSQL)', () => {
         [id],
       )
     ).rows[0];
-    const purchaseRes = await request(h.server())
-      .post(`/api/v1/subscription-lines/${lineRow.id}/purchases`)
-      .set(h.as(h.it1))
-      .send({
-        kind: 'TOP_UP',
-        quantity: 2,
-        purchasedOn: lineRow.today,
-        invoiceObligation: 'NONE',
-        expectedUpdatedAt: lineRow.updated_at.toISOString(),
-      })
-      .expect(201);
-    const updatedAt = h.dataOf<{ line: { updatedAt: string }; entry: { id: string } }>(purchaseRes);
+    const lineUpdatedAt = lineRow.updated_at.toISOString();
 
     for (const badNote of [undefined, '', '   ']) {
       const corrRes = await request(h.server())
@@ -222,23 +212,29 @@ describe('subscription quantity change rules (real PostgreSQL)', () => {
           delta: 1,
           effectiveOn: lineRow.today,
           ...(badNote === undefined ? {} : { note: badNote }),
-          expectedUpdatedAt: updatedAt.line.updatedAt,
+          expectedUpdatedAt: lineUpdatedAt,
         })
         .expect(422);
       expect(h.codeOf(corrRes)).toBe('VALIDATION_ERROR');
+      const corrIssues = h.detailsOf(corrRes).issues as Array<{ path: string }>;
+      expect(corrIssues.length).toBeGreaterThan(0);
+      expect(corrIssues.every((issue) => issue.path === 'note')).toBe(true);
 
       const redRes = await request(h.server())
         .post(`/api/v1/subscription-lines/${lineRow.id}/seat-reductions`)
         .set(h.as(h.it1))
         .send({
-          refundedSeatChangeId: updatedAt.entry.id,
+          refundedSeatChangeId: randomUUID(),
           quantity: 1,
           effectiveOn: lineRow.today,
           ...(badNote === undefined ? {} : { note: badNote }),
-          expectedUpdatedAt: updatedAt.line.updatedAt,
+          expectedUpdatedAt: lineUpdatedAt,
         })
         .expect(422);
       expect(h.codeOf(redRes)).toBe('VALIDATION_ERROR');
+      const redIssues = h.detailsOf(redRes).issues as Array<{ path: string }>;
+      expect(redIssues.length).toBeGreaterThan(0);
+      expect(redIssues.every((issue) => issue.path === 'note')).toBe(true);
     }
   });
 

@@ -56,21 +56,74 @@ describe('a subscription has no owning department: no finance gate on a change, 
     await h.stop();
   });
 
+  const lineOf = async (subscriptionId: string) =>
+    (
+      await h.ctx.sql.query<{ id: string; updated_at: Date; today: string }>(
+        `SELECT id, updated_at, (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date::text AS today
+           FROM subscription_lines WHERE subscription_id = $1`,
+        [subscriptionId],
+      )
+    ).rows[0];
+
   describe('a change that creates, raises or extends what is owed asks no Cost Center', () => {
     it.each([
-      ['more seats bought', { purchasedQuantity: 11 }],
       ['the end date later than the stored one', { endDate: '2028-12-31' }],
       ['auto renewal switched on', { autoRenew: true }],
-      ['a higher unit price', { unitPrice: { amount: '1500000', currency: 'VND' } }],
     ])('is allowed for a K1 and a K2 subscription alike: %s', async (_name, body) => {
       expect((await patch(k1WithoutUnit, body)).status).toBe(200);
       expect((await patch(k2WithoutUnit, body)).status).toBe(200);
     });
 
-    it('stores the change', async () => {
-      expect((await patch(k1WithoutUnit, { purchasedQuantity: 20, endDate: '2029-12-31' })).status).toBe(200);
+    it('is allowed for a higher unit price: K1 on PATCH /subscriptions/:id and K2 via PATCH /subscription-lines/:id', async () => {
+      expect((await patch(k1WithoutUnit, { unitPrice: { amount: '1500000', currency: 'VND' } })).status).toBe(200);
 
-      expect(await stored(k1WithoutUnit)).toMatchObject({ purchased_quantity: 20, end_date: '2029-12-31' });
+      const line = await lineOf(k2WithoutUnit);
+      await request(h.server())
+        .patch(`/api/v1/subscription-lines/${line.id}`)
+        .set(h.as(h.it1))
+        .send({
+          monthlyUnitPrice: { amount: '1500000', currency: 'VND' },
+          expectedUpdatedAt: line.updated_at.toISOString(),
+        })
+        .expect(200);
+    });
+
+    it('is allowed for more seats bought through the seat ledger (K2 line seat-correction) without a Cost Center', async () => {
+      const line = await lineOf(k2WithoutUnit);
+      await request(h.server())
+        .post(`/api/v1/subscription-lines/${line.id}/seat-corrections`)
+        .set(h.as(h.it1))
+        .send({
+          delta: 1,
+          effectiveOn: line.today,
+          note: 'More seats needed',
+          expectedUpdatedAt: line.updated_at.toISOString(),
+        })
+        .expect(201);
+    });
+
+    it('stores the change', async () => {
+      expect((await patch(k2WithoutUnit, { endDate: '2029-12-31' })).status).toBe(200);
+
+      const line = await lineOf(k2WithoutUnit);
+      await request(h.server())
+        .post(`/api/v1/subscription-lines/${line.id}/seat-corrections`)
+        .set(h.as(h.it1))
+        .send({
+          delta: 9,
+          effectiveOn: line.today,
+          note: 'Raise seats to 20',
+          expectedUpdatedAt: line.updated_at.toISOString(),
+        })
+        .expect(201);
+
+      expect(await stored(k2WithoutUnit)).toMatchObject({ end_date: '2029-12-31' });
+      const view = h.dataOf<{
+        purchasedQuantity: number;
+        lines: Array<{ seatsToday: number }>;
+        endDate: string | null;
+      }>(await request(h.server()).get(`/api/v1/subscriptions/${k2WithoutUnit}`).set(h.as(h.it1)).expect(200));
+      expect(view).toMatchObject({ purchasedQuantity: 20, endDate: '2029-12-31', lines: [{ seatsToday: 20 }] });
     });
   });
 

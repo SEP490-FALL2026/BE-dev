@@ -216,7 +216,7 @@ describe('license key import and the kind of its plan, racing (integration, P28-
     expect(dataStatements(many.statements)).toHaveLength(dataStatements(few.statements).length);
   });
 
-  it('R-1: real POST /applications/:id/retire blocks later lot key import with LICENSE_KEY.APPLICATION_RETIRED', async () => {
+  it('R-1: real POST /applications/:id/retire blocks later lot creation and lot key import with 422 APPLICATION_RETIRED', async () => {
     const planId = await h.plan('K4');
     const appId = (
       await h.ctx.sql.query<{ application_id: string }>(`SELECT application_id FROM plans WHERE id = $1`, [planId])
@@ -237,12 +237,113 @@ describe('license key import and the kind of its plan, racing (integration, P28-
 
     await request(h.server()).post(`/api/v1/applications/${appId}/retire`).set(h.as(h.it1)).expect(200);
 
+    const lotAfter = await request(h.server())
+      .post('/api/v1/license-lots')
+      .set(h.as(h.it1))
+      .send({
+        planId,
+        purchasedOn: '2026-11-25',
+        licenseCount: 2,
+        unitPrice: { amount: '100000', currency: 'VND' },
+        purpose: 'STOCK',
+      })
+      .expect(422);
+    expect(h.codeOf(lotAfter)).toBe('LICENSE_LOT.APPLICATION_RETIRED');
+    expect((await h.ctx.sql.query(`SELECT 1 FROM license_lots WHERE plan_id = $1`, [planId])).rowCount).toBe(1);
+
     const keysAfter = await request(h.server())
       .post(`/api/v1/license-lots/${lotId}/keys`)
       .set(h.as(h.it1))
       .send({ keys: [key('RETIRED')] })
       .expect(422);
     expect(h.codeOf(keysAfter)).toBe('LICENSE_KEY.APPLICATION_RETIRED');
+  });
+
+  it('R-1: deterministic race between POST /applications/:id/retire and POST /license-lots serializes without deadlock', async () => {
+    const planId = await h.plan('K4');
+    const appId = (
+      await h.ctx.sql.query<{ application_id: string }>(`SELECT application_id FROM plans WHERE id = $1`, [planId])
+    ).rows[0].application_id;
+
+    await holder.query('BEGIN');
+    await holder.query(`SELECT id FROM applications WHERE id = $1 FOR UPDATE`, [appId]);
+
+    const retiring = request(h.server())
+      .post(`/api/v1/applications/${appId}/retire`)
+      .set(h.as(h.it1))
+      .then((response) => response);
+    await waitForLockWaiters(h.ctx.sql, 1);
+
+    const creating = request(h.server())
+      .post('/api/v1/license-lots')
+      .set(h.as(h.it1))
+      .send({
+        planId,
+        purchasedOn: '2026-11-25',
+        licenseCount: 2,
+        unitPrice: { amount: '100000', currency: 'VND' },
+        purpose: 'STOCK',
+      })
+      .then((response) => response);
+    await waitForLockWaiters(h.ctx.sql, 2);
+    await holder.query('ROLLBACK');
+
+    expect((await retiring).status).toBe(200);
+    const createRes = await creating;
+    expect([201, 422]).toContain(createRes.status);
+    const lotCount = (await h.ctx.sql.query(`SELECT 1 FROM license_lots WHERE plan_id = $1`, [planId])).rowCount;
+    if (createRes.status === 422) {
+      expect(h.codeOf(createRes)).toBe('LICENSE_LOT.APPLICATION_RETIRED');
+      expect(lotCount).toBe(0);
+    } else {
+      expect(lotCount).toBe(1);
+    }
+
+    const followUp = await request(h.server())
+      .post('/api/v1/license-lots')
+      .set(h.as(h.it1))
+      .send({
+        planId,
+        purchasedOn: '2026-11-25',
+        licenseCount: 2,
+        unitPrice: { amount: '100000', currency: 'VND' },
+        purpose: 'STOCK',
+      })
+      .expect(422);
+    expect(h.codeOf(followUp)).toBe('LICENSE_LOT.APPLICATION_RETIRED');
+  });
+
+  it('R-1: concurrent POST /applications/:id/retire and POST /license-lots over real routes produce one consistent outcome', async () => {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const planId = await h.plan('K4');
+      const appId = (
+        await h.ctx.sql.query<{ application_id: string }>(`SELECT application_id FROM plans WHERE id = $1`, [planId])
+      ).rows[0].application_id;
+
+      const [retireRes, createRes] = await Promise.all([
+        request(h.server()).post(`/api/v1/applications/${appId}/retire`).set(h.as(h.it1)),
+        request(h.server())
+          .post('/api/v1/license-lots')
+          .set(h.as(h.it1))
+          .send({
+            planId,
+            purchasedOn: '2026-11-25',
+            licenseCount: 2,
+            unitPrice: { amount: '100000', currency: 'VND' },
+            purpose: 'STOCK',
+          }),
+      ]);
+
+      expect(retireRes.status).toBe(200);
+      expect([201, 422]).toContain(createRes.status);
+      const lotCount = (await h.ctx.sql.query(`SELECT 1 FROM license_lots WHERE plan_id = $1`, [planId])).rowCount;
+      if (createRes.status === 422) {
+        expect(h.codeOf(createRes)).toBe('LICENSE_LOT.APPLICATION_RETIRED');
+        expect(lotCount).toBe(0);
+      } else {
+        expect(lotCount).toBe(1);
+      }
+    }
   });
 
   it('R-1: deterministic race between POST /license-lots/:id/keys and POST /applications/:id/retire serializes without deadlock and blocks follow-up imports', async () => {

@@ -42,24 +42,20 @@ describe('a month of the seats of a K2 pool is charged to the departments of the
     await h.stop();
   });
 
-  /** A subscription of the shared pool of a K2 plan at 400.000 đ a seat a month. */
+  /** A subscription of the shared pool of a K2 plan at 400.000 đ a seat a month (declared on 01/01 so the ledger opens at year-start). */
   async function newPool(): Promise<string> {
-    const pool = await takeOwnerOff(h, await h.subscription(10, 'K2'));
-    await h.ctx.sql.query(
-      `UPDATE subscriptions
-          SET unit_price_minor = 400000, price_reporting_minor = 400000, monthly_unit_price_minor = 400000
-        WHERE id = $1`,
-      [pool],
-    );
-    await h.ctx.sql.query(
-      `UPDATE subscription_lines
-          SET monthly_unit_price_minor = 400000
-        WHERE subscription_id = $1`,
-      [pool],
-    );
-
-    return pool;
+    return takeOwnerOff(h, await h.subscription(10, 'K2', { startDate: `${h.year}-01-01`, monthlyPrice: '400000' }));
   }
+  const atDay = async <T>(day: string, work: () => Promise<T>): Promise<T> => {
+    const clockSpy = pretendBusinessToday(h.ctx.app, day);
+    const todaySpy = jest.spyOn(h, 'today').mockReturnValue(day);
+    try {
+      return await work();
+    } finally {
+      todaySpy.mockRestore();
+      clockSpy.mockRestore();
+    }
+  };
   const department = async (): Promise<Unit> => {
     counter += 1;
     const unit = await h.departmentWithHead(`P-SM${counter}`);
@@ -185,9 +181,12 @@ describe('a month of the seats of a K2 pool is charged to the departments of the
   it('takes the commitment of the seat down by the days of the department whose Cost Center is its own, never by the new department after the transfer; charging again applies nothing more', async () => {
     const pool = await newPool();
     const planId = await h.planOf(pool);
-    const [from, to] = [await department(), await department()];
-    const requestId = await h.waitingForApprover(from, planId, { amount: 400_000 });
-    await h.decideSpend(requestId, { decision: 'APPROVE' }, h.boss.account).expect(200);
+    const { from, to, requestId } = await atDay(`${h.year}-10-01`, async () => {
+      const [f, t] = [await department(), await department()];
+      const reqId = await h.waitingForApprover(f, planId, { amount: 400_000 });
+      await h.decideSpend(reqId, { decision: 'APPROVE' }, h.boss.account).expect(200);
+      return { from: f, to: t, requestId: reqId };
+    });
     const person = await holder('E-SM-T2', from, to, `${h.year}-10-26`);
     await seat(pool, planId, person, { requestId });
 
@@ -218,9 +217,12 @@ describe('a month of the seats of a K2 pool is charged to the departments of the
   it('SM1-01: a seat a renewal carried on still takes down the commitment of the Request that made the first seat, along a chain of three seats', async () => {
     const pool = await newPool();
     const planId = await h.planOf(pool);
-    const unit = await department();
-    const requestId = await h.waitingForApprover(unit, planId, { amount: 4_800_000 });
-    await h.decideSpend(requestId, { decision: 'APPROVE' }, h.boss.account).expect(200);
+    const { unit, requestId } = await atDay(`${h.year}-07-01`, async () => {
+      const u = await department();
+      const reqId = await h.waitingForApprover(u, planId, { amount: 4_800_000 });
+      await h.decideSpend(reqId, { decision: 'APPROVE' }, h.boss.account).expect(200);
+      return { unit: u, requestId: reqId };
+    });
     const person = await holder('E-SM-CARRY', unit);
     const first = await seat(pool, planId, person, {
       validFrom: `${h.year}-01-01`,
@@ -366,19 +368,17 @@ describe('a month of the seats of a K2 pool is charged to the departments of the
   });
 
   it('SM1-04: a pool of 10 seats bought for a year from 01/07 is the line of 600.000 each month (10 seats paid at 300.000, 8 held), 3.600.000 for the six months, not the year in the month it was invoiced; the pool of a department does not enter it', async () => {
-    const pool = await newPool();
+    const pool = await takeOwnerOff(
+      h,
+      await h.subscription(10, 'K2', {
+        startDate: `${h.year}-07-01`,
+        endDate: `${h.year + 1}-06-30`,
+        billingCycle: 'ANNUAL',
+        monthlyPrice: '300000',
+      }),
+    );
     const planId = await h.planOf(pool);
     const vendorId = (await h.vendorOf(planId)).id;
-    await h.ctx.sql.query(
-      `UPDATE subscriptions SET unit_price_minor = 3600000, price_reporting_minor = 3600000,
-          monthly_unit_price_minor = 300000, billing_cycle = 'ANNUAL',
-          purchased_quantity = 10, start_date = $2, end_date = $3 WHERE id = $1`,
-      [pool, `${h.year}-07-01`, `${h.year + 1}-06-30`],
-    );
-    await h.ctx.sql.query(
-      `UPDATE subscription_lines SET monthly_unit_price_minor = 300000 WHERE subscription_id = $1`,
-      [pool],
-    );
     const unit = await department();
     for (let index = 0; index < 8; index += 1) {
       await seat(pool, planId, await holder(`E-SM-YR${index}`, unit), { validFrom: `${h.year}-07-01` });
@@ -426,18 +426,25 @@ describe('a month of the seats of a K2 pool is charged to the departments of the
         [requestId],
       )
     ).rows;
-  const approvedRequest = async (unit: Unit, planId: string, amount: number): Promise<string> => {
-    const requestId = await h.waitingForApprover(unit, planId, { amount });
-    await h.decideSpend(requestId, { decision: 'APPROVE' }, h.boss.account).expect(200);
+  const approvedUnit = async (planId: string, amount: number): Promise<{ unit: Unit; requestId: string }> =>
+    atDay(`${h.year}-10-01`, async () => {
+      const unit = await department();
+      const requestId = await h.waitingForApprover(unit, planId, { amount });
+      await h.decideSpend(requestId, { decision: 'APPROVE' }, h.boss.account).expect(200);
 
-    return requestId;
-  };
+      return { unit, requestId };
+    });
 
   it('SM1-06: a month charged again after the person moved earlier gives back what the old department applied, never applies the commitment of another Cost Center, and charging a third time changes nothing', async () => {
     const pool = await newPool();
     const planId = await h.planOf(pool);
-    const [from, to] = [await department(), await department()];
-    const requestId = await approvedRequest(from, planId, 400_000);
+    const { from, to, requestId } = await atDay(`${h.year}-10-01`, async () => {
+      const [f, t] = [await department(), await department()];
+      const reqId = await h.waitingForApprover(f, planId, { amount: 400_000 });
+      await h.decideSpend(reqId, { decision: 'APPROVE' }, h.boss.account).expect(200);
+
+      return { from: f, to: t, requestId: reqId };
+    });
     const person = await holder('E-SM-REV', from, to, `${h.year}-10-26`);
     await seat(pool, planId, person, { requestId });
     await service().chargeMonth(month());
@@ -470,8 +477,7 @@ describe('a month of the seats of a K2 pool is charged to the departments of the
   it('SM1-06: a commitment that became an expense is held again for what a seat-month no longer applies, and what the rows of the seat apply never exceeds the days it was held', async () => {
     const pool = await newPool();
     const planId = await h.planOf(pool);
-    const unit = await department();
-    const requestId = await approvedRequest(unit, planId, 400_000);
+    const { unit, requestId } = await approvedUnit(planId, 400_000);
     const seatId = await seat(pool, planId, await holder('E-SM-EXP', unit), {
       requestId,
       validFrom: `${h.year}-01-01`,
@@ -488,10 +494,9 @@ describe('a month of the seats of a K2 pool is charged to the departments of the
   });
 
   it('SM1-06: the database lets the applied amount of a commitment go down only by what the reversals add up to, and never changes or removes a reversal', async () => {
-    const unit = await department();
     const pool = await newPool();
     const planId = await h.planOf(pool);
-    const requestId = await approvedRequest(unit, planId, 400_000);
+    const { unit, requestId } = await approvedUnit(planId, 400_000);
     await seat(pool, planId, await holder('E-SM-GRD', unit), { requestId, validFrom: `${h.year}-01-01` });
     await service().chargeMonth(month());
     const [commitment] = (

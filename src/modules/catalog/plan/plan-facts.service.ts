@@ -75,6 +75,11 @@ export class PlanFactsService implements ApplicationPlans {
     return this.plans.lockSharedLookup(tx, id);
   }
 
+  /** Locks the application `FOR SHARE` before locking the plan `FOR SHARE` so retirement cannot commit in between. */
+  lockSharedWithApplication(tx: DbTx, id: string): Promise<LockedPlan | null> {
+    return this.plans.lockSharedWithApplicationLookup(tx, id);
+  }
+
   /** The plan, locked `FOR UPDATE` until the transaction ends; null if absent. */
   lockExclusive(tx: DbTx, id: string): Promise<LockedPlan | null> {
     return this.plans.lockExclusiveLookup(tx, id);

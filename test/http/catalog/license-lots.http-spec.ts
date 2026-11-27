@@ -2,7 +2,10 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { LicenseLotCreateService as CatalogLicenseLotCreateService } from '../../../src/modules/catalog/license-lot/license-lot-create.service';
-import { LicenseLotVendorAdminsRequiredError } from '../../../src/modules/catalog/license-lot/license-lot.errors';
+import {
+  LicenseLotApplicationRetiredError,
+  LicenseLotVendorAdminsRequiredError,
+} from '../../../src/modules/catalog/license-lot/license-lot.errors';
 import { bodyOf } from '../../support/api-body';
 import { bearer, createHttpContractApp, principal } from '../../support/http-contract-app';
 
@@ -228,6 +231,20 @@ describe('W3-12 & W3-24: POST /license-lots workspace admin gate HTTP contract',
     expect(bodyOf(response).error).toMatchObject({
       code: 'LICENSE_LOT.VENDOR_ADMINS_REQUIRED',
       details: { planId: ID, given: 1, required: 2 },
+    });
+  });
+
+  it('maps LicenseLotApplicationRetiredError to 422 LICENSE_LOT.APPLICATION_RETIRED', async () => {
+    create.mockRejectedValueOnce(new LicenseLotApplicationRetiredError());
+
+    const response = await request(app.getHttpServer())
+      .post(LOTS)
+      .set('Authorization', bearer(principal(['IT_ADMIN'])))
+      .send({ ...CREATE, workspaceId: OTHER })
+      .expect(422);
+
+    expect(bodyOf(response).error).toMatchObject({
+      code: 'LICENSE_LOT.APPLICATION_RETIRED',
     });
   });
 });

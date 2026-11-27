@@ -66,6 +66,11 @@ const LOT_REFUSALS = {
     'LICENSE_LOT.PRICE_NOT_VND',
     'The unit price of a lot is entered in dong only.',
   ),
+  applicationRetired: refusedLot(
+    HttpStatus.UNPROCESSABLE_ENTITY,
+    'LICENSE_LOT.APPLICATION_RETIRED',
+    'The application of this plan has been retired: no new license lot can be bought for it.',
+  ),
   vendorAdminsRequired: new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, {
     code: 'LICENSE_LOT.VENDOR_ADMINS_REQUIRED',
     message: 'The plan needs at least 2 different working IT Admins who administer it at the vendor.',
@@ -111,10 +116,11 @@ export class LicenseLotCreateController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The request is invalid (VALIDATION_ERROR), the plan is not a plan of keys bought once, the purpose does not fit the plan, a lot for a request has no open grant task, the workspace has fewer than two working IT Admins once the seat baseline is closed, or the workspace, the contract or the price does not fit (LICENSE_LOT.PLAN_NOT_K4, LICENSE_LOT.PURPOSE_NOT_AVAILABLE, LICENSE_LOT.REQUEST_REQUIRED, LICENSE_LOT.VENDOR_ADMINS_REQUIRED, LICENSE_LOT.WORKSPACE_REQUIRED, LICENSE_LOT.CONTRACT_VENDOR_MISMATCH).',
+        'The request is invalid (VALIDATION_ERROR), the application is retired, the plan is not a plan of keys bought once, the purpose does not fit the plan, a lot for a request has no open grant task, the workspace has fewer than two working IT Admins once the seat baseline is closed, or the workspace, the contract or the price does not fit (LICENSE_LOT.APPLICATION_RETIRED, LICENSE_LOT.PLAN_NOT_K4, LICENSE_LOT.PURPOSE_NOT_AVAILABLE, LICENSE_LOT.REQUEST_REQUIRED, LICENSE_LOT.VENDOR_ADMINS_REQUIRED, LICENSE_LOT.WORKSPACE_REQUIRED, LICENSE_LOT.CONTRACT_VENDOR_MISMATCH).',
       examples: [
         VALIDATION_EXAMPLE,
         errorExampleOf(requestRequired),
+        errorExampleOf(LOT_REFUSALS.applicationRetired),
         errorExampleOf(LOT_REFUSALS.planNotK4),
         errorExampleOf(LOT_REFUSALS.purposeNotAvailable),
         errorExampleOf(LOT_REFUSALS.workspaceRequired),

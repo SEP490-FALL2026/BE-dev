@@ -337,8 +337,8 @@ describe('the money held for a seat goes back by the day (RV-07, M-06, M-10; int
   });
 
   it('the same right taken back in the middle of its term gives back the months that had not begun and the days of the month it is taken back in, not the whole commitment', async () => {
-    const clockSpy = pretendBusinessToday(h.ctx.app, `${h.year}-01-15`);
-    const todaySpy = jest.spyOn(h, 'today').mockReturnValue(`${h.year}-01-15`);
+    const clockSpy = pretendBusinessToday(h.ctx.app, `${h.year}-03-15`);
+    const todaySpy = jest.spyOn(h, 'today').mockReturnValue(`${h.year}-03-15`);
     try {
       const id = await approvedWithTerm(await unit(), 3);
       await setSeatMonthly(id, MONTHLY);

@@ -15,6 +15,7 @@ import {
 } from '../workspace/workspace.errors';
 import { LicenseLotAlreadyInvoicedError, LicenseLotReservedForRequestError } from '../public/catalog.errors';
 import {
+  LicenseLotApplicationRetiredError,
   LicenseLotContractReasonRequiredError,
   LicenseLotKeysExceedLicensesError,
   LicenseLotMismatchError,
@@ -107,6 +108,9 @@ export function toLicenseLotApiException(error: unknown): unknown {
   if (error instanceof LicenseLotPriceNotVndError) {
     return refuse(UNPROCESSABLE, 'LICENSE_LOT.PRICE_NOT_VND', error.message, { currency: error.currency });
   }
+  if (error instanceof LicenseLotApplicationRetiredError) {
+    return refuse(UNPROCESSABLE, 'LICENSE_LOT.APPLICATION_RETIRED', error.message);
+  }
   if (error instanceof LicenseLotVendorAdminsRequiredError) {
     return refuse(UNPROCESSABLE, 'LICENSE_LOT.VENDOR_ADMINS_REQUIRED', error.message, {
       planId: error.planId,
@@ -140,6 +144,7 @@ export const LICENSE_LOT_ERROR_EXAMPLES = {
   RESPONSIBLE_NOT_IT_ADMIN: example(new LicenseLotResponsibleNotItAdminError()),
   KEYS_EXCEED_LICENSES: example(new LicenseLotKeysExceedLicensesError(3, 3)),
   PRICE_NOT_VND: example(new LicenseLotPriceNotVndError('USD')),
+  APPLICATION_RETIRED: example(new LicenseLotApplicationRetiredError()),
   VENDOR_ADMINS_REQUIRED: example(new LicenseLotVendorAdminsRequiredError('<plan-id>', 1, 2)),
   MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(2, 'unitPrice')),
   MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError('unitPrice')),

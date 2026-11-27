@@ -38,7 +38,7 @@ export interface Expected {
   month: number;
   /** What the seats of the pool cost the department through that month, by the days each was held. */
   spentThrough: number;
-  /** What open baseline seats in the year still cost from `today` through year-end (`running-uncommitted.policy.ts`). */
+  /** Calendar months still open in the year after the last closed `seat_month_runs` month for baseline seats held on `today` (`running-uncommitted.policy.ts`). */
   runningUncommitted: number;
   /** What the decided requests of the department hold for the year. */
   committed: number;
@@ -109,6 +109,7 @@ function k2SeatInfo(
 function seatRunningUncommitted(
   fixture: Basis,
   today: Day,
+  closedMonth: number,
   yearStart: Day,
   yearEnd: Day,
   department: string,
@@ -123,19 +124,22 @@ function seatRunningUncommitted(
   const effectiveStart = [heldFrom, periodStart, yearStart].reduce((latest, day) => (day > latest ? day : latest));
   if (effectiveStart > yearEnd || lastHeld < effectiveStart) return 0;
   const capped = lastHeld < yearEnd ? lastHeld : yearEnd;
-  const months = Number(capped.slice(5, 7)) - Number(effectiveStart.slice(5, 7)) + 1;
+  const fromMonth = Math.max(Number(effectiveStart.slice(5, 7)), closedMonth + 1);
+  const toMonth = Number(capped.slice(5, 7));
+  const months = toMonth - fromMonth + 1;
 
   return months > 0 ? monthlyPriceOf(info.subscription, info.planKey) * months : 0;
 }
 
-/** Remaining un-run calendar months in `year` from `max(heldFrom, periodStart, yearStart)` through the end of each open baseline K2 seat. */
+/** Remaining un-run calendar months in `year` (excluding months `<= lastClosedMonth(today)` already closed in `seat_month_runs`) of each open baseline K2 seat (`W3-08`). */
 function runningUncommittedOf(fixture: Basis, today: Day, department: string): number {
   const year = Number(today.slice(0, 4));
+  const closedMonth = lastClosedMonth(today);
   const yearStart = `${year}-01-01`;
   const yearEnd = `${year}-12-31`;
 
   return fixture.seats.reduce(
-    (total, seat) => total + seatRunningUncommitted(fixture, today, yearStart, yearEnd, department, seat),
+    (total, seat) => total + seatRunningUncommitted(fixture, today, closedMonth, yearStart, yearEnd, department, seat),
     0,
   );
 }
