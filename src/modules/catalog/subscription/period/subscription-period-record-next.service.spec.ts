@@ -1,10 +1,12 @@
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import type { AuditApi } from '../../../audit/public/audit.api';
+import type { FinanceApi } from '../../../finance/public/finance.api';
+import type { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import type { OperatingParametersApi } from '../../../operating-parameters/public/operating-parameters.api';
 import type { PlanFactsService } from '../../plan/plan-facts.service';
 import type { SubscriptionPeriodLinesService } from '../../subscription-line/subscription-period-lines.service';
 import type { SubscriptionPoolService } from '../pool/subscription-pool.service';
-import type { SubscriptionPricingService } from '../subscription-pricing.service';
+import { SubscriptionPricingService } from '../subscription-pricing.service';
 import type { SubscriptionRepo } from '../subscription.repo';
 import type { SubscriptionRecord } from '../subscription.types';
 import { SubscriptionWindowsService } from '../subscription-windows.service';
@@ -56,7 +58,8 @@ function prevRecord(): SubscriptionRecord {
 }
 
 describe('SubscriptionPeriodService.recordNext multi-line ACTIVE pricing', () => {
-  it('populates non-null unitPrice and priceSnapshot when continuing a multi-line ACTIVE period so subscriptions_active_complete holds', async () => {
+  /** Renews the two-line period with the lines in the order given and returns what was inserted. */
+  async function renewWith(lines: { previousLineId: string; quantity: number }[]) {
     const subscriptions = {
       findMany: jest.fn(),
       find: jest.fn().mockResolvedValue(prevRecord()),
@@ -73,12 +76,14 @@ describe('SubscriptionPeriodService.recordNext multi-line ACTIVE pricing', () =>
         applicationStatus: 'ACTIVE',
       }),
     };
-    const pricing = {
-      read: jest.fn(),
-      priceToday: jest.fn(),
-      businessToday: jest.fn().mockResolvedValue(TODAY),
-      getOrganization: jest.fn().mockResolvedValue({ id: 'org-1' }),
-    };
+    // The real pricing: the price recorded today and the snapshot of the same currency are what the renewal writes.
+    const pricing = new SubscriptionPricingService(
+      {} as FinanceApi,
+      {
+        businessToday: jest.fn().mockResolvedValue(TODAY),
+        getOrganization: jest.fn().mockResolvedValue({ id: 'org-1' }),
+      } as unknown as OrganizationReadApi,
+    );
     const audit = { record: jest.fn() };
     const pool = { releasePrimary: jest.fn() };
     const parameters = { getValuesAt: jest.fn().mockResolvedValue([30]) };
@@ -111,7 +116,7 @@ describe('SubscriptionPeriodService.recordNext multi-line ACTIVE pricing', () =>
       subscriptions as unknown as SubscriptionRepo,
       {} as SubscriptionPeriodRepo,
       plans as unknown as PlanFactsService,
-      pricing as unknown as SubscriptionPricingService,
+      pricing,
       audit as unknown as AuditApi,
       pool as unknown as SubscriptionPoolService,
       new SubscriptionWindowsService(parameters as unknown as OperatingParametersApi),
@@ -132,24 +137,41 @@ describe('SubscriptionPeriodService.recordNext multi-line ACTIVE pricing', () =>
         allowsMidTermReduction: false,
         renewalId: 'ren-2',
         autoRecorded: true,
-        lines: [
-          { previousLineId: 'line-std', quantity: 12 },
-          { previousLineId: 'line-prm', quantity: 2 },
-        ],
+        lines,
       },
     );
 
-    const inserted = (subscriptions.insert.mock.calls as unknown[][])[0][1] as {
+    return (subscriptions.insert.mock.calls as unknown[][])[0][1] as {
       status?: string;
-      unitPrice?: { amountMinor: bigint; currency: string } | null;
-      priceSnapshot?: { reportingMinor: bigint; rate: bigint } | null;
+      unitPrice?: { amountMinor: bigint; currency: string; recordedOn: string } | null;
+      priceSnapshot?: { reportingMinor: bigint; rate: bigint; rateSource: string } | null;
       monthlyUnitPriceMinor?: bigint | null;
     };
+  }
+
+  const RATE_ONE = 10n ** 10n;
+  const bothLines = [
+    { previousLineId: 'line-std', quantity: 12 },
+    { previousLineId: 'line-prm', quantity: 2 },
+  ];
+
+  it('prices a two-line ANNUAL period at 12 times the monthly price of its first line, with the snapshot of the same currency (RATE_ONE)', async () => {
+    const inserted = await renewWith(bothLines);
+
     expect(inserted).toMatchObject({
       status: 'ACTIVE',
-      unitPrice: { amountMinor: 500000n, currency: 'VND' },
-      priceSnapshot: { reportingMinor: 500000n, rate: 1n },
+      unitPrice: { amountMinor: 6_000_000n, currency: 'VND', recordedOn: TODAY },
+      priceSnapshot: { reportingMinor: 6_000_000n, rate: RATE_ONE, rateSource: 'SAME_CURRENCY' },
       monthlyUnitPriceMinor: 500000n,
+    });
+  });
+
+  it('takes the price of the period from the line named first, not from the plan of the previous period', async () => {
+    const inserted = await renewWith([...bothLines].reverse());
+
+    expect(inserted).toMatchObject({
+      unitPrice: { amountMinor: 30_000_000n, currency: 'VND' },
+      priceSnapshot: { reportingMinor: 30_000_000n, rate: RATE_ONE },
     });
   });
 });

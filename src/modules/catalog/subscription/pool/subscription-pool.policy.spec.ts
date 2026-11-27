@@ -13,7 +13,6 @@ import {
   assertDeclarableCycle,
   assertPoolTerms,
   assertResponsibleNamed,
-  defaultResponsibleOf,
   isLiveSubscription,
   isPooledPlan,
   liveIdsByPlan,
@@ -330,31 +329,5 @@ describe('withoutPeriodsAhead: the seats of the period that runs and of the next
 
   it('excludes a future period whose predecessor is in knownIds (already collected via subscription lines)', () => {
     expect(idsOf(withoutPeriodsAhead([period('b', 'a', '2026-12-15')], TODAY, new Set(['a'])))).toEqual([]);
-  });
-});
-
-describe('the IT Admin a new subscription answers to when the declaration names none (QĐ-111g, BB-3)', () => {
-  const given = (over: Partial<Parameters<typeof defaultResponsibleOf>[0]> = {}) =>
-    defaultResponsibleOf({
-      named: undefined,
-      applicationResponsible: 'it-app',
-      applicationResponsibleIsUsable: true,
-      ...over,
-    });
-
-  it('keeps the one the declaration names, whatever the application has', () => {
-    expect(given({ named: 'it-body' })).toBe('it-body');
-    expect(given({ named: 'it-body', applicationResponsible: null, applicationResponsibleIsUsable: false })).toBe(
-      'it-body',
-    );
-  });
-
-  it('takes the IT Admin responsible for the application when none is named and they are still a usable IT Admin', () => {
-    expect(given()).toBe('it-app');
-  });
-
-  it('leaves it NULL when the application names nobody, or the one it names is no longer a usable IT Admin', () => {
-    expect(given({ applicationResponsible: null, applicationResponsibleIsUsable: false })).toBeNull();
-    expect(given({ applicationResponsible: 'it-gone', applicationResponsibleIsUsable: false })).toBeNull();
   });
 });

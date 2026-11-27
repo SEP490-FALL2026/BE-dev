@@ -172,7 +172,6 @@ describe('SubscriptionService lines[] & draft activation (W3-15)', () => {
       {
         workspaceFor,
         assertNoLiveDuplicate: jest.fn(),
-        responsibleOfDeclaration: jest.fn().mockResolvedValue('emp-khoa'),
         assert: jest.fn(),
         assertVendorAdmins: jest.fn(),
         requireItAdmin: jest.fn(),
@@ -303,7 +302,6 @@ describe('SubscriptionService lines[] & draft activation (W3-15)', () => {
       {
         workspaceFor: jest.fn().mockResolvedValue('ws-1'),
         assertNoLiveDuplicate: jest.fn(),
-        responsibleOfDeclaration: jest.fn().mockResolvedValue('emp-khoa'),
         assert: jest.fn(),
         assertVendorAdmins: jest.fn(),
         requireItAdmin: jest.fn(),

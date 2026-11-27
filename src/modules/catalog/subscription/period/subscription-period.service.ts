@@ -229,10 +229,8 @@ export class SubscriptionPeriodService {
    */
   async recordNext(tx: DbTx, actor: PeriodAuditActor, input: NextPeriodInput): Promise<RenewalPeriodFacts> {
     const previous = await this.requireRenewablePrevious(tx, input);
-    const plan = await this.plans.lockShared(tx, previous.planId);
-    if (!plan || plan.applicationStatus === 'RETIRED') throw new SubscriptionPeriodRefusedError('APPLICATION_RETIRED');
-
     const oldLines = await this.periodLines.linesOf(previous.id, tx);
+    const plan = await this.lockPlansOfPeriod(tx, previous, oldLines);
     const state = this.buildNextState(previous, input);
     this.assertNextPeriod(plan, state, input.billingCycle, previous);
 
@@ -264,6 +262,24 @@ export class SubscriptionPeriodService {
     await this.recordNextLinesAndAudit(tx, organization.id, created, previous, linePricing.resolved, input, actor);
 
     return (await this.withSuccessors([created], tx))[0];
+  }
+
+  /**
+   * Locks `FOR SHARE`, in id order, the plan of the period and the plan of each of its lines, and refuses the renewal when the application of any of
+   * them is retired. Returns the plan of the period. Throws SubscriptionPeriodRefusedError.
+   */
+  private async lockPlansOfPeriod(tx: DbTx, previous: SubscriptionRecord, oldLines: readonly SubscriptionLineRecord[]) {
+    const planIds = [...new Set([previous.planId, ...oldLines.map((line) => line.planId)])].sort();
+    const locked = new Map<string, Awaited<ReturnType<PlanFactsService['lockShared']>>>();
+    for (const planId of planIds) {
+      const plan = await this.plans.lockShared(tx, planId);
+      if (!plan || plan.applicationStatus === 'RETIRED') {
+        throw new SubscriptionPeriodRefusedError('APPLICATION_RETIRED', planId);
+      }
+      locked.set(planId, plan);
+    }
+
+    return locked.get(previous.planId)!;
   }
 
   private buildNextState(previous: SubscriptionRecord, input: NextPeriodInput) {
@@ -349,23 +365,19 @@ export class SubscriptionPeriodService {
     const resolved = await this.resolveInputLines(oldLines, input);
     const kept = resolved.filter((entry) => entry.quantity > 0);
     const single = this.singleLinePrice(kept, oldLines.length, input.billingCycle);
-    const priced = single.unitMoney
-      ? await this.pricing.priceToday(tx, single.unitMoney)
-      : { unitPrice: null, priceSnapshot: null };
+    const first = resolved[0];
+    const unitMoney = first
+      ? resolveSubscriptionPrices({
+          kind: 'TERM',
+          billingCycle: input.billingCycle,
+          cycleChanged: false,
+          sentMonthly: { amountMinor: first.monthlyUnitPriceMinor, currency: 'VND' },
+          sentUnit: undefined,
+        }).unitMoney
+      : null;
+    const priced = await this.pricing.priceToday(tx, unitMoney);
     const minor = kept[0]?.monthlyUnitPriceMinor ?? previous.monthlyUnitPriceMinor ?? 0n;
-    const fallbackUnit = { amountMinor: minor, currency: 'VND' as const, recordedOn: input.startDate };
-    const fallbackSnap = {
-      rate: 1n,
-      rateDate: input.startDate,
-      rateSource: 'SAME_CURRENCY' as const,
-      reportingMinor: minor,
-      reportingCurrency: 'VND' as const,
-      exchangeRateId: null,
-    };
-    const activePriced = {
-      unitPrice: priced.unitPrice ?? fallbackUnit,
-      priceSnapshot: priced.priceSnapshot ?? fallbackSnap,
-    };
+    const activePriced = priced;
 
     return {
       priced,

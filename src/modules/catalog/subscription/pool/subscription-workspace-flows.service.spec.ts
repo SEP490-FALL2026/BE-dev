@@ -3,7 +3,11 @@ import type { AuthenticatedPrincipal } from '../../../../infrastructure/security
 import type { AuditApi } from '../../../audit/public/audit.api';
 import type { PlanFactsService } from '../../plan/plan-facts.service';
 import type { SubscriptionPeriodLinesService } from '../../subscription-line/subscription-period-lines.service';
-import { SubscriptionSeatCountingFixedError, SubscriptionStaleError } from '../subscription.errors';
+import {
+  SubscriptionDuplicatePlanError,
+  SubscriptionSeatCountingFixedError,
+  SubscriptionStaleError,
+} from '../subscription.errors';
 import type { SubscriptionRepo } from '../subscription.repo';
 import type { SubscriptionRecord } from '../subscription.types';
 import type { SubscriptionChangeGuard } from '../subscription-change-guard.service';
@@ -70,7 +74,13 @@ describe('SubscriptionChangeService: the workspace of a subscription (W3-11, W3-
       ...over,
     }) as unknown as SubscriptionRecord;
 
-  function setup(options: { reads: SubscriptionRecord[]; locked?: SubscriptionRecord }) {
+  function setup(options: {
+    reads: SubscriptionRecord[];
+    locked?: SubscriptionRecord;
+    /** The lines of the period, and the plans that already have a live line in the workspace it moves to (a subscription id each). */
+    lines?: { id: string; planId: string; closedReason: string | null }[];
+    takenInTarget?: Record<string, string>;
+  }) {
     const order: string[] = [];
     const reads = [...options.reads];
     const subscriptions = {
@@ -121,6 +131,12 @@ describe('SubscriptionChangeService: the workspace of a subscription (W3-11, W3-
         activatePeriod: jest.fn(),
         syncDraftUpdate: jest.fn(),
         hasLines: jest.fn().mockResolvedValue(false),
+        linesOf: jest.fn().mockResolvedValue(options.lines ?? []),
+        hasLiveLine: jest.fn((_workspaceId: string, planId: string) =>
+          Promise.resolve(
+            options.takenInTarget?.[planId] ? { subscriptionId: options.takenInTarget[planId], planId } : null,
+          ),
+        ),
       } as unknown as SubscriptionPeriodLinesService,
     );
 
@@ -139,6 +155,35 @@ describe('SubscriptionChangeService: the workspace of a subscription (W3-11, W3-
 
     expect(order).toEqual(['find', 'lockWorkspaces', 'lock', 'lockShared']);
     expect(guard.lockWorkspaces).toHaveBeenCalledWith(tx, plan, ['ws-a', 'ws-b']);
+    expect(subscriptions.update).toHaveBeenCalledWith(tx, 'sub-1', expect.objectContaining({ workspaceId: 'ws-b' }));
+  });
+
+  it('refuses the move of a two-line period with 409 DUPLICATE_PLAN when the second line plan already has a live line in the workspace it goes to, and writes nothing', async () => {
+    const { service, subscriptions } = setup({
+      reads: [stored()],
+      lines: [
+        { id: 'l-1', planId: 'plan-1', closedReason: null },
+        { id: 'l-2', planId: 'plan-2', closedReason: null },
+      ],
+      takenInTarget: { 'plan-2': 'sub-other' },
+    });
+
+    await expect(service.update(actor, 'sub-1', { workspaceId: 'ws-b' })).rejects.toMatchObject({
+      constructor: SubscriptionDuplicatePlanError,
+      subscriptionIds: ['sub-other'],
+    });
+    expect(subscriptions.update).not.toHaveBeenCalled();
+  });
+
+  it('lets a period move when only a closed line of its plans has a live line in the target workspace', async () => {
+    const { service, subscriptions } = setup({
+      reads: [stored()],
+      lines: [{ id: 'l-1', planId: 'plan-1', closedReason: 'REMOVED' }],
+      takenInTarget: { 'plan-1': 'sub-other' },
+    });
+
+    await service.update(actor, 'sub-1', { workspaceId: 'ws-b' });
+
     expect(subscriptions.update).toHaveBeenCalledWith(tx, 'sub-1', expect.objectContaining({ workspaceId: 'ws-b' }));
   });
 

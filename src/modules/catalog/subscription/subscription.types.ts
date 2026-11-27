@@ -269,7 +269,6 @@ export interface DeclareSubscriptionInput {
   noticePeriodDays?: number;
   autoRenew?: boolean;
   allowsMidTermReduction?: boolean;
-  responsibleItAdminEmployeeId?: string;
   vendorMinimumSeats?: number;
   /** The workspace the subscription is held in; left out, the default of the vendor for a plan the company administers there. */
   workspaceId?: string;

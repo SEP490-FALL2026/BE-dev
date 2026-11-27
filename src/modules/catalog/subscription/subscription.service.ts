@@ -188,7 +188,8 @@ export class SubscriptionService {
     });
     const originalPrice = input.originalPrice ? await this.pricing.readOriginal(input.originalPrice) : null;
     const organizationId = await this.requireOrganizationId();
-    if (input.responsibleItAdminEmployeeId) await this.poolRules.requireItAdmin(input.responsibleItAdminEmployeeId);
+    // The IT Admin who declares answers for the subscription, so they must work as one now.
+    await this.poolRules.requireItAdmin(actor.employeeId);
 
     const record = await this.runner.run((tx) =>
       this.declareIn(
@@ -218,7 +219,7 @@ export class SubscriptionService {
       organizationId: string;
     },
   ): Promise<SubscriptionRecord> {
-    const { money, monthlyUnitPriceMinor, originalPrice, organizationId } = ctx;
+    const { originalPrice, organizationId } = ctx;
     // The workspace is locked `FOR UPDATE` first (tier 5b), so two declarations into one workspace take turns; its vendor is read from the plan
     // without a lock, as it never changes.
     const [unlocked] = await this.plans.lookups([input.planId], tx);
@@ -229,22 +230,18 @@ export class SubscriptionService {
     // declarations of the same K2 or K4 plan take turns on (R-E02); every other writer locks a subscription first, then its plan.
     const plan = await this.plans.lockExclusive(tx, input.planId);
     if (!plan) throw new SubscriptionPlanNotFoundError();
-    if (plan.applicationStatus === 'RETIRED') throw new SubscriptionApplicationRetiredError();
+    if (plan.applicationStatus === 'RETIRED') throw new SubscriptionApplicationRetiredError(plan.id);
     await this.poolRules.assertNoLiveDuplicate(tx, plan, null, workspaceId);
     const commitmentTermMonths =
       input.commitmentTermMonths ?? (input.kind === 'TERM' ? (plan.referenceCommitmentMonths ?? undefined) : undefined);
     const state = {
       ...declaredStateOf({ ...input, commitmentTermMonths }),
-      // QĐ-111g: a declaration that names nobody takes the IT Admin responsible for the application, when they still work as one.
-      responsibleItAdminEmployeeId: await this.poolRules.responsibleOfDeclaration(
-        tx,
-        plan.id,
-        input.responsibleItAdminEmployeeId,
-      ),
+      // The IT Admin who declares answers for the subscription; only a Super Admin moves it to another.
+      responsibleItAdminEmployeeId: actor.employeeId,
     };
     this.assertShape(plan, input.kind, state);
 
-    const priced = await this.pricing.priceToday(tx, money);
+    const { priced, monthlyUnitPriceMinor: monthlyMinor } = await this.pricedFor(tx, plan, input.kind, ctx);
     const complete = subscriptionStatusOf(plan, input.kind, { ...state, ...priced });
     this.poolRules.assert(plan, input.kind, state, complete === 'ACTIVE');
     if (complete === 'ACTIVE') await this.poolRules.assertVendorAdmins(tx, plan, organizationId, workspaceId);
@@ -254,12 +251,28 @@ export class SubscriptionService {
       kind: input.kind,
       state,
       priced,
-      monthlyUnitPriceMinor,
+      monthlyUnitPriceMinor: monthlyMinor,
       originalPrice,
       status: complete,
       organizationId,
       workspaceId,
     });
+  }
+
+  /** The price a declaration records today: a monthly price of zero on a K2 term is no price, as on a line, so the subscription stays a draft until one is given. */
+  private async pricedFor(
+    tx: DbTx,
+    plan: LockedPlan,
+    kind: SubscriptionKind,
+    ctx: { money: { amountMinor: bigint; currency: string } | null; monthlyUnitPriceMinor: bigint | null },
+  ) {
+    const noPrice =
+      plan.provisioningType === 'K2' && kind === 'TERM' && ctx.money !== null && ctx.money.amountMinor <= 0n;
+
+    return {
+      priced: await this.pricing.priceToday(tx, noPrice ? null : ctx.money),
+      monthlyUnitPriceMinor: noPrice ? null : ctx.monthlyUnitPriceMinor,
+    };
   }
 
   private async persistDeclaredSubscription(

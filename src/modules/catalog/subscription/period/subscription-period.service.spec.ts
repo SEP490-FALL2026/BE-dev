@@ -14,6 +14,7 @@ import type { SubscriptionPeriodLinesService } from '../../subscription-line/sub
 import type { SubscriptionRecord } from '../subscription.types';
 
 const TODAY = '2026-11-17';
+const RATE_ONE = 10n ** 10n;
 
 /** A K2 subscription of the shared pool by the year: the shape the renewal now reads (S20-T2). */
 function record(extra: Partial<SubscriptionRecord> = {}): SubscriptionRecord {
@@ -324,6 +325,16 @@ describe('SubscriptionPeriodService: the periods the renewal reads, the shared p
         },
       ];
       periodLines.linesOf.mockResolvedValue(oldLines);
+      pricing.priceToday.mockImplementation((_tx: DbTx, money: { amountMinor: bigint; currency: string } | null) =>
+        Promise.resolve(
+          money
+            ? {
+                unitPrice: { ...money, recordedOn: '2027-01-01' },
+                priceSnapshot: { rate: RATE_ONE, reportingMinor: money.amountMinor, rateSource: 'SAME_CURRENCY' },
+              }
+            : { unitPrice: null, priceSnapshot: null },
+        ),
+      );
       subscriptions.insert.mockImplementation((_tx: DbTx, created: Partial<SubscriptionRecord>) =>
         Promise.resolve(record({ ...created, id: 'sub-2', workspace: { id: 'ws-1', name: 'Slack WS' } })),
       );
@@ -351,6 +362,9 @@ describe('SubscriptionPeriodService: the periods the renewal reads, the shared p
           minimumSeatsTotal: 15,
           seatCounting: 'FIXED',
           invoicedLater: false,
+          // 12 months of the monthly price of the first line, recorded with the snapshot of the same currency.
+          unitPrice: { amountMinor: 600_000n, currency: 'VND', recordedOn: '2027-01-01' },
+          priceSnapshot: expect.objectContaining({ rate: RATE_ONE, reportingMinor: 600_000n }) as unknown,
         }),
       );
       expect(periodLines.createRenewedLines).toHaveBeenCalledWith(
@@ -372,6 +386,43 @@ describe('SubscriptionPeriodService: the periods the renewal reads, the shared p
         tx,
         expect.objectContaining({ actorKind: 'SYSTEM', actorAppUserId: null, correlationId: 'auto-sub-1' }),
       );
+    });
+
+    describe('the application of every plan of the lines (a retired one refuses the renewal)', () => {
+      const twoLines = [
+        { id: 'line-b', subscriptionId: 'sub-1', workspaceId: 'ws-1', planId: 'plan-9', closedReason: null },
+        { id: 'line-a', subscriptionId: 'sub-1', workspaceId: 'ws-1', planId: 'plan-2', closedReason: null },
+      ];
+      const lockOf = (retired: readonly string[]) => (_tx: DbTx, planId: string) =>
+        Promise.resolve({
+          id: planId,
+          applicationKind: 'SAAS',
+          provisioningType: 'K2',
+          applicationStatus: retired.includes(planId) ? 'RETIRED' : 'ACTIVE',
+        });
+
+      it('refuses with APPLICATION_RETIRED naming the plan of a second line whose application is retired, and writes nothing', async () => {
+        subscriptions.find.mockResolvedValue(record({ planId: 'plan-1' }));
+        periodLines.linesOf.mockResolvedValue(twoLines);
+        plans.lockShared.mockImplementation(lockOf(['plan-9']));
+
+        await expect(
+          service.recordNext(tx, actor, { ...input, lines: [{ previousLineId: 'line-a', quantity: 1 }] }),
+        ).rejects.toMatchObject({ reason: 'APPLICATION_RETIRED', planId: 'plan-9' });
+        expect(subscriptions.insert).not.toHaveBeenCalled();
+        expect(periodLines.closeLines).not.toHaveBeenCalled();
+      });
+
+      it('locks the plans of the period and of its lines in id order and stops at the first whose application is retired', async () => {
+        subscriptions.find.mockResolvedValue(record({ planId: 'plan-5' }));
+        periodLines.linesOf.mockResolvedValue(twoLines);
+        plans.lockShared.mockImplementation(lockOf(['plan-2']));
+
+        await expect(
+          service.recordNext(tx, actor, { ...input, lines: [{ previousLineId: 'line-a', quantity: 1 }] }),
+        ).rejects.toMatchObject({ reason: 'APPLICATION_RETIRED', planId: 'plan-2' });
+        expect(plans.lockShared.mock.calls.map((call: unknown[]) => call[1])).toEqual(['plan-2']);
+      });
     });
 
     it('closeExpiredLines delegates closing live lines as ENDED on endDate', async () => {

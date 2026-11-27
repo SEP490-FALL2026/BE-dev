@@ -101,7 +101,8 @@ export class SubscriptionMultiLineService {
     }
     const originalPrice = input.originalPrice ? await this.pricing.readOriginal(input.originalPrice) : null;
     const organizationId = await this.periodLines.requireOrganizationId();
-    if (input.responsibleItAdminEmployeeId) await this.poolRules.requireItAdmin(input.responsibleItAdminEmployeeId);
+    // The IT Admin who declares answers for the subscription, so they must work as one now.
+    await this.poolRules.requireItAdmin(actor.employeeId);
 
     return this.runner.run((tx) => this.declareIn(tx, actor, input, parsedLines, originalPrice, organizationId));
   }
@@ -122,7 +123,7 @@ export class SubscriptionMultiLineService {
     for (const planId of planIds) {
       const plan = byId.get(planId);
       if (!plan) throw new SubscriptionPlanNotFoundError();
-      if (plan.applicationStatus === 'RETIRED') throw new SubscriptionApplicationRetiredError();
+      if (plan.applicationStatus === 'RETIRED') throw new SubscriptionApplicationRetiredError(planId);
       if (plan.provisioningType !== 'K2') throw new SubscriptionLinePlanNotK2Error();
     }
     const vendors = await this.plans.vendorIdsOf(planIds);
@@ -149,6 +150,8 @@ export class SubscriptionMultiLineService {
     }
     for (const planId of planIds) {
       const locked = lockedById.get(planId)!;
+      // The application is read again under the lock of the plan: it may have been retired since the plans were looked up.
+      if (locked.applicationStatus === 'RETIRED') throw new SubscriptionApplicationRetiredError(planId);
       await this.poolRules.assertNoLiveDuplicate(tx, locked, null, workspaceId);
       if (workspaceId && (await this.periodLines.hasLiveLine(workspaceId, planId, tx))) {
         throw new SubscriptionDuplicatePlanError([]);
@@ -175,6 +178,7 @@ export class SubscriptionMultiLineService {
       lines,
       firstPlan,
       workspaceId,
+      actor.employeeId,
     );
     if (complete === 'ACTIVE') await this.poolRules.assertVendorAdmins(tx, firstPlan, organizationId, workspaceId);
 
@@ -223,6 +227,7 @@ export class SubscriptionMultiLineService {
     lines: readonly CreatePeriodLineInput[],
     firstPlan: LockedPlan,
     workspaceId: string | null,
+    responsibleItAdminEmployeeId: string,
   ) {
     const totalQuantity = lines.every((line) => line.quantity === null)
       ? undefined
@@ -230,11 +235,7 @@ export class SubscriptionMultiLineService {
     const commitmentTermMonths = input.commitmentTermMonths ?? firstPlan.referenceCommitmentMonths ?? undefined;
     const state = {
       ...declaredStateOf({ ...input, purchasedQuantity: totalQuantity, commitmentTermMonths }),
-      responsibleItAdminEmployeeId: await this.poolRules.responsibleOfDeclaration(
-        tx,
-        firstPlan.id,
-        input.responsibleItAdminEmployeeId,
-      ),
+      responsibleItAdminEmployeeId,
     };
     const singleResolved =
       lines.length > 0
