@@ -215,6 +215,9 @@ model AccessRequest {
   offPlan               Boolean                    @default(false) @map("off_plan")
   // The requests a head sent for people of the department in one go share this (US-03-02 AC-1); null for any other.
   delegatedBatchId      String?                    @map("delegated_batch_id") @db.Uuid
+  // Multi-item request ticket (QĐ-115aa): set together with ticketPosition for items submitted in one ticket; null for standalone requests.
+  ticketId              String?                    @map("ticket_id") @db.Uuid
+  ticketPosition        Int?                       @map("ticket_position") @db.SmallInt
   // When the person it is for is not staff, the day the access ends; the grant takes it as the end of the seat (US-03-02 AC-10).
   expectedEndDate       DateTime?                  @map("expected_end_date") @db.Date
   policy                Json
@@ -272,7 +275,10 @@ model AccessRequest {
   seatChanges          SeatChange[]      @relation("SeatChangeOfRequest")
   returnsFromHere      ReturnRequest[]              @relation("ReturnRequestOrigin")
   replacesAssignment   LicenseAssignment?           @relation("RequestReplacesAssignment", fields: [replacesAssignmentId], references: [id], onDelete: Restrict)
+  ticket               RequestTicket?               @relation(fields: [ticketId], references: [id], onDelete: Restrict)
 
+  @@unique([ticketId, ticketPosition])
+  @@index([ticketId])
   @@index([requesterEmployeeId, submittedAt])
   @@index([state, submittedAt])
   @@index([planId])
@@ -282,6 +288,25 @@ model AccessRequest {
   @@index([departmentId, submittedAt(sort: Desc), id(sort: Desc)], map: "access_requests_department_submitted_idx")
   @@index([submittedAt(sort: Desc), id(sort: Desc)], map: "access_requests_submitted_idx")
   @@map("access_requests")
+}
+
+// Multi-item submission envelope (QĐ-115aa): groups up to 6 PAID_IN_CATALOG GRANT items submitted together by one requester.
+// Holds no status, item count or amount; immutable (append-only) once created.
+model RequestTicket {
+  id                  String   @id @default(uuid()) @db.Uuid
+  organizationId      String   @map("organization_id") @db.Uuid
+  requesterEmployeeId String   @map("requester_employee_id") @db.Uuid
+  departmentId        String   @map("department_id") @db.Uuid
+  submittedAt         DateTime @map("submitted_at") @db.Timestamptz(3)
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  requester    Employee        @relation("RequestTicketRequester", fields: [requesterEmployeeId], references: [id], onDelete: Restrict)
+  department   Department      @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  items        AccessRequest[]
+
+  @@index([requesterEmployeeId, submittedAt(sort: Desc), id])
+  @@map("request_tickets")
 }
 
 // A person the request is for. One row today; a request for a group has a row for each person.
