@@ -52,6 +52,15 @@ describe('Workspace admins set and SBF-16 IT admin handover lock order (integrat
       ]);
 
       const recorded = await h.recordedCase(leaver);
+      const adminsOf = async (): Promise<string[]> =>
+        (
+          await h.ctx.sql.query<{ admin: string }>(
+            `SELECT employee_id || ':' || role::text AS admin FROM workspace_admins WHERE workspace_id = $1 ORDER BY employee_id`,
+            [ws.id],
+          )
+        ).rows.map((row) => row.admin);
+      const adminsBefore = await adminsOf();
+      const adminsRequested = [`${leaver.employeeId}:OWNER`, `${h.it1.employeeId}:ADMIN`].sort();
 
       const barrier = new Barrier(2);
       const handoverTask = (async () => {
@@ -86,6 +95,16 @@ describe('Workspace admins set and SBF-16 IT admin handover lock order (integrat
       if (adminsOutcome.status === 'fulfilled') {
         expect(isDeadlockResponse(adminsOutcome.value)).toBe(false);
         expect([200, 403]).toContain(adminsOutcome.value.status);
+      }
+      // Whatever the order, the hand-over moved the workspace to the IT Admin who took it, and the admins are the ones asked for (the set came
+      // first) or the ones there were (the leaver no longer answers for the workspace when the set came second): never a mix.
+      const responsible = await h.ctx.sql.query<{ responsible: string | null }>(
+        'SELECT responsible_it_admin_employee_id AS responsible FROM workspaces WHERE id = $1',
+        [ws.id],
+      );
+      expect(responsible.rows[0].responsible).toBe(target.employeeId);
+      if (adminsOutcome.status === 'fulfilled') {
+        expect(await adminsOf()).toEqual(adminsOutcome.value.status === 200 ? adminsRequested : adminsBefore);
       }
     }
   });
