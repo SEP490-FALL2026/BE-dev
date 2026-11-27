@@ -1,16 +1,13 @@
 import { BullModule, BullRootModuleOptions } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { queueEnvironmentFrom } from './queue.config';
+import { REDIS_ENVIRONMENT_KEYS, validateRedisEnvironment } from '../redis/redis.config';
 
-/**
- * The queue's Redis connection, validated when the module is mounted (production requires REDIS_HOST and
- * REDIS_PASSWORD). Standby infrastructure with no consumer yet (the Owner keeps it for future use): no
- * process mounts it today, so the API, the worker and the commands neither need Redis nor validate it. The first module that
- * needs a queue mounts it and gets the strict validation back with it.
- */
+/** Validates the queue connection when the module is mounted. */
 export function createQueueConfiguration(config: ConfigService): BullRootModuleOptions {
-  const queue = queueEnvironmentFrom(config);
+  const queue = validateRedisEnvironment(
+    Object.fromEntries(['NODE_ENV', ...REDIS_ENVIRONMENT_KEYS].map((key) => [key, config.get(key)])),
+  );
 
   return {
     connection: {

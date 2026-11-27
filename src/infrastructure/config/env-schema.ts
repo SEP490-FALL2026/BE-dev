@@ -1,4 +1,14 @@
 import Joi from 'joi';
+import {
+  assertProductionQueueBoard,
+  assertProductionRedisPassword,
+  RedisEnvironmentVariables,
+  RedisFeatureEnvironmentVariables,
+  redisFeatureKeys,
+  redisKeys,
+  usesRedis,
+  withRedisHostValidation,
+} from '../redis/redis.config';
 import { parseCorsOrigins, validateProductionCorsOrigins } from './cors';
 import {
   DatabaseEnvironmentVariables,
@@ -13,8 +23,7 @@ import { SecretEnvironmentVariables, assertSecrets, secretKeys } from './secret-
 /*
  * The one public contract of the environment configuration: the settings type and the validators. The parts live
  * beside it by responsibility — database (also the installation command) and secrets (a development run has no fallback for them) — and are composed here.
- * The queue and object storage validate their own keys when their module is mounted; the API, the worker and the
- * recovery command mount neither (they stay on standby), so their keys are not part of this contract. The AI service
+ * Redis is validated here because several processes share its configuration. The object storage module validates its own keys. The AI service
  * (`AI_SERVICE_*`) is checked by the module of the AI summary when it is mounted, and read by nothing else.
  */
 export { EnvironmentValidationError } from './environment-validation';
@@ -22,7 +31,12 @@ export { resolveDatabaseUrl } from './database-url';
 export { validateInstallationEnvironment } from './database-environment';
 export type { DatabaseEnvironmentVariables, NodeEnvironment } from './database-environment';
 
-export interface EnvironmentVariables extends DatabaseEnvironmentVariables, SecretEnvironmentVariables {
+export interface EnvironmentVariables
+  extends
+    DatabaseEnvironmentVariables,
+    SecretEnvironmentVariables,
+    RedisEnvironmentVariables,
+    RedisFeatureEnvironmentVariables {
   PORT: number;
   API_PREFIX: string;
   CORS_ORIGINS: string;
@@ -60,8 +74,10 @@ export interface EnvironmentVariables extends DatabaseEnvironmentVariables, Secr
 }
 
 // Key order is the order Joi reports missing keys in, so it stays stable.
-const environmentSchema = Joi.object({
+const environmentKeysSchema = Joi.object({
   ...databaseKeys,
+  ...redisKeys,
+  ...redisFeatureKeys,
   PORT: Joi.number().port().default(3000),
   API_PREFIX: Joi.string()
     .pattern(/^[a-z][a-z0-9-]*$/)
@@ -116,6 +132,7 @@ const environmentSchema = Joi.object({
   }),
   SMTP_TLS: Joi.boolean().default(false),
 }).unknown(true);
+const environmentSchema = withRedisHostValidation(environmentKeysSchema);
 
 /** Validates the environment of the API, the worker and the recovery command. */
 export function validateEnvironment(input: Record<string, unknown>): EnvironmentVariables {
@@ -162,6 +179,15 @@ export function validateEnvironment(input: Record<string, unknown>): Environment
     } catch (error) {
       throw new EnvironmentValidationError(error instanceof Error ? error.message : String(error));
     }
+
+    if (result.TRUST_PROXY_HOPS < 1) {
+      throw new EnvironmentValidationError(
+        'Environment validation failed: TRUST_PROXY_HOPS must be at least 1 in production',
+      );
+    }
+
+    if (usesRedis(result)) assertProductionRedisPassword(result);
+    assertProductionQueueBoard(result);
   }
 
   return result;

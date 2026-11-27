@@ -88,6 +88,7 @@ describe('recovery command (integration, spawned process)', () => {
         SMTP_HOST: 'smtp.example.com',
         SMTP_FROM: 'no-reply@licenses.example.com',
         SMTP_TLS: 'true',
+        TRUST_PROXY_HOPS: '1',
         REDIS_HOST: 'redis.internal',
         REDIS_PASSWORD: 'recovery-spec-redis-password',
         OBJECT_STORAGE_ENDPOINT: 'https://storage.example.com',

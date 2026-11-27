@@ -17,7 +17,7 @@ Tracker sống qua compact context. Người code đọc lại file này **đầ
 
 | Gói | Mục                                                                | Trạng thái | sha | Lệnh kiểm + kết quả (unit, integration của gói) | FIX-TEST thêm | Ghi chú / chưa kiểm được |
 | --- | ------------------------------------------------------------------ | ---------- | --- | ----------------------------------------------- | ------------- | ------------------------ |
-| T1  | R-01 cấu hình, env, `no-redis-in-modules`                          | chưa       |     |                                                 |               |                          |
+| T1  | R-01 cấu hình, env, `no-redis-in-modules`                          | xong       | commit T1 | Đỏ 10/20 ca env trước khi sửa. Unit 130/130. Recovery CLI integration 6/6. Typecheck, lint, arch:check, rules:check và 335/335 gate đạt. OpenAPI export bằng Node 22 không drift. | — | D-1 đã duyệt. |
 | T2  | R-01 client, R-08 (a)(b)                                           | chưa       |     |                                                 |               |                          |
 | T3  | R-09 CI + harness                                                  | chưa       |     |                                                 |               |                          |
 | T4  | R-02 rate-limit Redis                                              | chưa       |     |                                                 |               |                          |
@@ -38,6 +38,9 @@ Trạng thái: `chưa` · `đang làm` · `xong` (chỉ sau khi đối chiếu t
 
 | Gói | Tiêu chí SPEC §6 | Test | `file:line` code |
 | --- | ---------------- | ---- | ---------------- |
+| T1 | R-01 (a), mặc định theo môi trường và ràng buộc proxy | `env-matrix.spec.ts` | `redis.config.ts:47`, `env-schema.ts:183` |
+| T1 | R-01 (b)(c), host/mật khẩu production và tùy chọn vận hành không Redis | `env-matrix.spec.ts`, `env-example.spec.ts`, `redis.config.spec.ts` | `redis.config.ts:74`, `env-schema.ts:189` |
+| T1 | R-01 (f), cấm module import thư viện Redis | `pnpm arch:check` và ca diệt đột biến | `.dependency-cruiser.cjs:39` |
 
 ## Trọng tâm review (PLAN) → test
 
@@ -53,7 +56,7 @@ Trạng thái: `chưa` · `đang làm` · `xong` (chỉ sau khi đối chiếu t
 
 | Ca                                        | Test phải đỏ      | Đỏ thật? | Ghi chú |
 | ----------------------------------------- | ----------------- | -------- | ------- |
-| `import 'ioredis'` trong `src/modules/**` | `pnpm arch:check` |          |         |
+| `import 'ioredis'` trong `src/modules/**` | `pnpm arch:check` | Có | Báo `no-redis-in-modules`. Xóa file thử, chạy lại xanh. |
 | bỏ `deduplication`                        | I-2 (c)           |          |         |
 | `dueIds` dùng điều kiện riêng thiếu lease | I-2 (d)           |          |         |
 | bỏ M4                                     | I-5 / I-3 (g)     |          |         |
@@ -76,6 +79,7 @@ Trạng thái: `chưa` · `đang làm` · `xong` (chỉ sau khi đối chiếu t
 
 | D-n | Gói | Điểm | Chọn | Vì sao | File |
 | --- | --- | ---- | ---- | ------ | ---- |
+| D-1 | T1 | Fixture production cũ thiếu khóa Redis và proxy | Owner duyệt bổ sung khóa fixture, giữ nguyên assertion | SPEC yêu cầu cấu hình production hợp lệ trước khi kiểm tra guard quản trị DB hoặc lỗi kết nối của recovery CLI | `database-administration-credentials.spec.ts`, `recovery-cli.integration-spec.ts` |
 
 ## Điểm gộp đã gặp
 
