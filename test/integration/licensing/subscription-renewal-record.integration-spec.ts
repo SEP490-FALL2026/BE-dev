@@ -292,6 +292,56 @@ describe('the one-write renewal at the point of adjustment (integration, real Po
     expect(await h.count('subscriptions')).toBe(before);
   });
 
+  it('refuses the new period of a subscription whose second line belongs to a retired application, naming the plan of that line, and writes nothing', async () => {
+    const unit = await h.unit(2);
+    const { subscriptionId } = await h.termWithSeats(unit, 20, { quantity: 10, ...year() });
+    const secondPlanId = (
+      await h.ctx.sql.query<{ id: string }>(
+        `WITH app AS (
+           INSERT INTO applications (id, organization_id, kind, vendor_id, functional_group_id, name, normalized_name,
+             responsible_it_admin_employee_id, catalog_status, retired_at)
+           SELECT gen_random_uuid(), a.organization_id, a.kind, a.vendor_id, a.functional_group_id, 'Retired second app',
+                  'retired second app', a.responsible_it_admin_employee_id, 'RETIRED', now()
+             FROM subscriptions s JOIN plans p ON p.id = s.plan_id JOIN applications a ON a.id = p.application_id
+            WHERE s.id = $1
+           RETURNING id
+         )
+         INSERT INTO plans (id, organization_id, application_id, name, normalized_name, provisioning_type, pricing_model, control_level, key_binding)
+         SELECT gen_random_uuid(), p.organization_id, (SELECT id FROM app), 'Second line plan', 'second line plan',
+                p.provisioning_type, p.pricing_model, p.control_level, p.key_binding
+           FROM subscriptions s JOIN plans p ON p.id = s.plan_id WHERE s.id = $1
+         RETURNING id`,
+        [subscriptionId],
+      )
+    ).rows[0].id;
+    await h.ctx.sql.query(
+      `INSERT INTO subscription_lines (id, organization_id, subscription_id, workspace_id, plan_id, monthly_unit_price_minor, updated_at)
+       SELECT gen_random_uuid(), organization_id, id, workspace_id, $2, 800000, now() FROM subscriptions WHERE id = $1`,
+      [subscriptionId, secondPlanId],
+    );
+    const before = await h.count('subscriptions');
+    const lineIds = (
+      await h.ctx.sql.query<{ id: string }>(
+        `SELECT id FROM subscription_lines WHERE subscription_id = $1 ORDER BY created_at, id`,
+        [subscriptionId],
+      )
+    ).rows.map((row) => row.id);
+
+    const lines = lineIds.map((subscriptionLineId, index) => ({ subscriptionLineId, quantity: index === 0 ? 2 : 0 }));
+    const refused = await record({
+      subscriptionId,
+      choice: 'REDUCE',
+      lines,
+      outcome: 'AS_DECIDED',
+      nextPeriod: { ...nextYear(2), lines },
+    });
+
+    expect(refused.status).toBe(409);
+    expect(h.codeOf(refused)).toBe('SUBSCRIPTION_RENEWAL.PERIOD_REFUSED');
+    expect(detailsOf(refused)).toEqual({ reason: 'APPLICATION_RETIRED', planId: secondPlanId });
+    expect(await h.count('subscriptions')).toBe(before);
+  });
+
   it('starts the new period on the renewal day: a reduction in the middle of a year, or a gap after it, is refused and writes nothing (A1C-04)', async () => {
     const unit = await h.unit(2);
     const { subscriptionId, seats } = await h.termWithSeats(unit, 20, { quantity: 10, ...year() });
