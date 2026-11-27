@@ -94,7 +94,17 @@ describe('ItHandoverService', () => {
     const result = await service.handOver(SUPER_ADMIN, SOURCE, 'target');
 
     expect(result).toMatchObject({ subscriptions: 0, applications: 0, toEmployeeId: 'target' });
-    expect(recordDone).toHaveBeenCalledTimes(1);
+    expect(recordDone).toHaveBeenCalledWith(expect.anything(), {
+      organizationId: 'org',
+      source: SOURCE,
+      done: expect.objectContaining({
+        toEmployeeId: 'target',
+        subscriptions: 0,
+        applications: 0,
+        workspaces: 1,
+        licenseLots: 1,
+      }) as unknown,
+    });
     expect(tell).toHaveBeenCalledTimes(1);
   });
 

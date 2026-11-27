@@ -7,14 +7,7 @@ import type { SeatBaselinePhaseHook, SeatOccupancyHook } from '../public/catalog
 import { WorkspaceVendorMismatchError } from '../workspace/workspace.errors';
 import type { WorkspaceForSubscriptionService } from '../workspace/workspace-for-subscription.service';
 import type { SeatLedgerService } from './ledger/seat-ledger.service';
-import {
-  SubscriptionLineLiveTakenError,
-  SubscriptionLineNotResponsibleError,
-  SubscriptionLinePeriodStaleError,
-  SubscriptionLinePeriodStillDraftError,
-  SubscriptionLinePlanNotK2Error,
-  SubscriptionLineQuantityViaPurchaseError,
-} from './subscription-line.errors';
+import * as lineErrors from './subscription-line.errors';
 import { toSubscriptionLineApiException } from './subscription-line.http-errors';
 import type { SubscriptionLineRepo } from './subscription-line.repo';
 import { SubscriptionLineService } from './subscription-line.service';
@@ -26,24 +19,14 @@ const actor = {
   roles: ['IT_ADMIN'],
   sessionId: 'sess-1',
 } as unknown as AuthenticatedPrincipal;
-
 const updatedAt = new Date('2026-11-20T00:00:00.000Z');
-
-const k2Plan: LockedPlan = {
+const res = (v: unknown) => jest.fn().mockResolvedValue(v);
+const k2Plan = {
   id: 'plan-2',
   name: 'Figma FigJam',
-  applicationId: 'app-1',
-  applicationName: 'Figma',
-  applicationKind: 'SAAS',
   applicationStatus: 'APPROVED',
-  pricingModel: 'PER_SEAT',
   provisioningType: 'K2',
-  keyBinding: null,
-  sharingPolicy: null,
-  hasAdminConsole: true,
-  referenceCommitmentMonths: null,
-};
-
+} as unknown as LockedPlan;
 const makePeriod = (overrides: Record<string, unknown> = {}) => ({
   id: 'sub-1',
   organizationId: 'org-1',
@@ -56,7 +39,6 @@ const makePeriod = (overrides: Record<string, unknown> = {}) => ({
   updatedAt,
   ...overrides,
 });
-
 const makeLine = (overrides: Partial<SubscriptionLineRecord> = {}): SubscriptionLineRecord => ({
   id: 'line-1',
   organizationId: 'org-1',
@@ -73,80 +55,72 @@ const makeLine = (overrides: Partial<SubscriptionLineRecord> = {}): Subscription
   updatedAt,
   ...overrides,
 });
-
-function codeOf(error: unknown): { status: number; code: string | undefined } {
+const codeOf = (error: unknown) => {
   const mapped = toSubscriptionLineApiException(error) as {
     getStatus?: () => number;
     getResponse?: () => { code?: string };
   };
   return { status: mapped.getStatus?.() ?? 500, code: mapped.getResponse?.().code };
+};
+async function expectRefusal(
+  work: () => Promise<unknown>,
+  ErrClass: new (...args: never[]) => unknown,
+  status: HttpStatus,
+  code: string,
+) {
+  const caught = await work().catch((e: unknown) => e);
+  expect(caught).toBeInstanceOf(ErrClass);
+  expect(codeOf(caught)).toEqual({ status, code });
 }
 
 function makeSut(overrides: Record<string, unknown> = {}) {
   const tx = {} as DbTx;
   const order: string[] = [];
+  const seq = (label: string, v: unknown) =>
+    jest.fn().mockImplementation(() => (order.push(label), Promise.resolve(v)));
   const runner = {
     run: jest.fn(async (work: (t: DbTx) => Promise<unknown>) => work(tx)),
   } as unknown as TransactionRunner;
-  const insert = jest.fn().mockResolvedValue(makeLine());
-  const update = jest.fn().mockResolvedValue(makeLine({ monthlyUnitPriceMinor: 420_000n }));
+  const insert = res(makeLine());
+  const update = res(makeLine({ monthlyUnitPriceMinor: 420_000n }));
   const lines = {
-    readPeriodWorkspace: jest.fn().mockResolvedValue('ws-1'),
-    lockPeriod: jest.fn().mockImplementation(() => {
-      order.push('lockPeriod');
-      return Promise.resolve(makePeriod());
-    }),
-    findLive: jest.fn().mockResolvedValue(null),
-    ofSubscriptions: jest.fn().mockResolvedValue(new Map()),
+    readPeriodWorkspace: res('ws-1'),
+    lockPeriod: seq('lockPeriod', makePeriod()),
+    findLive: res(null),
+    ofSubscriptions: res(new Map()),
     insert,
-    lock: jest.fn().mockImplementation(() => {
-      order.push('lockLine');
-      return Promise.resolve(makeLine());
-    }),
-    find: jest.fn().mockResolvedValue(makeLine()),
+    lock: seq('lockLine', makeLine()),
+    find: seq('findLine', makeLine()),
     update,
     ...(overrides.lines as object),
   } as unknown as SubscriptionLineRepo;
-  const openLines = jest.fn().mockResolvedValue(undefined);
+  const openLines = res(undefined);
   const seatLedger = {
     openLines,
-    requireOrganizationId: jest.fn().mockResolvedValue('org-1'),
-    listPagedByLine: jest.fn().mockResolvedValue({ items: [], total: 0 }),
-    businessToday: jest.fn().mockResolvedValue('2026-11-21'),
-    seatsOnDays: jest.fn().mockResolvedValue(new Map([['line-1', new Map([['2026-11-21', 5]])]])),
+    businessToday: res('2026-11-21'),
+    requireOrganizationId: res('org-1'),
+    seatsOnDays: res(new Map([['line-1', new Map([['2026-11-21', 5]])]])),
     ...(overrides.seatLedger as object),
-    ...(overrides.ledgerRepo as object),
   } as unknown as SeatLedgerService;
   const occupancy = {
-    get: jest.fn().mockReturnValue({ occupiedBySubscriptionPlans: jest.fn().mockResolvedValue(new Map()) }),
+    get: jest.fn().mockReturnValue({ occupiedBySubscriptionPlans: res(new Map()) }),
   } as unknown as SeatOccupancyHook;
   const plans = {
-    lockShared: jest.fn().mockImplementation(() => {
-      order.push('lockPlan');
-      return Promise.resolve(k2Plan);
-    }),
-    vendorIdOf: jest.fn().mockResolvedValue('ven-1'),
-    lookups: jest.fn().mockResolvedValue([k2Plan]),
+    lockShared: seq('lockPlan', k2Plan),
+    vendorIdOf: res('ven-1'),
+    lookups: res([k2Plan]),
     ...(overrides.plans as object),
   } as unknown as PlanFactsService;
   const workspaces = {
-    lockBoth: jest.fn().mockImplementation(() => {
-      order.push('lockWorkspace');
-      return Promise.resolve();
-    }),
-    resolveAndLock: jest.fn().mockImplementation(() => {
-      order.push('resolveAndLock');
-      return Promise.resolve('ws-resolved');
-    }),
+    lockBoth: seq('lockWorkspace', undefined),
+    resolveAndLock: seq('resolveAndLock', 'ws-resolved'),
     ...(overrides.workspaces as object),
   } as unknown as WorkspaceForSubscriptionService;
   const baselinePhase = {
     isBound: jest.fn().mockReturnValue(true),
-    get: jest
-      .fn()
-      .mockReturnValue({ isClosed: jest.fn().mockResolvedValue(false), ...(overrides.baselinePhase as object) }),
+    get: jest.fn().mockReturnValue({ isClosed: res(false), ...(overrides.baselinePhase as object) }),
   } as unknown as SeatBaselinePhaseHook;
-  const auditRecord = jest.fn().mockResolvedValue(undefined);
+  const auditRecord = res(undefined);
   const audit = { record: auditRecord, ...(overrides.audit as object) } as unknown as AuditApi;
   const service = new SubscriptionLineService(
     lines,
@@ -158,21 +132,7 @@ function makeSut(overrides: Record<string, unknown> = {}) {
     audit,
     runner,
   );
-
-  return {
-    service,
-    lines,
-    insert,
-    update,
-    openLines,
-    auditRecord,
-    seatLedger,
-    plans,
-    workspaces,
-    baselinePhase,
-    audit,
-    order,
-  };
+  return { service, insert, update, openLines, auditRecord, order };
 }
 
 describe('SubscriptionLineService (W3-15)', () => {
@@ -227,140 +187,203 @@ describe('SubscriptionLineService (W3-15)', () => {
         .mockResolvedValueOnce(makePeriod({ workspaceId: 'ws-4' }));
       const { service } = makeSut({ lines: { readPeriodWorkspace, lockPeriod } });
 
-      const caught = await service.addLine(actor, 'sub-1', baseAdd).catch((e: unknown) => e);
-
+      await expectRefusal(
+        () => service.addLine(actor, 'sub-1', baseAdd),
+        lineErrors.SubscriptionLinePeriodStaleError,
+        HttpStatus.CONFLICT,
+        'SUBSCRIPTION.STALE',
+      );
       expect(lockPeriod).toHaveBeenCalledTimes(4);
-      expect(caught).toBeInstanceOf(SubscriptionLinePeriodStaleError);
-      expect(codeOf(caught)).toEqual({ status: HttpStatus.CONFLICT, code: 'SUBSCRIPTION.STALE' });
     });
 
-    it('rejects non-responsible IT Admin with 403 SUBSCRIPTION_LINE.NOT_RESPONSIBLE', async () => {
-      const { service } = makeSut({
-        lines: {
-          readPeriodWorkspace: jest.fn().mockResolvedValue('ws-1'),
-          lockPeriod: jest.fn().mockResolvedValue(makePeriod({ responsibleItAdminEmployeeId: 'emp-other' })),
+    const addRefusals: Array<
+      [string, Record<string, unknown>, Record<string, unknown>, new (...a: never[]) => unknown, HttpStatus, string]
+    > = [
+      [
+        'non-responsible IT Admin -> 403',
+        {},
+        { lines: { lockPeriod: res(makePeriod({ responsibleItAdminEmployeeId: 'emp-other' })) } },
+        lineErrors.SubscriptionLineNotResponsibleError,
+        HttpStatus.FORBIDDEN,
+        'SUBSCRIPTION_LINE.NOT_RESPONSIBLE',
+      ],
+      [
+        'closed baseline with quantity -> 422',
+        { quantity: 3 },
+        { baselinePhase: { isClosed: res(true) } },
+        lineErrors.SubscriptionLineQuantityViaPurchaseError,
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        'SUBSCRIPTION_LINE.QUANTITY_VIA_PURCHASE',
+      ],
+      [
+        'duplicate live line -> 409',
+        {},
+        { lines: { findLive: res({ id: 'line-existing', subscriptionId: 'sub-other' }) } },
+        lineErrors.SubscriptionLineLiveTakenError,
+        HttpStatus.CONFLICT,
+        'SUBSCRIPTION.DUPLICATE_PLAN',
+      ],
+      [
+        'plan from another vendor -> 422',
+        {},
+        {
+          workspaces: { lockBoth: jest.fn().mockRejectedValue(new WorkspaceVendorMismatchError()) },
+          plans: { vendorIdOf: res('ven-other') },
         },
-      });
-
-      const caught = await service.addLine(actor, 'sub-1', baseAdd).catch((e: unknown) => e);
-
-      expect(caught).toBeInstanceOf(SubscriptionLineNotResponsibleError);
-      expect(codeOf(caught)).toEqual({ status: HttpStatus.FORBIDDEN, code: 'SUBSCRIPTION_LINE.NOT_RESPONSIBLE' });
-    });
-
-    it('rejects quantity when baseline phase is closed with 422 SUBSCRIPTION_LINE.QUANTITY_VIA_PURCHASE', async () => {
-      const { service } = makeSut({
-        baselinePhase: { isClosed: jest.fn().mockResolvedValue(true) },
-      });
-
-      const caught = await service.addLine(actor, 'sub-1', { ...baseAdd, quantity: 3 }).catch((e: unknown) => e);
-
-      expect(caught).toBeInstanceOf(SubscriptionLineQuantityViaPurchaseError);
-      expect(codeOf(caught)).toEqual({
-        status: HttpStatus.UNPROCESSABLE_ENTITY,
-        code: 'SUBSCRIPTION_LINE.QUANTITY_VIA_PURCHASE',
-      });
-    });
-
-    it('rejects duplicate live line in workspace with 409 SUBSCRIPTION.DUPLICATE_PLAN', async () => {
-      const { service } = makeSut({
-        lines: {
-          readPeriodWorkspace: jest.fn().mockResolvedValue('ws-1'),
-          lockPeriod: jest.fn().mockResolvedValue(makePeriod()),
-          findLive: jest.fn().mockResolvedValue({ id: 'line-existing', subscriptionId: 'sub-other' }),
+        WorkspaceVendorMismatchError,
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        'WORKSPACE_VENDOR_MISMATCH',
+      ],
+      [
+        'non-K2 plan -> 422',
+        {},
+        { plans: { lockShared: res({ ...k2Plan, provisioningType: 'K4' }) } },
+        lineErrors.SubscriptionLinePlanNotK2Error,
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        'SUBSCRIPTION_LINE.PLAN_NOT_K2',
+      ],
+      [
+        '21st line (LINES_LIMIT) -> 409',
+        {},
+        {
+          lines: {
+            ofSubscriptions: res(
+              new Map([
+                ['sub-1', Array.from({ length: 20 }, (_, i) => makeLine({ id: `line-${i}`, planId: `plan-${i}` }))],
+              ]),
+            ),
+          },
         },
-      });
+        lineErrors.SubscriptionLinesLimitError,
+        HttpStatus.CONFLICT,
+        'SUBSCRIPTION.LINES_LIMIT',
+      ],
+      [
+        'DRAFT period -> 422',
+        {},
+        { lines: { lockPeriod: res(makePeriod({ status: 'DRAFT', responsibleItAdminEmployeeId: null })) } },
+        lineErrors.SubscriptionLinePeriodStillDraftError,
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        'SUBSCRIPTION.STILL_DRAFT',
+      ],
+    ];
 
-      const caught = await service.addLine(actor, 'sub-1', baseAdd).catch((e: unknown) => e);
-
-      expect(caught).toBeInstanceOf(SubscriptionLineLiveTakenError);
-      expect(codeOf(caught)).toEqual({ status: HttpStatus.CONFLICT, code: 'SUBSCRIPTION.DUPLICATE_PLAN' });
-    });
-
-    it('rejects plan from another vendor with 422 WORKSPACE_VENDOR_MISMATCH and non-K2 plan', async () => {
-      const { service } = makeSut({
-        workspaces: {
-          lockBoth: jest.fn().mockRejectedValue(new WorkspaceVendorMismatchError()),
-        },
-        plans: {
-          lockShared: jest.fn().mockResolvedValue(k2Plan),
-          vendorIdOf: jest.fn().mockResolvedValue('ven-other'),
-          lookups: jest.fn().mockResolvedValue([k2Plan]),
-        },
-      });
-
-      const caught = await service
-        .addLine(actor, 'sub-1', {
-          planId: 'plan-2',
-          monthlyUnitPrice: { amount: '375000', currency: 'VND' },
-          expectedUpdatedAt: updatedAt,
-        })
-        .catch((e: unknown) => e);
-      expect(caught).toBeInstanceOf(WorkspaceVendorMismatchError);
-      expect(codeOf(caught)).toEqual({ status: HttpStatus.UNPROCESSABLE_ENTITY, code: 'WORKSPACE_VENDOR_MISMATCH' });
-
-      const { service: nonK2Svc } = makeSut({
-        plans: {
-          lockShared: jest.fn().mockResolvedValue({ ...k2Plan, provisioningType: 'K4' }),
-          vendorIdOf: jest.fn().mockResolvedValue('ven-1'),
-          lookups: jest.fn().mockResolvedValue([{ ...k2Plan, provisioningType: 'K4' }]),
-        },
-      });
-      const caughtK4 = await nonK2Svc
-        .addLine(actor, 'sub-1', {
-          planId: 'plan-2',
-          monthlyUnitPrice: { amount: '375000', currency: 'VND' },
-          expectedUpdatedAt: updatedAt,
-        })
-        .catch((e: unknown) => e);
-      expect(caughtK4).toBeInstanceOf(SubscriptionLinePlanNotK2Error);
-    });
-
-    it('LINES_LIMIT: rejects adding a 21st line to a period with 409 SUBSCRIPTION.LINES_LIMIT', async () => {
-      const existingTwenty = Array.from({ length: 20 }, (_, i) => makeLine({ id: `line-${i}`, planId: `plan-${i}` }));
-      const { service, insert } = makeSut({
-        lines: {
-          readPeriodWorkspace: jest.fn().mockResolvedValue('ws-1'),
-          lockPeriod: jest.fn().mockResolvedValue(makePeriod()),
-          ofSubscriptions: jest.fn().mockResolvedValue(new Map([['sub-1', existingTwenty]])),
-        },
-      });
-
-      const caught = await service.addLine(actor, 'sub-1', baseAdd).catch((e: unknown) => e);
-
-      expect(codeOf(caught)).toEqual({ status: HttpStatus.CONFLICT, code: 'SUBSCRIPTION.LINES_LIMIT' });
+    it.each(addRefusals)('refuses %s', async (_label, extra, overrides, ErrClass, status, code) => {
+      const { service, insert } = makeSut(overrides);
+      await expectRefusal(() => service.addLine(actor, 'sub-1', { ...baseAdd, ...extra }), ErrClass, status, code);
       expect(insert).not.toHaveBeenCalled();
     });
 
     it('F-4: ensureLineWorkspace locks workspace (5b) before period (6) when period.workspaceId is null', async () => {
       const { service, order } = makeSut({
         lines: {
-          readPeriodWorkspace: jest.fn().mockResolvedValue(null),
-          lockPeriod: jest.fn().mockImplementation(() => {
-            order.push('lockPeriod');
-            return Promise.resolve(makePeriod({ workspaceId: null }));
-          }),
+          readPeriodWorkspace: res(null),
+          lockPeriod: jest
+            .fn()
+            .mockImplementation(() => (order.push('lockPeriod'), Promise.resolve(makePeriod({ workspaceId: null })))),
         },
       });
-
       await service.addLine(actor, 'sub-1', { ...baseAdd, quantity: 1 });
-
       expect(order).toEqual(['resolveAndLock', 'lockPeriod', 'lockPlan']);
     });
+  });
 
-    it('G-3: rejects adding a line to a DRAFT period (even with null responsible) with 422 SUBSCRIPTION.STILL_DRAFT', async () => {
-      const { service, insert } = makeSut({
+  describe('updateLine (K-7 merged from subscription-line-update.service.spec.ts)', () => {
+    const updBody = { monthlyUnitPrice: { amount: '400000', currency: 'VND' }, expectedUpdatedAt: updatedAt };
+
+    it.each([
+      [
+        'missing line (404)',
+        'line-x',
+        {},
+        { lines: { lock: res(null), find: res(null) } },
+        lineErrors.SubscriptionLineNotFoundError,
+        HttpStatus.NOT_FOUND,
+        'SUBSCRIPTION_LINE.NOT_FOUND',
+      ],
+      [
+        'non-responsible IT Admin (403)',
+        'line-1',
+        {},
+        { lines: { lockPeriod: res(makePeriod({ responsibleItAdminEmployeeId: 'other' })) } },
+        lineErrors.SubscriptionLineNotResponsibleError,
+        HttpStatus.FORBIDDEN,
+        'SUBSCRIPTION_LINE.NOT_RESPONSIBLE',
+      ],
+      [
+        'closed line (409)',
+        'line-1',
+        {},
+        { lines: { lock: res(makeLine({ closedOn: '2026-11-15', closedReason: 'REMOVED' })) } },
+        lineErrors.SubscriptionLineClosedError,
+        HttpStatus.CONFLICT,
+        'SUBSCRIPTION_LINE.CLOSED',
+      ],
+      [
+        'stale version (409)',
+        'line-1',
+        { expectedUpdatedAt: new Date('2026-11-19T00:00:00.000Z') },
+        {},
+        lineErrors.SubscriptionLineStaleError,
+        HttpStatus.CONFLICT,
+        'SUBSCRIPTION_LINE.STALE',
+      ],
+    ] as const)('rejects %s', async (_label, id, extra, overrides, ErrClass, status, code) => {
+      const { service } = makeSut(overrides);
+      await expectRefusal(() => service.updateLine(actor, id, { ...updBody, ...extra }), ErrClass, status, code);
+    });
+
+    it('updates monthlyUnitPriceMinor / minimumSeats and records SUBSCRIPTION_LINE.UPDATED audit', async () => {
+      const { service, update, auditRecord } = makeSut();
+      await service.updateLine(actor, 'line-1', {
+        monthlyUnitPrice: { amount: '420000', currency: 'VND' },
+        minimumSeats: 10,
+        expectedUpdatedAt: updatedAt,
+      });
+      expect(update).toHaveBeenCalledWith(expect.anything(), 'line-1', {
+        monthlyUnitPriceMinor: 420_000n,
+        minimumSeats: 10,
+      });
+      expect(auditRecord).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          action: 'SUBSCRIPTION_LINE.UPDATED',
+          resourceType: 'SUBSCRIPTION_LINE',
+          resourceId: 'line-1',
+        }),
+      );
+    });
+
+    it('F-4: reads line unlocked, locks period (6) before line (6c), and retries if subscriptionId moved', async () => {
+      const { service, order } = makeSut();
+      await service.updateLine(actor, 'line-1', updBody);
+      expect(order).toEqual(['findLine', 'lockPeriod', 'lockLine']);
+
+      const find = jest
+        .fn()
+        .mockResolvedValueOnce(makeLine({ subscriptionId: 'sub-old' }))
+        .mockResolvedValueOnce(makeLine({ subscriptionId: 'sub-new' }));
+      const lock = jest.fn().mockResolvedValue(makeLine({ subscriptionId: 'sub-new' }));
+      const lockPeriod = jest.fn().mockResolvedValue(makePeriod({ id: 'sub-new' }));
+      const retrySut = makeSut({ lines: { find, lock, lockPeriod } });
+      await retrySut.service.updateLine(actor, 'line-1', updBody);
+      expect(lockPeriod).toHaveBeenNthCalledWith(1, expect.anything(), 'sub-old', 'SHARE');
+      expect(lockPeriod).toHaveBeenNthCalledWith(2, expect.anything(), 'sub-new', 'SHARE');
+      expect(retrySut.update).toHaveBeenCalledTimes(1);
+
+      const alwaysMoved = makeSut({
         lines: {
-          readPeriodWorkspace: jest.fn().mockResolvedValue('ws-1'),
-          lockPeriod: jest.fn().mockResolvedValue(makePeriod({ status: 'DRAFT', responsibleItAdminEmployeeId: null })),
+          find: jest.fn().mockResolvedValue(makeLine({ subscriptionId: 'sub-old' })),
+          lock: jest.fn().mockResolvedValue(makeLine({ subscriptionId: 'sub-new' })),
+          lockPeriod: jest.fn().mockResolvedValue(makePeriod()),
         },
       });
-
-      const caught = await service.addLine(actor, 'sub-1', baseAdd).catch((e: unknown) => e);
-
-      expect(caught).toBeInstanceOf(SubscriptionLinePeriodStillDraftError);
-      expect(codeOf(caught)).toEqual({ status: HttpStatus.UNPROCESSABLE_ENTITY, code: 'SUBSCRIPTION.STILL_DRAFT' });
-      expect(insert).not.toHaveBeenCalled();
+      await expectRefusal(
+        () => alwaysMoved.service.updateLine(actor, 'line-1', updBody),
+        lineErrors.SubscriptionLineStaleError,
+        HttpStatus.CONFLICT,
+        'SUBSCRIPTION_LINE.STALE',
+      );
     });
   });
 });

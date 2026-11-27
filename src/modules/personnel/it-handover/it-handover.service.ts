@@ -85,7 +85,7 @@ export class ItHandoverService {
       await this.items.recordDone(tx, {
         organizationId: facts.organizationId,
         source,
-        done: { at, toEmployeeId, subscriptions: moved.subscriptions, applications: moved.applications },
+        done: { at, toEmployeeId, ...moved },
       });
       await this.telling.tell(tx, actor, facts.organizationId, source, {
         employeeId,

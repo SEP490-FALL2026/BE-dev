@@ -1,5 +1,4 @@
 import request from 'supertest';
-import { pretendBusinessToday } from '../../support/pretend-today';
 import type { TaskWire } from '../../support/provisioning-harness';
 import { RevocationHarness } from '../../support/revocation-harness';
 
@@ -288,20 +287,14 @@ describe('BR-MF1-09: a K4 key back to the store and withdrawn from it (integrati
   });
 
   it('T-5: keeps lot unitPrice locked (409 LICENSE_LOT.PRICE_LOCKED) after a key was granted and then revoked', async () => {
-    let seat: Awaited<ReturnType<typeof heldSeat>>;
-    const clock = pretendBusinessToday(h.ctx.app, '2026-01-05');
-    try {
-      seat = await heldSeat(2);
-      await h
-        .revoked(seat.taskId, {
-          completion: 'KEY_DEACTIVATED',
-          evidence: 'Deactivated on device',
-          keyDisposition: 'RETURN_TO_STORE',
-        })
-        .expect(200);
-    } finally {
-      clock.mockRestore();
-    }
+    const seat = await heldSeat(2);
+    await h
+      .revoked(seat.taskId, {
+        completion: 'KEY_DEACTIVATED',
+        evidence: 'Deactivated on device',
+        keyDisposition: 'RETURN_TO_STORE',
+      })
+      .expect(200);
 
     const lot = h.dataOf<{ updatedAt: string; assigned: number }>(
       await request(h.server()).get(`/api/v1/license-lots/${seat.subscriptionId}`).set(h.as(h.it1)).expect(200),

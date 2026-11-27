@@ -435,6 +435,22 @@ describe('the hand-over of an IT Admin who leaves, over HTTP (integration, real 
         applications: 0,
         handedOver: null,
       });
+      const storedItem = await h.ctx.sql.query<{
+        subscriptions_at_record: number;
+        applications_at_record: number;
+        workspaces_at_record: number;
+        license_lots_at_record: number;
+      }>(
+        `SELECT subscriptions_at_record, applications_at_record, workspaces_at_record, license_lots_at_record
+           FROM it_admin_handovers WHERE offboarding_case_id = $1`,
+        [recorded.id],
+      );
+      expect(storedItem.rows[0]).toEqual({
+        subscriptions_at_record: 0,
+        applications_at_record: 0,
+        workspaces_at_record: 1,
+        license_lots_at_record: 1,
+      });
 
       await handOver('offboarding-cases', recorded.id, target.employeeId, h.sa).expect(200);
 
@@ -457,6 +473,21 @@ describe('the hand-over of an IT Admin who leaves, over HTTP (integration, real 
         )
       ).rows.map((row) => row.action);
       expect(movedActions).toEqual(['LICENSE_LOT.RESPONSIBLE_TRANSFERRED', 'WORKSPACE.RESPONSIBLE_TRANSFERRED']);
+    });
+
+    it('H-5: database CHECK rejects an empty handover row with 0/0/0/0 responsibilities', async () => {
+      const u = await unit();
+      counter += 1;
+      const plain = await h.worker(u.department, `IH-ZERO${counter}`, ['IT_ADMIN']);
+      const recorded = await h.recordedCase(plain);
+
+      await expect(
+        h.ctx.sql.query(
+          `INSERT INTO it_admin_handovers (id, organization_id, offboarding_case_id, subscriptions_at_record, applications_at_record, workspaces_at_record, license_lots_at_record)
+           VALUES (gen_random_uuid(), $1, $2, 0, 0, 0, 0)`,
+          [h.seed.organizationId, recorded.id],
+        ),
+      ).rejects.toMatchObject({ code: '23514', constraint: 'it_admin_handovers_counts' });
     });
   });
 });

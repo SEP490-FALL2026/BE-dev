@@ -39,6 +39,8 @@ export class ItHandoverRecorder implements OnModuleInit {
       source: { kind: event.fileKind === 'OFFBOARDING' ? 'OFFBOARDING_CASE' : 'DEPARTMENT_TRANSFER', id: event.fileId },
       subscriptions: left.subscriptions,
       applications: left.applications,
+      workspaces: left.workspaces,
+      licenseLots: left.licenseLots,
     });
   }
 }

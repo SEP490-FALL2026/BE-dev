@@ -39,6 +39,8 @@ describe('ItHandoverRecorder', () => {
       source: { kind: 'OFFBOARDING_CASE', id: 'case-1' },
       subscriptions: 0,
       applications: 0,
+      workspaces: 1,
+      licenseLots: 1,
     });
   });
 });
