@@ -73,4 +73,16 @@ describe('nightly maintenance runner', () => {
     if (report === 'BUSY') throw new Error('Fixture unexpectedly reported BUSY');
     expect(report.tasks[0]).toEqual({ name: 'finished-email', deleted: 25_000, moreRemain: true, failed: false });
   });
+
+  it('reports no work remaining when the last batch of an exhausted budget is short', async () => {
+    const { runner, email } = fixture();
+    jest.spyOn(locks, 'trySessionAdvisoryLock').mockResolvedValue({ release: jest.fn().mockResolvedValue(undefined) });
+    email.purgeFinished.mockImplementation(() =>
+      Promise.resolve(email.purgeFinished.mock.calls.length < 50 ? 500 : 499),
+    );
+    const report = await runner.run(new Date());
+    expect(email.purgeFinished).toHaveBeenCalledTimes(50);
+    if (report === 'BUSY') throw new Error('Fixture unexpectedly reported BUSY');
+    expect(report.tasks[0]).toEqual({ name: 'finished-email', deleted: 24_999, moreRemain: false, failed: false });
+  });
 });

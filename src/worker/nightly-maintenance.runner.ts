@@ -72,20 +72,26 @@ export class NightlyMaintenanceRunner {
     let budget = MAINTENANCE_MAX_BATCHES;
     let deleted = 0;
     let failed = false;
+    // Work remains only if the budget ran out on a full batch, or before a later step could run at all.
+    let moreRemain = false;
     try {
       for (const step of steps) {
+        if (budget === 0) {
+          moreRemain = true;
+          break;
+        }
         while (budget > 0) {
           budget -= 1;
           const count = await step(MAINTENANCE_BATCH);
           deleted += count;
           if (count < MAINTENANCE_BATCH) break;
+          if (budget === 0) moreRemain = true;
         }
       }
     } catch (error) {
       failed = true;
       this.logger.warn(`Nightly maintenance ${name} failed: ${describeForOperator(error)}`);
     }
-    const moreRemain = budget === 0;
     this.logger.log(`Nightly maintenance ${name}: deleted ${deleted}${moreRemain ? ', more remain' : ''}`);
     return { name, deleted, moreRemain, failed };
   }
