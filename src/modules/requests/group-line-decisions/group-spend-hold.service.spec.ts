@@ -2,6 +2,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { CatalogApi } from '../../catalog/public/catalog.api';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { AccessRequestNotPriceableError } from '../access-request/access-request.errors';
 import type { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import type { LineAmountRepo, NewLineAmount } from '../group-request/line-amount.repo';
@@ -160,5 +161,46 @@ describe('GroupSpendHold (FIX-B1 F1)', () => {
       'req-group-1',
       expect.objectContaining({ nextYearAmount: { amountMinor: 166_666n, currency: 'VND' } }),
     );
+  });
+
+  it('B-5: throws AccessRequestNotPriceableError when RECURRING pricing.monthlyPriceMinor is null even with catalog price', async () => {
+    const insertMany = jest.fn();
+    const service = new GroupSpendHold(
+      { setPricing: jest.fn() } as unknown as AccessRequestRepo,
+      { insertMany } as unknown as LineAmountRepo,
+      {
+        hold: jest.fn().mockResolvedValue({
+          id: 'chk-1',
+          currency: 'VND',
+          years: [{ year: 2027, code: 'WITHIN_BASE', costMinor: 0n }],
+        }),
+      } as unknown as SpendEffectsService,
+      { businessToday: jest.fn().mockResolvedValue('2027-11-15') } as unknown as OrganizationReadApi,
+      { endsOfPeople: jest.fn().mockResolvedValue(['2028-02-10']) } as unknown as RequestTermEndsService,
+      {
+        getPlanPrice: jest.fn().mockResolvedValue({
+          kind: 'RECURRING',
+          provisioningType: 'K2',
+          unitPrice: { amountMinor: 500_000n, currency: 'VND' },
+          monthlyPriceMinor: 500_000n,
+          billingCycle: 'MONTHLY',
+        }),
+      } as unknown as CatalogApi,
+    );
+
+    const noMonthlyReq = groupRequestOf({
+      pricing: {
+        ...groupRequestOf().pricing,
+        monthlyPriceMinor: null,
+      },
+    });
+
+    await expect(
+      service.hold(TX, ACTOR, noMonthlyReq, [{ employeeId: 'emp-1', decision: 'APPROVE' }], {
+        checkId: 'chk-1',
+        now: NOW,
+      }),
+    ).rejects.toBeInstanceOf(AccessRequestNotPriceableError);
+    expect(insertMany).not.toHaveBeenCalled();
   });
 });

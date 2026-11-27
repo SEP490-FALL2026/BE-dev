@@ -5,7 +5,12 @@ import type { YearStartCandidate } from './year-start-commitments.repo';
 const tx = { tx: true };
 const PASS: YearStartPassContext = { organizationId: 'org-1', year: 2027, now: new Date(), today: '2027-01-05' };
 /** 650 000 VND a month, the price of 01/01 of the plan of every request. */
-const PRICE = { kind: 'RECURRING', unitPrice: { amountMinor: 650_000n, currency: 'VND' }, billingCycle: 'MONTHLY' };
+const PRICE = {
+  kind: 'RECURRING',
+  unitPrice: { amountMinor: 650_000n, currency: 'VND' },
+  monthlyPriceMinor: 650_000n,
+  billingCycle: 'MONTHLY',
+};
 
 /** A request for 9 months approved in 2026 at 600.000 a month that kept 4.200.000 of 2027 (T-RQ2), unless a test says otherwise. */
 const candidate = (patch: Partial<YearStartCandidate> = {}): YearStartCandidate => ({

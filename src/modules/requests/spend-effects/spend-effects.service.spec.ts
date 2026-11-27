@@ -1,5 +1,6 @@
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { CommitmentHoldInput } from '../../budgets/public/budgets.types';
+import { AccessRequestNotPriceableError } from '../access-request/access-request.errors';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { SpendEffectsService } from './spend-effects.service';
 
@@ -125,10 +126,36 @@ describe('SpendEffectsService (W3-07 monthly slicing on hold)', () => {
     );
   });
 
-  it('B-5: hold reads stored pricing.monthlyPriceMinor without dividing unitPrice/cycle', async () => {
+  it('B-5: throws 409 ACCESS_REQUEST.NOT_PRICEABLE for RECURRING with null monthlyPriceMinor without falling back to catalog', async () => {
     const { service, holdForRequest } = makeService({
       provisioningType: 'K2',
       monthlyPriceMinor: 777_000n,
+      today: '2026-11-15',
+    });
+
+    await expect(
+      service.hold(
+        TX,
+        ACTOR,
+        baseRequest({
+          pricing: {
+            ...baseRequest().pricing,
+            unitPrice: { amountMinor: 10_000_000n, currency: 'VND' },
+            monthlyPriceMinor: null,
+            billingCycle: 'ANNUAL',
+          },
+        }),
+        'chk-1',
+        NOW,
+      ),
+    ).rejects.toBeInstanceOf(AccessRequestNotPriceableError);
+    expect(holdForRequest).not.toHaveBeenCalled();
+  });
+
+  it('B-5: hold reads stored pricing.monthlyPriceMinor directly even when it differs from unitPrice / cycle and catalog', async () => {
+    const { service, holdForRequest } = makeService({
+      provisioningType: 'K2',
+      monthlyPriceMinor: 999_000n,
       today: '2026-11-15',
     });
 
@@ -139,7 +166,7 @@ describe('SpendEffectsService (W3-07 monthly slicing on hold)', () => {
         pricing: {
           ...baseRequest().pricing,
           unitPrice: { amountMinor: 10_000_000n, currency: 'VND' },
-          monthlyPriceMinor: null,
+          monthlyPriceMinor: 777_000n,
           billingCycle: 'ANNUAL',
         },
       }),

@@ -40,9 +40,16 @@ describe('W3-17 K1 annual rolling pricing (Case 1 & Case 6)', () => {
     });
   });
 
-  it('B-5: converts ANNUAL 10.000.000 via roundHalfAway to 833.333/month (no ceilDiv) for K1/K2', () => {
+  it('B-5: monthlyPriceOf returns stored monthlyPriceMinor without read-time division fallback', () => {
     expect(
       monthlyPriceOf({ unitPrice: { amountMinor: 10_000_000n, currency: 'VND' }, billingCycle: 'ANNUAL' }),
+    ).toBeNull();
+    expect(
+      monthlyPriceOf({
+        unitPrice: { amountMinor: 10_000_000n, currency: 'VND' },
+        monthlyPriceMinor: 833_333n,
+        billingCycle: 'ANNUAL',
+      }),
     ).toEqual({
       amountMinor: 833_333n,
       currency: 'VND',

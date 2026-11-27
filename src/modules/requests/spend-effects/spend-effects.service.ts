@@ -10,6 +10,7 @@ import type { MonthSliceInput } from '../../budgets/public/budgets.types';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
+import { AccessRequestNotPriceableError } from '../access-request/access-request.errors';
 import { chargedCostCenterId } from '../access-request/access-request.policy';
 import { seatMonthlyOf } from '../access-request/pricing.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
@@ -99,12 +100,13 @@ export class SpendEffectsService {
     seats: number,
     now: Date,
   ): Promise<{ seatMonthlyMinor: bigint | null; months: MonthSliceInput[] | undefined }> {
+    const monthlyPriceMinor = this.savedMonthlyPriceOf(request.pricing);
+    if (request.pricing.kind === 'RECURRING' && monthlyPriceMinor === null) {
+      throw new AccessRequestNotPriceableError();
+    }
     const planPrice = request.planId !== null ? await this.catalog.getPlanPrice(request.planId, tx) : undefined;
-    const monthlyPriceMinor = this.savedMonthlyPriceOf(request.pricing, planPrice?.monthlyPriceMinor);
     const seatMonthlyMinor = seatMonthlyOf({
       monthlyPriceMinor,
-      unitPrice: request.pricing.unitPrice,
-      billingCycle: request.pricing.billingCycle,
       costMinor: year.costMinor,
       kind: request.pricing.kind,
       months: request.pricing.budgetYear === year.year ? request.pricing.amountMonths : null,
@@ -117,11 +119,8 @@ export class SpendEffectsService {
     return { seatMonthlyMinor, months };
   }
 
-  private savedMonthlyPriceOf(
-    pricing: AccessRequestRecord['pricing'],
-    catalogMonthly: bigint | null | undefined,
-  ): bigint | null | undefined {
-    return pricing.monthlyPriceMinor ?? catalogMonthly;
+  private savedMonthlyPriceOf(pricing: AccessRequestRecord['pricing']): bigint | null {
+    return pricing.monthlyPriceMinor ?? null;
   }
 
   private async monthlySlicesForHold(

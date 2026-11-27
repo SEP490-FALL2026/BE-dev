@@ -124,9 +124,7 @@ function keptAmountOf(seat: YearStartSeat, yearStart: BusinessDate): bigint | nu
   const monthsToClose = requestAmountOf({
     kind: 'RECURRING',
     unitPrice: price.unitPrice,
-    monthlyPriceMinor:
-      price.monthlyPriceMinor ??
-      monthlyPriceOf({ unitPrice: price.unitPrice, billingCycle: price.billingCycle })?.amountMinor,
+    monthlyPriceMinor: price.monthlyPriceMinor ?? null,
     billingCycle: price.billingCycle,
     beneficiaries: 1,
     checkDate: yearStart,

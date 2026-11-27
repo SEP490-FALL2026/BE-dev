@@ -5,7 +5,12 @@ import type { ForeignKeptLine, YearStartCandidate } from './year-start-commitmen
 const tx = { tx: true };
 const PASS: YearStartPassContext = { organizationId: 'org-1', year: 2027, now: new Date(), today: '2027-01-05' };
 /** 650 000 VND a month, the price of 01/01 of the plan of every request. */
-const PRICE = { kind: 'RECURRING', unitPrice: { amountMinor: 650_000n, currency: 'VND' }, billingCycle: 'MONTHLY' };
+const PRICE = {
+  kind: 'RECURRING',
+  unitPrice: { amountMinor: 650_000n, currency: 'VND' },
+  monthlyPriceMinor: 650_000n,
+  billingCycle: 'MONTHLY',
+};
 
 const candidate = (patch: Partial<YearStartCandidate> & { id: string }): YearStartCandidate => ({
   type: 'GRANT',

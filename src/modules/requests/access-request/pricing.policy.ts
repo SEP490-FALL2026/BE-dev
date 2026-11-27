@@ -72,20 +72,9 @@ export function ceilMonthlyPriceOf(unitPrice: Money, billingCycle: Exclude<Billi
   };
 }
 
-function legacySeatMonthlyOf(unitPrice?: Money | null, billingCycle?: BillingCycleCode | null): bigint | null {
-  if (!unitPrice || !billingCycle || billingCycle === 'OTHER') return null;
-
-  return monthlyPriceOf({ unitPrice, billingCycle })?.amountMinor ?? null;
-}
-
-/**
- * What one seat of a commitment costs a month (`RV-07`, `M-10`): reads `monthlyPriceMinor` directly when provided (no reverse
- * division of cost over months × seats), falling back to the stored monthly price of `unitPrice`/`billingCycle` only when absent.
- */
+/** What one seat of a commitment costs a month: reads stored `monthlyPriceMinor` directly without dividing at read time. */
 export function seatMonthlyOf(input: {
   monthlyPriceMinor?: bigint | null;
-  unitPrice?: Money | null;
-  billingCycle?: BillingCycleCode | null;
   costMinor: bigint;
   kind: 'RECURRING' | 'ONE_TIME' | null;
   months: number | null;
@@ -93,31 +82,20 @@ export function seatMonthlyOf(input: {
 }): bigint | null {
   if (input.kind !== 'RECURRING' || input.months === null || input.months <= 0 || input.seats <= 0) return null;
   if (input.costMinor <= 0n) return null;
-  const monthly =
-    input.monthlyPriceMinor !== undefined
-      ? input.monthlyPriceMinor
-      : legacySeatMonthlyOf(input.unitPrice, input.billingCycle);
+  const monthly = input.monthlyPriceMinor ?? null;
 
   return monthly !== null && monthly > 0n ? monthly : null;
 }
 
-/** What one person costs a month, reading `monthlyPriceMinor` directly when provided. */
+/** What one person costs a month, reading stored `monthlyPriceMinor` directly without dividing at read time. */
 export function monthlyPriceOf(price: {
   monthlyPriceMinor?: bigint | null;
   unitPrice: Money;
-  billingCycle: BillingCycleCode | null;
+  billingCycle?: BillingCycleCode | null;
 }): Money | null {
-  if (price.monthlyPriceMinor !== undefined) {
-    return price.monthlyPriceMinor === null
-      ? null
-      : { amountMinor: price.monthlyPriceMinor, currency: price.unitPrice.currency };
-  }
-  if (price.billingCycle === null || price.billingCycle === 'OTHER') return null;
+  if (price.monthlyPriceMinor === undefined || price.monthlyPriceMinor === null) return null;
 
-  return {
-    amountMinor: roundHalfAway(price.unitPrice.amountMinor, BigInt(CYCLE_MONTHS[price.billingCycle])),
-    currency: price.unitPrice.currency,
-  };
+  return { amountMinor: price.monthlyPriceMinor, currency: price.unitPrice.currency };
 }
 
 function isAnnualFirstPurchaseCommitment(price: {

@@ -50,13 +50,14 @@ describe('the amount of a request from a quote (US-05-06 AC-14, BR-MF1-06)', () 
     expect(priced({ quote: quote({ billingCycle: 'ANNUAL', unitPrice: dong(120) }) }).amount).toEqual(dong(30));
   });
 
-  it('B-5: populates monthlyPriceMinor on quote pricing and PricingRecord for persistence at submit time', () => {
+  it('B-5: populates roundHalfAway monthlyPriceMinor on quote pricing and PricingRecord for persistence at submit time', () => {
     const res = priced({
       quote: quote({ billingCycle: 'ANNUAL', unitPrice: { amountMinor: 10_000_000n, currency: 'VND' } }),
     });
     const record = pricingRecordOfQuote(res, null);
 
-    expect(record.monthlyPriceMinor).toBe(833_334n);
+    expect(res.monthlyPriceMinor).toBe(833_333n);
+    expect(record.monthlyPriceMinor).toBe(833_333n);
   });
 
   describe('what is refused', () => {

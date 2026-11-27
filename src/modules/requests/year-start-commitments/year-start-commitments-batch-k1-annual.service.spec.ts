@@ -16,6 +16,7 @@ const candidate = (patch: Partial<YearStartCandidate> & { id: string }): YearSta
   nextYearAmountMinor: 4_500_000n,
   amountCurrency: 'VND',
   unitPriceMinor: 450_000n,
+  monthlyPriceMinor: 450_000n,
   billingCycle: 'MONTHLY',
   ...patch,
 });
@@ -79,6 +80,7 @@ function setup(candidates: YearStartCandidate[], seats: GrantedSeatOfRequest[] =
     getPlanPrice: jest.fn().mockResolvedValue({
       kind: 'RECURRING',
       unitPrice: { amountMinor: 450_000n, currency: 'VND' },
+      monthlyPriceMinor: 450_000n,
       billingCycle: 'MONTHLY',
     }),
   };

@@ -37,10 +37,20 @@ const view = (over: Partial<CommitmentRequestView> = {}): CommitmentRequestView 
   vendorId: 'vendor-1',
   ...over,
 });
-type Price = { kind: 'RECURRING' | 'ONE_TIME'; unitPrice: { amountMinor: bigint }; billingCycle: string } | null;
-const monthly = (amountMinor: bigint, billingCycle = 'MONTHLY'): Price => ({
+type Price = {
+  kind: 'RECURRING' | 'ONE_TIME';
+  unitPrice: { amountMinor: bigint };
+  monthlyPriceMinor?: bigint | null;
+  billingCycle: string;
+} | null;
+const monthly = (
+  amountMinor: bigint,
+  billingCycle = 'MONTHLY',
+  monthlyPriceMinor: bigint | null = amountMinor,
+): Price => ({
   kind: 'RECURRING',
   unitPrice: { amountMinor },
+  monthlyPriceMinor,
   billingCycle,
 });
 
@@ -139,12 +149,12 @@ describe('the price increase already known of the commitments of a Cost Center (
     expect(knownPriceIncrease(items.get(CC) ?? [])).toBe(2_000_000n);
   });
 
-  it('turns the price of a quarter or a year into the price of a month, rounded up, as the commitment did', async () => {
-    const { service } = build([held()], [view()], { 'plan-1': monthly(18_000_001n, 'ANNUAL') });
+  it('reads stored monthlyPriceMinor directly without dividing unitPrice at read time (H-7 / B-5)', async () => {
+    const { service } = build([held()], [view()], { 'plan-1': monthly(18_000_001n, 'ANNUAL', 1_500_000n) });
 
     const items = await service.itemsOf(tx, [CC], YEAR, 8);
 
-    expect(items.get(CC)?.[0].monthlyMinor[0]).toBe(1_500_001n);
+    expect(items.get(CC)?.[0].monthlyMinor[0]).toBe(1_500_000n);
   });
 
   it('keeps the price of the month before for a month the catalog has no comparable price for: it is not known to have changed', async () => {

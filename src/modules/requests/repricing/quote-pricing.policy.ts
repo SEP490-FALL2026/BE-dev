@@ -1,8 +1,11 @@
 import type { BusinessDate } from '../../../core/business-date';
 import { DONG, type Money } from '../../../core/money/money';
+import { roundHalfAway } from '../../../core/seat-month-cost';
 import type { PricingRecord } from '../access-request/access-request.types';
 import type { Quote, QuoteCycle } from '../access-request/assessment-record.types';
-import { ceilMonthlyPriceOf, requestAmountOf } from '../access-request/pricing.policy';
+import { requestAmountOf } from '../access-request/pricing.policy';
+
+const CYCLE_MONTHS: Readonly<Record<QuoteCycle, bigint>> = { MONTHLY: 1n, QUARTERLY: 3n, ANNUAL: 12n };
 
 /**
  * What a request for software that is not in the catalog costs, from the quote the IT Admin records (`US-05-06` AC-14, `QĐ-84e`,
@@ -54,9 +57,11 @@ export function priceFromQuote(input: QuotePricingInput): QuotePricing {
   if (quote.validFrom > input.checkDate || (expired && input.expiredStillPrices !== true)) {
     return { status: 'REFUSED', reason: 'QUOTE_NOT_IN_FORCE' };
   }
+  const monthlyPriceMinor = roundHalfAway(quote.unitPrice.amountMinor, CYCLE_MONTHS[quote.billingCycle]);
   const priced = requestAmountOf({
     kind: 'RECURRING',
     unitPrice: quote.unitPrice,
+    monthlyPriceMinor,
     billingCycle: quote.billingCycle,
     beneficiaries: input.beneficiaries,
     checkDate: input.checkDate,
@@ -72,7 +77,7 @@ export function priceFromQuote(input: QuotePricingInput): QuotePricing {
     status: 'PRICED',
     amount: priced.amount,
     unitPrice: quote.unitPrice,
-    monthlyPriceMinor: ceilMonthlyPriceOf(quote.unitPrice, quote.billingCycle).amountMinor,
+    monthlyPriceMinor,
     billingCycle: quote.billingCycle,
     months: priced.months,
     budgetYear: priced.budgetYear,
