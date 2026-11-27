@@ -315,7 +315,7 @@ describe('runningUncommittedByCostCenter (SPEC-B1 W3-08)', () => {
       expect(result.size).toBe(0);
     });
 
-    it('prices each seat of a period with two plans at the price of its own plan (SPEC W3-08: 2 x 375.000 x 6 and 800.000 x 6)', () => {
+    it('prices each seat of a period with two plans at the price of its own plan (2 x 375.000 x 6 and 800.000 x 6)', () => {
       const result = runningUncommittedByCostCenter({
         year: 2027,
         today: '2027-07-08',

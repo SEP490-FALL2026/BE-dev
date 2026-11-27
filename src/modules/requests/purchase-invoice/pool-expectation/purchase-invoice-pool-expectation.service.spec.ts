@@ -36,7 +36,7 @@ function serviceWith(lines: LineOfPeriod[]) {
   return { service, periods };
 }
 
-describe('PurchaseInvoicePoolService.topUpSource (SPEC-B3 :46, :121: a period with lines is priced by its lines)', () => {
+describe('PurchaseInvoicePoolService.topUpSource (a period with lines is priced by its lines)', () => {
   const standard = line({});
   const premium = line({ planId: 'premium', monthlyUnitPriceMinor: 800_000n });
 

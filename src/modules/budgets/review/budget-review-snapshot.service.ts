@@ -76,7 +76,10 @@ export class BudgetReviewSnapshotService {
     return this.query.wireOf(actor, created);
   }
 
-  /** The seat-months of the month are charged again whatever was charged before, so a change after the month ended is in the picture (`QĐ-111ae`). */
+  /**
+   * The seat-months of the month are charged again whatever was charged before, so a change of the seats after the month ended is in the picture
+   * (`QĐ-111ae`); a seat that already has its row keeps the price that row recorded, a seat with none takes the price of today.
+   */
   private async chargeSeatMonths(body: { year: number; month: number }, now: Date): Promise<void> {
     try {
       await this.seatMonths.chargeMonth(`${body.year}-${String(body.month).padStart(2, '0')}-01`, now);
