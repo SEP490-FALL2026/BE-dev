@@ -14,7 +14,8 @@ export class SubscriptionPlanNotFoundError extends Error {
 
 /** The application of the plan is retired: a purchase of it is no longer declared (`US-04-01` AC-8, AC-9). */
 export class SubscriptionApplicationRetiredError extends Error {
-  constructor() {
+  /** `planId` names the plan whose application is retired when a declaration holds several. */
+  constructor(readonly planId?: string) {
     super('The application of the plan is retired: no subscription is declared for it.');
     this.name = 'SubscriptionApplicationRetiredError';
   }

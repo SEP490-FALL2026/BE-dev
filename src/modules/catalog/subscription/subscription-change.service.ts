@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
-import { isCheckViolation } from '../../../infrastructure/database/unique-violation';
+import { isCheckViolation, isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { catalogAuditEvent } from '../catalog-audit-event.mapper';
 import { PlanFactsService } from '../plan/plan-facts.service';
 import {
+  SubscriptionDuplicatePlanError,
   SubscriptionNotFoundError,
   SubscriptionPlanNotFoundError,
   SubscriptionPriceOnLinesError,
@@ -169,6 +170,7 @@ export class SubscriptionChangeService {
       status: this.statusAfter(plan, current, { ...next, ...priced }),
     };
     await this.guard.judgePool(tx, { plan, current, state, input, actor, organizationId });
+    await this.assertLinesFitWorkspace(tx, current, input.workspaceId);
     if (sameState(state, stateOf(current))) return current;
 
     const updated = await this.saveState(tx, id, state);
@@ -179,12 +181,32 @@ export class SubscriptionChangeService {
     return updated;
   }
 
+  /**
+   * A period that moves takes its live lines to the other workspace, where a plan has one live line at most: a plan that already has one there
+   * refuses the move. Judged under the locks of both workspaces. Throws SubscriptionDuplicatePlanError.
+   */
+  private async assertLinesFitWorkspace(
+    tx: DbTx,
+    current: SubscriptionRecord,
+    workspaceId: string | undefined,
+  ): Promise<void> {
+    if (workspaceId === undefined || workspaceId === (current.workspace?.id ?? null)) return;
+    for (const line of await this.periodLines.linesOf(current.id, tx)) {
+      if (line.closedReason !== null) continue;
+      const taken = await this.periodLines.hasLiveLine(workspaceId, line.planId, tx);
+      if (taken) throw new SubscriptionDuplicatePlanError([taken.subscriptionId]);
+    }
+  }
+
   private async saveState(tx: DbTx, id: string, state: SubscriptionState): Promise<SubscriptionRecord> {
     try {
       return await this.subscriptions.update(tx, id, state);
     } catch (error) {
       if (isCheckViolation(error, 'subscriptions_active_term_monthly_price')) {
         throw new SubscriptionStillDraftError(['UNIT_PRICE']);
+      }
+      if (isUniqueViolation(error, 'subscription_lines_workspace_plan_live')) {
+        throw new SubscriptionDuplicatePlanError([]);
       }
       throw error;
     }

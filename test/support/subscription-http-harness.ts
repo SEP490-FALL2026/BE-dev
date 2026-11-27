@@ -168,7 +168,7 @@ export class SubscriptionHttpHarness {
   create = (body: object, account: ApiAccount = this.it1) => {
     const { kind, billingCycle } = body as { kind?: string; billingCycle?: string };
     // A subscription that becomes active names the months it commits to and the IT Admin who answers for it (QĐ-103e, QĐ-103v(4)):
-    // the commitment follows the cycle the body names, and the IT Admin of the harness answers unless the body says otherwise.
+    // the commitment follows the cycle the body names, and the IT Admin who declares answers for it.
     const commitment =
       kind === 'PERPETUAL' || billingCycle === undefined
         ? {}
@@ -177,11 +177,7 @@ export class SubscriptionHttpHarness {
     return request(this.server())
       .post('/api/v1/subscriptions')
       .set(this.as(account))
-      .send({
-        responsibleItAdminEmployeeId: this.it1.employeeId,
-        ...commitment,
-        ...body,
-      });
+      .send({ ...commitment, ...body });
   };
 
   patch = (id: string, body: object, account: ApiAccount = this.it1) =>

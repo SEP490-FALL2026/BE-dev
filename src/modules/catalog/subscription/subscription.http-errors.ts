@@ -136,7 +136,12 @@ export function toSubscriptionApiException(error: unknown): unknown {
     return refuse(UNPROCESSABLE, 'SUBSCRIPTION.PLAN_NOT_FOUND', error.message);
   }
   if (error instanceof SubscriptionApplicationRetiredError) {
-    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.APPLICATION_RETIRED', error.message);
+    return refuse(
+      UNPROCESSABLE,
+      'SUBSCRIPTION.APPLICATION_RETIRED',
+      error.message,
+      error.planId === undefined ? undefined : { planId: error.planId },
+    );
   }
   if (error instanceof SubscriptionPlanHasNoSubscriptionError) {
     return refuse(UNPROCESSABLE, 'SUBSCRIPTION.PLAN_HAS_NO_SUBSCRIPTION', error.message);

@@ -71,7 +71,6 @@ describe('SubscriptionMultiLineService (F-3)', () => {
       {
         workspaceFor: jest.fn().mockResolvedValue('ws-1'),
         assertNoLiveDuplicate: jest.fn(),
-        responsibleOfDeclaration: jest.fn().mockResolvedValue('emp-khoa'),
         assert: jest.fn(),
         assertVendorAdmins: jest.fn(),
         requireItAdmin: jest.fn(),
@@ -111,6 +110,60 @@ describe('SubscriptionMultiLineService (F-3)', () => {
     });
     expect(insert).not.toHaveBeenCalled();
     expect(createForPeriod).not.toHaveBeenCalled();
+  });
+
+  it('R8: refuses with 422 SUBSCRIPTION.APPLICATION_RETIRED naming the plan when the application of a second plan was retired between the lookup and the lock', async () => {
+    const tx = {} as DbTx;
+    const runner = { run: (work: (t: DbTx) => unknown) => Promise.resolve(work(tx)) } as unknown as TransactionRunner;
+    const insert = jest.fn();
+    const multiLine = new SubscriptionMultiLineService(
+      { insert } as unknown as SubscriptionRepo,
+      {
+        lookups: jest.fn().mockResolvedValue([planA, planB]),
+        vendorIdsOf: jest.fn().mockResolvedValue(
+          new Map([
+            ['plan-a', 'ven-1'],
+            ['plan-b', 'ven-1'],
+          ]),
+        ),
+        lockExclusive: jest.fn((_tx: DbTx, id: string) =>
+          Promise.resolve(id === 'plan-a' ? planA : { ...planB, applicationStatus: 'RETIRED' as const }),
+        ),
+      } as unknown as PlanFactsService,
+      {
+        read: jest.fn((m: { amount: string }) => Promise.resolve({ amountMinor: BigInt(m.amount), currency: 'VND' })),
+        readOriginal: jest.fn(),
+        priceToday: jest.fn(),
+      } as unknown as SubscriptionPricingService,
+      {
+        requireOrganizationId: jest.fn().mockResolvedValue('org-1'),
+        hasLiveLine: jest.fn().mockResolvedValue(null),
+        createForPeriod: jest.fn(),
+      } as unknown as SubscriptionPeriodLinesService,
+      {
+        workspaceFor: jest.fn().mockResolvedValue('ws-1'),
+        assertNoLiveDuplicate: jest.fn(),
+        requireItAdmin: jest.fn(),
+      } as unknown as SubscriptionPoolService,
+      { record: jest.fn() } as unknown as AuditApi,
+      runner,
+    );
+    const lines = [
+      { planId: 'plan-a', monthlyUnitPrice: { amount: '500000', currency: 'VND' }, quantity: 10 },
+      { planId: 'plan-b', monthlyUnitPrice: { amount: '375000', currency: 'VND' }, quantity: 2 },
+    ];
+
+    const err = await multiLine
+      .declare(actor, { kind: 'TERM', billingCycle: 'MONTHLY', startDate: '2026-11-01', lines }, lines)
+      .catch((e: unknown) => e);
+
+    const httpErr = toSubscriptionApiException(err) as { getStatus: () => number; getResponse: () => object };
+    expect(httpErr.getStatus()).toBe(HttpStatus.UNPROCESSABLE_ENTITY);
+    expect(httpErr.getResponse()).toMatchObject({
+      code: 'SUBSCRIPTION.APPLICATION_RETIRED',
+      details: { planId: 'plan-b' },
+    });
+    expect(insert).not.toHaveBeenCalled();
   });
 
   it('LINES_LIMIT: refuses declaring more than 20 lines with 409 SUBSCRIPTION.LINES_LIMIT', async () => {
@@ -246,7 +299,6 @@ describe('SubscriptionMultiLineService (F-3)', () => {
       {
         workspaceFor: jest.fn().mockResolvedValue('ws-1'),
         assertNoLiveDuplicate: jest.fn(),
-        responsibleOfDeclaration: jest.fn().mockResolvedValue('emp-khoa'),
         assert: jest.fn(),
         assertVendorAdmins: jest.fn(),
         requireItAdmin: jest.fn(),

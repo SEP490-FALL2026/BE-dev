@@ -75,7 +75,6 @@ describe('workspace >= 2 working admin gate and WORKSPACE_ADMIN_NOT_WORKING aler
         billingCycle: 'MONTHLY',
         commitmentTermMonths: 1,
         startDate: '2026-01-05',
-        responsibleItAdminEmployeeId: khoa.employeeId,
         ...extra,
       });
 

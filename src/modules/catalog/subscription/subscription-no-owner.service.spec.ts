@@ -20,7 +20,7 @@ import type { SubscriptionRecord } from './subscription.types';
 
 /** A subscription has no owning department (`QĐ-113g`): none is asked when one is declared, and no Cost Center when one is changed. A plan of personal accounts (K1) has no subscription since W3-27, so the plan here is one of seats. */
 describe('QĐ-113g: no owning department on a subscription', () => {
-  const actor = { roles: ['IT_ADMIN'] } as unknown as AuthenticatedPrincipal;
+  const actor = { roles: ['IT_ADMIN'], employeeId: 'it-1' } as unknown as AuthenticatedPrincipal;
   const tx = {};
   const runner = { run: (work: (t: unknown) => unknown) => Promise.resolve(work(tx)) } as unknown as TransactionRunner;
   const plan = {
@@ -87,7 +87,6 @@ describe('QĐ-113g: no owning department on a subscription', () => {
       {
         assertNoLiveDuplicate: jest.fn(),
         workspaceFor: jest.fn(() => Promise.resolve(null)),
-        responsibleOfDeclaration: jest.fn(() => Promise.resolve(null)),
         assert: jest.fn(),
         assertVendorAdmins: jest.fn(),
         requireItAdmin: jest.fn(),
@@ -167,7 +166,6 @@ describe('QĐ-113g: no owning department on a subscription', () => {
       {
         assertNoLiveDuplicate: jest.fn(),
         workspaceFor: jest.fn(() => Promise.resolve(null)),
-        responsibleOfDeclaration: jest.fn(() => Promise.resolve('it-1')),
         assert: jest.fn(),
         assertVendorAdmins: jest.fn(),
         requireItAdmin: jest.fn(),
@@ -189,9 +187,71 @@ describe('QĐ-113g: no owning department on a subscription', () => {
       tx,
       expect.objectContaining({
         commitmentTermMonths: 12,
+        responsibleItAdminEmployeeId: 'it-1',
         monthlyUnitPriceMinor: 500_000n,
         unitPrice: { amountMinor: 6_000_000n, currency: 'VND', recordedOn: '2026-11-25' },
       }),
+    );
+  });
+
+  it('declares a K2 TERM with a monthly price of 0 as a DRAFT without a price (no price, as on a line)', async () => {
+    const insert = jest.fn((_t: unknown, data: object) => Promise.resolve(stored({ ...data })));
+    const k2 = { ...plan, provisioningType: 'K2', referenceCommitmentMonths: 12 as const };
+    const priceToday = jest.fn((_t: unknown, money: { amountMinor: bigint; currency: string } | null) =>
+      Promise.resolve(
+        money
+          ? {
+              unitPrice: { ...money, recordedOn: '2026-11-25' },
+              priceSnapshot: {
+                rate: 10_000_000_000n,
+                rateDate: '2026-11-25',
+                rateSource: 'SAME_CURRENCY',
+                reportingMinor: money.amountMinor,
+                reportingCurrency: 'VND',
+                exchangeRateId: null,
+              },
+            }
+          : { unitPrice: null, priceSnapshot: null },
+      ),
+    );
+    const service = new SubscriptionService(
+      { insert } as unknown as SubscriptionRepo,
+      {
+        lockExclusive: jest.fn(() => Promise.resolve(k2)),
+        lookups: jest.fn(() => Promise.resolve([k2])),
+      } as unknown as PlanFactsService,
+      {
+        read: jest.fn((money: { amount: string; currency: string }) =>
+          Promise.resolve({ amountMinor: BigInt(money.amount), currency: money.currency }),
+        ),
+        priceToday,
+      } as unknown as SubscriptionPricingService,
+      view,
+      multiLineStub as never,
+      {
+        assertNoLiveDuplicate: jest.fn(),
+        workspaceFor: jest.fn(() => Promise.resolve(null)),
+        assert: jest.fn(),
+        assertVendorAdmins: jest.fn(),
+        requireItAdmin: jest.fn(),
+      } as unknown as SubscriptionPoolService,
+      audit,
+      runner,
+    );
+
+    await service.declare(actor, {
+      planId: 'plan-1',
+      kind: 'TERM',
+      purchasedQuantity: 5,
+      billingCycle: 'ANNUAL',
+      startDate: '2026-11-01',
+      monthlyUnitPrice: { amount: '0', currency: 'VND' },
+    });
+
+    expect(priceToday).toHaveBeenCalledWith(tx, null);
+    expect(insert).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({ status: 'DRAFT', unitPrice: null, priceSnapshot: null, monthlyUnitPriceMinor: null }),
     );
   });
 
@@ -231,7 +291,6 @@ describe('QĐ-113g: no owning department on a subscription', () => {
       {
         assertNoLiveDuplicate: jest.fn(),
         workspaceFor: jest.fn(() => Promise.resolve(null)),
-        responsibleOfDeclaration: jest.fn(() => Promise.resolve('it-1')),
         assert: jest.fn(),
         assertVendorAdmins: jest.fn(),
         requireItAdmin: jest.fn(),
@@ -253,6 +312,7 @@ describe('QĐ-113g: no owning department on a subscription', () => {
     expect(insert).toHaveBeenCalledWith(
       tx,
       expect.objectContaining({
+        responsibleItAdminEmployeeId: 'it-1',
         monthlyUnitPriceMinor: 83_333n,
         unitPrice: { amountMinor: 999_996n, currency: 'VND', recordedOn: '2026-11-25' },
       }),

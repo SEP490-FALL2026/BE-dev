@@ -82,7 +82,6 @@ describe('the IT Admin who answers for a subscription over HTTP (integration, re
           startDate: '2026-03-15',
           endDate: '2026-04-14',
           autoRenew: false,
-          responsibleItAdminEmployeeId: it1.employeeId,
         })
         .expect(201),
     );

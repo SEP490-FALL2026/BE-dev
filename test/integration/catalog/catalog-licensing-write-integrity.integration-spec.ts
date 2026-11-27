@@ -387,7 +387,7 @@ describe('write integrity of catalog, finance and licensing (integration, DB-03,
       expect(await sqlState(sql(), `UPDATE plans SET provisioning_type = 'K1' WHERE id = $1`, [plan])).toBe('23514');
     }, 60_000);
 
-    it('B-5: a K4 plan is bought once, so a term cannot be declared for it (422 SUBSCRIPTION.K4_PERPETUAL_ONLY) and a perpetual purchase can', async () => {
+    it('B-5: a K4 plan is bought once, so a term cannot be declared for it (422 SUBSCRIPTION.K4_PERPETUAL_ONLY) and what is bought once is a lot of the lots route, not a subscription', async () => {
       const k4 = await h.plan('K4');
       const declare = (body: object) =>
         request(h.server())
@@ -406,7 +406,21 @@ describe('write integrity of catalog, finance and licensing (integration, DB-03,
       expect(term.status).toBe(422);
       expect(h.codeOf(term)).toBe('SUBSCRIPTION.K4_PERPETUAL_ONLY');
       expect((await sql().query<{ n: number }>(`SELECT count(*)::int AS n FROM subscriptions`)).rows[0].n).toBe(before);
-      expect((await declare({ kind: 'PERPETUAL', startDate: '2026-03-15', purchasedQuantity: 5 })).status).toBe(201);
+      // Keys bought once are a lot since W3-24: the subscription route refuses a perpetual purchase and the route of the lots makes it.
+      const perpetual = await declare({ kind: 'PERPETUAL', startDate: '2026-03-15', purchasedQuantity: 5 });
+      expect(perpetual.status).toBe(422);
+      expect(h.codeOf(perpetual)).toBe('SUBSCRIPTION.PERPETUAL_IS_LICENSE_LOT');
+      await request(h.server())
+        .post('/api/v1/license-lots')
+        .set(as())
+        .send({
+          planId: k4,
+          purchasedOn: '2026-03-15',
+          licenseCount: 5,
+          unitPrice: { amount: '1000000', currency: 'VND' },
+          purpose: 'REPLACEMENT',
+        })
+        .expect(201);
     }, 60_000);
 
     it('CT-1: refuses to leave K4 while a perpetual purchase of an application that is not licensed hangs on it, and lets a licensed one go', async () => {
@@ -479,15 +493,18 @@ describe('write integrity of catalog, finance and licensing (integration, DB-03,
       });
     }, 60_000);
 
-    it('refuses the same for a plan of seats (K2) with the profile of its workspace admins, and leaves the profile as it was', async () => {
+    it('refuses the same for a plan of seats (K2) with the workspace and the admins of its vendor, and leaves them as they were', async () => {
       const subscription = await h.subscription(10, 'K2');
       const plan = await planOfSubscription(subscription);
       const before = await kindOf(plan);
       const profileOf = async () =>
         (
           await sql().query<{ profiles: string; admins: string }>(
-            `SELECT (SELECT count(*) FROM plan_workspace_profiles WHERE plan_id = $1)::text AS profiles,
-                    (SELECT count(*) FROM plan_workspace_admins WHERE plan_id = $1)::text AS admins`,
+            `SELECT (SELECT count(*) FROM workspaces w JOIN applications a ON a.vendor_id = w.vendor_id
+                       JOIN plans p ON p.application_id = a.id WHERE p.id = $1)::text AS profiles,
+                    (SELECT count(*) FROM workspace_admins wa JOIN workspaces w ON w.id = wa.workspace_id
+                       JOIN applications a ON a.vendor_id = w.vendor_id JOIN plans p ON p.application_id = a.id
+                      WHERE p.id = $1)::text AS admins`,
             [plan],
           )
         ).rows[0];

@@ -335,6 +335,15 @@ SELECT s."id", s."plan_id"
    AND s."workspace_id" IS NULL;
 ```
 
+Pre-check của migration `20261204000700_w3_audit_lot_source_currency_check` (lô sinh từ thuê bao nguồn có giá ngoài VND; phải trả 0 dòng):
+
+```sql
+SELECT l."id" AS "license_lot_id", s."id" AS "subscription_id", s."unit_price_currency"
+  FROM "license_lots" l
+  JOIN "subscriptions" s ON s."id" = l."legacy_subscription_id"
+ WHERE s."unit_price_currency" IS NOT NULL AND s."unit_price_currency" <> 'VND';
+```
+
 ### Kết quả Manual CI `45958467303` (`int/redesign-w3` @ `20d87002`)
 
 - `select`: **PASS** | `quality`: **PASS** | `http-contract`: **PASS** | `e2e-smoke`: **PASS** | `integration-inband` (`13/13` `_serial` gồm `seed-check-runtime`): **PASS** | `Deploy to VPS`: **skipped**
@@ -346,3 +355,21 @@ SELECT s."id", s."plan_id"
 - `select`: **PASS** | `quality`: **PASS** | `http-contract` (`123/123` suites, `2855` tests): **PASS** | `e2e-smoke` (`10/10`, `48` tests): **PASS** | `integration-inband` (`7/7` timing / `28` tests, `13/13` `_serial` / `99` tests): **PASS** | `Deploy to VPS`: **skipped**
 - **5/5 spec seed XANH**, **toàn bộ `L-1`, `L-2`, `M-1..M-8`, `J-1..J-7`, `R-1..R-9` XANH** (`year-start-commitments` & `commitment-release-by-day` chỉ còn `5`/`9` ca `403` trùng `dev 45478093759`, `w3_only = 0`), và **10 spec từng đỏ trên `dev 45478093759` nay đã XANH** (`dashboards-http`, `dashboards-progress`, `k4-key-pool-return`, `license-key-constraints`, `license-key-import-plan-race`, `subscription-renewal-cancelled`, `personnel-file-hooks`, `k4-pool-commitment-release`, `requester-became-head-edges`, `year-start-commitments-kept`).
 - `integration (1..3)`: **122 spec đỏ** (`686` ca test đỏ: `268 + 192 + 226`) so với `dev 45478093759` (`114` spec đỏ, `617` ca test): **`18` spec W3-only** (`54` ca) + **`10` spec chung thêm ca W3** (`60 -> 103`, `+43/-0`) đều 100 % thuộc nợ fixture §4 `FIX-W3-FINAL-4` đã tách từng dòng trong [FIX-TEST-tech.md](FIX-TEST-tech.md) và [FIX-TEST-biz.md](FIX-TEST-biz.md); **`94` spec còn lại** (`529` ca) trùng tên 100 % với `dev`. Chi tiết tại [CI-45990216175-RED-SPECS.md](CI-45990216175-RED-SPECS.md).
+
+## FIX-W3-AUDIT gói A — catalog (`fix/w3-audit-catalog`, 27/11)
+
+| Mã  | Việc                                                                                                                                                         | Test chính                                                                                                     |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| A-1 | Kỳ gia hạn nhiều dòng: `unit_price_*` = 12 × giá tháng dòng đầu, snapshot cùng tiền tệ (`RATE_ONE`); bỏ `fallbackUnit`/`fallbackSnap`                       | `subscription-audit-lines.integration-spec.ts` R1; `subscription-period-record-next.service.spec.ts`           |
+| A-2 | Khai K2 thân cũ giá tháng 0 ⟹ `DRAFT`, `missing` có `UNIT_PRICE`                                                                                             | `subscription-audit-lines` R2 (2 ca); `subscription-no-owner.service.spec.ts`                                  |
+| A-3 | Đổi workspace của kỳ nhiều dòng: kiểm mọi dòng sống ở workspace đích ⟹ 409 `DUPLICATE_PLAN`; 23505 `subscription_lines_workspace_plan_live` ⟹ 409          | `subscription-audit-lines` R3; `subscription-workspace-flows.service.spec.ts` (2 ca)                           |
+| A-4 | Người phụ trách = người khai; bỏ `responsibleItAdminEmployeeId` khỏi DTO khai ⟹ 422 `VALIDATION_ERROR`; bỏ `responsibleOfDeclaration`/`defaultResponsibleOf` | `subscription-audit-lines` R4 (2 ca); `shared-pool-subscription-http` (2 ca viết lại)                          |
+| A-5 | Khai/gia hạn kiểm ứng dụng mọi gói dòng (422 `APPLICATION_RETIRED` kèm `planId`); ngừng ứng dụng thấy cả `subscription_lines.plan_id`                       | `subscription-audit-lines` R8/N1 (3 ca); `subscription-period.service.spec.ts`; `subscription-lines.service.spec.ts` |
+| A-6 | Migration `20261204000700_w3_audit_lot_source_currency_check`: dừng nếu lô sinh từ thuê bao nguồn không phải VND; SELECT pre-check ở mục trên                | `lot-source-currency-migration.integration-spec.ts` (2 ca)                                                     |
+| A-7 | Sửa kỳ vọng theo luật W3: số `it` trước → sau — tax 10→10, purchase-and-drafts 14→15, seat-increase 10→10, plan-http 27→27, plan-terms 17→17, contracts 28→28, write-integrity 17→17, license-key-http 20→20 | từng spec xanh local trên Postgres 17 (Docker)                                                                  |
+
+Căn cứ A-7 theo nhóm: AC-11 `840004` = 66.667 × 12 + 40.000 (SPEC-B1 W3-02); AC-8 `PERPETUAL` ⟹ `POST /license-lots` (SPEC-B3 W3-24, `PERPETUAL_IS_LICENSE_LOT`);
+sửa giá/seat của thuê bao có dòng ⟹ route dòng, `PRICE_ON_LINES`/`SEAT_COUNT_VIA_LEDGER` (SPEC-B3 W3-15, W3-27); ca báo tăng seat gọi service
+`tellSeatIncrease` trực tiếp (route PATCH seat đã đóng, mã chết dọn ở đợt 8 — FIX-W3-AUDIT §5 R5), người nhận khi IT phụ trách không dùng được là Super Admin (SPEC §8.1 R1);
+plan-http: hồ sơ workspace ghi audit `WORKSPACE.ADMINS_SET` trên workspace (W3-13); contracts: thuê bao `K4` không gắn hợp đồng (`CONTRACT.SUBSCRIPTION_NOT_K2`, hợp đồng của lô); license-key-http: summary lô thêm `free`/`occupied`/`keyBinding`,
+khóa không vượt số license của lô (`LICENSE_LOT.KEYS_EXCEED_LICENSES`), audit nhập khóa ghi trên `LicenseLot`.

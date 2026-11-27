@@ -1,3 +1,4 @@
+import request from 'supertest';
 import {
   SubscriptionHttpHarness,
   type SubscriptionWire,
@@ -19,74 +20,79 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
     await h.stop();
   });
 
-  describe('a perpetual purchase (AC-8)', () => {
-    it('stores 50 licenses at 12.500.000 đ bought 15/03/2026, with no term, no milestone and no warning', async () => {
+  describe('what is bought once is a lot of license keys (AC-8, W3-24)', () => {
+    const createLot = (body: object, account = h.it1) =>
+      request(h.server()).post('/api/v1/license-lots').set(h.as(account)).send(body);
+    const lotBody = (planId: string, extra: object = {}) => ({
+      planId,
+      purchasedOn: '2026-03-15',
+      licenseCount: 50,
+      unitPrice: { amount: '12500000', currency: 'VND' },
+      purpose: 'REPLACEMENT',
+      ...extra,
+    });
+
+    it('stores 50 licenses at 12.500.000 đ bought 15/03/2026 as a lot, with no term, no milestone and no subscription', async () => {
       const { planId } = await plan({ kind: 'LICENSED', type: 'K4' });
       today('2026-03-15');
+      const before = await n('subscriptions');
 
-      const created = dataOf<SubscriptionWire>(
-        await create({
-          planId,
-          kind: 'PERPETUAL',
-          purchasedQuantity: 50,
-          unitPrice: { amount: '12500000', currency: 'VND' },
-          startDate: '2026-03-15',
-        }).expect(201),
+      const created = dataOf<{ id: string }>(await createLot(lotBody(planId)).expect(201));
+
+      const lot = dataOf<{ licenseCount: number; free: number; unitPrice: { amount: string; currency: string } }>(
+        await request(h.server()).get(`/api/v1/license-lots/${created.id}`).set(h.as(h.it1)).expect(200),
       );
-
-      expect(created).toMatchObject({
-        kind: 'PERPETUAL',
-        status: 'ACTIVE',
-        purchasedQuantity: 50,
-        unitPrice: { amount: '12500000', currency: 'VND' },
-        originalPrice: null,
-        endDate: null,
-        renewalDate: null,
-        autoRenew: false,
-        billingCycle: null,
-        noticeDeadline: { value: null, source: 'NOT_APPLICABLE' },
-        alerts: { baseDate: null, dates: [] },
-        warnings: [],
-      });
+      expect(lot).toMatchObject({ licenseCount: 50, free: 50 });
+      expect(Number(lot.unitPrice.amount)).toBe(12500000);
+      expect(lot.unitPrice.currency).toBe('VND');
+      expect(
+        (
+          await h.ctx.sql.query<{ purchased_on: string }>(
+            `SELECT to_char(purchased_on, 'YYYY-MM-DD') AS purchased_on FROM license_lots WHERE id = $1`,
+            [created.id],
+          )
+        ).rows[0].purchased_on,
+      ).toBe('2026-03-15');
+      expect(await n('subscriptions')).toBe(before);
     });
 
     it.each([
-      ['an end date', { endDate: '2027-01-01' }, ['endDate']],
-      ['a renewal date', { renewalDate: '2027-01-01' }, ['renewalDate']],
-      ['a deadline', { noticeDeadline: '2026-12-01' }, ['noticeDeadline']],
-      ['a notice period', { noticePeriodDays: 30 }, ['noticePeriodDays']],
-      ['a billing cycle', { billingCycle: 'ANNUAL' }, ['billingCycle']],
-      ['auto renewal', { autoRenew: true }, ['autoRenew']],
-      ['a mid-term reduction', { allowsMidTermReduction: true }, ['allowsMidTermReduction']],
-      ['an end date and auto renewal', { endDate: '2027-01-01', autoRenew: true }, ['endDate', 'autoRenew']],
-    ])(
-      'refuses %s: 422 SUBSCRIPTION.PERPETUAL_HAS_NO_TERM naming the field, and stores nothing',
-      async (_name, extra, fields) => {
-        const { planId } = await plan({ kind: 'LICENSED', type: 'K4' });
-        const before = await n('subscriptions');
+      ['an end date', { endDate: '2027-01-01' }],
+      ['a renewal date', { renewalDate: '2027-01-01' }],
+      ['a deadline', { noticeDeadline: '2026-12-01' }],
+      ['a notice period', { noticePeriodDays: 30 }],
+      ['a billing cycle', { billingCycle: 'ANNUAL' }],
+      ['auto renewal', { autoRenew: true }],
+      ['a mid-term reduction', { allowsMidTermReduction: true }],
+      ['an end date and auto renewal', { endDate: '2027-01-01', autoRenew: true }],
+    ])('refuses a lot with %s: 422 VALIDATION_ERROR, a lot has no term, and stores nothing', async (_name, extra) => {
+      const { planId } = await plan({ kind: 'LICENSED', type: 'K4' });
+      const before = await n('license_lots');
 
+      const response = await createLot(lotBody(planId, extra)).expect(422);
+
+      expect(codeOf(response)).toBe('VALIDATION_ERROR');
+      expect(await n('license_lots')).toBe(before);
+    });
+
+    it('refuses a perpetual purchase on the subscription route, whatever it names: 422 SUBSCRIPTION.PERPETUAL_IS_LICENSE_LOT, and stores nothing', async () => {
+      const { planId } = await plan({ kind: 'LICENSED', type: 'K4' });
+      const before = { subscriptions: await n('subscriptions'), lots: await n('license_lots') };
+
+      for (const extra of [{}, { endDate: '2027-01-01' }, { billingCycle: 'ANNUAL', autoRenew: true }]) {
         const response = await create({ planId, kind: 'PERPETUAL', startDate: '2026-03-15', ...extra }).expect(422);
+        expect(codeOf(response)).toBe('SUBSCRIPTION.PERPETUAL_IS_LICENSE_LOT');
+      }
+      expect({ subscriptions: await n('subscriptions'), lots: await n('license_lots') }).toEqual(before);
+    });
 
-        expect(codeOf(response)).toBe('SUBSCRIPTION.PERPETUAL_HAS_NO_TERM');
-        expect(detailsOf(response)).toEqual({ fields });
-        expect(await n('subscriptions')).toBe(before);
-      },
-    );
-
-    it('is for licensed software only, and a perpetual purchase cannot be given a term later', async () => {
+    it('is for licensed software only: a lot of the plan of a SaaS application is refused, and so is a perpetual purchase of it', async () => {
       const saas = await plan({ kind: 'SAAS' });
-      const licensed = await plan({ kind: 'LICENSED', type: 'K4' });
 
       expect(codeOf(await create({ planId: saas.planId, kind: 'PERPETUAL' }).expect(422))).toBe(
-        'SUBSCRIPTION.PERPETUAL_NEEDS_LICENSED_APPLICATION',
+        'SUBSCRIPTION.PERPETUAL_IS_LICENSE_LOT',
       );
-      const purchase = await subscription(licensed.planId, {
-        kind: 'PERPETUAL',
-        startDate: '2026-03-15',
-        purchasedQuantity: 5,
-      });
-      const response = await patch(purchase.id, { endDate: '2027-01-01' }).expect(422);
-      expect(codeOf(response)).toBe('SUBSCRIPTION.PERPETUAL_HAS_NO_TERM');
+      expect(codeOf(await createLot(lotBody(saas.planId)).expect(422))).toBe('LICENSE_LOT.PLAN_NOT_K4');
     });
   });
 
@@ -158,7 +164,7 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
       });
     });
 
-    it('needs no exchange rate: a priced subscription is active at once whatever rates are entered, and an edit of the price takes the day of the edit', async () => {
+    it('needs no exchange rate: a priced subscription is active at once whatever rates are entered; its price is edited on its line, never on the subscription (J-2)', async () => {
       const { planId } = await plan();
       today('2026-09-01');
 
@@ -169,18 +175,40 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
         startDate: '2026-09-01',
       });
       today('2026-09-02');
-      const edited = dataOf<SubscriptionWire>(
-        await patch(created.id, { unitPrice: { amount: '31000000', currency: 'VND' } }).expect(200),
-      );
+      // The period has a line that holds the price (SPEC-B3 W3-15): a price sent to the subscription is refused and nothing moves.
+      const refused = await patch(created.id, { unitPrice: { amount: '31000000', currency: 'VND' } }).expect(409);
 
       expect(created.status).toBe('ACTIVE');
-      expect(edited).toMatchObject({ status: 'ACTIVE', unitPrice: { amount: '31000000', currency: 'VND' } });
+      expect(codeOf(refused)).toBe('SUBSCRIPTION.PRICE_ON_LINES');
       expect(await snapshotOf(created.id)).toMatchObject({
-        price_recorded_on: '2026-09-02',
-        price_rate_date: '2026-09-02',
-        price_reporting_minor: '31000000',
+        price_recorded_on: '2026-09-01',
+        price_rate_date: '2026-09-01',
+        price_reporting_minor: '30000000',
         price_rate_source: 'SAME_CURRENCY',
       });
+      // The edit of the price goes through the line.
+      const line = (
+        await h.ctx.sql.query<{ id: string; updated_at: Date }>(
+          `SELECT id, updated_at FROM subscription_lines WHERE subscription_id = $1`,
+          [created.id],
+        )
+      ).rows[0];
+      await request(h.server())
+        .patch(`/api/v1/subscription-lines/${line.id}`)
+        .set(h.as(h.it1))
+        .send({
+          monthlyUnitPrice: { amount: '2583334', currency: 'VND' },
+          expectedUpdatedAt: line.updated_at.toISOString(),
+        })
+        .expect(200);
+      expect(
+        (
+          await h.ctx.sql.query<{ monthly_unit_price_minor: string }>(
+            `SELECT monthly_unit_price_minor::text FROM subscription_lines WHERE id = $1`,
+            [line.id],
+          )
+        ).rows[0].monthly_unit_price_minor,
+      ).toBe('2583334');
     });
 
     it('US-04-05 AC-2: what was stored does not change, however often it is read', async () => {
@@ -265,7 +293,8 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
         await patch(created.id, { originalPrice: { amount: '50.00', currency: 'USD' } }).expect(200),
       );
       expect(changed.originalPrice).toEqual({ amount: '50.00', currency: 'USD' });
-      const kept = dataOf<SubscriptionWire>(await h.changeSeats(created.id, { purchasedQuantity: 11 }));
+      // A change of something else leaves it alone (the seats are no longer edited here: W3-27).
+      const kept = dataOf<SubscriptionWire>(await patch(created.id, { autoRenew: true }).expect(200));
       expect(kept.originalPrice).toEqual({ amount: '50.00', currency: 'USD' });
       const cleared = dataOf<SubscriptionWire>(await patch(created.id, { originalPrice: null }).expect(200));
       expect(cleared.originalPrice).toBeNull();
@@ -313,12 +342,14 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
       const entered = dataOf<SubscriptionWire>(
         await patch(draftId, { unitPrice: { amount: '250000', currency: 'VND' } }).expect(200),
       );
-      expect(entered).toMatchObject({ status: 'ACTIVE', unitPrice: { amount: '250000', currency: 'VND' } });
+      // The price is kept as a monthly price (20.833 in the stored draft) and the year is 12 times it: 249.996 (SPEC-B1 W3-02).
+      expect(entered).toMatchObject({ status: 'ACTIVE', unitPrice: { amount: '249996', currency: 'VND' } });
     });
 
     it('is complete only when a per-seat plan has its quantity, and a flat-rate plan needs none; supplying the rest makes it active', async () => {
       const perSeat = await plan({ pricing: 'PER_SEAT' });
-      const flat = await plan({ pricing: 'FLAT_RATE', type: 'K1' });
+      // A plan of personal accounts (K1) has no subscription since W3-27: the flat-rate plan is one of seats too.
+      const flat = await plan({ pricing: 'FLAT_RATE' });
       const whole = {
         unitPrice: { amount: '2000000', currency: 'VND' },
         billingCycle: 'MONTHLY',
@@ -328,9 +359,23 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
       expect(await subscription(perSeat.planId, whole)).toMatchObject({ status: 'DRAFT', missing: ['QUANTITY'] });
       expect(await subscription(flat.planId, whole)).toMatchObject({ status: 'ACTIVE', missing: [] });
 
-      const draft = await subscription(perSeat.planId, whole);
-      const done = dataOf<SubscriptionWire>(await h.changeSeats(draft.id, { purchasedQuantity: 25 }));
-      expect(done).toMatchObject({ status: 'ACTIVE', missing: [], purchasedQuantity: 25 });
+      // The quantity is not supplied by an edit any more (the seats are bought on the lines, W3-27): the edit is refused, the draft stays a draft,
+      // and a declaration that gives the seats at once is active.
+      // One live subscription of a plan per workspace (W3-14): the second draft is of a plan of its own.
+      const draft = await subscription((await plan({ pricing: 'PER_SEAT' })).planId, whole);
+      expect(codeOf(await h.changeSeats(draft.id, { purchasedQuantity: 25 }, 409))).toBe(
+        'SUBSCRIPTION.SEAT_COUNT_VIA_LEDGER',
+      );
+      expect(dataOf<SubscriptionWire>(await get(draft.id).expect(200))).toMatchObject({
+        status: 'DRAFT',
+        missing: ['QUANTITY'],
+      });
+      const perSeatTwo = await plan({ pricing: 'PER_SEAT' });
+      expect(await subscription(perSeatTwo.planId, { ...whole, purchasedQuantity: 25 })).toMatchObject({
+        status: 'ACTIVE',
+        missing: [],
+        purchasedQuantity: 25,
+      });
     });
 
     it('refuses a price that is negative, too large or over-precise in dong, in another currency, or not an amount', async () => {

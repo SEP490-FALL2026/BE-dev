@@ -76,7 +76,6 @@ describe('duplicate live subscription by (workspace, plan) and concurrency barri
         commitmentTermMonths: 1,
         startDate: '2026-01-05',
         purchasedQuantity: 5,
-        responsibleItAdminEmployeeId: h.it1.employeeId,
         ...extra,
       });
 

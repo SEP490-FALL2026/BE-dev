@@ -141,7 +141,6 @@ describe('a subscription has no owning department: no finance gate on a change, 
             unitPrice: { amount, currency: 'VND' },
             billingCycle: 'MONTHLY',
             commitmentTermMonths: 1,
-            responsibleItAdminEmployeeId: h.it1.employeeId,
             startDate: '2026-01-05',
           })
           .expect(201),

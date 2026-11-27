@@ -330,21 +330,25 @@ export class SubscriptionRepo {
     return new Map(rows.map((row) => [row.employee_id, row.total]));
   }
 
-  /** The subscriptions and perpetual purchases of these plans: only what a rule about their term needs. */
+  /**
+   * The subscriptions and perpetual purchases of these plans: only what a rule about their term needs. A period belongs to a plan by its own
+   * plan and by each live line, and is named once: with its own plan when that is one of these, else the first plan of its live lines that is.
+   */
   async findOfPlans(
     planIds: readonly string[],
     tx?: DbTx,
   ): Promise<{ subscriptionId: string; planId: string; kind: SubscriptionKind; endDate: BusinessDate | null }[]> {
     if (planIds.length === 0) return [];
+    const live = { planId: { in: [...planIds] }, closedReason: null };
     const rows = await (tx ?? this.prisma).subscription.findMany({
-      where: { planId: { in: [...planIds] } },
-      select: { id: true, planId: true, kind: true, endDate: true },
+      where: { OR: [{ planId: { in: [...planIds] } }, { lines: { some: live } }] },
+      select: { id: true, planId: true, kind: true, endDate: true, lines: { where: live, select: { planId: true } } },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     });
 
     return rows.map((row) => ({
       subscriptionId: row.id,
-      planId: row.planId,
+      planId: planIds.includes(row.planId) ? row.planId : row.lines.map((line) => line.planId).sort()[0],
       kind: row.kind,
       endDate: row.endDate ? fromDateColumn(row.endDate) : null,
     }));

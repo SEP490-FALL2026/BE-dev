@@ -18,7 +18,6 @@ describe('a second live subscription of a K2 or K4 plan (integration, real Postg
     commitmentTermMonths: 1,
     startDate: '2026-01-05',
     purchasedQuantity: 5,
-    responsibleItAdminEmployeeId: h.it1.employeeId,
     ...extra,
   });
   const secondWorkspaceFor = async (planId: string): Promise<string> => {

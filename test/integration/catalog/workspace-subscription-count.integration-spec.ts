@@ -85,7 +85,6 @@ describe('workspaceGet and workspaceList live subscriptionCount (integration, re
           commitmentTermMonths: 1,
           startDate: addDays(today, -28),
           renewalDate: addDays(today, 2),
-          responsibleItAdminEmployeeId: khoa.employeeId,
         })
         .expect(201),
     );

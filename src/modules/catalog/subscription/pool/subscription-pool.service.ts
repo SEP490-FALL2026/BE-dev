@@ -5,7 +5,7 @@ import { AuditApi } from '../../../audit/public/audit.api';
 import { IdentityAccessApi } from '../../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { catalogAuditEvent, type CatalogAuditActor } from '../../catalog-audit-event.mapper';
-import { PlanFactsService, type LockedPlan } from '../../plan/plan-facts.service';
+import type { LockedPlan } from '../../plan/plan-facts.service';
 import { needsVendorAdmins } from '../../plan/plan-vendor-admins.policy';
 import { SeatBaselinePhaseHook } from '../../public/catalog.extension-points';
 import {
@@ -18,7 +18,6 @@ import {
 import {
   assertPoolTerms,
   assertResponsibleNamed,
-  defaultResponsibleOf,
   isLiveSubscription,
   isPooledPlan,
   liveIdsByWorkspacePlan,
@@ -90,7 +89,6 @@ export class SubscriptionPoolService {
     private readonly subscriptions: SubscriptionRepo,
     private readonly audit: AuditApi,
     private readonly baselinePhase: SeatBaselinePhaseHook,
-    private readonly planFacts: PlanFactsService,
     private readonly workspaces: WorkspaceForSubscriptionService,
   ) {}
 
@@ -121,24 +119,6 @@ export class SubscriptionPoolService {
   /** Locks the workspaces of a move in id order, each held at the vendor of the plan. */
   lockWorkspaces(tx: DbTx, plan: LockedPlan, ids: readonly (string | null)[]): Promise<void> {
     return this.workspaces.lockBoth(tx, ids, plan.applicationVendorId ?? null);
-  }
-
-  /**
-   * The IT Admin a subscription being declared answers to (`QĐ-111g`): the one the declaration names, else the one responsible for the
-   * application of its plan while they are a usable IT Admin, else none. The one responsible is read through the plan, one column and not
-   * the whole application row. Read inside the transaction of the declaration.
-   */
-  async responsibleOfDeclaration(tx: DbTx, planId: string, named: string | undefined): Promise<string | null> {
-    if (named !== undefined) return named;
-    const responsible = await this.planFacts.responsibleItAdminIdOf(planId, tx);
-    const usable =
-      responsible === null ? new Set<string>() : await this.identity.findUsableItAdminEmployeeIds([responsible], tx);
-
-    return defaultResponsibleOf({
-      named,
-      applicationResponsible: responsible,
-      applicationResponsibleIsUsable: responsible !== null && usable.has(responsible),
-    });
   }
 
   /**
