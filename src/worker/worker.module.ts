@@ -6,6 +6,7 @@ import { ObservabilityModule } from '../infrastructure/observability/observabili
 import { QueueInfrastructureModule } from '../infrastructure/queue/queue-infrastructure.module';
 import { RELAY_SOURCES, type RelaySource } from '../infrastructure/queue/relay-source.types';
 import { EmailDispatchLoop } from './email-dispatch.job';
+import { EmailQueueConsumer } from './email-queue.job';
 import { OutboxRelayLoop } from './outbox-relay.job';
 import { RequestWorkLoop } from './request-work.job';
 import { IdentityAccessFacadeModule } from '../modules/identity-access/identity-access-facade.module';
@@ -39,6 +40,7 @@ export class WorkerModule {
       imports: [...workerImports, QueueInfrastructureModule],
       providers: [
         OutboxRelayLoop,
+        EmailQueueConsumer,
         RequestWorkLoop,
         {
           provide: RELAY_SOURCES,
