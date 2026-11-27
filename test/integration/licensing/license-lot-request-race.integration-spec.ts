@@ -245,30 +245,61 @@ describe('REQUEST license-lot creation vs request cancellation race (integration
     return sent.id;
   }
 
-  it('G-5 barrier x20: two requests naming same K4 REQUEST lot -> one 201 and one 409 LICENSE_LOT.RESERVED_FOR_REQUEST', async () => {
+  const completeGrant = (taskId: string, licenseKeyId: string) =>
+    request(h.server())
+      .post(`/api/v1/provisioning-tasks/${taskId}/complete`)
+      .set(h.as(h.it1))
+      .send({ evidence: 'Assigned key for grant', licenseKeyId });
+
+  it('H-8 / F11 barrier x20: two key completions competing for 1 excess slot on K4 REQUEST lot -> [200, 409] LICENSE_LOT.RESERVED_FOR_REQUEST', async () => {
     for (let i = 0; i < 20; i += 1) {
       const lotCId = await seedApprovedGroupAndLot();
       const [reqA, reqB] = await Promise.all([
         approvedSingleRequest(`F17-A-${i}`),
         approvedSingleRequest(`F17-B-${i}`),
       ]);
+      const grantA = await h.grant({ requestId: reqA, subscriptionId: lotCId }).expect(201);
+      const grantB = await h.grant({ requestId: reqB, subscriptionId: lotCId }).expect(201);
+      const taskAId = h.dataOf<{ task: { id: string } }>(grantA).task.id;
+      const taskBId = h.dataOf<{ task: { id: string } }>(grantB).task.id;
+      const keyRows = await h.ctx.sql.query<{ id: string }>(
+        `SELECT id FROM license_keys WHERE license_lot_id = $1 ORDER BY id LIMIT 2`,
+        [lotCId],
+      );
+      const [key1, key2] = keyRows.rows.map((r) => r.id);
       const barrier = new Barrier(2);
 
       const resA = (async () => {
         await barrier.wait();
-        return h.grant({ requestId: reqA, subscriptionId: lotCId });
+        return completeGrant(taskAId, key1);
       })();
       const resB = (async () => {
         await barrier.wait();
-        return h.grant({ requestId: reqB, subscriptionId: lotCId });
+        return completeGrant(taskBId, key2);
       })();
 
       const outcomes = await Promise.all([resA, resB]);
       const statuses = outcomes.map((r) => r.status).sort((a, b) => a - b);
-      expect(statuses).toEqual([201, 409]);
+      expect(statuses).toEqual([200, 409]);
       const refused = outcomes.find((r) => r.status === 409);
       expect(refused).toBeDefined();
       expect(h.codeOf(refused!)).toBe('LICENSE_LOT.RESERVED_FOR_REQUEST');
     }
+  });
+
+  it('H-8 / F11 post-charge: refuses POST /provisioning-tasks with 409 LICENSE_LOT.RESERVED_FOR_REQUEST once excess charge is recorded', async () => {
+    const lotCId = await seedApprovedGroupAndLot();
+    const [reqA, reqD] = await Promise.all([approvedSingleRequest('F17-POST-A'), approvedSingleRequest('F17-POST-D')]);
+    const grantA = await h.grant({ requestId: reqA, subscriptionId: lotCId }).expect(201);
+    const taskAId = h.dataOf<{ task: { id: string } }>(grantA).task.id;
+    const keyRows = await h.ctx.sql.query<{ id: string }>(
+      `SELECT id FROM license_keys WHERE license_lot_id = $1 ORDER BY id LIMIT 1`,
+      [lotCId],
+    );
+    await completeGrant(taskAId, keyRows.rows[0].id).expect(200);
+
+    const refused = await h.grant({ requestId: reqD, subscriptionId: lotCId });
+    expect(refused.status).toBe(409);
+    expect(h.codeOf(refused)).toBe('LICENSE_LOT.RESERVED_FOR_REQUEST');
   });
 });

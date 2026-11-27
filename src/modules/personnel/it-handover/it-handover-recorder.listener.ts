@@ -25,7 +25,13 @@ export class ItHandoverRecorder implements OnModuleInit {
   ) {}
 
   onModuleInit(): void {
-    this.hooks.add('personnel.it-handover', { onRecorded: (tx, event) => this.keep(tx, event) });
+    const noop = () => Promise.resolve();
+    this.hooks.add('personnel.it-handover', {
+      onRecorded: (tx, event) => this.keep(tx, event),
+      onDueChanged: noop,
+      onCancelled: noop,
+      onLeft: noop,
+    });
   }
 
   private async keep(tx: DbTx, event: PersonnelFileEvent): Promise<void> {

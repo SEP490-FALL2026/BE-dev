@@ -85,7 +85,11 @@ function setup(options: {
   const isClosed = jest.fn().mockResolvedValue(options.closed ?? true);
   const baselinePhase = {
     isBound: jest.fn().mockReturnValue(options.bound ?? true),
-    get: jest.fn().mockReturnValue({ isClosed }),
+    get: jest.fn().mockImplementation(() => {
+      if (options.bound === false) throw new Error("ExtensionPoint 'catalog.seat-baseline-phase' is not bound.");
+
+      return { isClosed };
+    }),
   };
 
   const service = new LicenseLotCreateService(
@@ -140,14 +144,6 @@ describe('LicenseLotCreateService workspace >= 2 working admin gate (W3-12, W3-2
       allowed: true,
     },
     {
-      label: 'hasAdminConsole=true, baseline hook unbound, workingAdmins=1 -> fails closed with 422',
-      hasAdminConsole: true,
-      bound: false,
-      closed: false,
-      workingCount: 1,
-      allowed: false,
-    },
-    {
       label: 'hasAdminConsole=false, baseline closed, workingAdmins=0 -> skips admin gate and allows creation',
       hasAdminConsole: false,
       bound: true,
@@ -180,6 +176,13 @@ describe('LicenseLotCreateService workspace >= 2 working admin gate (W3-12, W3-2
       code: 'LICENSE_LOT.VENDOR_ADMINS_REQUIRED',
       details: { planId: 'plan-k4', given: workingCount, required: 2 },
     });
+  });
+
+  it('H-6 / G-4: throws loudly when SeatBaselinePhaseHook is unbound', async () => {
+    const { service, insert } = setup({ hasAdminConsole: true, bound: false, closed: false, workingCount: 1 });
+
+    await expect(service.create(actor, baseInput)).rejects.toThrow('not bound');
+    expect(insert).not.toHaveBeenCalled();
   });
 
   it('locks workspace (5b) before plan (7) and skips baseline/admin checks when hasAdminConsole=false', async () => {

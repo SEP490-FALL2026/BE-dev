@@ -53,7 +53,7 @@ export class ProvisioningTaskFrame {
     id: string,
     action: {
       /** Takes what stands above the task in the order of locks (the employee), from the task read without a lock, before the task is locked. */
-      beforeLock?: (tx: DbTx, task: ProvisioningTaskRecord) => Promise<void>;
+      beforeLock: ((tx: DbTx, task: ProvisioningTaskRecord) => Promise<void>) | null;
       check: (task: ProvisioningTaskRecord) => void;
       write: (context: TaskWorkContext) => Promise<TaskWrite>;
     },

@@ -57,7 +57,7 @@ describe('AssignmentSeatOccupancy (S-6)', () => {
     } as unknown as GrantRequestGateHook;
     const listener = new AssignmentSeatOccupancy(repo, capacity, deviceActivations, lots, hook, audit, gate);
 
-    return { listener, repo, capacity, deviceActivations, audit, gate };
+    return { listener, repo, capacity, deviceActivations, lots, audit, gate };
   }
 
   it('adds device_activation_occupied into occupiedBySubscription', async () => {
@@ -99,11 +99,25 @@ describe('AssignmentSeatOccupancy (S-6)', () => {
     });
 
     it('takes the figure of the lot alone in seatsOfSubscriptions, and keeps what is being taken back', async () => {
-      const { listener } = setup(['sub-seat']);
+      const { listener, lots } = setup(['sub-seat']);
 
-      const map = await listener.seatsOfSubscriptions(['sub-seat', 'sub-key-only'], day, tx);
+      const map = await listener.seatsOfSubscriptions(['sub-seat', 'sub-key-only', 'unused-sub'], day, tx);
       expect(map.get('sub-seat')).toEqual({ occupied: 1, inRevocation: 1 });
       expect(map.get('sub-key-only')).toEqual({ occupied: 4, inRevocation: 0 });
+      expect((lots as unknown as { idsOfLots: jest.Mock }).idsOfLots).toHaveBeenCalledWith(
+        ['sub-seat', 'sub-key-only'],
+        tx,
+      );
+    });
+
+    it('H-10: skips lots.idsOfLots completely when neither activationOccupied nor seatMap has any entry', async () => {
+      const { listener, capacity, deviceActivations, lots } = setup(['sub-seat']);
+      (capacity.occupancyOf as jest.Mock).mockResolvedValueOnce(new Map());
+      (deviceActivations.occupiedBySubscriptions as jest.Mock).mockResolvedValueOnce(new Map());
+
+      const map = await listener.seatsOfSubscriptions(['empty-sub-1', 'empty-sub-2'], day, tx);
+      expect(map.size).toBe(0);
+      expect((lots as unknown as { idsOfLots: jest.Mock }).idsOfLots).not.toHaveBeenCalled();
     });
   });
 

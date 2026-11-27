@@ -19,8 +19,6 @@ export interface AccountLotCandidate {
   free: number;
   keysInStore: number;
   openTasksWithoutKey: number;
-  /** Open grant tasks without a key from OTHER requests against this `REQUEST` lot (`G-5`). */
-  openExcessTasksWithoutKey?: number;
   /** Active/reserved beneficiaries of the owning request when `purpose === 'REQUEST'`; 0 otherwise. */
   beneficiaries: number;
   /** Number of excess licenses already charged in `license_lot_charges` for this lot. */
@@ -59,20 +57,13 @@ export function accountLotGrantable(input: { free: number; keysInStore: number; 
   return Math.max(0, Math.min(input.free, input.keysInStore - input.openTasksWithoutKey));
 }
 
-/**
- * Remaining excess licenses available to non-owning requests in a `REQUEST` lot (`F11`):
- * `n - m - chargedExcess - openExcessTasksWithoutKey`.
- */
+/** Remaining excess licenses available to non-owning requests in a `REQUEST` lot (`F11`: `n - m - chargedExcess`). */
 export function excessGrantableOf(input: {
   licenseCount: number;
   beneficiaries: number;
   chargedExcess: number;
-  openExcessTasksWithoutKey?: number;
 }): number {
-  return Math.max(
-    0,
-    input.licenseCount - input.beneficiaries - input.chargedExcess - (input.openExcessTasksWithoutKey ?? 0),
-  );
+  return Math.max(0, input.licenseCount - input.beneficiaries - input.chargedExcess);
 }
 
 /**
@@ -94,25 +85,7 @@ export function countOpenTasksByLot(
   }[],
   tasks: readonly { taskId: string; requestId: string | null; subscriptionId: string | null; createdAt: Date }[],
 ): Map<string, number> {
-  const detailed = countOpenTasksByLotDetailed(lots, tasks);
-
-  return new Map([...detailed].map(([id, entry]) => [id, entry.total]));
-}
-
-export function countOpenTasksByLotDetailed(
-  lots: readonly {
-    id: string;
-    purchasedOn: BusinessDate;
-    purpose: LicenseLotPurpose;
-    requestId: string | null;
-    legacySubscriptionId: string | null;
-    free: number;
-    keysInStore: number;
-    excessCap?: number;
-  }[],
-  tasks: readonly { taskId: string; requestId: string | null; subscriptionId: string | null; createdAt: Date }[],
-): Map<string, { total: number; excess: number }> {
-  const counts = new Map<string, { total: number; excess: number }>(lots.map((l) => [l.id, { total: 0, excess: 0 }]));
+  const counts = new Map<string, number>(lots.map((l) => [l.id, 0]));
   if (tasks.length === 0 || lots.length === 0) return counts;
 
   const remainingTasks = tallyDirectTasks(lots, tasks, counts);
@@ -123,19 +96,6 @@ export function countOpenTasksByLotDetailed(
   return counts;
 }
 
-function addTaskCount(
-  counts: Map<string, { total: number; excess: number }>,
-  lot: { id: string; purpose: LicenseLotPurpose; requestId: string | null },
-  task: { requestId: string | null },
-): void {
-  const entry = counts.get(lot.id);
-  if (!entry) return;
-  entry.total += 1;
-  if (lot.purpose === 'REQUEST' && task.requestId !== lot.requestId) {
-    entry.excess += 1;
-  }
-}
-
 function tallyDirectTasks(
   lots: readonly {
     id: string;
@@ -144,15 +104,14 @@ function tallyDirectTasks(
     legacySubscriptionId: string | null;
   }[],
   tasks: readonly { taskId: string; requestId: string | null; subscriptionId: string | null; createdAt: Date }[],
-  counts: Map<string, { total: number; excess: number }>,
+  counts: Map<string, number>,
 ) {
-  const lotById = new Map<string, (typeof lots)[number]>(lots.map((l) => [l.id, l]));
-  const bySub = new Map<string, (typeof lots)[number]>();
-  const byReq = new Map<string, (typeof lots)[number]>();
+  const bySub = new Map<string, string>();
+  const byReq = new Map<string, string>();
   for (const l of lots) {
-    bySub.set(l.id, l);
-    if (l.legacySubscriptionId) bySub.set(l.legacySubscriptionId, l);
-    if (l.purpose === 'REQUEST' && l.requestId) byReq.set(l.requestId, l);
+    bySub.set(l.id, l.id);
+    if (l.legacySubscriptionId) bySub.set(l.legacySubscriptionId, l.id);
+    if (l.purpose === 'REQUEST' && l.requestId) byReq.set(l.requestId, l.id);
   }
 
   const remaining: (typeof tasks)[number][] = [];
@@ -161,7 +120,7 @@ function tallyDirectTasks(
       (task.subscriptionId ? bySub.get(task.subscriptionId) : undefined) ??
       (task.requestId ? byReq.get(task.requestId) : undefined);
     if (directLot) {
-      addTaskCount(counts, lotById.get(directLot.id) ?? directLot, task);
+      counts.set(directLot, (counts.get(directLot) ?? 0) + 1);
     } else {
       remaining.push(task);
     }
@@ -171,17 +130,9 @@ function tallyDirectTasks(
 }
 
 function tallyFifoTasks(
-  lots: readonly {
-    id: string;
-    purchasedOn: BusinessDate;
-    purpose: LicenseLotPurpose;
-    requestId: string | null;
-    free: number;
-    keysInStore: number;
-    excessCap?: number;
-  }[],
-  remainingTasks: readonly { taskId: string; requestId: string | null; createdAt: Date }[],
-  counts: Map<string, { total: number; excess: number }>,
+  lots: readonly { id: string; purchasedOn: BusinessDate; free: number; keysInStore: number }[],
+  remainingTasks: readonly { taskId: string; createdAt: Date }[],
+  counts: Map<string, number>,
 ): void {
   const orderedLots = [...lots].sort((a, b) =>
     a.purchasedOn !== b.purchasedOn ? (a.purchasedOn < b.purchasedOn ? -1 : 1) : a.id.localeCompare(b.id),
@@ -192,17 +143,10 @@ function tallyFifoTasks(
       : a.taskId.localeCompare(b.taskId),
   );
   for (const task of orderedTasks) {
-    const target = orderedLots.find((l) => {
-      const entry = counts.get(l.id);
-      if (Math.min(l.free, l.keysInStore) - (entry?.total ?? 0) <= 0) return false;
-      if (l.purpose === 'REQUEST' && task.requestId !== l.requestId && l.excessCap !== undefined) {
-        return (entry?.excess ?? 0) < l.excessCap;
-      }
-
-      return true;
-    });
+    void task;
+    const target = orderedLots.find((l) => Math.min(l.free, l.keysInStore) - (counts.get(l.id) ?? 0) > 0);
     if (!target) break;
-    addTaskCount(counts, target, task);
+    counts.set(target.id, (counts.get(target.id) ?? 0) + 1);
   }
 }
 

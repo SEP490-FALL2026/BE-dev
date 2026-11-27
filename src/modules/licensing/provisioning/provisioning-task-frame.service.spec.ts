@@ -57,7 +57,7 @@ describe('ProvisioningTaskFrame.work', () => {
     defaultResponsibleEmployeeId: 'e-it1',
     assignment: { employeeId: beneficiaryEmployeeId },
   });
-  const action = { check: jest.fn(), write };
+  const action = { beforeLock: null, check: jest.fn(), write };
 
   beforeEach(async () => {
     jest.resetAllMocks();

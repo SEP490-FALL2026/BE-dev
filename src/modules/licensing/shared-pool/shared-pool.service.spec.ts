@@ -351,6 +351,19 @@ describe('SharedPoolService (ledger seats & chooseLine)', () => {
       ],
       tx,
     );
+
+    const depleted = lotStock as unknown as { accountLotCandidates: jest.Mock };
+    depleted.accountLotCandidates.mockResolvedValue([
+      { ...lot('lot-duc', 'req-duc', 2, '2027-04-01'), grantable: 0, excessGrantable: 0 },
+    ]);
+    await expect(
+      service.assertK4LotGrantable(tx, {
+        planId: 'plan-cad',
+        lotId: 'lot-duc',
+        requestId: 'req-minh',
+        afterKeyAssigned: true,
+      }),
+    ).rejects.toBeInstanceOf(LicenseLotReservedForRequestError);
   });
 
   it('G-4: lotReservationsOf fails loudly when GrantRequestGateHook is unbound', async () => {
@@ -364,27 +377,20 @@ describe('SharedPoolService (ledger seats & chooseLine)', () => {
       {} as unknown as LicenseLotStockApi,
       unboundGate,
     );
-
-    await expect(
-      service.lotReservationsOf(
-        [
-          {
-            id: 'lot-duc',
-            purchasedOn: '2027-04-01',
-            licenseCount: 3,
-            unitPriceMinor: 12_000_000n,
-            purpose: 'REQUEST',
-            requestId: 'req-duc',
-            legacySubscriptionId: null,
-            free: 1,
-            keysInStore: 1,
-            openTasksWithoutKey: 0,
-            grantable: 1,
-            excessGrantable: 2,
-          },
-        ],
-        tx,
-      ),
-    ).rejects.toThrow('not bound');
+    const c = {
+      id: 'lot-duc',
+      purchasedOn: '2027-04-01',
+      licenseCount: 3,
+      unitPriceMinor: 12_000_000n,
+      purpose: 'REQUEST' as const,
+      requestId: 'req-duc',
+      legacySubscriptionId: null,
+      free: 1,
+      keysInStore: 1,
+      openTasksWithoutKey: 0,
+      grantable: 1,
+      excessGrantable: 2,
+    };
+    await expect(service.lotReservationsOf([c], tx)).rejects.toThrow('not bound');
   });
 });

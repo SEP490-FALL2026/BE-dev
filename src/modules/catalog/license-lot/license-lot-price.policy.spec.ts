@@ -1,7 +1,7 @@
 import {
   accountLotGrantable,
   chooseAccountLot,
-  countOpenTasksByLotDetailed,
+  countOpenTasksByLot,
   excessGrantableOf,
   pickK4LotUnitPrice,
   type AccountLotCandidate,
@@ -62,13 +62,10 @@ describe('accountLotGrantable and excessGrantableOf (W3-24 AC-2 & F11)', () => {
     expect(accountLotGrantable({ free: 2, keysInStore: 1, openTasksWithoutKey: 3 })).toBe(0);
   });
 
-  it('computes excess grantable = n - m - chargedExcess - openExcessTasksWithoutKey for a REQUEST lot', () => {
+  it('computes excess grantable = n - m - chargedExcess for a REQUEST lot (SPEC F11)', () => {
     expect(excessGrantableOf({ licenseCount: 3, beneficiaries: 1, chargedExcess: 0 })).toBe(2);
     expect(excessGrantableOf({ licenseCount: 3, beneficiaries: 1, chargedExcess: 2 })).toBe(0);
     expect(excessGrantableOf({ licenseCount: 2, beneficiaries: 3, chargedExcess: 0 })).toBe(0);
-    expect(
-      excessGrantableOf({ licenseCount: 3, beneficiaries: 2, chargedExcess: 0, openExcessTasksWithoutKey: 1 }),
-    ).toBe(0);
   });
 });
 
@@ -144,8 +141,8 @@ describe('chooseAccountLot (W3-24 & F11)', () => {
     if (decision.kind === 'RESERVED_FOR_REQUEST') expect(decision.lot.id).toBe('lot-duc');
   });
 
-  it('G-5: FIFO task attribution skips a REQUEST lot whose excessCap is exhausted and routes to the next lot', () => {
-    const detailed = countOpenTasksByLotDetailed(
+  it('SPEC F11: countOpenTasksByLot attributes unassigned tasks purely FIFO by (purchasedOn ASC, id ASC)', () => {
+    const counts = countOpenTasksByLot(
       [
         {
           id: 'lot-req-a',
@@ -155,7 +152,6 @@ describe('chooseAccountLot (W3-24 & F11)', () => {
           legacySubscriptionId: null,
           free: 3,
           keysInStore: 3,
-          excessCap: 1,
         },
         {
           id: 'lot-req-b',
@@ -165,7 +161,6 @@ describe('chooseAccountLot (W3-24 & F11)', () => {
           legacySubscriptionId: null,
           free: 3,
           keysInStore: 3,
-          excessCap: 1,
         },
       ],
       [
@@ -184,7 +179,7 @@ describe('chooseAccountLot (W3-24 & F11)', () => {
       ],
     );
 
-    expect(detailed.get('lot-req-a')).toEqual({ total: 1, excess: 1 });
-    expect(detailed.get('lot-req-b')).toEqual({ total: 1, excess: 1 });
+    expect(counts.get('lot-req-a')).toBe(2);
+    expect(counts.get('lot-req-b')).toBe(0);
   });
 });

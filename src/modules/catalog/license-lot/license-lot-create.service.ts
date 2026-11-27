@@ -120,8 +120,7 @@ export class LicenseLotCreateService {
   ): Promise<void> {
     const needs = needsVendorAdmins(plan.provisioningType, plan.hasAdminConsole);
     if (!needs) return;
-    // Nobody to say the baseline is still open: take it as closed, so nothing is let through by accident.
-    const closed = !this.baselinePhase.isBound() || (await this.baselinePhase.get().isClosed(tx, organizationId));
+    const closed = await this.baselinePhase.get().isClosed(tx, organizationId);
     if (!closed) return;
     const given = workspaceId === null ? 0 : await this.workspaces.workingAdminCount(tx, workspaceId);
     assertLotVendorAdminsRecorded({ needs, given, planId: plan.id });

@@ -300,7 +300,7 @@ export class SharedPoolService {
    */
   async assertK4LotGrantable(
     tx: DbTx,
-    input: { planId: string; lotId: string; requestId?: string | null },
+    input: { planId: string; lotId: string; requestId?: string | null; afterKeyAssigned?: boolean },
   ): Promise<void> {
     const raw = await this.lotStock.accountLotCandidates(input.planId, undefined, tx);
     const match = raw.find((l) => l.id === input.lotId || l.legacySubscriptionId === input.lotId);
@@ -309,7 +309,8 @@ export class SharedPoolService {
     const candidates =
       reservations.size > 0 ? await this.lotStock.accountLotCandidates(input.planId, { reservations }, tx) : raw;
     const checked = candidates.find((l) => l.id === match.id);
-    if (checked && checked.grantable > 0 && checked.excessGrantable <= 0) {
+    const enforceEvenIfZeroGrantable = input.afterKeyAssigned === true || (checked?.grantable ?? 0) > 0;
+    if (checked && enforceEvenIfZeroGrantable && checked.excessGrantable <= 0) {
       throw new LicenseLotReservedForRequestError(checked.id);
     }
   }

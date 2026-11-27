@@ -137,7 +137,7 @@ export class OffboardingFrame {
     options: FrameOptions & { outer?: DbTx | undefined },
     rules: {
       beforeLocks: (seen: OffboardingRecord) => void;
-      afterLocks?: (tx: DbTx, held: OffboardingRecord, today: BusinessDate) => Promise<void>;
+      afterLocks: (tx: DbTx, held: OffboardingRecord, today: BusinessDate) => Promise<void>;
     },
     apply: (tx: DbTx, context: OffboardingCommandContext) => Promise<T>,
   ): Promise<T> {
@@ -161,7 +161,7 @@ export class OffboardingFrame {
       if (!held) throw new OffboardingRefusedError('NOT_FOUND');
       const earlier = held.headHandover?.successorEmployeeId ?? null;
       if (options.lockDepartment && earlier && earlier !== chosen) await this.lockShared(tx, earlier);
-      await rules.afterLocks?.(tx, held, today);
+      await rules.afterLocks(tx, held, today);
       const zone = (await this.organizationReads.getOrganization(tx))?.timeZone ?? 'UTC';
 
       return apply(tx, { held, today, recordedOn: businessDateAt(held.recordedAt, zone) });

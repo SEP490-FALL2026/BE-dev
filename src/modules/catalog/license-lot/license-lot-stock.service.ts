@@ -7,7 +7,6 @@ import { SeatOccupancyHook, type OpenK4GrantTask } from '../public/catalog.exten
 import {
   chooseAccountLot,
   countOpenTasksByLot,
-  countOpenTasksByLotDetailed,
   excessGrantableOf,
   pickK4LotUnitPrice,
   type AccountLotWithGrantable,
@@ -213,7 +212,7 @@ export class LicenseLotStockService {
     tasks: readonly OpenK4GrantTask[],
     reservations?: ReadonlyMap<string, RequestLotReservation>,
   ): AccountLotWithGrantable[] {
-    const taskCounts = countOpenTasksByLotDetailed(
+    const taskCounts = countOpenTasksByLot(
       lotRows.map((l) => ({
         id: l.id,
         purchasedOn: l.purchasedOn,
@@ -222,15 +221,6 @@ export class LicenseLotStockService {
         legacySubscriptionId: l.legacySubscriptionId,
         free: Math.max(0, l.licenseCount - (taken.get(l.id)?.occupied ?? 0)),
         keysInStore: keys.get(l.id)?.inStore ?? 0,
-        excessCap:
-          l.purpose === 'REQUEST'
-            ? Math.max(
-                0,
-                l.licenseCount -
-                  (reservations?.get(l.id)?.beneficiaries ?? 1) -
-                  (reservations?.get(l.id)?.chargedExcess ?? 0),
-              )
-            : Number.POSITIVE_INFINITY,
       })),
       tasks,
     );
@@ -240,7 +230,7 @@ export class LicenseLotStockService {
         l,
         taken.get(l.id)?.occupied ?? 0,
         keys.get(l.id)?.inStore ?? 0,
-        taskCounts.get(l.id),
+        taskCounts.get(l.id) ?? 0,
         reservations?.get(l.id),
       ),
     );
@@ -250,12 +240,10 @@ export class LicenseLotStockService {
     l: LicenseLotRecord,
     occupied: number,
     keysInStore: number,
-    counted: { total: number; excess: number } | undefined,
+    openTasksWithoutKey: number,
     res: RequestLotReservation | undefined,
   ): AccountLotWithGrantable {
     const { free } = freeOf(l.licenseCount, occupied, l.unitPriceMinor);
-    const openTasksWithoutKey = counted?.total ?? 0;
-    const openExcessTasksWithoutKey = counted?.excess ?? 0;
     const beneficiaries = l.purpose === 'REQUEST' ? (res?.beneficiaries ?? 1) : 0;
     const chargedExcess = res?.chargedExcess ?? 0;
 
@@ -270,7 +258,6 @@ export class LicenseLotStockService {
       free,
       keysInStore,
       openTasksWithoutKey,
-      openExcessTasksWithoutKey,
       beneficiaries,
       chargedExcess,
       grantable: Math.max(0, Math.min(free, keysInStore - openTasksWithoutKey)),
@@ -278,7 +265,6 @@ export class LicenseLotStockService {
         licenseCount: l.licenseCount,
         beneficiaries,
         chargedExcess,
-        openExcessTasksWithoutKey,
       }),
     };
   }

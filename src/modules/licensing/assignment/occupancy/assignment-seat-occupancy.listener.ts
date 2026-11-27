@@ -131,7 +131,8 @@ export class AssignmentSeatOccupancy implements SeatOccupancyReader, OnModuleIni
     tx?: DbTx,
   ): Promise<Map<string, { occupied: number; inRevocation: number }>> {
     const activationOccupied = await this.deviceActivations.occupiedBySubscriptions(subscriptionIds, tx);
-    const lotIds = await this.lots.idsOfLots(subscriptionIds, tx);
+    const candidateLotIds = [...new Set([...activationOccupied.keys(), ...seatMap.keys()])];
+    const lotIds = candidateLotIds.length > 0 ? await this.lots.idsOfLots(candidateLotIds, tx) : new Set<string>();
     const merged = new Map(seatMap);
     for (const lotId of lotIds) {
       const current = merged.get(lotId);

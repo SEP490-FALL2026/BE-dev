@@ -106,7 +106,11 @@ describe('SubscriptionPoolService.assertVendorAdmins and assertActivation', () =
     const isClosed = jest.fn().mockResolvedValue(input.closed ?? true);
     const baselinePhase = {
       isBound: jest.fn().mockReturnValue(input.bound ?? true),
-      get: jest.fn().mockReturnValue({ isClosed }),
+      get: jest.fn().mockImplementation(() => {
+        if (input.bound === false) throw new Error("ExtensionPoint 'catalog.seat-baseline-phase' is not bound.");
+
+        return { isClosed };
+      }),
     };
     const workingAdminCount = jest.fn().mockResolvedValue(input.workingCount ?? 0);
     const findUsableItAdminEmployeeIds = jest
@@ -188,17 +192,10 @@ describe('SubscriptionPoolService.assertVendorAdmins and assertActivation', () =
     await expect(service.assertVendorAdmins(tx, k2Plan, 'org-1', 'ws-a')).resolves.toBeUndefined();
   });
 
-  it('fails closed when the baseline phase hook is not bound', async () => {
-    const { service, isClosed } = buildGate({
-      bound: false,
-      workingCount: 1,
-    });
+  it('H-6 / G-4: fails loudly when SeatBaselinePhaseHook is not bound', async () => {
+    const { service, isClosed } = buildGate({ bound: false, workingCount: 1 });
 
-    const err = await service.assertVendorAdmins(tx, k2Plan, 'org-1', 'ws-a').catch((e: unknown) => e);
-    expect(err).toBeInstanceOf(SubscriptionVendorAdminsRequiredError);
-    expect((toSubscriptionApiException(err) as { getResponse?: () => unknown }).getResponse?.()).toMatchObject({
-      code: 'SUBSCRIPTION.VENDOR_ADMINS_REQUIRED',
-    });
+    await expect(service.assertVendorAdmins(tx, k2Plan, 'org-1', 'ws-a')).rejects.toThrow('not bound');
     expect(isClosed).not.toHaveBeenCalled();
   });
 

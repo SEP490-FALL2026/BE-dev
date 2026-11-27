@@ -169,6 +169,7 @@ export class ProvisioningService {
   ): Promise<TaskView> {
     const evidence = input.k1Checklist === undefined ? cleanEvidence(input.evidence) : input.evidence.trim();
     const task = await this.frame.work(actor, id, {
+      beforeLock: null,
       check: (locked) => {
         assertNotRevocationTask(locked.kind);
         nextStatus(locked.status, 'COMPLETE', locked.channel);
@@ -197,6 +198,7 @@ export class ProvisioningService {
   async reportFailure(actor: AuthenticatedPrincipal, id: string, input: { reason: string }): Promise<TaskView> {
     const reason = cleanFailureReason(input.reason);
     const task = await this.frame.work(actor, id, {
+      beforeLock: null,
       check: (locked) => nextStatus(locked.status, 'FAIL', locked.channel),
       write: async ({ tx, task: locked, now }) => {
         await this.repo.markFailed(tx, locked.id, actor.appUserId, reason, now);

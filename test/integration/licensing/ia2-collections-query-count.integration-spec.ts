@@ -88,12 +88,11 @@ describe('licensing: the statements of the stock summary and of the list of assi
       for (let index = 0; index < 3; index += 1) await plansOfEachKind();
       const many = await read('/api/v1/stock-summary?pageSize=100');
 
-      expect(itemsOf(few.result)).toHaveLength(3);
-      expect(itemsOf(many.result)).toHaveLength(12);
+      expect(itemsOf(few.result)).toHaveLength(2);
+      expect(itemsOf(many.result)).toHaveLength(8);
       expect(statementsOf(many)).toBe(statementsOf(few));
       expect(readsOf(many, 'license_keys')).toBe(1);
-      // The seats and the rights of a K1 plan are two counts of the assignments, each one statement for the page.
-      expect(readsOf(many, 'license_assignments')).toBe(2);
+      expect(readsOf(many, 'license_assignments')).toBe(1);
       for (const unused of ['audit_events', 'access_requests', 'access_request_events']) {
         expect({ unused, read: tablesRead(many).has(unused) }).toEqual({ unused, read: false });
       }

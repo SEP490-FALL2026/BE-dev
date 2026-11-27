@@ -41,7 +41,13 @@ export class OpenRequestsSource implements OnModuleInit {
         return counted.requests + counted.grantTasks;
       },
     });
-    this.hooks.add('personnel.open-requests', { onRecorded: (tx, event) => this.remind(tx, event) });
+    const noop = () => Promise.resolve();
+    this.hooks.add('personnel.open-requests', {
+      onRecorded: (tx, event) => this.remind(tx, event),
+      onDueChanged: noop,
+      onCancelled: noop,
+      onLeft: noop,
+    });
   }
 
   private async remind(tx: DbTx, event: PersonnelFileEvent): Promise<void> {

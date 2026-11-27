@@ -18,22 +18,22 @@ export class PersonnelFileHooks {
   constructor(private readonly hooks: PersonnelFileHookContributions) {}
 
   onRecorded(tx: DbTx, event: PersonnelFileEvent): Promise<void> {
-    return this.each((hook) => hook.onRecorded?.(tx, event));
+    return this.each((hook) => hook.onRecorded(tx, event));
   }
 
   onDueChanged(tx: DbTx, event: PersonnelFileEvent & { previousDueOn: BusinessDate }): Promise<void> {
-    return this.each((hook) => hook.onDueChanged?.(tx, event));
+    return this.each((hook) => hook.onDueChanged(tx, event));
   }
 
   onCancelled(tx: DbTx, event: PersonnelFileEvent): Promise<void> {
-    return this.each((hook) => hook.onCancelled?.(tx, event));
+    return this.each((hook) => hook.onCancelled(tx, event));
   }
 
   onLeft(tx: DbTx, event: PersonnelFileEvent): Promise<void> {
-    return this.each((hook) => hook.onLeft?.(tx, event));
+    return this.each((hook) => hook.onLeft(tx, event));
   }
 
-  private async each(call: (hook: PersonnelFileHook) => Promise<void> | undefined): Promise<void> {
+  private async each(call: (hook: PersonnelFileHook) => Promise<void>): Promise<void> {
     for (const hook of this.hooks.all()) await call(hook);
   }
 }

@@ -66,7 +66,7 @@ async function expectRefusal(
   work: () => Promise<unknown>,
   ErrClass: new (...args: never[]) => unknown,
   status: HttpStatus,
-  code: string,
+  code?: string,
 ) {
   const caught = await work().catch((e: unknown) => e);
   expect(caught).toBeInstanceOf(ErrClass);
@@ -102,36 +102,16 @@ function makeSut(overrides: Record<string, unknown> = {}) {
     seatsOnDays: res(new Map([['line-1', new Map([['2026-11-21', 5]])]])),
     ...(overrides.seatLedger as object),
   } as unknown as SeatLedgerService;
-  const occupancy = {
-    get: jest.fn().mockReturnValue({ occupiedBySubscriptionPlans: res(new Map()) }),
-  } as unknown as SeatOccupancyHook;
-  const plans = {
-    lockShared: seq('lockPlan', k2Plan),
-    vendorIdOf: res('ven-1'),
-    lookups: res([k2Plan]),
-    ...(overrides.plans as object),
-  } as unknown as PlanFactsService;
-  const workspaces = {
-    lockBoth: seq('lockWorkspace', undefined),
-    resolveAndLock: seq('resolveAndLock', 'ws-resolved'),
-    ...(overrides.workspaces as object),
-  } as unknown as WorkspaceForSubscriptionService;
-  const baselinePhase = {
+  const occupancy = { get: jest.fn().mockReturnValue({ occupiedBySubscriptionPlans: res(new Map()) }) } as unknown as SeatOccupancyHook;
+  const plans = { lockShared: seq('lockPlan', k2Plan), vendorIdOf: res('ven-1'), lookups: res([k2Plan]), ...(overrides.plans as object) } as unknown as PlanFactsService;
+  const workspaces = { lockBoth: seq('lockWorkspace', undefined), resolveAndLock: seq('resolveAndLock', 'ws-resolved'), ...(overrides.workspaces as object) } as unknown as WorkspaceForSubscriptionService;
+  const baselinePhase = (overrides.overrideBaseline ?? {
     isBound: jest.fn().mockReturnValue(true),
     get: jest.fn().mockReturnValue({ isClosed: res(false), ...(overrides.baselinePhase as object) }),
-  } as unknown as SeatBaselinePhaseHook;
+  }) as unknown as SeatBaselinePhaseHook;
   const auditRecord = res(undefined);
   const audit = { record: auditRecord, ...(overrides.audit as object) } as unknown as AuditApi;
-  const service = new SubscriptionLineService(
-    lines,
-    seatLedger,
-    plans,
-    workspaces,
-    baselinePhase,
-    occupancy,
-    audit,
-    runner,
-  );
+  const service = new SubscriptionLineService(lines, seatLedger, plans, workspaces, baselinePhase, occupancy, audit, runner);
   return { service, insert, update, openLines, auditRecord, order };
 }
 
@@ -139,7 +119,6 @@ describe('SubscriptionLineService (W3-15)', () => {
   describe('addLine (N5 lock order + baseline + uniqueness)', () => {
     it('locks workspace (5b) -> period (6) -> plan (7) and opens ledger when ACTIVE', async () => {
       const { service, insert, openLines, order } = makeSut();
-
       const created = await service.addLine(actor, 'sub-1', {
         planId: 'plan-2',
         monthlyUnitPrice: { amount: '375000', currency: 'VND' },
@@ -160,14 +139,7 @@ describe('SubscriptionLineService (W3-15)', () => {
         }),
       );
       expect(openLines).toHaveBeenCalledWith(expect.anything(), {
-        lines: [
-          {
-            lineId: created.id,
-            effectiveOn: '2026-11-01',
-            quantity: 4,
-            recordedByEmployeeId: 'emp-khoa',
-          },
-        ],
+        lines: [{ lineId: created.id, effectiveOn: '2026-11-01', quantity: 4, recordedByEmployeeId: 'emp-khoa' }],
       });
     });
 
@@ -196,9 +168,14 @@ describe('SubscriptionLineService (W3-15)', () => {
       expect(lockPeriod).toHaveBeenCalledTimes(4);
     });
 
-    const addRefusals: Array<
-      [string, Record<string, unknown>, Record<string, unknown>, new (...a: never[]) => unknown, HttpStatus, string]
-    > = [
+    const addRefusals: [
+      string,
+      Record<string, unknown>,
+      Record<string, unknown>,
+      new (...a: never[]) => unknown,
+      HttpStatus,
+      string?,
+    ][] = [
       [
         'non-responsible IT Admin -> 403',
         {},
@@ -206,6 +183,22 @@ describe('SubscriptionLineService (W3-15)', () => {
         lineErrors.SubscriptionLineNotResponsibleError,
         HttpStatus.FORBIDDEN,
         'SUBSCRIPTION_LINE.NOT_RESPONSIBLE',
+      ],
+      [
+        'unbound baseline hook -> throws loudly (H-6 / G-4)',
+        { quantity: 3 },
+        {
+          baselinePhase: undefined,
+          overrideBaseline: {
+            isBound: jest.fn().mockReturnValue(false),
+            get: jest.fn(() => {
+              throw new Error("ExtensionPoint 'catalog.seat-baseline-phase' is not bound.");
+            }),
+          },
+        },
+        Error,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        undefined,
       ],
       [
         'closed baseline with quantity -> 422',

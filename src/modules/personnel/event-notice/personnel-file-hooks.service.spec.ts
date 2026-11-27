@@ -32,7 +32,12 @@ describe('PersonnelFileHooks (OD-R10 = A: a hook is a part of the write)', () =>
     'calls %s on every hook in the order they were added, with the transaction and the event',
     async (step, run, sent) => {
       const calls: string[] = [];
+      const noop = () => Promise.resolve();
       const hook = (name: string): PersonnelFileHook => ({
+        onRecorded: noop,
+        onDueChanged: noop,
+        onCancelled: noop,
+        onLeft: noop,
         [step]: (received: DbTx, payload: unknown) => {
           calls.push(name);
           expect(received).toBe(tx);
@@ -48,22 +53,32 @@ describe('PersonnelFileHooks (OD-R10 = A: a hook is a part of the write)', () =>
     },
   );
 
-  it('skips a hook that has no such step, and calls none when there is no hook', async () => {
-    const onLeft = jest.fn(() => Promise.resolve());
+  it('calls the step on every registered hook and handles zero registered hooks', async () => {
+    const noop = () => Promise.resolve();
+    const onLeft = jest.fn(noop);
+    const full = (over: Partial<PersonnelFileHook> = {}): PersonnelFileHook => ({
+      onRecorded: noop,
+      onDueChanged: noop,
+      onCancelled: noop,
+      onLeft: noop,
+      ...over,
+    });
 
-    await build(['recorded-only', { onRecorded: () => Promise.resolve() }], ['leaver', { onLeft }]).onLeft(tx, event);
+    await build(['first', full()], ['leaver', full({ onLeft })]).onLeft(tx, event);
     await build().onRecorded(tx, event);
 
     expect(onLeft).toHaveBeenCalledTimes(1);
   });
 
   it('lets the error of a hook reach the caller, unchanged, and does not call the hooks after it', async () => {
+    const noop = () => Promise.resolve();
     const failure = new Error('a hook failed');
-    const later = jest.fn(() => Promise.resolve());
+    const later = jest.fn(noop);
+    const base: PersonnelFileHook = { onRecorded: noop, onDueChanged: noop, onCancelled: noop, onLeft: noop };
     const hooks = build(
-      ['fine', { onRecorded: () => Promise.resolve() }],
-      ['fails', { onRecorded: () => Promise.reject(failure) }],
-      ['later', { onRecorded: later }],
+      ['fine', base],
+      ['fails', { ...base, onRecorded: () => Promise.reject(failure) }],
+      ['later', { ...base, onRecorded: later }],
     );
 
     await expect(hooks.onRecorded(tx, event)).rejects.toBe(failure);
@@ -71,10 +86,14 @@ describe('PersonnelFileHooks (OD-R10 = A: a hook is a part of the write)', () =>
   });
 
   it('lets a hook that throws before it returns a promise reach the caller as a rejection too', async () => {
+    const noop = () => Promise.resolve();
     const failure = new TypeError('not a promise');
     const hooks = build([
       'sync',
       {
+        onRecorded: noop,
+        onDueChanged: noop,
+        onLeft: noop,
         onCancelled: () => {
           throw failure;
         },

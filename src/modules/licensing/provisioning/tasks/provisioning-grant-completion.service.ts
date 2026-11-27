@@ -81,6 +81,14 @@ export class ProvisioningGrantCompletion {
       completedOn,
       licenseKeyId: input.licenseKeyId,
     });
+    if (provisioningType === 'K4' && task.purchase === null && keyMeta?.licenseLotId) {
+      await this.sharedPool.assertK4LotGrantable(tx, {
+        planId: task.assignment.planId,
+        lotId: keyMeta.licenseLotId,
+        requestId: task.requestId,
+        afterKeyAssigned: true,
+      });
+    }
     const granted = await this.assignments.recordGranted(tx, task.assignmentId, completedOn);
     await this.notifyGrantedOutcome(tx, { task, provisioningType, completedOn, granted, keyMeta });
     if (keyMeta && !keyMeta.costBorne) await this.keys.markCostBorne(tx, keyMeta.licenseKeyId);

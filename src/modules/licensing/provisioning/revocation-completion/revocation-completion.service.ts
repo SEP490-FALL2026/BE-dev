@@ -51,6 +51,7 @@ export class RevocationCompletionService {
    */
   async complete(actor: AuthenticatedPrincipal, id: string, input: CompletionInput): Promise<TaskView> {
     const task = await this.frame.work(actor, id, {
+      beforeLock: null,
       check: (locked) => {
         assertRevocationTask(locked.kind);
         nextStatus(locked.status, 'COMPLETE', locked.channel);
@@ -70,7 +71,6 @@ export class RevocationCompletionService {
         // A K4 seat granted before the key pool holds no key: nothing is asked about one (Owner 12/11/2026).
         const holdsKey = plan.provisioningType === 'K4' && (await this.aftermath.holdsKey(tx, locked.assignmentId));
         const key = planKeyReturn(input, plan.provisioningType, holdsKey);
-
         await this.tasks.markRevocationCompleted(tx, locked.id, actor.appUserId, done, now);
         await this.ending.end(tx, actor, { organizationId, assignment, until: done.endOn, taskId: locked.id });
         // The listeners of the end of the work are told what the right held and when it ends, so the money held for it can be given back.
@@ -98,21 +98,7 @@ export class RevocationCompletionService {
           now,
         });
 
-        // The evidence and the notes stay on the task: the audit event says what was done, not what was written about it.
-        return {
-          action: 'REVOCATION_COMPLETED',
-          after: {
-            status: 'COMPLETED',
-            taskKind: 'REVOKE',
-            completion: done.completion,
-            accessState: done.accessState,
-            paidThroughOn: done.paidThroughOn,
-            validUntil: done.endOn,
-            completedBy: actor.appUserId,
-            // A K4 seat: the key that went back to the store (null when the seat held none), and whether it was withdrawn.
-            ...(key ? { licenseKeyId: followed.licenseKeyId, keyDisposition: key.disposition } : {}),
-          },
-        };
+        return completedRevocationAudit(done, actor.appUserId, key, followed);
       },
     });
 
@@ -131,6 +117,7 @@ export class RevocationCompletionService {
     input: { accessCutOn: BusinessDate; evidence: string },
   ): Promise<TaskView> {
     const task = await this.frame.work(actor, id, {
+      beforeLock: null,
       check: (locked) => {
         assertRevocationTask(locked.kind);
         if (locked.status !== 'COMPLETED' || locked.accessState !== 'UNTIL_PAID_END') {
@@ -168,4 +155,25 @@ export class RevocationCompletionService {
 
     return (await this.views.views([task]))[0];
   }
+}
+
+function completedRevocationAudit(
+  done: ReturnType<typeof planCompletion>,
+  completedBy: string,
+  key: ReturnType<typeof planKeyReturn>,
+  followed: { licenseKeyId?: string | null },
+) {
+  return {
+    action: 'REVOCATION_COMPLETED' as const,
+    after: {
+      status: 'COMPLETED',
+      taskKind: 'REVOKE',
+      completion: done.completion,
+      accessState: done.accessState,
+      paidThroughOn: done.paidThroughOn,
+      validUntil: done.endOn,
+      completedBy,
+      ...(key ? { licenseKeyId: followed.licenseKeyId, keyDisposition: key.disposition } : {}),
+    },
+  };
 }

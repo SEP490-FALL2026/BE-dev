@@ -128,7 +128,7 @@ describe('LicenseLotStockService (W3-24)', () => {
     expect(await service.newestFreeLotUnitPrice('plan-1')).toBe(11_000_000n);
   });
 
-  it('G-5: subtracts open excess tasks without a key from excessGrantable while excluding own request tasks', async () => {
+  it('SPEC F11: excessGrantable uses n - m - chargedExcess without subtracting open excess tasks without a key', async () => {
     const service = build({
       lots: [lot({ id: 'lot-1', licenseCount: 3, requestId: 'req-c' })],
       occupied: 0,
@@ -156,9 +156,8 @@ describe('LicenseLotStockService (W3-24)', () => {
     });
     expect(candidates[0]).toMatchObject({
       openTasksWithoutKey: 2,
-      openExcessTasksWithoutKey: 1,
       grantable: 1,
-      excessGrantable: 0,
+      excessGrantable: 1,
     });
   });
 });

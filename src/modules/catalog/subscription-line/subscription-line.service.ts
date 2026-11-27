@@ -246,8 +246,7 @@ export class SubscriptionLineService {
     if (plan.applicationStatus === 'RETIRED') throw new PlanApplicationRetiredError();
     if (await this.lines.findLive(workspaceId, input.planId, tx)) throw new SubscriptionLineLiveTakenError();
 
-    const baselineClosed =
-      !this.baselinePhase.isBound() || (await this.baselinePhase.get().isClosed(tx, organizationId));
+    const baselineClosed = await this.baselinePhase.get().isClosed(tx, organizationId);
     if (input.quantity !== undefined && baselineClosed) throw new SubscriptionLineQuantityViaPurchaseError();
 
     return plan;
