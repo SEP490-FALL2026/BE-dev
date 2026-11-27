@@ -163,7 +163,7 @@ describe('GroupSpendHold (FIX-B1 F1)', () => {
     );
   });
 
-  it('B-5: throws AccessRequestNotPriceableError when RECURRING pricing.monthlyPriceMinor is null even with catalog price', async () => {
+  it('throws AccessRequestNotPriceableError when RECURRING pricing.monthlyPriceMinor is null even with catalog price', async () => {
     const insertMany = jest.fn();
     const service = new GroupSpendHold(
       { setPricing: jest.fn() } as unknown as AccessRequestRepo,

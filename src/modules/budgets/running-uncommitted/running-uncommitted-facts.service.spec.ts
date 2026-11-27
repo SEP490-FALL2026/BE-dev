@@ -284,7 +284,7 @@ describe('RunningUncommittedFactsService', () => {
     expect(filtered.get(CC_TK)).toBe(4_800_000n);
   });
 
-  it('H-2: clamps open mid-year seats by today department placement validFrom (both K2 and unrequested K1)', async () => {
+  it('clamps open mid-year seats by today department placement validFrom (both K2 and unrequested K1)', async () => {
     const { service, licensing, periods, organizationReads, organizationHistory } = buildService();
     licensing.getSeatsInForceOn.mockResolvedValue([
       inForceSeat({ assignmentId: 'a-k2', subscriptionId: 'sub-1', heldFrom: '2027-07-01', heldUntil: null }),

@@ -59,11 +59,12 @@ export class LicenseLotKeysController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The request is invalid (VALIDATION_ERROR), the keys would pass the licenses of the lot (LICENSE_LOT.KEYS_EXCEED_LICENSES), the application is retired (LICENSE_KEY.APPLICATION_RETIRED), the plan has no keys (LICENSE_KEY.PLAN_HAS_NO_KEYS) or initialActivationsUsed does not fit (LICENSE_KEY.INITIAL_ACTIVATIONS_EXCEED_MAX, LICENSE_KEY.INITIAL_ACTIVATIONS_ON_ACCOUNT_PLAN).',
+        'The request is invalid (VALIDATION_ERROR), the keys would pass the licenses of the lot (LICENSE_LOT.KEYS_EXCEED_LICENSES), the application is retired (LICENSE_KEY.APPLICATION_RETIRED), the plan does not allow key import (LICENSE_KEY.PLAN_HAS_NO_KEYS, LICENSE_KEY.PLAN_NOT_K4) or initialActivationsUsed does not fit (LICENSE_KEY.INITIAL_ACTIVATIONS_EXCEED_MAX, LICENSE_KEY.INITIAL_ACTIVATIONS_ON_ACCOUNT_PLAN).',
       examples: [
         VALIDATION_EXAMPLE,
         EXAMPLES.LOT_KEYS_EXCEED_LICENSES,
         EXAMPLES.PLAN_HAS_NO_KEYS,
+        EXAMPLES.PLAN_NOT_K4,
         EXAMPLES.APPLICATION_RETIRED,
         EXAMPLES.INITIAL_ACTIVATIONS_EXCEED_MAX,
         EXAMPLES.INITIAL_ACTIVATIONS_ON_ACCOUNT_PLAN,

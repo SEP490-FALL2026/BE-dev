@@ -192,7 +192,7 @@ describe('SubscriptionPoolService.assertVendorAdmins and assertActivation', () =
     await expect(service.assertVendorAdmins(tx, k2Plan, 'org-1', 'ws-a')).resolves.toBeUndefined();
   });
 
-  it('H-6 / G-4: fails loudly when SeatBaselinePhaseHook is not bound', async () => {
+  it('fails loudly when SeatBaselinePhaseHook is not bound', async () => {
     const { service, isClosed } = buildGate({ bound: false, workingCount: 1 });
 
     await expect(service.assertVendorAdmins(tx, k2Plan, 'org-1', 'ws-a')).rejects.toThrow('not bound');

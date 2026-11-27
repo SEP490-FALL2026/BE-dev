@@ -369,7 +369,7 @@ export class SubscriptionViewService {
       linePlans.filter((plan): plan is NonNullable<typeof plan> => plan !== null).map((plan) => [plan.id, plan.name]),
     );
 
-    return { linesBySub, planNameById, lineOccupied };
+    return { linesBySub, planNameById, lineOccupied, today };
   }
 
   private resolveRecordLines(
@@ -378,6 +378,7 @@ export class SubscriptionViewService {
       linesBySub: ReadonlyMap<string, SubscriptionLineWithSeats[]>;
       planNameById: ReadonlyMap<string, string>;
       lineOccupied: ReadonlyMap<string, number>;
+      today: BusinessDate;
     },
   ) {
     const subLines = ctx.linesBySub.get(record.id) ?? [];
@@ -398,7 +399,9 @@ export class SubscriptionViewService {
     });
     const servingSeatsSum = subLines.reduce((sum, entry) => (entry.isServing ? sum + entry.seatsToday : sum), 0);
     const lineCount = subLines.length;
-    const hasOpenedLedger = subLines.some((entry) => entry.line.ledgerOpenedOn !== null);
+    const hasOpenedLedger = subLines.some(
+      (entry) => entry.line.ledgerOpenedOn !== null && entry.line.ledgerOpenedOn <= ctx.today,
+    );
 
     return {
       lineViews,

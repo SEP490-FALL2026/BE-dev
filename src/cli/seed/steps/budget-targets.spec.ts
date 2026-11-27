@@ -273,7 +273,7 @@ describe('the base counted for the light a department must show (baseFor, SPEC S
     expect(F.budgets.find((budget) => budget.department === 'FIN')!.reserve).toMatchObject({ percent: 60 });
   });
 
-  it('H-2: sizes MKT and DES reserve bases inside (forecast / 1.1, forecast) across calendar months and baseline seats, leaving SAL blocked', () => {
+  it('sizes MKT and DES reserve bases inside (forecast / 1.1, forecast) across calendar months and baseline seats, leaving SAL blocked', () => {
     for (const today of ['2026-10-01', '2026-11-26', '2026-12-31']) {
       for (const department of ['MKT', 'DES'] as const) {
         const base = tightBaseFor(F, department, today)!;

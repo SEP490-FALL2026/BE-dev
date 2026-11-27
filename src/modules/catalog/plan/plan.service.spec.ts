@@ -190,7 +190,7 @@ describe('W3-02: referenceCommitmentMonths on plan declare & update', () => {
     expect(update).toHaveBeenCalledWith(TX, 'plan-1', expect.objectContaining({ referenceCommitmentMonths: null }));
   });
 
-  it('H-4: maps plan_change_blocked: LICENSE_LOTS to PlanInUseBlocksChangeError (409)', async () => {
+  it('maps plan_change_blocked: LICENSE_LOTS to PlanInUseBlocksChangeError (409)', async () => {
     const { service, update } = setup({ provisioningType: 'K4' });
     update.mockRejectedValueOnce(
       new Prisma.PrismaClientKnownRequestError('check failed', {

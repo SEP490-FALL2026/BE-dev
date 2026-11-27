@@ -185,7 +185,7 @@ describe('SubscriptionViewService lines & D-18 (W3-15)', () => {
     expect(k1View.seatsToday).toBe(0);
   });
 
-  it('H-9(b): keeps record.purchasedQuantity = null and missing = [QUANTITY] for a DRAFT K2 PER_SEAT subscription with an un-opened line', async () => {
+  it('keeps record.purchasedQuantity = null and missing = [QUANTITY] for a DRAFT K2 PER_SEAT subscription with an un-opened line', async () => {
     const draftK2 = makeRecord({
       id: 'sub-draft',
       status: 'DRAFT',
@@ -261,5 +261,83 @@ describe('SubscriptionViewService lines & D-18 (W3-15)', () => {
     const [view] = await service.viewAll([draftK2]);
     expect(view.purchasedQuantity).toBeNull();
     expect(view.missing).toEqual(['QUANTITY']);
+  });
+
+  it('keeps header purchasedQuantity on an ACTIVE future-dated renewal whose line ledgerOpenedOn is after today', async () => {
+    const activeRenewal = makeRecord({
+      id: 'sub-renewal',
+      status: 'ACTIVE',
+      startDate: '2026-12-01',
+      purchasedQuantity: 10,
+      unitPrice: { amountMinor: 375_000n, currency: 'VND', recordedOn: '2026-11-01' },
+      monthlyUnitPriceMinor: 375_000n,
+      priceSnapshot: {
+        rate: 1n,
+        rateDate: '2026-11-01',
+        rateSource: 'SAME_CURRENCY',
+        reportingMinor: 375_000n,
+        reportingCurrency: 'VND',
+        exchangeRateId: null,
+      },
+    });
+    const service = new SubscriptionViewService(
+      {
+        findCurrency: jest.fn().mockResolvedValue({ code: 'VND', minorUnit: 0 }),
+        taxProfileGroups: jest.fn().mockResolvedValue(new Map()),
+        estimateTaxMany: jest.fn().mockResolvedValue([
+          {
+            basis: 'NO_PROFILE',
+            group: null,
+            taxMinor: 0n,
+            deductibleMinor: 0n,
+            nonDeductibleMinor: 0n,
+            estimatedCostMinor: 375_000n,
+          },
+        ]),
+      } as unknown as FinanceApi,
+      {
+        businessToday: jest.fn().mockResolvedValue('2026-11-15'),
+        getEmployees: jest.fn().mockResolvedValue([]),
+      } as unknown as OrganizationReadApi,
+      {
+        vendorAdminsOf: jest.fn().mockResolvedValue(new Map()),
+        workingAdminsAmong: jest.fn(),
+        lookups: jest.fn().mockResolvedValue([{ id: 'plan-1', name: 'FigJam' }]),
+      } as unknown as PlanFactsService,
+      {
+        get: () => ({
+          seatsAndPlansOfSubscriptions: jest
+            .fn()
+            .mockResolvedValue({ bySubscription: new Map(), bySubscriptionPlan: new Map() }),
+        }),
+      } as unknown as SeatOccupancyHook,
+      { idsWithSuccessor: jest.fn().mockResolvedValue(new Set()) } as unknown as SubscriptionGrantingRepo,
+      { of: jest.fn().mockResolvedValue(new Map()) } as unknown as SubscriptionWindowsService,
+      {
+        withLines: jest.fn().mockResolvedValue(new Set(['sub-renewal'])),
+        lotResponsibles: jest.fn().mockResolvedValue(new Map()),
+        linesForSubscriptions: jest.fn().mockResolvedValue(
+          new Map([
+            [
+              'sub-renewal',
+              [
+                {
+                  line: makeLine({ subscriptionId: 'sub-renewal', ledgerOpenedOn: '2026-12-01' }),
+                  seatsToday: 0,
+                  isServing: false,
+                },
+              ],
+            ],
+          ]),
+        ),
+      } as unknown as SubscriptionLotResponsibleService,
+      {
+        findMany: jest.fn().mockResolvedValue([]),
+        workingAdminsAmong: jest.fn().mockResolvedValue(new Set()),
+      } as unknown as WorkspaceForSubscriptionService,
+    );
+
+    const [view] = await service.viewAll([activeRenewal]);
+    expect(view.purchasedQuantity).toBe(10);
   });
 });

@@ -40,7 +40,7 @@ describe('W3-17 K1 annual rolling pricing (Case 1 & Case 6)', () => {
     });
   });
 
-  it('B-5: monthlyPriceOf returns stored monthlyPriceMinor without read-time division fallback', () => {
+  it('monthlyPriceOf returns stored monthlyPriceMinor without read-time division fallback', () => {
     expect(
       monthlyPriceOf({ unitPrice: { amountMinor: 10_000_000n, currency: 'VND' }, billingCycle: 'ANNUAL' }),
     ).toBeNull();

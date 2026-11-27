@@ -149,7 +149,7 @@ describe('the price increase already known of the commitments of a Cost Center (
     expect(knownPriceIncrease(items.get(CC) ?? [])).toBe(2_000_000n);
   });
 
-  it('reads stored monthlyPriceMinor directly without dividing unitPrice at read time (H-7 / B-5)', async () => {
+  it('reads stored monthlyPriceMinor directly without dividing unitPrice at read time', async () => {
     const { service } = build([held()], [view()], { 'plan-1': monthly(18_000_001n, 'ANNUAL', 1_500_000n) });
 
     const items = await service.itemsOf(tx, [CC], YEAR, 8);

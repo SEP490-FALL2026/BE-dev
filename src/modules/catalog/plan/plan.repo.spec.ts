@@ -1,7 +1,7 @@
 import type { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { PlanRepo } from './plan.repo';
 
-describe('PlanRepo.findWorkspaceDuties (H-11)', () => {
+describe('PlanRepo.findWorkspaceDuties', () => {
   it('executes one constant $queryRaw statement and returns PRIMARY_OWNER before ADMIN members', async () => {
     const queryRaw = jest
       .fn()

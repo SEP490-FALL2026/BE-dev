@@ -9,7 +9,7 @@ const plan = (key: string) => F.applications.flatMap((app) => app.plans).find((c
 const subscriptionOf = (planKey: string) =>
   F.subscriptions.find((candidate) => subscriptionHasPlan(candidate, planKey))!;
 
-describe('shared dataset v4: restored catalog, baseline seat & cycle coverage (H-3)', () => {
+describe('shared dataset v4: restored catalog, baseline seat & cycle coverage', () => {
   it('holds 25 SAAS and 2 INTERNAL applications with unique keys, no refused names, and no pricingModel property', () => {
     expect(F.applications.filter((app) => app.kind === 'SAAS')).toHaveLength(25);
     expect(F.applications.filter((app) => app.kind === 'INTERNAL')).toHaveLength(2);

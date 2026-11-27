@@ -151,6 +151,51 @@ describe('license key import and the kind of its plan, racing (integration, P28-
     expect(await keysOf(subscriptionId)).toBe(2);
   });
 
+  it('import first (lot): real POST /license-lots/:id/keys holds shared plan lock until commit while PATCH /plans waits, then refuses with LICENSE_LOTS', async () => {
+    const planId = await h.plan('K4');
+    const lotRes = await request(h.server())
+      .post('/api/v1/license-lots')
+      .set(h.as(h.it1))
+      .send({
+        planId,
+        purchasedOn: '2026-11-25',
+        licenseCount: 2,
+        unitPrice: { amount: '100000', currency: 'VND' },
+        purpose: 'STOCK',
+      })
+      .expect(201);
+    const lotId = h.dataOf<{ id: string }>(lotRes).id;
+
+    const held = key('LHELD');
+    const other = await purchase();
+    const fingerprint = h.ctx.app.get(LicenseKeyCipher, { strict: false }).fingerprint(held);
+    await holder.query('BEGIN');
+    await holder.query(
+      `INSERT INTO license_keys (id, organization_id, subscription_id, cost_borne, fingerprint, masked, ciphertext, cipher_key_id,
+         imported_by_app_user_id)
+       VALUES ($1, $2, $3, true, $4, 'LHELD', decode(repeat('00', 29), 'hex'), 'k1', $5)`,
+      [randomUUID(), h.seed.organizationId, other.subscriptionId, fingerprint, h.it1.appUserId],
+    );
+
+    const importing = request(h.server())
+      .post(`/api/v1/license-lots/${lotId}/keys`)
+      .set(h.as(h.it1))
+      .send({ keys: [held, key('L2')] })
+      .then((response) => response);
+    await waitForLockWaiters(h.ctx.sql, 1);
+    const changing = changeToK1(planId).then((response) => response);
+    await waitForLockWaiters(h.ctx.sql, 2);
+    await holder.query('ROLLBACK');
+
+    expect((await importing).status).toBe(201);
+    const changeRes = await changing;
+    expect(changeRes.status).toBe(409);
+    expect(h.codeOf(changeRes)).toBe('PLAN.IN_USE_BLOCKS_CHANGE');
+    expect((changeRes.body as { error: { details: { reason: string } } }).error.details.reason).toBe('LICENSE_LOTS');
+    expect(await kindOf(planId)).toBe('K4');
+    expect((await h.ctx.sql.query(`SELECT 1 FROM license_keys WHERE license_lot_id = $1`, [lotId])).rowCount).toBe(2);
+  });
+
   it('stores a batch in the same number of statements whatever its size', async () => {
     const [small, large] = [(await purchase()).subscriptionId, (await purchase()).subscriptionId];
 

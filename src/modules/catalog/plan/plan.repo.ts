@@ -558,7 +558,7 @@ export class PlanRepo {
          WHERE p.provisioning_type = 'K2' OR (p.provisioning_type = 'K4' AND p.has_admin_console = true)
          ORDER BY mw.id,
                   EXISTS (SELECT 1 FROM subscriptions s WHERE s.workspace_id = mw.id AND s.plan_id = p.id
-                             AND s.status IN ('DRAFT', 'ACTIVE') AND NOT EXISTS (SELECT 1 FROM subscriptions r WHERE r.renewed_from_id = s.id)) DESC,
+                             AND s.status IN ('DRAFT', 'ACTIVE') AND s.closed_at IS NULL AND NOT EXISTS (SELECT 1 FROM subscriptions r WHERE r.renewed_from_id = s.id)) DESC,
                   p.name ASC, p.id ASC
       )
       SELECT mw.id::text AS workspace_id, mw.name AS workspace_name, mw.vendor_id::text AS vendor_id,

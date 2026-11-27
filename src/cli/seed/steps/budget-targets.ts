@@ -111,9 +111,9 @@ function seatRunningUncommitted(
 ): number {
   const info = k2SeatInfo(fixture, department, seat);
   if (!info) return 0;
-  const until = seat.endInDays === undefined ? yearEnd : dayOffset(today, seat.endInDays);
-  if (until < today) return 0;
-  const capped = until < yearEnd ? until : yearEnd;
+  const lastHeld = seat.endInDays === undefined ? yearEnd : dayOffset(today, seat.endInDays - 1);
+  if (lastHeld < today) return 0;
+  const capped = lastHeld < yearEnd ? lastHeld : yearEnd;
   const months = Number(capped.slice(5, 7)) - startMonth + 1;
 
   return months > 0 ? monthlyPriceOf(info.subscription, info.planKey) * months : 0;

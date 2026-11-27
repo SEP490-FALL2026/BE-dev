@@ -328,7 +328,7 @@ describe('withoutPeriodsAhead: the seats of the period that runs and of the next
     expect(idsOf(withoutPeriodsAhead([period('a'), period('b', 'a', null)], TODAY))).toEqual(['a', 'b']);
   });
 
-  it('H-9: excludes a future period whose predecessor is in knownIds (already collected via subscription lines)', () => {
+  it('excludes a future period whose predecessor is in knownIds (already collected via subscription lines)', () => {
     expect(idsOf(withoutPeriodsAhead([period('b', 'a', '2026-12-15')], TODAY, new Set(['a'])))).toEqual([]);
   });
 });

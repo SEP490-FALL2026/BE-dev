@@ -110,7 +110,7 @@ describe('AssignmentSeatOccupancy (S-6)', () => {
       );
     });
 
-    it('H-10: skips lots.idsOfLots completely when neither activationOccupied nor seatMap has any entry', async () => {
+    it('skips lots.idsOfLots completely when neither activationOccupied nor seatMap has any entry', async () => {
       const { listener, capacity, deviceActivations, lots } = setup(['sub-seat']);
       (capacity.occupancyOf as jest.Mock).mockResolvedValueOnce(new Map());
       (deviceActivations.occupiedBySubscriptions as jest.Mock).mockResolvedValueOnce(new Map());

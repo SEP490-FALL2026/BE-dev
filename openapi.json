@@ -24758,7 +24758,7 @@
             }
           },
           "409": {
-            "description": "The application already has a plan of this name (PLAN.NAME_TAKEN) or the plan still has a workspace profile or a numeric install limit the new kind cannot keep (PLAN.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE, PLAN.TERMS_BLOCK_TYPE_CHANGE), or a subscription or license key of the plan would no longer fit the new pricing model or kind (PLAN.IN_USE_BLOCKS_CHANGE, `details.reason`: ACTIVE_SUBSCRIPTION_WITHOUT_QUANTITY, LICENSE_KEYS, PERPETUAL_SUBSCRIPTIONS (a perpetual purchase of an application that is not licensed hangs on the K4 plan), TERM_SUBSCRIPTIONS (a subscription over a term hangs on a plan that would become K4, which is bought once), CONTRACT_LINKS (a subscription of the plan rests on a contract, which only a plan of a shared stock, K2 or K4, has), KEY_BINDING_PURCHASES (a perpetual purchase hangs on the plan, so its keyBinding cannot change), KEY_BINDING_ASSIGNMENTS (a person holds a seat of the plan), DEVICE_ACTIVATIONS (a machine holds an activation of the plan) or SUBSCRIPTIONS).",
+            "description": "The application already has a plan of this name (PLAN.NAME_TAKEN) or the plan still has a workspace profile or a numeric install limit the new kind cannot keep (PLAN.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE, PLAN.TERMS_BLOCK_TYPE_CHANGE), or a subscription or license key of the plan would no longer fit the new pricing model or kind (PLAN.IN_USE_BLOCKS_CHANGE, `details.reason`: ACTIVE_SUBSCRIPTION_WITHOUT_QUANTITY, LICENSE_KEYS, LICENSE_LOTS, PERPETUAL_SUBSCRIPTIONS (a perpetual purchase of an application that is not licensed hangs on the K4 plan), TERM_SUBSCRIPTIONS (a subscription over a term hangs on a plan that would become K4, which is bought once), CONTRACT_LINKS (a subscription of the plan rests on a contract, which only a plan of a shared stock, K2 or K4, has), KEY_BINDING_PURCHASES (a perpetual purchase hangs on the plan, so its keyBinding cannot change), KEY_BINDING_ASSIGNMENTS (a person holds a seat of the plan), DEVICE_ACTIVATIONS (a machine holds an activation of the plan) or SUBSCRIPTIONS).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -25384,7 +25384,7 @@
             }
           },
           "409": {
-            "description": "The application already has a plan of this name (PLAN.NAME_TAKEN) or the plan still has a workspace profile or a numeric install limit the new kind cannot keep (PLAN.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE, PLAN.TERMS_BLOCK_TYPE_CHANGE), or a subscription or license key of the plan would no longer fit the new pricing model or kind (PLAN.IN_USE_BLOCKS_CHANGE, `details.reason`: ACTIVE_SUBSCRIPTION_WITHOUT_QUANTITY, LICENSE_KEYS, PERPETUAL_SUBSCRIPTIONS (a perpetual purchase of an application that is not licensed hangs on the K4 plan), TERM_SUBSCRIPTIONS (a subscription over a term hangs on a plan that would become K4, which is bought once), CONTRACT_LINKS (a subscription of the plan rests on a contract, which only a plan of a shared stock, K2 or K4, has), KEY_BINDING_PURCHASES (a perpetual purchase hangs on the plan, so its keyBinding cannot change), KEY_BINDING_ASSIGNMENTS (a person holds a seat of the plan), DEVICE_ACTIVATIONS (a machine holds an activation of the plan) or SUBSCRIPTIONS).",
+            "description": "The application already has a plan of this name (PLAN.NAME_TAKEN) or the plan still has a workspace profile or a numeric install limit the new kind cannot keep (PLAN.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE, PLAN.TERMS_BLOCK_TYPE_CHANGE), or a subscription or license key of the plan would no longer fit the new pricing model or kind (PLAN.IN_USE_BLOCKS_CHANGE, `details.reason`: ACTIVE_SUBSCRIPTION_WITHOUT_QUANTITY, LICENSE_KEYS, LICENSE_LOTS, PERPETUAL_SUBSCRIPTIONS (a perpetual purchase of an application that is not licensed hangs on the K4 plan), TERM_SUBSCRIPTIONS (a subscription over a term hangs on a plan that would become K4, which is bought once), CONTRACT_LINKS (a subscription of the plan rests on a contract, which only a plan of a shared stock, K2 or K4, has), KEY_BINDING_PURCHASES (a perpetual purchase hangs on the plan, so its keyBinding cannot change), KEY_BINDING_ASSIGNMENTS (a person holds a seat of the plan), DEVICE_ACTIVATIONS (a machine holds an activation of the plan) or SUBSCRIPTIONS).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -45183,7 +45183,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR), the keys would pass the licenses of the lot (LICENSE_LOT.KEYS_EXCEED_LICENSES), the application is retired (LICENSE_KEY.APPLICATION_RETIRED), the plan has no keys (LICENSE_KEY.PLAN_HAS_NO_KEYS) or initialActivationsUsed does not fit (LICENSE_KEY.INITIAL_ACTIVATIONS_EXCEED_MAX, LICENSE_KEY.INITIAL_ACTIVATIONS_ON_ACCOUNT_PLAN).",
+            "description": "The request is invalid (VALIDATION_ERROR), the keys would pass the licenses of the lot (LICENSE_LOT.KEYS_EXCEED_LICENSES), the application is retired (LICENSE_KEY.APPLICATION_RETIRED), the plan does not allow key import (LICENSE_KEY.PLAN_HAS_NO_KEYS, LICENSE_KEY.PLAN_NOT_K4) or initialActivationsUsed does not fit (LICENSE_KEY.INITIAL_ACTIVATIONS_EXCEED_MAX, LICENSE_KEY.INITIAL_ACTIVATIONS_ON_ACCOUNT_PLAN).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -45219,6 +45219,18 @@
                       "error": {
                         "code": "LICENSE_KEY.PLAN_HAS_NO_KEYS",
                         "message": "A plan bundled with the machine has no license keys.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "LICENSE_KEY.PLAN_NOT_K4": {
+                    "summary": "Only a purchase of a K4 plan keeps license keys; this plan is K1.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "LICENSE_KEY.PLAN_NOT_K4",
+                        "message": "Only a purchase of a K4 plan keeps license keys; this plan is K1.",
+                        "details": { "provisioningType": "K1" },
                         "requestId": "req_example"
                       }
                     }

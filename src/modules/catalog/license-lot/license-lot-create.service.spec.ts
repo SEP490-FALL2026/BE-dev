@@ -178,7 +178,7 @@ describe('LicenseLotCreateService workspace >= 2 working admin gate (W3-12, W3-2
     });
   });
 
-  it('H-6 / G-4: throws loudly when SeatBaselinePhaseHook is unbound', async () => {
+  it('throws loudly when SeatBaselinePhaseHook is unbound', async () => {
     const { service, insert } = setup({ hasAdminConsole: true, bound: false, closed: false, workingCount: 1 });
 
     await expect(service.create(actor, baseInput)).rejects.toThrow('not bound');

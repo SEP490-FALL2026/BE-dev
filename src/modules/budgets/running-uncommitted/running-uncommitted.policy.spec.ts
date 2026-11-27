@@ -328,7 +328,7 @@ describe('runningUncommittedByCostCenter (SPEC-B1 W3-08)', () => {
       expect(result.get(CC_TK)).toBe(4_800_000n);
     });
 
-    it('H-2: clamps open seats starting mid-year by placementStart when placementStart is later than heldFrom', () => {
+    it('clamps open seats starting mid-year by placementStart when placementStart is later than heldFrom', () => {
       const result = runningUncommittedByCostCenter({
         year: 2027,
         today: '2027-11-26',

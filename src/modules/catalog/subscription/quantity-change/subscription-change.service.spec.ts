@@ -215,7 +215,7 @@ describe('SubscriptionChangeService', () => {
     expect(event.after).not.toHaveProperty('quantityChangeReason');
   });
 
-  it('K-3: maps subscriptions_active_term_monthly_price CHECK violation to SubscriptionStillDraftError (422)', async () => {
+  it('maps subscriptions_active_term_monthly_price CHECK violation to SubscriptionStillDraftError (422)', async () => {
     const { service, subscriptions } = makeSut();
     subscriptions.update.mockRejectedValueOnce(
       new Prisma.PrismaClientKnownRequestError('check failed', {

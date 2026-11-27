@@ -28,6 +28,24 @@ export const notTakenOverOn = (today: BusinessDate): Prisma.SubscriptionWhereInp
 
 /** Reads which subscriptions grant seats on a day, the way the shared pool reads it: what the rules of wasted seats judge. */
 
+const GRANTABLE_LINE_SELECT = {
+  id: true,
+  planId: true,
+  ledgerOpenedOn: true,
+  closedOn: true,
+  createdAt: true,
+  subscription: {
+    select: {
+      id: true,
+      status: true,
+      startDate: true,
+      endDate: true,
+      purchasedQuantity: true,
+      isPrimaryForPlan: true,
+    },
+  },
+} as const;
+
 /** The plan row of a stock page as the stock plan it is: a K2 plan over the subscriptions of its pool, a K4 plan over its lots (the id of the lot as the purchase). */
 function stockPlanOf(
   row: {
@@ -179,28 +197,13 @@ export class SubscriptionGrantingRepo {
           closedAt: null,
           kind: 'TERM',
           AND: [
+            notTakenOverOn(today),
             { OR: [{ startDate: null }, { startDate: { lte: day } }] },
             { OR: [{ endDate: null }, { endDate: { gte: day } }] },
           ],
         },
       },
-      select: {
-        id: true,
-        planId: true,
-        ledgerOpenedOn: true,
-        closedOn: true,
-        createdAt: true,
-        subscription: {
-          select: {
-            id: true,
-            status: true,
-            startDate: true,
-            endDate: true,
-            purchasedQuantity: true,
-            isPrimaryForPlan: true,
-          },
-        },
-      },
+      select: GRANTABLE_LINE_SELECT,
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     });
 
