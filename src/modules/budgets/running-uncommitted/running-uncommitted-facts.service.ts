@@ -5,7 +5,7 @@ import { CatalogPricingApi } from '../../catalog/public/catalog-pricing.api';
 import { LicensingSeatMonthApi } from '../../licensing/public/licensing-seat-month.api';
 import type { SeatInForce, UnrequestedK1SeatInForce } from '../../licensing/public/licensing-seat-month.types';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import { servingMonthlyPriceMinor } from './serving-line-price.policy';
+import { servingMonthlyPriceMinor } from '../../catalog/public/subscription-line-price.policy';
 import { SharedPoolLineRepo } from '../shared-pool-line/shared-pool-line.repo';
 import { RunningUncommittedRepo } from './running-uncommitted.repo';
 import {

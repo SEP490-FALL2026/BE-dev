@@ -5,7 +5,7 @@ import { CatalogApi } from '../../catalog/public/catalog.api';
 import type { BaselineSubscription } from '../../catalog/public/catalog.types';
 import { SeatLedgerApi } from '../../catalog/public/seat-ledger.api';
 import { SubscriptionPeriodApi } from '../../catalog/public/subscription-period.api';
-import { servingLineOf, servingMonthlyPriceMinor } from '../running-uncommitted/serving-line-price.policy';
+import { servingLineOf, servingMonthlyPriceMinor } from '../../catalog/public/subscription-line-price.policy';
 
 /** The subscriptions in force and what each plan of each is: its price and its seats. */
 export interface BaselinePricing {

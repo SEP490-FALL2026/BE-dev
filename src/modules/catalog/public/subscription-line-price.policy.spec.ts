@@ -1,4 +1,4 @@
-import { servingMonthlyPriceMinor, type PricedLine } from './serving-line-price.policy';
+import { servingLineOf, servingMonthlyPriceMinor, type PricedLine } from './subscription-line-price.policy';
 
 const line = (over: Partial<PricedLine> = {}): PricedLine => ({
   planId: 'standard',
@@ -70,5 +70,19 @@ describe('servingMonthlyPriceMinor', () => {
 
   it('keeps a null column as no price for a period with no line', () => {
     expect(servingMonthlyPriceMinor([], 'standard', null)).toBeNull();
+  });
+});
+
+describe('servingLineOf', () => {
+  it('is the live line of the plan, then the one closed last, and never a line taken away', () => {
+    const live = line({ closedReason: null, createdAt: new Date('2027-02-01T00:00:00Z') });
+    const closedLast = line({ closedReason: 'ENDED', createdAt: new Date('2026-06-01T00:00:00Z') });
+    const closedFirst = line({ closedReason: 'RENEWED', createdAt: new Date('2026-01-01T00:00:00Z') });
+    const removed = line({ closedReason: 'REMOVED', createdAt: new Date('2027-03-01T00:00:00Z') });
+
+    expect(servingLineOf([closedFirst, closedLast, live, removed], 'standard')).toBe(live);
+    expect(servingLineOf([closedFirst, closedLast, removed], 'standard')).toBe(closedLast);
+    expect(servingLineOf([removed], 'standard')).toBeNull();
+    expect(servingLineOf([live], 'premium')).toBeNull();
   });
 });

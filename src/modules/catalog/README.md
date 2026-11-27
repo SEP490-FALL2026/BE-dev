@@ -13,6 +13,7 @@ personnel, onboarding, data-import (chỉ type), installation (`CatalogBootstrap
 
 - `CatalogBootstrapApi` (`public/catalog-bootstrap.api.ts`, Nest module `catalog-bootstrap-facade.module.ts`: không controller, storage hay listener) — `seedStandardFunctionalGroups(tx, organizationId)`: ghi
   bảy nhóm chức năng chuẩn của một tổ chức lúc cài đặt (`QĐ-111bf`), trong transaction của bên gọi; nhóm đã có giữ nguyên, trả số nhóm đã ghi. Dùng bởi `installation` (`InstallationApi.install`); ngoài ra không ghi gì của catalog.
+- `public/subscription-line-price.policy.ts` — `servingLineOf`, `servingMonthlyPriceMinor`: the price of a seat of a plan on a period is the price of the line that serves the plan (the live one, otherwise the one closed last; a line taken away never serves), the columns of the period only when it has no line; the baseline, the running uncommitted cost and the ceiling of a pool invoice read it.
 - `public/catalog-duplicate.policy.ts` — `duplicateOf`: mục danh mục đã là phần mềm đó theo tên chuẩn hóa (hoa thường, dấu, khoảng trắng bỏ qua) hoặc tên miền (host đã chuẩn hóa, tên xét trước,
   `QĐ-111b`); hàm thuần, một luật cho lệnh tạo ứng dụng (`application-intake/`) và cho cửa case B của `requests` (qua `findCatalogEntryOfSoftware`); đăng ký trong `PUBLIC_ROOT_POLICY_FILES` vì cả hai bên dùng.
 - `CatalogApi` ([public/catalog.api.ts](public/catalog.api.ts)) — facade cho module khác:

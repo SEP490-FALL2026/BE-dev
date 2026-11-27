@@ -15,7 +15,7 @@ import type { CeilingPart, LinkFacts, PoolExpectationFacts } from '../purchase-i
 import { expectedPoolAmountOf, type PoolInvoiceExpectationSource } from './purchase-invoice-pool-expectation.policy';
 import { pricingOf } from '../purchase-invoice-charge.policy';
 import type { SeatPricing } from '../purchase-invoice.types';
-import { servingMonthlyPriceMinor } from './serving-line-price.policy';
+import { servingMonthlyPriceMinor } from '../../../catalog/public/subscription-line-price.policy';
 
 /**
  * Aggregates subscription-line, seat-purchase, and prior-month `NONE` purchase facts from `catalog` and `licensing`
