@@ -11,8 +11,8 @@ import type { BillingCycle, SubscriptionKind } from './subscription.types';
 /**
  * The subscriptions that can price a plan: active, with a unit price in dong (`QĐ-111an`: a price an earlier release left in another currency
  * is no price of the new flow, B1A-03) and a billing cycle, and not already continued by a later
- * period that is active itself (that one prices the plan; a later period still a draft leaves the price with this one, F-012). Its end date
- * is not looked at here, the repository has no calendar. No department is asked: the pool is the plan's. A draft has no price to rely on.
+ * period that is active itself (that one prices the plan; a later period still a draft leaves the price with this one, F-012). A period
+ * already ended before `today` (the business day of the organization) prices nothing. No department is asked: the pool is the plan's. A draft has no price to rely on.
  * `pickPriceSource` chooses the one that prices the plan among them (`Q-04` C).
  */
 export const livePricedOf = (today: BusinessDate): Prisma.SubscriptionWhereInput => ({
