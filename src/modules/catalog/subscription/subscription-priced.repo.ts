@@ -15,7 +15,7 @@ import type { BillingCycle, SubscriptionKind } from './subscription.types';
  * is not looked at here, the repository has no calendar. No department is asked: the pool is the plan's. A draft has no price to rely on.
  * `pickPriceSource` chooses the one that prices the plan among them (`Q-04` C).
  */
-export const livePricedOf = (): Prisma.SubscriptionWhereInput => ({
+export const livePricedOf = (today: BusinessDate): Prisma.SubscriptionWhereInput => ({
   status: 'ACTIVE',
   closedAt: null,
   unitPriceMinor: { not: null },
@@ -24,8 +24,8 @@ export const livePricedOf = (): Prisma.SubscriptionWhereInput => ({
     { OR: [{ renewedBy: null }, { renewedBy: { is: { status: { not: 'ACTIVE' } } } }] },
     // A perpetual purchase has a price and no billing cycle: its price is the price of the purchase (`QĐ-106d`).
     { OR: [{ billingCycle: { not: null } }, { kind: 'PERPETUAL' }] },
-    // A period that has already ended does not price the plan any more (review G23-05); the UTC day is close enough here.
-    { OR: [{ endDate: null }, { endDate: { gte: new Date(new Date().toISOString().slice(0, 10)) } }] },
+    // A period that has already ended does not price the plan any more (review G23-05); `today` is the day of the organization.
+    { OR: [{ endDate: null }, { endDate: { gte: toDateColumn(today) } }] },
   ],
 });
 
@@ -137,15 +137,15 @@ const LINE_CYCLE_MONTHS: Readonly<Record<BillingCycle, number>> = {
 };
 
 /** Lines of active non-superseded periods that can price their plan (`B2-R7`). */
-export const livePricedLineOf = (): Prisma.SubscriptionLineWhereInput => ({
-  OR: [{ closedOn: null }, { closedOn: { gte: new Date(new Date().toISOString().slice(0, 10)) } }],
+export const livePricedLineOf = (today: BusinessDate): Prisma.SubscriptionLineWhereInput => ({
+  OR: [{ closedOn: null }, { closedOn: { gte: toDateColumn(today) } }],
   subscription: {
     status: 'ACTIVE',
     closedAt: null,
     AND: [
       { OR: [{ renewedBy: null }, { renewedBy: { is: { status: { not: 'ACTIVE' } } } }] },
       { OR: [{ billingCycle: { not: null } }, { kind: 'PERPETUAL' }] },
-      { OR: [{ endDate: null }, { endDate: { gte: new Date(new Date().toISOString().slice(0, 10)) } }] },
+      { OR: [{ endDate: null }, { endDate: { gte: toDateColumn(today) } }] },
     ],
   },
 });
@@ -253,6 +253,7 @@ export function toPricedLineOfPlan(winner: ReturnType<typeof withLinePriceSource
 export async function findPricedLineOfPlan(
   db: DbTx | PrismaService,
   planId: string,
+  today: BusinessDate,
   on?: BusinessDate,
 ): Promise<PricedOfPlanResult | null> {
   let chosen =
@@ -269,7 +270,7 @@ export async function findPricedLineOfPlan(
   chosen ??= pickPriceSource(
     (
       await db.subscriptionLine.findMany({
-        where: { planId, ...livePricedLineOf() },
+        where: { planId, ...livePricedLineOf(today) },
         select: LINE_PRICE_SELECT,
       })
     ).map(withLinePriceSource),
@@ -282,10 +283,11 @@ export async function findPricedLineOfPlan(
 export async function collectLineCycles(
   db: DbTx | PrismaService,
   planIds: readonly string[],
+  today: BusinessDate,
   cycles: Map<string, 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER' | 'ONE_TIME'>,
 ): Promise<void> {
   const lineRows = await db.subscriptionLine.findMany({
-    where: { planId: { in: [...planIds] }, ...livePricedLineOf() },
+    where: { planId: { in: [...planIds] }, ...livePricedLineOf(today) },
     select: LINE_PRICE_SELECT,
   });
   const byPlan = new Map<string, ReturnType<typeof withLinePriceSource>[]>();
@@ -305,15 +307,16 @@ export async function collectLineCycles(
 export async function findPricedCyclesInDb(
   db: DbTx | PrismaService,
   planIds: readonly string[],
+  today: BusinessDate,
 ): Promise<Map<string, 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER' | 'ONE_TIME'>> {
   const cycles = new Map<string, 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER' | 'ONE_TIME'>();
   if (planIds.length === 0) return cycles;
-  await collectLineCycles(db, planIds, cycles);
+  await collectLineCycles(db, planIds, today, cycles);
 
   const remaining = planIds.filter((id) => !cycles.has(id));
   if (remaining.length === 0) return cycles;
   const rows = await db.subscription.findMany({
-    where: { planId: { in: remaining }, ...livePricedOf(), lines: { none: {} } },
+    where: { planId: { in: remaining }, ...livePricedOf(today), lines: { none: {} } },
     select: { id: true, planId: true, startDate: true, isPrimaryForPlan: true, ...PRICE_FIELDS, ...PLAN_KIND },
   });
   const byPlan = new Map<string, Array<ReturnType<typeof withPriceSource> & { kind: SubscriptionKind }>>();
@@ -327,4 +330,29 @@ export async function findPricedCyclesInDb(
   }
 
   return cycles;
+}
+
+/** The subscription with no lines that prices the plan: the one running on `on` first, else the newest live one by the day of the organization. */
+export async function findPricedSubscriptionOfPlan(
+  db: DbTx | PrismaService,
+  planId: string,
+  today: BusinessDate,
+  on?: BusinessDate,
+): Promise<PricedOfPlanResult | null> {
+  const select = { id: true, startDate: true, isPrimaryForPlan: true, ...PRICE_FIELDS, ...PLAN_KIND } as const;
+  let row =
+    on === undefined
+      ? null
+      : pickPriceSource(
+          (await db.subscription.findMany({ where: { planId, ...pricedOn(on), lines: { none: {} } }, select })).map(
+            withPriceSource,
+          ),
+        );
+  row ??= pickPriceSource(
+    (await db.subscription.findMany({ where: { planId, ...livePricedOf(today), lines: { none: {} } }, select })).map(
+      withPriceSource,
+    ),
+  );
+
+  return row ? toPricedOfPlan(row) : null;
 }

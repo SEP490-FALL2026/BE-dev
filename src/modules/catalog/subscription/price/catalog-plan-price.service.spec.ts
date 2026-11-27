@@ -3,6 +3,9 @@ import type { SubscriptionRepo } from '../subscription.repo';
 import { CatalogPlanPriceService } from './catalog-plan-price.service';
 import type { PlanReferencePriceRepo } from './plan-reference-price.repo';
 
+/** The organization is on the 29th, the day after the UTC day it is 01:00 on in Vietnam. */
+const DAY_OF_ORGANIZATION = { businessToday: jest.fn().mockResolvedValue('2026-11-29') } as never;
+
 describe('CatalogPlanPriceService', () => {
   it('returns subscription price first and falls back to plan reference price', async () => {
     const tx = {} as DbTx;
@@ -21,6 +24,7 @@ describe('CatalogPlanPriceService', () => {
         }),
       } as unknown as SubscriptionRepo,
       { findOfPlan: jest.fn() } as unknown as PlanReferencePriceRepo,
+      DAY_OF_ORGANIZATION,
     );
 
     expect(await subService.priceOfPlan('plan-1', tx, '2027-01-01')).toMatchObject({
@@ -39,6 +43,7 @@ describe('CatalogPlanPriceService', () => {
           referenceCommitmentMonths: 1,
         }),
       } as unknown as PlanReferencePriceRepo,
+      DAY_OF_ORGANIZATION,
     );
 
     expect(await refService.priceOfPlan('plan-k1', tx)).toMatchObject({
