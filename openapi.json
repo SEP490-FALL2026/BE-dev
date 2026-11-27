@@ -143485,24 +143485,30 @@
                       "type": "object",
                       "properties": {
                         "subscriptionId": { "type": "string", "format": "uuid" },
+                        "planId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "description": "The plan of the row: a period with several plans has a row for each plan."
+                        },
                         "application": { "type": "string" },
                         "plan": { "type": "string" },
                         "seatsPurchased": {
                           "type": "integer",
                           "minimum": -9007199254740991,
-                          "maximum": 9007199254740991
+                          "maximum": 9007199254740991,
+                          "description": "The seats the line serving the plan has today."
                         },
                         "seatsAssigned": {
                           "type": "integer",
                           "minimum": -9007199254740991,
                           "maximum": 9007199254740991,
-                          "description": "The seats held by anyone, every department together."
+                          "description": "The seats of the plan held by anyone, every department together."
                         },
                         "seatsIdle": {
                           "type": "integer",
                           "minimum": -9007199254740991,
                           "maximum": 9007199254740991,
-                          "description": "Bought and not held: the seats of the line."
+                          "description": "Bought and not held: the seats of the plan, each at the price of its own line."
                         },
                         "monthlyUnitPrice": {
                           "type": "object",
@@ -143523,6 +143529,7 @@
                       },
                       "required": [
                         "subscriptionId",
+                        "planId",
                         "application",
                         "plan",
                         "seatsPurchased",

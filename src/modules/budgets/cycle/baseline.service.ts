@@ -23,7 +23,6 @@ import {
   baselineVersionRefusal,
   type SeatAllocation,
   shouldSuggestRenewal,
-  subscriptionCost,
   subscriptionCostByPlan,
 } from './baseline.policy';
 import type { BaselineSubscription } from '../../catalog/public/catalog.types';
@@ -127,52 +126,86 @@ export function departmentOf(
 
 type PoolLine = NonNullable<BaselineWire['sharedPoolUnallocated']>;
 
+/** What the idle seats of the shared pool are read from: the seats of each plan of a period, held and bought, and what a seat of it costs. */
+interface PoolReading extends Pick<Reading, 'year' | 'today' | 'ending' | 'format' | 'priceOf'> {
+  /** The seats held by anyone, by subscription and plan. */
+  heldByPlan: ReadonlyMap<string, ReadonlyMap<string, number>>;
+  /** The seats the line serving the plan has today; null when it has no number of seats. */
+  seatsOf: (subscriptionId: string, planId: string) => number | null;
+  /** The plans a period serves. */
+  planIdsOf: (subscriptionId: string) => readonly string[];
+  planNameOf: (planId: string) => string;
+}
+
 /**
  * The line _Unallocated - shared pool_ of the baseline (`QĐ-103k`, `QĐ-89a(2)`): the seats of the `K2`/`K4` subscriptions bought and held by
- * nobody, a line of the company in no department, which Finance reads to set the reserve of the shared pool (B2). Their cost is the same
- * reading as a department's (idle seats x monthly price x months running).
+ * nobody, a line of the company in no department, which Finance reads to set the reserve of the shared pool (B2). Each plan of a period is
+ * read on its own line: the idle seats of a plan are the seats its line serves less the seats held of that plan, charged at the price of
+ * that line x months running.
  */
-export function sharedPoolLineOf(
-  subscriptions: readonly BaselineSubscription[],
-  reading: Pick<Reading, 'year' | 'today' | 'ending' | 'format'> & { held: ReadonlyMap<string, number> },
-): PoolLine {
-  const { year, today, held, ending, format } = reading;
+export function sharedPoolLineOf(subscriptions: readonly BaselineSubscription[], reading: PoolReading): PoolLine {
   const software: PoolLine['software'] = [];
   let total = 0n;
   let idleTotal = 0;
   let unknown = false;
   let counted = 0;
   for (const subscription of subscriptions) {
-    const holding = held.get(subscription.subscriptionId) ?? 0;
-    const idle = poolIdleSeats(subscription.provisioningType, subscription.purchasedQuantity, holding);
-    if (idle === null) continue;
-    counted += 1;
-    const terminated = ending.has(subscription.subscriptionId);
-    const { monthlyMinor, months, costMinor } = subscriptionCost(year, today, idle, subscription, terminated);
-    total += costMinor ?? 0n;
-    unknown ||= costMinor === null;
-    if (!subscription.hasSuccessor) idleTotal += idle;
-    if (software.length >= SOFTWARE_LISTED_MAX) continue;
-    software.push({
-      subscriptionId: subscription.subscriptionId,
-      application: subscription.applicationName,
-      plan: subscription.planName,
-      seatsPurchased: subscription.purchasedQuantity ?? 0,
-      seatsAssigned: holding,
-      seatsIdle: idle,
-      monthlyUnitPrice: monthlyMinor === null ? null : format(monthlyMinor),
-      monthsRunning: months,
-      estimatedAnnualCost: costMinor === null ? null : format(costMinor),
-    });
+    for (const planId of reading.planIdsOf(subscription.subscriptionId)) {
+      const row = poolRowOf(subscription, planId, reading);
+      if (row === null) continue;
+      counted += 1;
+      total += row.cost ?? 0n;
+      unknown ||= row.cost === null;
+      if (!subscription.hasSuccessor) idleTotal += row.wire.seatsIdle;
+      if (software.length < SOFTWARE_LISTED_MAX) software.push(row.wire);
+    }
   }
 
   return {
     line: 'SHARED_POOL_UNALLOCATED',
-    estimatedAnnualCost: format(total),
+    estimatedAnnualCost: reading.format(total),
     hasUnknownCost: unknown,
     seatsIdle: idleTotal,
     softwareTotal: counted,
     software,
+  };
+}
+
+/** The row of one plan of a period in the shared pool, with what it costs; null when the plan has no idle seat. */
+function poolRowOf(
+  subscription: BaselineSubscription,
+  planId: string,
+  reading: PoolReading,
+): { wire: PoolLine['software'][number]; cost: bigint | null } | null {
+  const { year, today, heldByPlan, seatsOf, priceOf, planNameOf, ending, format } = reading;
+  const purchased = seatsOf(subscription.subscriptionId, planId);
+  const holding = heldByPlan.get(subscription.subscriptionId)?.get(planId) ?? 0;
+  const idle = poolIdleSeats(subscription.provisioningType, purchased, holding);
+  if (idle === null) return null;
+  const monthly = priceOf(subscription.subscriptionId, planId);
+  const { months, costMinor } = subscriptionCostByPlan(
+    year,
+    today,
+    new Map([[planId, idle]]),
+    () => monthly,
+    subscription,
+    ending.has(subscription.subscriptionId),
+  );
+
+  return {
+    cost: costMinor,
+    wire: {
+      subscriptionId: subscription.subscriptionId,
+      planId,
+      application: subscription.applicationName,
+      plan: planNameOf(planId),
+      seatsPurchased: purchased ?? 0,
+      seatsAssigned: holding,
+      seatsIdle: idle,
+      monthlyUnitPrice: monthly === null ? null : format(monthly),
+      monthsRunning: months,
+      estimatedAnnualCost: costMinor === null ? null : format(costMinor),
+    },
   };
 }
 
@@ -211,12 +244,12 @@ export class BaselineService {
       this.organizationReads.getDepartmentBriefs(wanted),
       this.organizationReads.getUnitCostCenterIds(wanted),
       this.organizationReads.getUnitCostCenterHistory(wanted),
-      this.catalog.subscriptions(),
+      this.catalog.subscriptions(today),
       this.facts.formatter(cycle.currency),
     ]);
     const { subscriptions, priceOf } = pricing;
     const { allocation, ending } = await this.seatsOf(subscriptions, today);
-    const kpi3ByPlan = await this.catalog.kpi3Of([...new Set(subscriptions.map((one) => one.planId))]);
+    const { kpi3ByPlan, planNameOf } = await this.planFacts(subscriptions, pricing.planIdsOf, allocation);
     const spentOf = await this.spentByDepartment(history, today);
 
     const costCenterIds = [...costCenters.values()];
@@ -244,8 +277,44 @@ export class BaselineService {
       departments,
       sharedPoolUnallocated:
         departmentId === undefined
-          ? sharedPoolLineOf(subscriptions, { year, today, held: allocation.held, ending, format })
+          ? sharedPoolLineOf(subscriptions, {
+              year,
+              today,
+              heldByPlan: allocation.heldByPlan,
+              seatsOf: pricing.seatsOf,
+              planIdsOf: pricing.planIdsOf,
+              priceOf,
+              planNameOf,
+              ending,
+              format,
+            })
           : null,
+    };
+  }
+
+  /** `KPI-3` and the name of every plan the baseline lists: the plans of the lines of the periods and the plans of the seats held. */
+  private async planFacts(
+    subscriptions: readonly BaselineSubscription[],
+    planIdsOf: (subscriptionId: string) => readonly string[],
+    allocation: SeatAllocation,
+  ): Promise<{ kpi3ByPlan: Map<string, number>; planNameOf: (planId: string) => string }> {
+    const planIds = [
+      ...new Set([
+        ...subscriptions.flatMap((one) => planIdsOf(one.subscriptionId)),
+        ...[...allocation.heldByPlan.values()].flatMap((plans) => [...plans.keys()]),
+      ]),
+    ];
+    const kpi3ByPlan = await this.catalog.kpi3Of(planIds);
+    const names = await this.catalog.planNames(planIds);
+
+    return {
+      kpi3ByPlan,
+      planNameOf: (planId) => {
+        const name = names.get(planId);
+        if (name === undefined) throw new Error(`The baseline reads a plan that does not exist: ${planId}`);
+
+        return name;
+      },
     };
   }
 

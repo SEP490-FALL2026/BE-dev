@@ -71,27 +71,10 @@ function monthsCounted(year: number, today: BusinessDate, subscription: RenewalF
 }
 
 /**
- * What one subscription is estimated to cost over a year at the prices of today (`R-I03`): the seats it HOLDS (what is assigned; the
- * seats bought and idle are the shared pool's, `QĐ-103k`), the monthly price of a seat and the months it runs; a subscription that will
- * be renewed counts for the twelve months of the year (`Q-162`), any other only for the months it runs, to the day it stops.
- */
-export function subscriptionCost(
-  year: number,
-  today: BusinessDate,
-  seatsHeld: number,
-  subscription: RenewalFacts & { monthlyPriceMinor: bigint | null },
-  terminated = false,
-): { monthlyMinor: bigint | null; months: number; costMinor: bigint | null } {
-  const monthlyMinor = subscription.monthlyPriceMinor;
-  const months = monthsCounted(year, today, subscription, terminated);
-
-  return { monthlyMinor, months, costMinor: estimatedCost(seatsHeld, monthlyMinor, months) };
-}
-
-/**
  * What the seats held of one subscription are estimated to cost over a year when the period has several plans: each seat is charged the
- * monthly price of its own plan (`priceOf`, the line that serves it), never the price of the first plan. The months are those of
- * `subscriptionCost`. None when a plan that has seats has no price.
+ * monthly price of its own plan (`priceOf`, the line that serves it), never the price of the first plan. Seats are the ones HELD (what
+ * is assigned; the seats bought and idle are the shared pool's, `QĐ-103k`); a subscription that will be renewed counts for the twelve
+ * months of the year (`Q-162`), any other only for the months it runs, to the day it stops. None when a plan that has seats has no price.
  */
 export function subscriptionCostByPlan(
   year: number,
@@ -120,6 +103,8 @@ export interface SeatAllocation {
   byDepartmentPlan: Map<string, Map<string, Map<string, number>>>;
   /** The seats held in all, by subscription, a holder placed in no department included. */
   held: Map<string, number>;
+  /** The same seats held in all, by subscription and the plan of the seat: what each plan of a period has left idle. */
+  heldByPlan: Map<string, Map<string, number>>;
 }
 
 /**
@@ -134,8 +119,12 @@ export function allocateSeats(
   const byDepartment = new Map<string, Map<string, number>>();
   const byDepartmentPlan = new Map<string, Map<string, Map<string, number>>>();
   const held = new Map<string, number>();
+  const heldByPlan = new Map<string, Map<string, number>>();
   for (const holding of holdings) {
     held.set(holding.subscriptionId, (held.get(holding.subscriptionId) ?? 0) + holding.seats);
+    const plansHeld = heldByPlan.get(holding.subscriptionId) ?? new Map<string, number>();
+    plansHeld.set(holding.planId, (plansHeld.get(holding.planId) ?? 0) + holding.seats);
+    heldByPlan.set(holding.subscriptionId, plansHeld);
     const departmentId = departmentOf.get(holding.employeeId);
     if (departmentId === undefined) continue;
     const seats = byDepartment.get(departmentId) ?? new Map<string, number>();
@@ -148,7 +137,7 @@ export function allocateSeats(
     byDepartmentPlan.set(departmentId, plansOf);
   }
 
-  return { byDepartment, byDepartmentPlan, held };
+  return { byDepartment, byDepartmentPlan, held, heldByPlan };
 }
 
 /** A `K2` or `K4` purchase is the shared pool of the company (`QĐ-103d`): its idle seats belong to no department. */

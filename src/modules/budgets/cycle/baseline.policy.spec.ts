@@ -5,7 +5,6 @@ import {
   inOrderOf,
   listedDepartments,
   shouldSuggestRenewal,
-  subscriptionCost,
   subscriptionCostByPlan,
   willRenew,
 } from './baseline.policy';
@@ -81,6 +80,22 @@ describe('the baseline of the budget (R-I03)', () => {
 });
 
 describe('the cost of one subscription over a year (R-I03, W3-02)', () => {
+  /** One plan on the period, priced as the period is: what a period with a single plan costs. */
+  const subscriptionCost = (
+    year: number,
+    today: string,
+    seats: number,
+    subscription: Parameters<typeof subscriptionCostByPlan>[4] & { monthlyPriceMinor: bigint | null },
+    terminated = false,
+  ) => {
+    const monthlyMinor = subscription.monthlyPriceMinor;
+
+    return {
+      monthlyMinor,
+      ...subscriptionCostByPlan(year, today, new Map([['plan', seats]]), () => monthlyMinor, subscription, terminated),
+    };
+  };
+
   const annual = {
     monthlyPriceMinor: 100n,
     startDate: '2026-01-01',

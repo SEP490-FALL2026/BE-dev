@@ -131,11 +131,18 @@ const baselineDepartmentView = z.strictObject({
 });
 const poolSoftwareView = z.strictObject({
   subscriptionId: z.uuid(),
+  planId: z.uuid().meta({ description: 'The plan of the row: a period with several plans has a row for each plan.' }),
   application: z.string(),
   plan: z.string(),
-  seatsPurchased: z.number().int(),
-  seatsAssigned: z.number().int().meta({ description: 'The seats held by anyone, every department together.' }),
-  seatsIdle: z.number().int().meta({ description: 'Bought and not held: the seats of the line.' }),
+  seatsPurchased: z.number().int().meta({ description: 'The seats the line serving the plan has today.' }),
+  seatsAssigned: z
+    .number()
+    .int()
+    .meta({ description: 'The seats of the plan held by anyone, every department together.' }),
+  seatsIdle: z
+    .number()
+    .int()
+    .meta({ description: 'Bought and not held: the seats of the plan, each at the price of its own line.' }),
   monthlyUnitPrice: moneyView.nullable(),
   monthsRunning: z.number().int().min(0).max(12),
   estimatedAnnualCost: moneyView.nullable().meta({

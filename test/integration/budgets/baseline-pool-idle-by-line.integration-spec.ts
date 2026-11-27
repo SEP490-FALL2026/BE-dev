@@ -1,0 +1,123 @@
+import request from 'supertest';
+import { SpendHarness, type Unit } from '../../support/spend-harness';
+
+const h = new SpendHarness();
+
+interface Money {
+  amount: string;
+}
+interface BaselineWire {
+  departments: {
+    departmentId: string;
+    estimatedAnnualCost: Money;
+    software: {
+      subscriptionId: string;
+      planId: string;
+      plan: string;
+      seatsPurchased: number | null;
+      seatsAssigned: number;
+      monthlyUnitPrice: Money | null;
+      estimatedAnnualCost: Money | null;
+    }[];
+  }[];
+  sharedPoolUnallocated: {
+    estimatedAnnualCost: Money;
+    seatsIdle: number;
+    softwareTotal: number;
+    software: {
+      subscriptionId: string;
+      planId: string;
+      plan: string;
+      seatsPurchased: number;
+      seatsAssigned: number;
+      seatsIdle: number;
+      monthlyUnitPrice: Money | null;
+      estimatedAnnualCost: Money | null;
+    }[];
+  } | null;
+}
+
+/**
+ * A K2 period with two plans, each its own line with its own seats in the ledger: Standard 10 seats at 500.000 and Premium 5 seats at
+ * 800.000. The department holds 3 Standard and 2 Premium. The idle seats of each plan are charged at the line of that plan.
+ */
+describe('the baseline of a period with two plans: a row for each plan, the idle seats at the line of the plan (integration, real PostgreSQL)', () => {
+  let unit: Unit;
+  let subscriptionId: string;
+  let standardPlanId: string;
+  let premiumPlanId: string;
+  const baselineOf = async () =>
+    h.dataOf<BaselineWire>(
+      await request(h.server()).get(`/api/v1/budget-cycles/${h.year}/baseline`).set(h.as(h.finance)).expect(200),
+    );
+  const seatOf = async (employeeId: string, planId: string) => {
+    await h.ctx.sql.query(
+      `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id,
+         account_identifier, normalized_account_identifier, valid_from, valid_from_basis, created_by_app_user_id, granted_on)
+       SELECT gen_random_uuid(), e.organization_id, 'PERSONAL', 'REQUEST', $2, $3, e.id, e.employee_code || '@acme.vn',
+              lower(e.employee_code) || '@acme.vn', $4::date, 'ACTUAL', gen_random_uuid(), $4::date
+         FROM employees e WHERE e.id = $1`,
+      [employeeId, planId, subscriptionId, `${h.year}-01-05`],
+    );
+  };
+  const openLedger = async (lineId: string, seats: number) => {
+    await h.ctx.sql.query(`UPDATE subscription_lines SET ledger_opened_on = '2026-01-05' WHERE id = $1`, [lineId]);
+    await h.ctx.sql.query(
+      `INSERT INTO seat_changes (id, organization_id, subscription_line_id, effective_on, delta, reason, source, basis)
+       SELECT gen_random_uuid(), organization_id, id, '2026-01-05', $2, 'INITIAL', 'ADJUSTMENT', 'NONE'
+         FROM subscription_lines WHERE id = $1`,
+      [lineId, seats],
+    );
+  };
+
+  beforeAll(async () => {
+    await h.start();
+    await h.withApprover();
+    unit = await h.departmentWithHead('P-PI1');
+    subscriptionId = await h.subscription(10, 'K2');
+    standardPlanId = (
+      await h.ctx.sql.query<{ plan_id: string }>(`SELECT plan_id FROM subscriptions WHERE id = $1`, [subscriptionId])
+    ).rows[0].plan_id;
+    // The line of the declared plan keeps the ledger of its 10 seats the declaration opened.
+    await h.ctx.sql.query(
+      `UPDATE subscription_lines SET monthly_unit_price_minor = 500000 WHERE subscription_id = $1`,
+      [subscriptionId],
+    );
+    premiumPlanId = (
+      await h.ctx.sql.query<{ id: string }>(
+        `INSERT INTO plans (id, organization_id, application_id, name, normalized_name, provisioning_type, pricing_model, control_level, key_binding)
+         SELECT gen_random_uuid(), organization_id, application_id, 'Premium idle', 'premium idle', provisioning_type,
+                pricing_model, control_level, key_binding
+           FROM plans WHERE id = $1
+         RETURNING id`,
+        [standardPlanId],
+      )
+    ).rows[0].id;
+    const premiumLineId = (
+      await h.ctx.sql.query<{ id: string }>(
+        `INSERT INTO subscription_lines (id, organization_id, subscription_id, workspace_id, plan_id, monthly_unit_price_minor, updated_at)
+         SELECT gen_random_uuid(), organization_id, id, workspace_id, $2, 800000, now() FROM subscriptions WHERE id = $1
+         RETURNING id`,
+        [subscriptionId, premiumPlanId],
+      )
+    ).rows[0].id;
+    await openLedger(premiumLineId, 5);
+    // The department holds 3 Standard and 2 Premium.
+    await seatOf((await h.staff(unit.department, 'PI1-S1')).employeeId, standardPlanId);
+    await seatOf((await h.staff(unit.department, 'PI1-S2')).employeeId, standardPlanId);
+    await seatOf((await h.staff(unit.department, 'PI1-P1')).employeeId, premiumPlanId);
+    await seatOf((await h.staff(unit.department, 'PI1-S3')).employeeId, standardPlanId);
+    await seatOf((await h.staff(unit.department, 'PI1-P2')).employeeId, premiumPlanId);
+  }, 240000);
+
+  afterAll(async () => {
+    await h.stop();
+  });
+
+  it('charges the idle seats of each plan at its own line: 7 Standard at 500.000 and 3 Premium at 800.000 = 5.900.000 a month', async () => {
+    const pool = (await baselineOf()).sharedPoolUnallocated;
+
+    expect(pool?.seatsIdle).toBe(10);
+    expect(pool?.estimatedAnnualCost.amount).toBe('70800000');
+  });
+});

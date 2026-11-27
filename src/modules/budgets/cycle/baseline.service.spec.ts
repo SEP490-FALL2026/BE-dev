@@ -139,8 +139,24 @@ describe('one department of the baseline', () => {
 });
 
 describe('BR-MF4-01 QĐ-103k: the line Unallocated - shared pool of the baseline', () => {
+  /** One plan on each period, priced and counted as the period is. */
   const line = (subscriptions: BaselineSubscription[], held: Map<string, number>) =>
-    sharedPoolLineOf(subscriptions, { year: 2027, today: '2026-11-09', held, ending: new Set(), format });
+    sharedPoolLineOf(subscriptions, {
+      year: 2027,
+      today: '2026-11-09',
+      heldByPlan: new Map(
+        subscriptions.map((one) => [one.subscriptionId, new Map([[one.planId, held.get(one.subscriptionId) ?? 0]])]),
+      ),
+      seatsOf: (subscriptionId) =>
+        subscriptions.find((one) => one.subscriptionId === subscriptionId)?.purchasedQuantity ?? null,
+      planIdsOf: (subscriptionId) =>
+        subscriptions.filter((one) => one.subscriptionId === subscriptionId).map((one) => one.planId),
+      priceOf: (subscriptionId) =>
+        subscriptions.find((one) => one.subscriptionId === subscriptionId)?.monthlyPriceMinor ?? null,
+      planNameOf: (planId) => `Plan ${planId}`,
+      ending: new Set(),
+      format,
+    });
 
   it('holds the idle seats of the K2/K4 subscriptions at the same price reading as a department', () => {
     const figma = subscription(1, { purchasedQuantity: 10 });
@@ -156,6 +172,46 @@ describe('BR-MF4-01 QĐ-103k: the line Unallocated - shared pool of the baseline
     // 2 idle seats × 100 a month × 12.
     expect(pool.estimatedAnnualCost).toEqual(format(2_400n));
     expect(pool.software[0]).toMatchObject({ seatsPurchased: 10, seatsAssigned: 8, seatsIdle: 2 });
+  });
+
+  it('W3-08: charges the idle seats of each plan of a period at the line of that plan, one row for each plan', () => {
+    const period = subscription(1, { planId: 'standard', monthlyPriceMinor: 500_000n, purchasedQuantity: 15 });
+    const seats = new Map([
+      ['standard', 10],
+      ['premium', 5],
+    ]);
+    const prices = new Map([
+      ['standard', 500_000n],
+      ['premium', 800_000n],
+    ]);
+
+    const pool = sharedPoolLineOf([period], {
+      year: 2027,
+      today: '2026-11-09',
+      heldByPlan: new Map([
+        [
+          period.subscriptionId,
+          new Map([
+            ['standard', 3],
+            ['premium', 2],
+          ]),
+        ],
+      ]),
+      seatsOf: (_subscriptionId, planId) => seats.get(planId) ?? null,
+      planIdsOf: () => ['standard', 'premium'],
+      priceOf: (_subscriptionId, planId) => prices.get(planId) ?? null,
+      planNameOf: (planId) => planId,
+      ending: new Set(),
+      format,
+    });
+
+    // 7 idle Standard at 500.000 + 3 idle Premium at 800.000 = 5.900.000 a month, twelve months.
+    expect(pool.estimatedAnnualCost).toEqual(format(70_800_000n));
+    expect(pool.seatsIdle).toBe(10);
+    expect(pool.software.map((row) => [row.planId, row.seatsIdle, row.monthlyUnitPrice])).toEqual([
+      ['standard', 7, format(500_000n)],
+      ['premium', 3, format(800_000n)],
+    ]);
   });
 
   it('leaves out a subscription with no idle seat, one with no number of seats, and a K1 purchase', () => {
