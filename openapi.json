@@ -19385,7 +19385,7 @@
             }
           },
           "409": {
-            "description": "The request already has a lot; a request has at most one (LICENSE_LOT.REQUEST_HAS_LOT).",
+            "description": "The request already has a lot; a request has at most one (LICENSE_LOT.REQUEST_HAS_LOT), or the person the request is for has not started working in a department yet (EMPLOYEE.NOT_STARTED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -19397,6 +19397,17 @@
                       "error": {
                         "code": "LICENSE_LOT.REQUEST_HAS_LOT",
                         "message": "This request already has a lot of licenses.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
                         "requestId": "req_example"
                       }
                     }

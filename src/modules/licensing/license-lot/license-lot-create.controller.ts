@@ -14,6 +14,7 @@ import { RequireRoles } from '../../../infrastructure/security/decorators/access
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { CreateLicenseLotBodyDto, LicenseLotCreatedResponseDto } from './license-lot-create.dto';
+import { EmployeeNotStartedError } from '../../organization/public/organization.errors';
 import { ProvisioningNotInChargeError } from '../provisioning/provisioning.errors';
 import { toLicenseKeyApiException } from '../license-key/license-key.http-errors';
 import { LicenseKeyLotRequestNotOpenError } from '../license-key/license-key.errors';
@@ -71,6 +72,10 @@ const LOT_REFUSALS = {
     'LICENSE_LOT.APPLICATION_RETIRED',
     'The application of this plan has been retired: no new license lot can be bought for it.',
   ),
+  employeeNotStarted: new ApiException(HttpStatus.CONFLICT, {
+    code: 'EMPLOYEE.NOT_STARTED',
+    message: new EmployeeNotStartedError('<employee-id>').message,
+  }),
   vendorAdminsRequired: new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, {
     code: 'LICENSE_LOT.VENDOR_ADMINS_REQUIRED',
     message: 'The plan needs at least 2 different working IT Admins who administer it at the vendor.',
@@ -137,8 +142,9 @@ export class LicenseLotCreateController {
     },
     {
       status: HttpStatus.CONFLICT,
-      description: 'The request already has a lot; a request has at most one (LICENSE_LOT.REQUEST_HAS_LOT).',
-      examples: [errorExampleOf(LOT_REFUSALS.requestHasLot)],
+      description:
+        'The request already has a lot; a request has at most one (LICENSE_LOT.REQUEST_HAS_LOT), or the person the request is for has not started working in a department yet (EMPLOYEE.NOT_STARTED).',
+      examples: [errorExampleOf(LOT_REFUSALS.requestHasLot), errorExampleOf(LOT_REFUSALS.employeeNotStarted)],
     },
   )
   async create(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: CreateLicenseLotBodyDto) {
