@@ -212,7 +212,7 @@ export class ProvisioningHarness extends SeatHarness {
         fullName: `Person ${code}`,
         workEmail: `${code.toLowerCase()}@acme.vn`,
         employmentType: 'STAFF',
-        hireDate: '2026-10-01',
+        hireDate: this.today() < '2026-10-01' ? this.today() : '2026-10-01',
         departmentCode,
         jobTitle,
       })

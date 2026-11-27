@@ -1,3 +1,4 @@
+import request from 'supertest';
 import type { Department, Person } from '../../support/request-harness';
 import { declareSubscription } from '../../support/builders/catalog.builder';
 import { pretendBusinessToday } from '../../support/pretend-today';
@@ -53,13 +54,41 @@ describe('what a request is priced by (integration, real PostgreSQL)', () => {
     );
   };
 
+  const secondWorkspaceOf = async (planId: string): Promise<string> => {
+    const vendorId = (
+      await h.ctx.sql.query<{ vendor_id: string }>(
+        `SELECT a.vendor_id FROM plans p JOIN applications a ON a.id = p.application_id WHERE p.id = $1`,
+        [planId],
+      )
+    ).rows[0].vendor_id;
+    const wsId = h.dataOf<{ id: string }>(
+      await request(h.server())
+        .post('/api/v1/workspaces')
+        .set(h.as(h.it1))
+        .send({ vendorId, name: h.unique('WS2') })
+        .expect(201),
+    ).id;
+    await h.ctx.sql.query(
+      `INSERT INTO workspace_admins (workspace_id, employee_id, role)
+       SELECT $1, employee_id, role FROM workspace_admins
+        WHERE workspace_id = (SELECT id FROM workspaces WHERE vendor_id = $2 ORDER BY created_at, id LIMIT 1)`,
+      [wsId, vendorId],
+    );
+    await h.ctx.sql.query(`UPDATE workspaces SET primary_owner_employee_id = $2 WHERE id = $1`, [
+      wsId,
+      h.it1.employeeId,
+    ]);
+
+    return wsId;
+  };
+
   it('BR-MF1-07: prices a request by the main subscription of the plan, the same for every department: two departments, one plan, one price (S1-02)', async () => {
     // Rewritten from "by the subscription its own department owns": the pool is the plan's, so the price is too (QĐ-103d).
     const cheap = await department();
     const dear = await department();
-    // A second subscription of the plan, dearer (allowed while the seat baseline is open): the pool is the plan's, no department owns a copy.
     await declareSubscription(h.ctx, h.it1.accessToken, {
       planId: pricedPlan,
+      workspaceId: await secondWorkspaceOf(pricedPlan),
       kind: 'TERM',
       purchasedQuantity: 5,
       unitPrice: { amount: '2500000', currency: 'VND' },

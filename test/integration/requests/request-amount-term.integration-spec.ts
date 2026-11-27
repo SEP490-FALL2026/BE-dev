@@ -86,11 +86,42 @@ describe('the amount and the term of a request (integration, real PostgreSQL)', 
     return key;
   };
 
+  const secondWorkspaceOf = async (planId: string): Promise<string> => {
+    const vendorId = (
+      await h.ctx.sql.query<{ vendor_id: string }>(
+        `SELECT a.vendor_id FROM plans p JOIN applications a ON a.id = p.application_id WHERE p.id = $1`,
+        [planId],
+      )
+    ).rows[0].vendor_id;
+    const wsId = h.dataOf<{ id: string }>(
+      await request(h.server())
+        .post('/api/v1/workspaces')
+        .set(h.as(h.it1))
+        .send({ vendorId, name: h.unique('WS2') })
+        .expect(201),
+    ).id;
+    await h.ctx.sql.query(
+      `INSERT INTO workspace_admins (workspace_id, employee_id, role)
+       SELECT $1, employee_id, role FROM workspace_admins
+        WHERE workspace_id = (SELECT id FROM workspaces WHERE vendor_id = $2 ORDER BY created_at, id LIMIT 1)`,
+      [wsId, vendorId],
+    );
+    await h.ctx.sql.query(`UPDATE workspaces SET primary_owner_employee_id = $2 WHERE id = $1`, [
+      wsId,
+      h.it1.employeeId,
+    ]);
+
+    return wsId;
+  };
+
   describe('the price: the main subscription of the plan, whichever department sends (BR-MF1-07, S1-02)', () => {
     it('BR-MF1-07: with several subscriptions and no flag is the one with the highest price a month', async () => {
       const shared = await h.plan('K2');
       await subscribe(shared, { unitPrice: { amount: '1000000', currency: 'VND' } });
-      await subscribe(shared, { unitPrice: { amount: '3000000', currency: 'VND' } });
+      await subscribe(shared, {
+        workspaceId: await secondWorkspaceOf(shared),
+        unitPrice: { amount: '3000000', currency: 'VND' },
+      });
 
       const sent = await h.sent(design.member, shared);
 
@@ -101,7 +132,10 @@ describe('the amount and the term of a request (integration, real PostgreSQL)', 
     it('BR-MF1-07: with a subscription flagged primary is that one, whatever the others cost', async () => {
       const shared = await h.plan('K2');
       const cheap = await subscribe(shared, { unitPrice: { amount: '1000000', currency: 'VND' } });
-      await subscribe(shared, { unitPrice: { amount: '3000000', currency: 'VND' } });
+      await subscribe(shared, {
+        workspaceId: await secondWorkspaceOf(shared),
+        unitPrice: { amount: '3000000', currency: 'VND' },
+      });
       await h.ctx.sql.query(`UPDATE subscriptions SET is_primary_for_plan = true WHERE id = $1`, [cheap]);
 
       const sent = await h.sent(design.member, shared);
