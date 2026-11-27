@@ -238,4 +238,30 @@ describe('ProvisioningReplacementService', () => {
       });
     },
   );
+
+  it('P13a W3-17: k1TermsOfReplaced reads original commitment and anchor for K1 annual replacement', async () => {
+    const findRecord = jest.fn().mockResolvedValue({
+      id: 'asg-old',
+      personalCommitmentMonths: 12,
+      billingAnchorOn: '2026-11-05',
+      expectedEndDate: '2027-11-04',
+    });
+    const service = new ProvisioningReplacementService(
+      {} as unknown as ProvisioningTaskRepo,
+      {} as unknown as ProvisioningTaskReasonRepo,
+      {} as unknown as ForRevocationWithdrawalService,
+      { findRecord } as unknown as AssignmentService,
+      { get: jest.fn() } as unknown as GrantRequestGateHook,
+    );
+
+    expect(
+      await (
+        service as never as { k1TermsOfReplaced: (tx: unknown, id: string) => Promise<unknown> }
+      ).k1TermsOfReplaced(tx, 'asg-old'),
+    ).toEqual({
+      personalCommitmentMonths: 12,
+      billingAnchorOn: '2026-11-05',
+      expectedEndDate: '2027-11-04',
+    });
+  });
 });

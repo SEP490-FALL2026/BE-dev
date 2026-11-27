@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { pageOf } from '../../../core/application/pagination';
 import { BudgetFactsService, type MoneyView } from '../budget/budget-facts.service';
 import { SeatMonthRepo } from '../seat-month/seat-month.repo';
-import { SeatMonthPoolService } from '../seat-month/seat-month-pool.service';
+import { SharedPoolLineFactsService } from '../shared-pool-line/shared-pool-line-facts.service';
 import type { BudgetSummaryWire, TableRowWire } from '../budget/budget.dto';
 import { BudgetViewNumbersService, type BudgetViewNumbers } from './budget-view-numbers.service';
 import { budgetNumbers } from './budget-view.mapper';
@@ -16,8 +16,10 @@ interface SummarySums {
   committed: bigint;
   spent: bigint;
   pendingSpend: bigint;
+  runningUncommitted: bigint;
   costCenterCount: number;
   overBudgetCount: number;
+  noPriceRightCount: number;
 }
 
 /** Finance and the spending approver read the same table and totals, including commitment-only years. */
@@ -28,7 +30,7 @@ export class BudgetTableViewService {
     private readonly numbers: BudgetViewNumbersService,
     private readonly facts: BudgetFactsService,
     private readonly seatMonths: SeatMonthRepo,
-    private readonly pool: SeatMonthPoolService,
+    private readonly poolFacts: SharedPoolLineFactsService,
   ) {}
 
   async table(query: { year?: number; page: number; pageSize: number }) {
@@ -57,6 +59,7 @@ export class BudgetTableViewService {
         ...figures,
         remaining: figures.remainingWithReserve,
         overCommitted: figures.overBudget,
+        noPriceRightCount: numbers.noPriceRightCount,
         priorPeriodAdjustment: money(numbers.priorPeriodAdjustment),
       };
     });
@@ -95,23 +98,40 @@ export class BudgetTableViewService {
   ): Promise<
     Pick<
       BudgetSummaryWire,
-      'companySpent' | 'sharedPoolUnallocated' | 'sharedPoolOverReserve' | 'seatMonthsWithoutCostCenter'
+      | 'companySpent'
+      | 'sharedPoolUnallocated'
+      | 'sharedPoolOverReserve'
+      | 'seatMonthsWithoutCostCenter'
+      | 'sharedPoolLines'
     >
   > {
     const company = await this.seatMonths.yearTotals(year);
-    const unallocatedMinor = await this.pool.yearLineMinor(year);
+    const lines = await this.poolFacts.yearFigures(year);
+    const overReserve = reserveMinor === null ? null : lines.unallocatedMinor > reserveMinor;
 
     return {
       companySpent: money ? money(company.companyMinor) : null,
-      sharedPoolUnallocated: money ? money(unallocatedMinor) : null,
-      sharedPoolOverReserve: reserveMinor === null ? null : unallocatedMinor > reserveMinor,
+      sharedPoolUnallocated: money ? money(lines.unallocatedMinor) : null,
+      sharedPoolOverReserve: overReserve,
       seatMonthsWithoutCostCenter: money ? money(company.withoutCostCenterMinor) : null,
+      sharedPoolLines: money
+        ? {
+            idleCost: money(lines.idleCostMinor),
+            invoiceVariance: money(lines.invoiceVarianceMinor),
+            invoiceVarianceInReview: money(lines.invoiceVarianceInReviewMinor),
+            deviceLotPurchases: money(lines.deviceLotPurchasesMinor),
+            replacementKeys: money(lines.replacementKeysMinor),
+            total: money(lines.unallocatedMinor),
+            reserve: reserveMinor === null ? null : money(reserveMinor),
+            overReserve,
+          }
+        : null,
     };
   }
 
   private async summaryTotal(currency: string, sum: SummarySums) {
     const money = await this.facts.formatter(currency);
-    const used = sum.committed + sum.spent + sum.pendingSpend;
+    const used = sum.committed + sum.spent + sum.pendingSpend + sum.runningUncommitted;
     return {
       currency,
       base: money(sum.base),
@@ -126,11 +146,13 @@ export class BudgetTableViewService {
       committed: money(sum.committed),
       spent: money(sum.spent),
       pendingSpend: money(sum.pendingSpend),
+      runningUncommitted: money(sum.runningUncommitted),
       remaining: money(sum.total + sum.adjustment - used),
       remainingBase: money(sum.base + sum.adjustment - used),
       remainingWithReserve: money(sum.total + sum.adjustment - used),
       costCenterCount: sum.costCenterCount,
       overBudgetCount: sum.overBudgetCount,
+      noPriceRightCount: sum.noPriceRightCount,
     };
   }
 
@@ -152,8 +174,10 @@ const emptySums = (): SummarySums => ({
   committed: 0n,
   spent: 0n,
   pendingSpend: 0n,
+  runningUncommitted: 0n,
   costCenterCount: 0,
   overBudgetCount: 0,
+  noPriceRightCount: 0,
 });
 
 function addToSummary(sum: SummarySums, row: BudgetViewFigures, numbers: BudgetViewNumbers): void {
@@ -164,10 +188,9 @@ function addToSummary(sum: SummarySums, row: BudgetViewFigures, numbers: BudgetV
   sum.committed += numbers.committed;
   sum.spent += numbers.spent;
   sum.pendingSpend += numbers.pendingSpend;
+  sum.runningUncommitted += numbers.runningUncommitted;
+  sum.noPriceRightCount += numbers.noPriceRightCount;
   sum.costCenterCount += 1;
-  if (
-    row.totalMinor !== null &&
-    row.totalMinor + (row.adjustmentMinor ?? 0n) < numbers.committed + numbers.spent + numbers.pendingSpend
-  )
-    sum.overBudgetCount += 1;
+  const used = numbers.committed + numbers.spent + numbers.pendingSpend + numbers.runningUncommitted;
+  if (row.totalMinor !== null && row.totalMinor + (row.adjustmentMinor ?? 0n) < used) sum.overBudgetCount += 1;
 }

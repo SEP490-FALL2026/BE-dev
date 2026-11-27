@@ -27,19 +27,46 @@ const pagination = z.strictObject({
   totalPages: z.number().int().nonnegative(),
 });
 const money = z.strictObject({ amount: z.string().max(40), currency: z.string().regex(/^[A-Z]{3}$/) });
+export const RENEWAL_LINES_MAX = 20;
 
-const nextPeriodSchema = z.strictObject({
-  purchasedQuantity: quantity,
-  unitPrice: money,
-  billingCycle: z.enum(['MONTHLY', 'QUARTERLY', 'ANNUAL', 'OTHER']),
-  startDate: businessDate,
-  endDate: businessDate.optional(),
-  renewalDate: businessDate.optional(),
-  noticeDeadline: businessDate.optional(),
-  noticePeriodDays: z.number().int().min(0).max(3650).optional(),
-  autoRenew: z.boolean(),
-  allowsMidTermReduction: z.boolean(),
+const nextPeriodLineSchema = z.strictObject({
+  subscriptionLineId: z.uuid(),
+  quantity,
+  monthlyUnitPrice: money.optional(),
 });
+
+const nextPeriodSchema = z
+  .strictObject({
+    purchasedQuantity: quantity.optional(),
+    unitPrice: money.optional(),
+    lines: z.array(nextPeriodLineSchema).min(1).max(RENEWAL_LINES_MAX).optional(),
+    billingCycle: z.enum(['MONTHLY', 'QUARTERLY', 'ANNUAL', 'OTHER']),
+    startDate: businessDate,
+    endDate: businessDate.optional(),
+    renewalDate: businessDate.optional(),
+    noticeDeadline: businessDate.optional(),
+    noticePeriodDays: z.number().int().min(0).max(3650).optional(),
+    autoRenew: z.boolean(),
+    allowsMidTermReduction: z.boolean(),
+  })
+  .superRefine((period, context) => {
+    if (period.lines === undefined) {
+      if (period.purchasedQuantity === undefined) {
+        context.addIssue({
+          code: 'custom',
+          path: ['purchasedQuantity'],
+          message: 'purchasedQuantity is required when nextPeriod.lines is absent.',
+        });
+      }
+      if (period.unitPrice === undefined) {
+        context.addIssue({
+          code: 'custom',
+          path: ['unitPrice'],
+          message: 'unitPrice is required when nextPeriod.lines is absent.',
+        });
+      }
+    }
+  });
 
 /** What the vendor did instead of the decision needs the reason and the evidence the IT Admin has (`QĐ-96i`). */
 const NEEDS_NOTE: readonly (typeof RENEWAL_OUTCOMES)[number][] = ['VENDOR_REFUSED', 'DIFFERENT'];
@@ -66,11 +93,61 @@ const writtenOutcome = z.enum(['AS_DECIDED', 'VENDOR_REFUSED', 'DIFFERENT']);
  * for a cancellation the two confirmations of closing the subscription (`QĐ-99i`). Only the shape is judged here; which number the seats must be
  * is the count of the system (`QĐ-104d`), answered with its own code.
  */
+const proposeLineSchema = z.strictObject({
+  subscriptionLineId: z.uuid(),
+  quantity,
+});
+
+type ProposeBodyShape = {
+  choice?: (typeof RENEWAL_CHOICES)[number];
+  lines?: { quantity: number }[];
+  outcome: 'AS_DECIDED' | 'VENDOR_REFUSED' | 'DIFFERENT';
+  outcomeNote?: string;
+  closure?: { dataExported: boolean; adminsTransferred: boolean };
+};
+
+function validateCancellationClosure(body: ProposeBodyShape, context: z.RefinementCtx): void {
+  const allZeroLines = body.lines !== undefined && body.lines.every((line) => line.quantity === 0);
+  const isCancel = body.choice === 'CANCEL' || (body.choice === undefined && allZeroLines);
+  if (body.closure !== undefined && !isCancel) {
+    context.addIssue({
+      code: 'custom',
+      path: ['closure'],
+      message: 'The closure is confirmed only with a cancellation.',
+    });
+  }
+  const confirmed = body.closure?.dataExported === true && body.closure.adminsTransferred === true;
+  if (isCancel && body.outcome === 'AS_DECIDED' && !confirmed) {
+    context.addIssue({
+      code: 'custom',
+      path: ['closure'],
+      message: 'Closing a subscription needs the data exported and the admins transferred, both confirmed.',
+    });
+  }
+}
+
+function validateProposeBody(body: ProposeBodyShape, context: z.RefinementCtx): void {
+  if (body.choice === undefined && body.lines === undefined) {
+    context.addIssue({ code: 'custom', path: ['choice'], message: 'Either choice or lines must be provided.' });
+  }
+  if (NEEDS_NOTE.includes(body.outcome) && body.outcomeNote === undefined) {
+    context.addIssue({
+      code: 'custom',
+      path: ['outcomeNote'],
+      message: 'The note (the reason and the evidence) is required when the vendor refused or did something else.',
+    });
+  }
+  validateCancellationClosure(body, context);
+}
+
 export const proposeRenewalBodySchema = z
   .strictObject({
     subscriptionId: z.uuid(),
-    choice,
+    choice: choice.optional(),
     proposedQuantity: quantity.optional(),
+    lines: z.array(proposeLineSchema).min(1).max(RENEWAL_LINES_MAX).optional(),
+    minimumTotalHolderLineId: z.uuid().optional(),
+    minimumTotalNote: text.optional(),
     /** The evidence of the vendor minimum when the seats are that minimum above the need. */
     note: text.optional(),
     outcome: writtenOutcome,
@@ -78,30 +155,7 @@ export const proposeRenewalBodySchema = z
     nextPeriod: nextPeriodSchema.optional(),
     closure: z.strictObject({ dataExported: z.boolean(), adminsTransferred: z.boolean() }).optional(),
   })
-  .superRefine((body, context) => {
-    if (NEEDS_NOTE.includes(body.outcome) && body.outcomeNote === undefined) {
-      context.addIssue({
-        code: 'custom',
-        path: ['outcomeNote'],
-        message: 'The note (the reason and the evidence) is required when the vendor refused or did something else.',
-      });
-    }
-    if (body.closure !== undefined && body.choice !== 'CANCEL') {
-      context.addIssue({
-        code: 'custom',
-        path: ['closure'],
-        message: 'The closure is confirmed only with a cancellation.',
-      });
-    }
-    const closing = body.choice === 'CANCEL' && body.outcome === 'AS_DECIDED';
-    if (closing && !(body.closure?.dataExported === true && body.closure.adminsTransferred === true)) {
-      context.addIssue({
-        code: 'custom',
-        path: ['closure'],
-        message: 'Closing a subscription needs the data exported and the admins transferred, both confirmed.',
-      });
-    }
-  });
+  .superRefine(validateProposeBody);
 
 const listQuerySchema = z.strictObject({
   state: states.optional(),
@@ -119,7 +173,11 @@ const deadlineEventsQuerySchema = z.strictObject({
   to: businessDate.optional(),
   ...pageQuery,
 });
-const seatRankingQuerySchema = z.strictObject({ proposedOnly: flag.optional(), ...pageQuery });
+const seatRankingQuerySchema = z.strictObject({
+  proposedOnly: flag.optional(),
+  subscriptionLineId: z.uuid().optional(),
+  ...pageQuery,
+});
 const idParamSchema = z.strictObject({ id: z.uuid() });
 const adjustmentQuerySchema = z.strictObject({ subscriptionId: z.uuid() });
 
@@ -138,6 +196,15 @@ const subscriptionBrief = z.strictObject({
     .meta({ description: 'The IT Admin who answers for the subscription, by name; null when none is named.' }),
 });
 
+export const renewalLineSchema = z.strictObject({
+  subscriptionLineId: z.uuid(),
+  plan: z.strictObject({ id: z.uuid(), name: z.string() }),
+  seatsToday: z.number().int().nonnegative(),
+  need: z.number().int().nonnegative(),
+  target: z.number().int().nonnegative(),
+  label: z.enum(['REDUCIBLE', 'LOCKED_UNTIL']).nullable(),
+});
+
 export const renewalSummarySchema = z.strictObject({
   id: z.uuid(),
   state: states,
@@ -153,8 +220,9 @@ export const renewalSummarySchema = z.strictObject({
   executionPoint: executionPoint.nullable(),
   outcome: outcome.nullable(),
   lateFlagged: z.boolean(),
-  /** Always null now: no case waits for a head (`QĐ-103e`); kept so a reader of the earlier contract still finds it. */
+  /** Always null now: no case waits for a head; kept so a reader of the earlier contract still finds it. */
   waitingReason: z.enum(['NO_HEAD']).nullable(),
+  lineCount: z.number().int().nonnegative(),
   proposedAt: z.iso.datetime(),
 });
 
@@ -208,8 +276,14 @@ export const renewalDetailSchema = renewalSummarySchema.extend({
       quantity: z.number().int().nullable(),
       reason: z.string().nullable(),
       decidedByEmployeeId: z.uuid(),
-      /** `IT_ADMIN_IN_CHARGE` is the one written now; the others are historical: a decision of before the one-write renewal (`QĐ-103e`). */
-      deciderRole: z.enum(['OWNER_DEPARTMENT_HEAD', 'SPENDING_APPROVER', 'CONFLICT_SUBSTITUTE', 'IT_ADMIN_IN_CHARGE']),
+      /** `IT_ADMIN_IN_CHARGE` and `SYSTEM` are the current decider roles; the others are historical. */
+      deciderRole: z.enum([
+        'OWNER_DEPARTMENT_HEAD',
+        'SPENDING_APPROVER',
+        'CONFLICT_SUBSTITUTE',
+        'IT_ADMIN_IN_CHARGE',
+        'SYSTEM',
+      ]),
       decidedAt: z.iso.datetime(),
       decidedOn: z.string(),
       decidedAfterDeadline: z.boolean(),
@@ -231,10 +305,13 @@ export const renewalDetailSchema = renewalSummarySchema.extend({
       vendorFollowUpOpen: z.boolean(),
       nextSubscriptionId: z.uuid().nullable(),
       realisedSavings: money.nullable(),
-      /** The outcome was recorded after the renewal day of the period (`QĐ-98e`). */
+      /** The outcome was recorded after the renewal day of the period. */
       lateRenewal: z.boolean(),
     })
     .nullable(),
+  lines: z.array(renewalLineSchema).max(RENEWAL_LINES_MAX),
+  minimumSeatsTotal: z.number().int().nullable(),
+  shortfall: z.number().int().nonnegative(),
 });
 
 export const rankedSeatSchema = z.strictObject({
@@ -297,8 +374,12 @@ export const renewalAdjustmentSchema = z.strictObject({
   callerIsResponsible: z.boolean(),
   /** The case that already stands for the period (the result is recorded); null while none does. */
   recordedRenewalId: z.uuid().nullable(),
+  lines: z.array(renewalLineSchema).max(RENEWAL_LINES_MAX),
+  minimumSeatsTotal: z.number().int().nullable(),
+  shortfall: z.number().int().nonnegative(),
 });
 
+export type RenewalLineWire = z.infer<typeof renewalLineSchema>;
 export type RenewalSummaryWire = z.infer<typeof renewalSummarySchema>;
 export type RenewalDetailWire = z.infer<typeof renewalDetailSchema>;
 export type RankedSeatWire = z.infer<typeof rankedSeatSchema>;
@@ -328,9 +409,56 @@ export class SubscriptionRenewalSeatRankingResponseDto extends createZodDto(
       seatsInUse: z.number().int().nonnegative(),
       items: z.array(rankedSeatSchema),
       pagination,
+      lines: z.array(renewalLineSchema).max(RENEWAL_LINES_MAX),
+      minimumSeatsTotal: z.number().int().nullable(),
+      shortfall: z.number().int().nonnegative(),
     }),
   ),
 ) {}
 export class SubscriptionDeadlineEventPageResponseDto extends createZodDto(
   successEnvelopeSchema(z.strictObject({ items: z.array(deadlineEventSchema), pagination })),
+) {}
+
+const monthStart = businessDate.refine((value) => value.endsWith('-01'), {
+  message: 'Must be the first day of a calendar month (YYYY-MM-01)',
+});
+
+const kpiMonthSchema = z.strictObject({
+  missedIdleSeatDays: z.number().int().nonnegative(),
+  daysInMonth: z.number().int().positive(),
+  seatMonths: z.number().nonnegative(),
+  amount: money,
+});
+
+const kpiLineSchema = z.strictObject({
+  planId: z.uuid(),
+  missedSeats: z.number().int().nonnegative(),
+  seatMonths: z.number().nonnegative(),
+  amount: money,
+  monthsByMonth: z.record(z.string(), kpiMonthSchema),
+});
+
+export class SubscriptionRenewalMissedAdjustmentKpiQueryDto extends createZodDto(
+  z.strictObject({
+    months: z.preprocess((value: unknown): unknown => {
+      if (Array.isArray(value)) {
+        return value.flatMap((v: unknown): unknown[] => (typeof v === 'string' ? v.split(',') : [v]));
+      }
+      if (typeof value === 'string') return value.split(',').filter((v) => v.length > 0);
+      return value;
+    }, z.array(monthStart).min(1).max(24)),
+  }),
+) {}
+
+export class SubscriptionRenewalMissedAdjustmentKpiResponseDto extends createZodDto(
+  successEnvelopeSchema(
+    z.strictObject({
+      kpi: z.strictObject({
+        subscriptionId: z.uuid(),
+        totalSeatMonths: z.number().nonnegative(),
+        totalAmount: money,
+        linesById: z.record(z.uuid(), kpiLineSchema),
+      }),
+    }),
+  ),
 ) {}

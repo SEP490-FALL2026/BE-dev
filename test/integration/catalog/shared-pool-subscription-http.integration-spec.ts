@@ -136,23 +136,16 @@ describe('the shared-pool fields of a subscription over HTTP (integration, real 
   });
 
   describe('the IT Admin who answers for the subscription (R-E03)', () => {
-    it('is needed once it is active: refused when missing, when the person is not an IT Admin who works and signs in', async () => {
-      const { planId, applicationId } = await plan();
+    it('is the IT Admin who declares, who must work and sign in as one; a declaration cannot name another person (QĐ-118f)', async () => {
+      const { planId } = await plan();
       const body = { ...BASE, planId, billingCycle: 'ANNUAL' };
 
-      // BB-3: a declaration that names nobody takes the IT Admin responsible for the application, so it is missing only when that is empty too.
-      await h.ctx.sql.query(`UPDATE applications SET responsible_it_admin_employee_id = NULL WHERE id = $1`, [
-        applicationId,
-      ]);
-      expect(codeOf(await create({ ...body, responsibleItAdminEmployeeId: undefined }).expect(422))).toBe(
-        'SUBSCRIPTION.RESPONSIBLE_REQUIRED',
-      );
-      expect(codeOf(await create({ ...body, responsibleItAdminEmployeeId: h.employee.employeeId }).expect(422))).toBe(
-        'SUBSCRIPTION.RESPONSIBLE_NOT_IT_ADMIN',
-      );
-      expect(codeOf(await create({ ...body, responsibleItAdminEmployeeId: randomUUID() }).expect(422))).toBe(
-        'SUBSCRIPTION.RESPONSIBLE_NOT_IT_ADMIN',
-      );
+      // The person who answers is the one who declares: a body that names one is refused as an unknown field, whoever is named.
+      for (const named of [h.employee.employeeId, randomUUID()]) {
+        expect(codeOf(await create({ ...body, responsibleItAdminEmployeeId: named }).expect(422))).toBe(
+          'VALIDATION_ERROR',
+        );
+      }
       await h.ctx.sql.query(`UPDATE employees SET work_state = 'ON_LONG_LEAVE' WHERE id = $1`, [h.it1.employeeId]);
       try {
         expect(codeOf(await create(body).expect(422))).toBe('SUBSCRIPTION.RESPONSIBLE_NOT_IT_ADMIN');
@@ -166,7 +159,7 @@ describe('the shared-pool fields of a subscription over HTTP (integration, real 
       });
     });
 
-    it('QĐ-111g, BB-3: a new subscription that names nobody takes the IT Admin responsible for its application while they still work as one, and keeps the one the body names', async () => {
+    it('QĐ-118f: a new subscription is answered for by the IT Admin who declares it, whoever the application names', async () => {
       const second = await createActivatedAccount(h.ctx, h.seed, {
         code: 'E-IT-DEF',
         email: 'it-def@acme.vn',
@@ -182,32 +175,22 @@ describe('the shared-pool fields of a subscription over HTTP (integration, real 
         ]);
 
       await setApplicationResponsible(second.employeeId);
-      const inherited = dataOf<PoolWire>(
-        await create({ ...body, responsibleItAdminEmployeeId: undefined }).expect(201),
+      const declaredByIt1 = dataOf<PoolWire>(await create(body).expect(201));
+      expect(await stored(declaredByIt1.id)).toMatchObject({ responsible: h.it1.employeeId });
+      // One live subscription of a plan per workspace (W3-14): the next declarations are of plans of their own.
+      const declaredBySecond = dataOf<PoolWire>(
+        await create({ ...body, planId: (await plan()).planId }, second).expect(201),
       );
-      const named = dataOf<PoolWire>(
-        await create({ ...body, responsibleItAdminEmployeeId: h.it1.employeeId }).expect(201),
-      );
-      expect(await stored(inherited.id)).toMatchObject({ responsible: second.employeeId });
-      expect(await stored(named.id)).toMatchObject({ responsible: h.it1.employeeId });
+      expect(await stored(declaredBySecond.id)).toMatchObject({ responsible: second.employeeId });
 
-      // The one the application names has lost the role: nothing is taken, and an active subscription is refused as before.
-      await h.ctx.sql.query(`UPDATE app_users SET status = 'LOCKED' WHERE employee_id = $1`, [second.employeeId]);
-      try {
-        expect(codeOf(await create({ ...body, responsibleItAdminEmployeeId: undefined }).expect(422))).toBe(
-          'SUBSCRIPTION.RESPONSIBLE_REQUIRED',
-        );
-        const draft = dataOf<PoolWire>(
-          await create({ kind: 'TERM', planId, responsibleItAdminEmployeeId: undefined }).expect(201),
-        );
-        expect(await stored(draft.id)).toMatchObject({ responsible: null });
-      } finally {
-        await h.ctx.sql.query(`UPDATE app_users SET status = 'ACTIVE' WHERE employee_id = $1`, [second.employeeId]);
-      }
+      // A draft has the declarer too, whoever the application names.
+      await setApplicationResponsible(null);
+      const draft = dataOf<PoolWire>(await create({ kind: 'TERM', planId: (await plan()).planId }).expect(201));
+      expect(await stored(draft.id)).toMatchObject({ responsible: h.it1.employeeId });
 
       // Only a declaration is judged: a subscription that exists keeps its person when the application changes hands.
-      await setApplicationResponsible(h.it1.employeeId);
-      expect(await stored(inherited.id)).toMatchObject({ responsible: second.employeeId });
+      await setApplicationResponsible(second.employeeId);
+      expect(await stored(declaredByIt1.id)).toMatchObject({ responsible: h.it1.employeeId });
     });
 
     it('is needed to complete a draft, and a draft may be given the person before it', async () => {
@@ -280,13 +263,7 @@ describe('the shared-pool fields of a subscription over HTTP (integration, real 
         // A draft that waits only for the seats bought: naming them makes it active.
         const { planId } = await plan();
         const draft = dataOf<PoolWire>(
-          await create({
-            ...BASE,
-            planId,
-            billingCycle: 'ANNUAL',
-            purchasedQuantity: undefined,
-            responsibleItAdminEmployeeId: second.employeeId,
-          }).expect(201),
+          await create({ ...BASE, planId, billingCycle: 'ANNUAL', purchasedQuantity: undefined }, second).expect(201),
         );
         expect(draft).toMatchObject({ status: 'DRAFT', missing: ['QUANTITY'] });
         await revokeRole();

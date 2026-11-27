@@ -1,4 +1,5 @@
 import { SUCCESS_MESSAGES_WAVE2 } from './openapi-example-messages-wave2';
+import { SUCCESS_MESSAGES_WAVE3_TECH } from './openapi-example-messages-wave3-tech';
 
 /**
  * Part of SUCCESS_MESSAGES (requests): the success `message` each operation of the purchase invoices answers with (`PI-1`, `QĐ-111u`), and of the cases
@@ -6,6 +7,7 @@ import { SUCCESS_MESSAGES_WAVE2 } from './openapi-example-messages-wave2';
  */
 export const SUCCESS_MESSAGES_PURCHASE_INVOICE: Readonly<Record<string, string>> = {
   ...SUCCESS_MESSAGES_WAVE2,
+  ...SUCCESS_MESSAGES_WAVE3_TECH,
   invoiceDiscrepancyClose: 'INVOICE_DISCREPANCY.CLOSED',
   invoiceDiscrepancyGet: 'INVOICE_DISCREPANCY.READ',
   invoiceDiscrepancyList: 'INVOICE_DISCREPANCY.LISTED',

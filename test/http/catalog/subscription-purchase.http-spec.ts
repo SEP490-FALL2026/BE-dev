@@ -113,7 +113,6 @@ describe('subscription routes (e2e, no database)', () => {
     });
 
     it.each([
-      ['no plan', without(VALID_SUBSCRIPTION, 'planId')],
       ['a plan that is not a uuid', { ...VALID_SUBSCRIPTION, planId: 'P' }],
       ['an owner department, which a subscription has none of', { ...VALID_SUBSCRIPTION, ownerDepartmentId: ID }],
       ['an owner department that is null', { ...VALID_SUBSCRIPTION, ownerDepartmentId: null }],
@@ -148,6 +147,16 @@ describe('subscription routes (e2e, no database)', () => {
         .expect(422);
 
       expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('W3-15: refuses POST with neither planId nor lines as 422 SUBSCRIPTION.LINES_XOR_PLAN', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/subscriptions')
+        .set(asIt())
+        .send(without(VALID_SUBSCRIPTION, 'planId'))
+        .expect(422);
+
+      expect(bodyOf(response).error.code).toBe('SUBSCRIPTION.LINES_XOR_PLAN');
     });
 
     it.each([

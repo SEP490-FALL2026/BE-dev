@@ -294,6 +294,7 @@ describe('budgets over HTTP: the proposals of the heads (integration, real Postg
         'remainingBase',
         'remainingWithReserve',
         'reserve',
+        'runningUncommitted',
         'spent',
         'status',
         'total',

@@ -28,6 +28,7 @@ export class DashboardProgressService {
       personnel: await this.personnel.progress({ departmentIds: scope.departmentIds }, today),
       seats: await this.licensing.seatsReturned(today, scope.responsibleEmployeeId),
       plansBelowMinimum: await this.catalog.countPlansBelowVendorAdminMinimum(),
+      workspacesBelowMinimum: await this.catalog.countWorkspacesBelowMinimum(),
     });
   }
 }

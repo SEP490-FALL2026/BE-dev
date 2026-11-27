@@ -5,11 +5,13 @@ import type { YearStartCandidate } from './year-start-commitments.repo';
 const tx = { tx: true };
 const PASS: YearStartPassContext = { organizationId: 'org-1', year: 2027, now: new Date(), today: '2027-01-05' };
 /** 1 000 000 VND a month, the plan of every request unless a test says otherwise. */
-const VND_PRICE = {
+const vnd = (monthly: bigint) => ({
   kind: 'RECURRING',
-  unitPrice: { amountMinor: 1_000_000n, currency: 'VND' },
+  unitPrice: { amountMinor: monthly, currency: 'VND' },
+  monthlyPriceMinor: monthly,
   billingCycle: 'MONTHLY',
-};
+});
+const VND_PRICE = vnd(1_000_000n);
 
 const candidate = (patch: Partial<YearStartCandidate> & { id: string }): YearStartCandidate => ({
   type: 'GRANT',
@@ -55,6 +57,7 @@ function setup(input: {
     foreignKeptNextYearOfLines: jest.fn().mockResolvedValue([]),
     renewalSuccessors: jest.fn().mockResolvedValue(input.renewals ?? []),
     renewalsThatBegan: jest.fn().mockResolvedValue(input.renewalsThatBegan ?? new Map()),
+    confirmedInvoiceIdsByRequests: jest.fn().mockResolvedValue(new Map()),
   };
   const budgets = {
     listRequestsHoldingYear: jest.fn().mockResolvedValue(new Set()),
@@ -68,6 +71,7 @@ function setup(input: {
   };
   const catalog = {
     getPlanRevocationInfo: jest.fn().mockResolvedValue([{ planId: 'plan-1', provisioningType: 'K2' }]),
+    findPlanSeatTargets: jest.fn().mockResolvedValue([]),
     getPlanPrice: jest.fn().mockResolvedValue(input.price === undefined ? VND_PRICE : input.price),
   };
   const grants = { listHeldSeatsOfRequests: jest.fn().mockResolvedValue(input.seats ?? []) };
@@ -177,11 +181,7 @@ describe('YearStartCommitmentsBatchService (BR-MF1-09e, FR-5.8(6): one batch of 
   });
 
   describe('QĐ-111ak: what the approval kept is what 01/01 holds', () => {
-    const at = (monthly: bigint) => ({
-      kind: 'RECURRING',
-      unitPrice: { amountMinor: monthly, currency: 'VND' },
-      billingCycle: 'MONTHLY',
-    });
+    const at = vnd;
 
     it('T-RQ2 (K1): a request approved in 2026 that kept 4.200.000 of 2027 holds 4.200.000 although the price rose to 650.000', async () => {
       const { service, held } = setup({
@@ -346,13 +346,13 @@ describe('YearStartCommitmentsBatchService (BR-MF1-09e, FR-5.8(6): one batch of 
       await service.commitBatch(tx as never, PASS, null);
 
       expect(held()).toEqual([
-        {
+        expect.objectContaining({
           requestId: 'r-1',
           costCenterId: 'cc-dep-request',
           currency: 'VND',
           amountMinor: 12_000_000n,
           seatMonthlyMinor: 1_000_000n,
-        },
+        }),
       ]);
     });
 
@@ -372,7 +372,7 @@ describe('YearStartCommitmentsBatchService (BR-MF1-09e, FR-5.8(6): one batch of 
       const { service, skipped } = setup({
         candidates: [candidate({ id: 'r-1' })],
         seats: [heldSeat({ requestId: 'r-1' })],
-        price: { kind: 'RECURRING', unitPrice: { amountMinor: 10n ** 15n, currency: 'VND' }, billingCycle: 'MONTHLY' },
+        price: vnd(10n ** 15n),
       });
 
       await service.commitBatch(tx as never, PASS, null);

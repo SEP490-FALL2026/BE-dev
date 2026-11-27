@@ -2,14 +2,15 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { CatalogApi } from '../../catalog/public/catalog.api';
 import { LicensingApi } from '../../licensing/public/licensing.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import {
+  BaselinePlanMissingError,
   BudgetBaselineVersionNotAllowedError,
   BudgetCycleNotFoundError,
   BudgetNotYourCostCenterError,
 } from '../budget/budget.errors';
+import { BaselineCatalogFacts } from './baseline-catalog-facts.service';
 import { BaselineFlags, type BaselineCarried } from './baseline-flags.service';
 import { BudgetFactsService } from '../budget/budget-facts.service';
 import { CommitmentRepo, heldKey } from '../budget/commitment.repo';
@@ -23,7 +24,7 @@ import {
   baselineVersionRefusal,
   type SeatAllocation,
   shouldSuggestRenewal,
-  subscriptionCost,
+  subscriptionCostByPlan,
 } from './baseline.policy';
 import type { BaselineSubscription } from '../../catalog/public/catalog.types';
 import type { BaselineWire } from './cycle.dto';
@@ -35,6 +36,14 @@ type Reading = {
   today: BusinessDate;
   /** The seats the people of the department hold, by subscription. */
   seats: ReadonlyMap<string, number>;
+  /** The same seats by subscription and the plan of the seat: each is charged the line of its own plan. */
+  seatPlans: ReadonlyMap<string, ReadonlyMap<string, number>>;
+  /** The monthly price of a seat of a plan on a period (the line that serves the plan); null when it has none. */
+  priceOf: (subscriptionId: string, planId: string) => bigint | null;
+  /** The seats the line serving the plan has today (the seats bought of a period with no line); null when it has no number of seats. */
+  seatsOf: (subscriptionId: string, planId: string) => number | null;
+  /** The name of a plan and of its application: a period with several plans may hold plans of several applications. */
+  planFactsOf: (planId: string) => { planName: string; applicationName: string };
   /** The subscriptions the company has decided to end: they are not renewed (`Q-162`). */
   ending: ReadonlySet<string>;
   /** `KPI-3` in percent by plan, for the plans that have one. */
@@ -42,6 +51,43 @@ type Reading = {
   spent: bigint;
   format: (minor: bigint) => { amount: string; currency: string };
 };
+
+/** The row of one plan of a subscription the department holds seats of: its seats, the price of its line and what its year costs. */
+function planRowOf(
+  subscription: BaselineSubscription,
+  planId: string,
+  held: number,
+  reading: Reading,
+): { wire: BaselineWire['departments'][number]['software'][number]; cost: bigint | null } {
+  const { year, today, priceOf, seatsOf, planFactsOf, ending, kpi3ByPlan, format } = reading;
+  const terminated = ending.has(subscription.subscriptionId);
+  const monthly = priceOf(subscription.subscriptionId, planId);
+  const { months, costMinor } = subscriptionCostByPlan(
+    year,
+    today,
+    new Map([[planId, held]]),
+    () => monthly,
+    subscription,
+    terminated,
+  );
+
+  return {
+    cost: costMinor,
+    wire: {
+      subscriptionId: subscription.subscriptionId,
+      planId,
+      application: planFactsOf(planId).applicationName,
+      plan: planFactsOf(planId).planName,
+      seatsPurchased: seatsOf(subscription.subscriptionId, planId),
+      seatsAssigned: held,
+      monthlyUnitPrice: monthly === null ? null : format(monthly),
+      monthsRunning: months,
+      estimatedAnnualCost: costMinor === null ? null : format(costMinor),
+      suggestRenewal: shouldSuggestRenewal(year, today, subscription, terminated),
+      kpi3: kpi3ByPlan.get(planId) ?? null,
+    },
+  };
+}
 
 /**
  * One department of the baseline (`QĐ-103k`): the subscriptions its people hold seats of, those seats, and what the year is estimated to
@@ -59,36 +105,22 @@ export function departmentOf(
     carriedOverShortfall: 0n,
   },
 ): BaselineWire['departments'][number] {
-  const { year, today, seats, ending, kpi3ByPlan, spent, format } = reading;
+  const { seats, seatPlans, spent, format } = reading;
   const software: BaselineWire['departments'][number]['software'] = [];
   let total = 0n;
   let assigned = 0;
   let unknown = false;
+  let rows = 0;
   for (const subscription of subscriptions) {
-    const held = seats.get(subscription.subscriptionId) ?? 0;
-    const terminated = ending.has(subscription.subscriptionId);
-    const {
-      monthlyMinor: monthly,
-      months,
-      costMinor: cost,
-    } = subscriptionCost(year, today, held, subscription, terminated);
-    total += cost ?? 0n;
-    unknown ||= cost === null;
     // The seats of a period that a later one follows are the later one's too (the same people): they are counted once.
-    if (!subscription.hasSuccessor) assigned += held;
-    if (software.length >= SOFTWARE_LISTED_MAX) continue;
-    software.push({
-      subscriptionId: subscription.subscriptionId,
-      application: subscription.applicationName,
-      plan: subscription.planName,
-      seatsPurchased: subscription.purchasedQuantity,
-      seatsAssigned: held,
-      monthlyUnitPrice: monthly === null ? null : format(monthly),
-      monthsRunning: months,
-      estimatedAnnualCost: cost === null ? null : format(cost),
-      suggestRenewal: shouldSuggestRenewal(year, today, subscription, terminated),
-      kpi3: kpi3ByPlan.get(subscription.planId) ?? null,
-    });
+    if (!subscription.hasSuccessor) assigned += seats.get(subscription.subscriptionId) ?? 0;
+    for (const [planId, held] of seatPlans.get(subscription.subscriptionId) ?? []) {
+      const row = planRowOf(subscription, planId, held, reading);
+      total += row.cost ?? 0n;
+      unknown ||= row.cost === null;
+      rows += 1;
+      if (software.length < SOFTWARE_LISTED_MAX) software.push(row.wire);
+    }
   }
 
   return {
@@ -104,59 +136,94 @@ export function departmentOf(
     estimatedAnnualCost: format(total),
     hasUnknownCost: unknown,
     seatsAssigned: assigned,
-    softwareTotal: subscriptions.length,
+    softwareTotal: rows,
     software,
   };
 }
 
 type PoolLine = NonNullable<BaselineWire['sharedPoolUnallocated']>;
 
+/** What the idle seats of the shared pool are read from: the seats of each plan of a period, held and bought, and what a seat of it costs. */
+interface PoolReading extends Pick<Reading, 'year' | 'today' | 'ending' | 'format' | 'priceOf'> {
+  /** The seats held by anyone, by subscription and plan. */
+  heldByPlan: ReadonlyMap<string, ReadonlyMap<string, number>>;
+  /** The seats the line serving the plan has today; null when it has no number of seats. */
+  seatsOf: (subscriptionId: string, planId: string) => number | null;
+  /** The plans a period serves. */
+  planIdsOf: (subscriptionId: string) => readonly string[];
+  /** The name of a plan and of its application: a period with several plans may hold plans of several applications. */
+  planFactsOf: (planId: string) => { planName: string; applicationName: string };
+}
+
 /**
  * The line _Unallocated - shared pool_ of the baseline (`QĐ-103k`, `QĐ-89a(2)`): the seats of the `K2`/`K4` subscriptions bought and held by
- * nobody, a line of the company in no department, which Finance reads to set the reserve of the shared pool (B2). Their cost is the same
- * reading as a department's (idle seats x monthly price x months running).
+ * nobody, a line of the company in no department, which Finance reads to set the reserve of the shared pool (B2). Each plan of a period is
+ * read on its own line: the idle seats of a plan are the seats its line serves less the seats held of that plan, charged at the price of
+ * that line x months running.
  */
-export function sharedPoolLineOf(
-  subscriptions: readonly BaselineSubscription[],
-  reading: Pick<Reading, 'year' | 'today' | 'ending' | 'format'> & { held: ReadonlyMap<string, number> },
-): PoolLine {
-  const { year, today, held, ending, format } = reading;
+export function sharedPoolLineOf(subscriptions: readonly BaselineSubscription[], reading: PoolReading): PoolLine {
   const software: PoolLine['software'] = [];
   let total = 0n;
   let idleTotal = 0;
   let unknown = false;
   let counted = 0;
   for (const subscription of subscriptions) {
-    const holding = held.get(subscription.subscriptionId) ?? 0;
-    const idle = poolIdleSeats(subscription.provisioningType, subscription.purchasedQuantity, holding);
-    if (idle === null) continue;
-    counted += 1;
-    const terminated = ending.has(subscription.subscriptionId);
-    const { monthlyMinor, months, costMinor } = subscriptionCost(year, today, idle, subscription, terminated);
-    total += costMinor ?? 0n;
-    unknown ||= costMinor === null;
-    if (!subscription.hasSuccessor) idleTotal += idle;
-    if (software.length >= SOFTWARE_LISTED_MAX) continue;
-    software.push({
-      subscriptionId: subscription.subscriptionId,
-      application: subscription.applicationName,
-      plan: subscription.planName,
-      seatsPurchased: subscription.purchasedQuantity ?? 0,
-      seatsAssigned: holding,
-      seatsIdle: idle,
-      monthlyUnitPrice: monthlyMinor === null ? null : format(monthlyMinor),
-      monthsRunning: months,
-      estimatedAnnualCost: costMinor === null ? null : format(costMinor),
-    });
+    for (const planId of reading.planIdsOf(subscription.subscriptionId)) {
+      const row = poolRowOf(subscription, planId, reading);
+      if (row === null) continue;
+      counted += 1;
+      total += row.cost ?? 0n;
+      unknown ||= row.cost === null;
+      if (!subscription.hasSuccessor) idleTotal += row.wire.seatsIdle;
+      if (software.length < SOFTWARE_LISTED_MAX) software.push(row.wire);
+    }
   }
 
   return {
     line: 'SHARED_POOL_UNALLOCATED',
-    estimatedAnnualCost: format(total),
+    estimatedAnnualCost: reading.format(total),
     hasUnknownCost: unknown,
     seatsIdle: idleTotal,
     softwareTotal: counted,
     software,
+  };
+}
+
+/** The row of one plan of a period in the shared pool, with what it costs; null when the plan has no idle seat. */
+function poolRowOf(
+  subscription: BaselineSubscription,
+  planId: string,
+  reading: PoolReading,
+): { wire: PoolLine['software'][number]; cost: bigint | null } | null {
+  const { year, today, heldByPlan, seatsOf, priceOf, planFactsOf, ending, format } = reading;
+  const purchased = seatsOf(subscription.subscriptionId, planId);
+  const holding = heldByPlan.get(subscription.subscriptionId)?.get(planId) ?? 0;
+  const idle = poolIdleSeats(subscription.provisioningType, purchased, holding);
+  if (idle === null) return null;
+  const monthly = priceOf(subscription.subscriptionId, planId);
+  const { months, costMinor } = subscriptionCostByPlan(
+    year,
+    today,
+    new Map([[planId, idle]]),
+    () => monthly,
+    subscription,
+    ending.has(subscription.subscriptionId),
+  );
+
+  return {
+    cost: costMinor,
+    wire: {
+      subscriptionId: subscription.subscriptionId,
+      planId,
+      application: planFactsOf(planId).applicationName,
+      plan: planFactsOf(planId).planName,
+      seatsPurchased: purchased ?? 0,
+      seatsAssigned: holding,
+      seatsIdle: idle,
+      monthlyUnitPrice: monthly === null ? null : format(monthly),
+      monthsRunning: months,
+      estimatedAnnualCost: costMinor === null ? null : format(costMinor),
+    },
   };
 }
 
@@ -174,7 +241,7 @@ export class BaselineService {
     private readonly facts: BudgetFactsService,
     private readonly cycles: CycleRepo,
     private readonly organizationReads: OrganizationReadApi,
-    private readonly catalog: CatalogApi,
+    private readonly catalog: BaselineCatalogFacts,
     private readonly licensing: LicensingApi,
     private readonly commitments: CommitmentRepo,
     private readonly proposals: ProposalRepo,
@@ -191,28 +258,31 @@ export class BaselineService {
 
     const inYear = await this.organizationReads.getActiveDepartmentIds(year);
     const wanted = listedDepartments(inYear, departmentId);
-    const [briefs, costCenters, history, subscriptions, format] = await Promise.all([
+    const [briefs, costCenters, history, pricing, format] = await Promise.all([
       this.organizationReads.getDepartmentBriefs(wanted),
       this.organizationReads.getUnitCostCenterIds(wanted),
       this.organizationReads.getUnitCostCenterHistory(wanted),
-      this.catalog.getBaselineSubscriptions(),
+      this.catalog.subscriptions(today),
       this.facts.formatter(cycle.currency),
     ]);
+    const { subscriptions, priceOf } = pricing;
     const { allocation, ending } = await this.seatsOf(subscriptions, today);
-    const kpi3ByPlan = await this.catalog.getPlanKpi3([...new Set(subscriptions.map((one) => one.planId))]);
+    const { kpi3ByPlan, planFactsOf } = await this.planFacts(subscriptions, pricing.planIdsOf, allocation);
     const spentOf = await this.spentByDepartment(history, today);
+    const common = { year, today, priceOf, seatsOf: pricing.seatsOf, planFactsOf, ending, format };
 
     const costCenterIds = [...costCenters.values()];
     // Locked is a state of the cycle (`QĐ-111z`): a draft whose deadline is behind us is not locked, and nobody missed a deadline yet.
     const carriedOf = await this.flags.of(costCenterIds, year, cycleStateOf(cycle, today) === 'LOCKED');
     const departments = inOrderOf(wanted, briefs).map((brief) => {
       const seats = allocation.byDepartment.get(brief.id) ?? new Map<string, number>();
+      const seatPlans = allocation.byDepartmentPlan.get(brief.id) ?? new Map<string, Map<string, number>>();
 
       return departmentOf(
         brief,
         costCenters.get(brief.id) ?? null,
         subscriptions.filter((subscription) => (seats.get(subscription.subscriptionId) ?? 0) > 0),
-        { year, today, seats, ending, kpi3ByPlan, spent: spentOf(brief.id), format },
+        { ...common, seats, seatPlans, kpi3ByPlan, spent: spentOf(brief.id) },
         carriedOf(costCenters.get(brief.id) ?? ''),
       );
     });
@@ -226,8 +296,41 @@ export class BaselineService {
       departments,
       sharedPoolUnallocated:
         departmentId === undefined
-          ? sharedPoolLineOf(subscriptions, { year, today, held: allocation.held, ending, format })
+          ? sharedPoolLineOf(subscriptions, {
+              ...common,
+              heldByPlan: allocation.heldByPlan,
+              planIdsOf: pricing.planIdsOf,
+            })
           : null,
+    };
+  }
+
+  /** `KPI-3` and the name of every plan the baseline lists: the plans of the lines of the periods and the plans of the seats held. */
+  private async planFacts(
+    subscriptions: readonly BaselineSubscription[],
+    planIdsOf: (subscriptionId: string) => readonly string[],
+    allocation: SeatAllocation,
+  ): Promise<{
+    kpi3ByPlan: Map<string, number>;
+    planFactsOf: (planId: string) => { planName: string; applicationName: string };
+  }> {
+    const planIds = [
+      ...new Set([
+        ...subscriptions.flatMap((one) => planIdsOf(one.subscriptionId)),
+        ...[...allocation.heldByPlan.values()].flatMap((plans) => [...plans.keys()]),
+      ]),
+    ];
+    const kpi3ByPlan = await this.catalog.kpi3Of(planIds);
+    const facts = await this.catalog.planFacts(planIds);
+
+    return {
+      kpi3ByPlan,
+      planFactsOf: (planId) => {
+        const plan = facts.get(planId);
+        if (plan === undefined) throw new BaselinePlanMissingError(planId);
+
+        return plan;
+      },
     };
   }
 

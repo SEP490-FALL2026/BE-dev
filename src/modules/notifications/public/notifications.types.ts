@@ -134,6 +134,8 @@ export const IN_APP_NOTIFICATION_CODES = [
   'BUDGET_REVIEW_DUE',
   'BUDGET_REVIEW_SUMMARY',
   'BUDGET_SHARED_POOL_OVER_RESERVE',
+  'IDLE_SEAT_COST_RATIO_HIGH',
+  'LICENSE_LOT_IDLE_COST_HIGH',
   // The use of the budget of a Cost Center reached 80 or 100 percent of its base (`QĐ-111af`, RV-2): told once each time to the head of the department and Finance; the Cost Center, the year and the threshold, never a figure.
   'BUDGET_THRESHOLD_REACHED',
   // The head of a department is reminded to explain a Cost Center of a quarterly review (`QĐ-111ah`, B-7): on the due day and every Monday until they explain or Finance signs; the period, the Cost Center and the due day, never a figure.
@@ -204,8 +206,14 @@ export const IN_APP_NOTIFICATION_CODES = [
   'DEPARTMENT_SOFTWARE_PROPOSED',
   'DEPARTMENT_SOFTWARE_PROPOSAL_DECIDED',
   'VENDOR_ADMINS_BELOW_MINIMUM',
+  'WORKSPACE_ADMIN_NOT_WORKING',
   'DEPARTMENT_WITHOUT_HEAD',
   'SUBSCRIPTION_SEATS_INCREASED',
+  'SUBSCRIPTION_SEATS_REDUCED',
+  'SUBSCRIPTION_SEATS_BOUGHT',
+  'SEAT_PURCHASE_INVOICE_OVERDUE',
+  'SEAT_LEDGER_VENDOR_RECORDED',
+  'SUBSCRIPTION_PRICE_REVIEW',
   'IT_ADMIN_HANDOVER_PENDING',
   // The IT Admin who took everything a leaving IT Admin answered for is told how many subscriptions and applications are theirs now (`QĐ-110j`, SPEC P5).
   'IT_ADMIN_HANDOVER_RECEIVED',

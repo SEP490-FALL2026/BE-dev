@@ -100,11 +100,6 @@
       "count": 1
     }
   },
-  "src/modules/licensing/license-key/license-key.service.ts": {
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
   "src/modules/licensing/provisioning/grant-cancellation/grant-cancellation.policy.ts": {
     "complexity": {
       "count": 1

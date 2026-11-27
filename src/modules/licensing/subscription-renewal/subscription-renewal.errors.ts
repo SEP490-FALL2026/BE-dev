@@ -32,13 +32,19 @@ export type RenewalProblem =
   /** The new period cannot be recorded as the continuation of this one. */
   | 'PERIOD_REFUSED'
   /** A result with no new period leaves the period with no way to be recorded: a renewal, a reduction or an increase carries it (`A1C-03`). */
-  | 'NEXT_PERIOD_REQUIRED';
+  | 'NEXT_PERIOD_REQUIRED'
+  /** Per-line proposed quantity does not match the line target before deadline. */
+  | 'LINE_QUANTITY_NOT_TARGET'
+  /** Annual commitment period cannot reduce seats below deadline seat count after deadline (R-LATE). */
+  | 'REDUCTION_AFTER_DEADLINE'
+  /** Multi-line period renewal proposal must submit `lines[]` instead of legacy `proposedQuantity`. */
+  | 'LINES_REQUIRED';
 
 /** A request about the renewal of a subscription was refused; nothing is written. */
 export class RenewalError extends Error {
   constructor(
     readonly problem: RenewalProblem,
-    readonly details: Record<string, string | number | boolean | null> = {},
+    readonly details: Record<string, unknown> = {},
   ) {
     super(`The renewal request was refused: ${problem}.`);
     this.name = 'RenewalError';

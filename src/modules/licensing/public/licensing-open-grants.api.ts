@@ -6,7 +6,11 @@ import type {
   GrantCompletion,
   GrantExecution,
   GrantedSeatOfRequest,
+  K1AnnualChainDetail,
+  K1AnnualHolderTimeline,
+  K1AnnualPaidSeat,
   OpenGrantTask,
+  PoolTopUpPurchase,
   SeatRootsOfRequests,
 } from './licensing-open-grants.types';
 
@@ -52,6 +56,11 @@ export class LicensingOpenGrantsApi {
     return this.openGrants.grantCompletionsOf(requestIds, tx);
   }
 
+  /** Completed `POOL_TOP_UP` grant tasks of `requestId`, for pooled-quota top-up invoice expectation. */
+  listCompletedPoolTopUpPurchasesOfRequest(requestId: string, tx?: DbTx): Promise<PoolTopUpPurchase[]> {
+    return this.openGrants.completedPoolTopUpPurchasesOf(requestId, tx);
+  }
+
   /**
    * The grant tasks of these requests that were not cancelled, each with the person it is for, its state and channel and why it failed, the
    * newest first: where the grant of each person of a request stands. A request nobody has granted has none. One statement, whatever the
@@ -59,5 +68,29 @@ export class LicensingOpenGrantsApi {
    */
   listGrantExecutionsOfRequests(requestIds: readonly string[], tx?: DbTx): Promise<GrantExecution[]> {
     return this.openGrants.grantExecutionsOf(requestIds, tx);
+  }
+
+  /** Root assignment & replacement segments along the lifetime of a K1 annual request. */
+  getK1AnnualHolderTimeline(
+    requestId: string,
+    renewedAssignmentId: string | null,
+    tx?: DbTx,
+  ): Promise<K1AnnualHolderTimeline | null> {
+    return this.openGrants.k1AnnualHolderTimeline(requestId, renewedAssignmentId, tx);
+  }
+
+  /** Maps request ids to their root assignment id for Tier 0 K1 allocation locking. */
+  listK1AnnualRootsOfRequests(roots: SeatRootsOfRequests, tx?: DbTx): Promise<Map<string, string>> {
+    return this.openGrants.k1AnnualRootsOfRequests(roots, tx);
+  }
+
+  /** Resolves root assignment and lineage assignments/requests for K1 annual requests (`F-7`). */
+  listK1AnnualChainDetails(roots: SeatRootsOfRequests, tx?: DbTx): Promise<Map<string, K1AnnualChainDetail>> {
+    return this.openGrants.k1AnnualChainDetails(roots, tx);
+  }
+
+  /** Closed (non-replaced) 12-month K1 seats whose `validUntil <= onDate` (`F9(c)`). */
+  listK1AnnualPaidSeatsOn(roots: SeatRootsOfRequests, onDate: BusinessDate, tx?: DbTx): Promise<K1AnnualPaidSeat[]> {
+    return this.openGrants.listK1AnnualPaidSeatsOn(roots, onDate, tx);
   }
 }

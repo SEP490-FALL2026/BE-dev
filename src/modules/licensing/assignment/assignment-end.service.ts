@@ -35,7 +35,9 @@ export class AssignmentEndService {
   async lock(tx: DbTx, assignmentId: string): Promise<AssignmentRecord> {
     const probe = await this.repo.find(assignmentId, tx);
     if (!probe) throw new AssignmentNotFoundError();
-    if (probe.subscriptionId) await this.catalog.lockSeatTarget(tx, { subscriptionId: probe.subscriptionId });
+    if (probe.subscriptionId) {
+      await this.catalog.lockSeatTarget(tx, { subscriptionId: probe.subscriptionId, planId: probe.planId });
+    }
     const current = await this.repo.lock(tx, assignmentId);
     if (!current) throw new AssignmentNotFoundError();
 

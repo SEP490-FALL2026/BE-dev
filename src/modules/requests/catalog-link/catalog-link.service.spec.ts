@@ -24,9 +24,16 @@ const LINKABLE = {
   planId: null,
   departmentId: 'dept',
 };
-const QUOTE = { unitPrice: { amountMinor: 3_000_000n, currency: 'VND' }, billingCycle: 'QUARTERLY' };
+const QUOTE = { unitPrice: { amountMinor: 3_000_000n, currency: 'VND' }, billingCycle: 'QUARTERLY' as const };
 
-function setup(request: object, adopted = true) {
+function setup(
+  request: object,
+  adopted = true,
+  quote: {
+    unitPrice: { amountMinor: bigint; currency: string };
+    billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
+  } = QUOTE,
+) {
   const adoptPlanQuotePrice = jest.fn().mockResolvedValue(adopted);
   const setPlan = jest.fn();
   const record = jest.fn();
@@ -38,7 +45,7 @@ function setup(request: object, adopted = true) {
       findById: jest.fn().mockResolvedValue({ ...request, planId: 'plan' }),
     } as unknown as AccessRequestRepo,
     {
-      findAssessment: jest.fn().mockResolvedValue({ quote: QUOTE }),
+      findAssessment: jest.fn().mockResolvedValue({ quote }),
       findProposal: jest.fn().mockResolvedValue(null),
     } as unknown as AssessmentReadRepo,
     {
@@ -76,6 +83,17 @@ describe('QĐ-113a linking a case B request to a plan', () => {
       });
     },
   );
+
+  it('offers monthly reference price rounded half-away (10 000 000 annual -> 833 333)', async () => {
+    const { service, adoptPlanQuotePrice } = setup(LINKABLE, true, {
+      unitPrice: { amountMinor: 10_000_000n, currency: 'VND' },
+      billingCycle: 'ANNUAL',
+    });
+
+    await service.link(ACTOR, 'request', { planId: 'plan' });
+
+    expect(adoptPlanQuotePrice).toHaveBeenCalledWith(ACTOR, 'plan', { amountMinor: 833_333n, currency: 'VND' }, TX);
+  });
 
   it('refuses a second link of a request that already has its plan, and offers no price', async () => {
     const { service, adoptPlanQuotePrice, setPlan } = setup({ ...LINKABLE, planId: 'plan' });

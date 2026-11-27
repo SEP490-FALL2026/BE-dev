@@ -283,7 +283,10 @@ describe('API inventory (e2e): openapi presentation and wire messages', () => {
       // 431 with the Super Admin route that names the IT Admin who answers for a subscription (redesign wave 2).
       // 432 with the IT Admin route that raises the cap of activations of a license key (redesign wave 2).
       // 453 with redesign wave 2 routes (department IT substitutes, unplaced-work designations, device lifecycle, return tasks, activations, initial records, device software reads).
-      expect(operations).toHaveLength(453);
+      // 459 with the six workspace routes of redesign wave 3.
+      // 465 with the six routes of the lots of licenses.
+      // 471 with the six routes of subscription-lines (W3 multi-line & seat ledger); 472 with F-16 missed-adjustment KPI.
+      expect(operations).toHaveLength(472);
       expect(missing).toEqual([]);
     });
 

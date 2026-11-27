@@ -9,11 +9,14 @@ import type { SkipGate } from '../rule-run/rule-run.repo';
 
 type Pricing = 'PER_SEAT' | 'FLAT_RATE' | 'CONCURRENT' | 'CONSUMPTION' | 'PER_HOST' | null;
 type Kind = 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
+type KeyBinding = 'ACCOUNT' | 'DEVICE_KEY' | 'DEVICE_BUNDLED' | null;
 
-/** A subscription that grants seats today, as the rule of free seats reads it (`FR-4.9` gate 1). */
+/** A subscription or license lot that grants seats/keys today, as Gate 1 of `G1` reads it. */
 export interface VacancyFacts {
   provisioningType: Kind;
   pricingModel: Pricing;
+  subjectKind?: 'SUBSCRIPTION' | 'LICENSE_LOT';
+  keyBinding?: KeyBinding;
   purchased: number | null;
   occupied: number;
   free: number | null;
@@ -41,12 +44,25 @@ export interface G1Decision {
 export const g1ActionOf = (kind: Kind): GhostSeatG1Action =>
   kind === 'K4' ? 'REGRANT_BEFORE_PURCHASE' : 'REGRANT_OR_REDUCE';
 
+/** Gate 1 pricing-model eligibility: `K4` rejects only explicit non-`PER_SEAT` non-`null` values; others require `PER_SEAT`. */
+export const isGate1PricingModelAllowed = (provisioningType: Kind, pricingModel: Pricing): boolean =>
+  provisioningType === 'K4' ? pricingModel === 'PER_SEAT' || pricingModel === null : pricingModel === 'PER_SEAT';
+
+/** Gate 1 eligibility for `G3`/`G4` usage rules: excludes `K5` and allows `K4` `ACCOUNT` only (never `DEVICE_KEY`/`DEVICE_BUNDLED`). */
+export const isUsageRuleEligibleSeat = (seat: {
+  provisioningType: Kind;
+  pricingModel: Pricing;
+  keyBinding?: KeyBinding;
+}): boolean => {
+  if (seat.provisioningType === 'K5') return false;
+  if (seat.provisioningType === 'K4' && seat.keyBinding !== 'ACCOUNT') return false;
+
+  return isGate1PricingModelAllowed(seat.provisioningType, seat.pricingModel);
+};
+
 /**
- * `G1` (`US-10-01` AC-1, AC-7, AC-8, AC-9; `R-E02`): a subscription of the shared pool (`K2`) that is `PER_SEAT` and still has free seats has
- * one open `G1` with how many; the number follows the free seats while it is open, and it closes when none are free or when the subscription
- * no longer grants seats, or is no longer `PER_SEAT`. A `K5` plan is internal software (`QĐ-62o`: out of the MVP) and a plan that
- * is not `PER_SEAT` has no seat to count: both are left out with a reason. Any other kind has no `G1` (`K1`, `K3`; `K4` is `TẠM CHỌN`: no
- * key pool in this build). `vacancy` is null when the subscription no longer grants seats today.
+ * `G1` (`US-10-01` AC-1, AC-7..9; `K-A10`): includes `K2` `PER_SEAT` subscriptions and `K4` `ACCOUNT` lots (`countsTowardVacantCost = false`).
+ * `K4` `DEVICE_KEY`/`DEVICE_BUNDLED`, `K1`, `K3`, and non-`PER_SEAT` legacy plans are excluded (`OUT_OF_SCOPE`).
  */
 export function decideG1(vacancy: VacancyFacts | null, open: Pick<GhostSeatRecord, 'freeSeats'> | null): G1Decision {
   const close = (reason: GhostSeatCloseReason): G1Step => (open ? { kind: 'CLOSE', reason } : { kind: 'NONE' });
@@ -54,7 +70,7 @@ export function decideG1(vacancy: VacancyFacts | null, open: Pick<GhostSeatRecor
   if (vacancy.provisioningType === 'K5') {
     return { skip: { gate: 'INTERNAL_SOFTWARE', detail: { provisioningType: 'K5' } }, step: close('OUT_OF_SCOPE') };
   }
-  if (vacancy.pricingModel !== 'PER_SEAT') {
+  if (!isGate1PricingModelAllowed(vacancy.provisioningType, vacancy.pricingModel)) {
     return {
       skip: {
         gate: 'PER_SEAT',
@@ -63,9 +79,9 @@ export function decideG1(vacancy: VacancyFacts | null, open: Pick<GhostSeatRecor
       step: close('OUT_OF_SCOPE'),
     };
   }
-  // A free seat is a seat of the shared pool (`K2`, BRD 5.4.1, `QĐ-103d`(2)): a personal plan (`K1`) cancelled to the end of its term is never
-  // granted again (`INV-12`), and a pool of keys (`K4`) is left out until the Owner decides it (TẠM CHỌN).
-  if (vacancy.provisioningType !== 'K2') return { skip: null, step: close('OUT_OF_SCOPE') };
+  const eligible =
+    vacancy.provisioningType === 'K2' || (vacancy.provisioningType === 'K4' && vacancy.keyBinding === 'ACCOUNT');
+  if (!eligible) return { skip: null, step: close('OUT_OF_SCOPE') };
 
   const free = vacancy.free ?? 0;
   if (free === 0) return { skip: null, step: close('FREE_SEATS_GONE') };
@@ -91,6 +107,7 @@ export interface SeatFacts {
   isMachineAccount: boolean;
   provisioningType: Kind;
   pricingModel: Pricing;
+  keyBinding?: KeyBinding;
   holderLeft: boolean;
   liveRevocation: { taskId: string } | null;
   terminatingUntil: string | null;
@@ -168,8 +185,15 @@ function newG2(seat: SeatFacts, existing: ChainRecommendation | null): G2Step {
 /** A seat the rule does not judge: not a personal seat, a machine account, internal software (`K5`) or a plan that is not `PER_SEAT` (gate 1). Null when it judges it. */
 function outOfScopeOf(seat: SeatFacts): G2Decision | null {
   if (seat.kind !== 'PERSONAL' || seat.isMachineAccount) return NO_STEP;
+  if (seat.provisioningType === 'K4' && seat.keyBinding !== undefined && seat.keyBinding !== 'ACCOUNT') {
+    return NO_STEP;
+  }
   const gate =
-    seat.provisioningType === 'K5' ? 'INTERNAL_SOFTWARE' : seat.pricingModel !== 'PER_SEAT' ? 'PER_SEAT' : null;
+    seat.provisioningType === 'K5'
+      ? 'INTERNAL_SOFTWARE'
+      : !isGate1PricingModelAllowed(seat.provisioningType, seat.pricingModel)
+        ? 'PER_SEAT'
+        : null;
   if (gate === null) return null;
   if (!seat.holderLeft) return NO_STEP;
   const detail =

@@ -9,8 +9,17 @@ const SOURCE = { kind: 'OFFBOARDING_CASE', id: 'case-1' } as const;
 
 /** What the service meets: every dependency answers what a hand-over of one subscription needs, and `moved` is what the catalog says it moved. */
 function build(
-  moved: { subscriptionIds: string[]; applicationIds: string[] },
-  options: { leftOn?: string | null; effectiveOn?: string | null } = {},
+  moved: {
+    subscriptionIds: string[];
+    applicationIds: string[];
+    workspaceIds?: string[];
+    licenseLotIds?: string[];
+  },
+  options: {
+    leftOn?: string | null;
+    effectiveOn?: string | null;
+    counts?: { subscriptions: number; applications: number; workspaces: number; licenseLots: number };
+  } = {},
 ) {
   const recordDone = jest.fn();
   const tell = jest.fn();
@@ -29,8 +38,9 @@ function build(
       }),
     } as never,
     {
-      countResponsibilitiesOf: () => new Map([['leaver', { subscriptions: 1, applications: 0 }]]),
-      transferResponsibilities: () => moved,
+      countResponsibilitiesOf: () =>
+        new Map([['leaver', options.counts ?? { subscriptions: 1, applications: 0, workspaces: 0, licenseLots: 0 }]]),
+      transferResponsibilities: () => ({ workspaceIds: [], licenseLotIds: [], ...moved }),
     } as never,
     { lockEmployeeForUpdate: jest.fn() } as never,
     { businessToday: () => '2026-11-13' } as never,
@@ -73,6 +83,41 @@ describe('ItHandoverService', () => {
     expect(result).toMatchObject({ subscriptions: 1, applications: 1, toEmployeeId: 'target' });
     expect(recordDone).toHaveBeenCalledTimes(1);
     expect(tell).toHaveBeenCalledTimes(1);
+  });
+
+  it('hands over when the leaving IT Admin only holds workspaces and license lots', async () => {
+    const { service, recordDone, tell } = build(
+      { subscriptionIds: [], applicationIds: [], workspaceIds: ['ws-1'], licenseLotIds: ['lot-1'] },
+      { counts: { subscriptions: 0, applications: 0, workspaces: 1, licenseLots: 1 } },
+    );
+
+    const result = await service.handOver(SUPER_ADMIN, SOURCE, 'target');
+
+    expect(result).toMatchObject({
+      subscriptions: 0,
+      applications: 0,
+      workspaces: 1,
+      licenseLots: 1,
+      toEmployeeId: 'target',
+    });
+    expect(recordDone).toHaveBeenCalledWith(expect.anything(), {
+      organizationId: 'org',
+      source: SOURCE,
+      done: expect.objectContaining({
+        toEmployeeId: 'target',
+        subscriptions: 0,
+        applications: 0,
+        workspaces: 1,
+        licenseLots: 1,
+      }) as unknown,
+    });
+    expect(tell).toHaveBeenCalledWith(
+      expect.anything(),
+      SUPER_ADMIN,
+      'org',
+      SOURCE,
+      expect.objectContaining({ subscriptions: 0, applications: 0, workspaces: 1, licenseLots: 1 }),
+    );
   });
 
   it('is refused with NOTHING_TO_HAND_OVER, not recorded and nobody told, when the catalog moved no subscription and no application', async () => {

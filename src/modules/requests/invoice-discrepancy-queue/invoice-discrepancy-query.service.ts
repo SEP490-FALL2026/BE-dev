@@ -5,6 +5,7 @@ import { FinanceApi } from '../../finance/public/finance.api';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { InvoiceDiscrepancyRefusedError } from '../invoice-discrepancy/invoice-discrepancy.errors';
+import type { InvoiceDiscrepancyOutcomeKind } from '../invoice-discrepancy/invoice-discrepancy-closure.policy';
 import { InvoiceDiscrepancyRepo, type InvoiceDiscrepancyRow } from '../invoice-discrepancy/invoice-discrepancy.repo';
 import type { InvoiceDiscrepancyScope } from '../invoice-discrepancy/invoice-discrepancy.types';
 import type { InvoiceDiscrepancyDetailWire, InvoiceDiscrepancySummaryWire } from './invoice-discrepancy.dto';
@@ -28,7 +29,7 @@ export class InvoiceDiscrepancyQueryService {
     actor: AuthenticatedPrincipal,
     query: {
       state?: 'OPEN' | 'CLOSED';
-      outcome?: 'EXPLAINED' | 'OUT_OF_PROCESS_SUSPECTED';
+      outcome?: InvoiceDiscrepancyOutcomeKind;
       page: number;
       pageSize: number;
     },

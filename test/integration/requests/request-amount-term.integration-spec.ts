@@ -1,10 +1,13 @@
+import request from 'supertest';
 import { addDays } from '../../../src/core/business-date';
 import { monthsBeginningIn, termEndOf, termRunOf } from '../../../src/core/term-limit';
 import { declareApplication, declarePlan, declareSubscription } from '../../support/builders/catalog.builder';
+import { pretendBusinessToday } from '../../support/pretend-today';
 import { SpendHarness } from '../../support/spend-harness';
 
 const h = new SpendHarness();
 const M = 1_000_000;
+const TODAY = '2026-06-01';
 
 interface SupplementWire {
   number: number;
@@ -22,10 +25,12 @@ describe('the amount and the term of a request (integration, real PostgreSQL)', 
   let design: Awaited<ReturnType<SpendHarness['departmentWithHead']>>;
 
   /** The months left of the calendar year of today, the month of today counted whole (`BR-MF1-06a`). */
-  const monthsLeft = 12 - Number(h.today().slice(5, 7)) + 1;
+  const monthsLeft = 12 - Number(TODAY.slice(5, 7)) + 1;
 
   beforeAll(async () => {
     await h.start();
+    pretendBusinessToday(h.ctx.app, TODAY);
+    jest.spyOn(h, 'today').mockReturnValue(TODAY);
     await h.withApprover();
     plan = await h.planOf(await h.subscription(10)); // 1 000 000 VND a seat a month
     design = await h.departmentWithHead('P-AMT');
@@ -33,6 +38,7 @@ describe('the amount and the term of a request (integration, real PostgreSQL)', 
   }, 240000);
 
   afterAll(async () => {
+    jest.restoreAllMocks();
     await h.stop();
   });
 
@@ -45,6 +51,19 @@ describe('the amount and the term of a request (integration, real PostgreSQL)', 
       purchasedQuantity: 5,
       ...over,
     });
+
+  const declareLot = async (planId: string, amount = '500000') =>
+    request(h.server())
+      .post('/api/v1/license-lots')
+      .set(h.as(h.it1))
+      .send({
+        planId,
+        purpose: 'STOCK',
+        licenseCount: 5,
+        unitPrice: { amount, currency: 'VND' },
+        purchasedOn: '2026-01-05',
+      })
+      .expect(201);
 
   const keyPlan = async (): Promise<string> => {
     const application = await declareApplication(h.ctx, h.it1.accessToken, {
@@ -60,21 +79,49 @@ describe('the amount and the term of a request (integration, real PostgreSQL)', 
       provisioningType: 'K4',
       pricingModel: 'PER_SEAT',
       controlLevel: 'FULL',
+      keyBinding: 'ACCOUNT',
     });
-    await subscribe(key, {
-      kind: 'PERPETUAL',
-      billingCycle: undefined,
-      unitPrice: { amount: '500000', currency: 'VND' },
-    });
+    await declareLot(key);
 
     return key;
+  };
+
+  const secondWorkspaceOf = async (planId: string): Promise<string> => {
+    const vendorId = (
+      await h.ctx.sql.query<{ vendor_id: string }>(
+        `SELECT a.vendor_id FROM plans p JOIN applications a ON a.id = p.application_id WHERE p.id = $1`,
+        [planId],
+      )
+    ).rows[0].vendor_id;
+    const wsId = h.dataOf<{ id: string }>(
+      await request(h.server())
+        .post('/api/v1/workspaces')
+        .set(h.as(h.it1))
+        .send({ vendorId, name: h.unique('WS2') })
+        .expect(201),
+    ).id;
+    await h.ctx.sql.query(
+      `INSERT INTO workspace_admins (workspace_id, employee_id, role)
+       SELECT $1, employee_id, role FROM workspace_admins
+        WHERE workspace_id = (SELECT id FROM workspaces WHERE vendor_id = $2 ORDER BY created_at, id LIMIT 1)`,
+      [wsId, vendorId],
+    );
+    await h.ctx.sql.query(`UPDATE workspaces SET primary_owner_employee_id = $2 WHERE id = $1`, [
+      wsId,
+      h.it1.employeeId,
+    ]);
+
+    return wsId;
   };
 
   describe('the price: the main subscription of the plan, whichever department sends (BR-MF1-07, S1-02)', () => {
     it('BR-MF1-07: with several subscriptions and no flag is the one with the highest price a month', async () => {
       const shared = await h.plan('K2');
       await subscribe(shared, { unitPrice: { amount: '1000000', currency: 'VND' } });
-      await subscribe(shared, { unitPrice: { amount: '3000000', currency: 'VND' } });
+      await subscribe(shared, {
+        workspaceId: await secondWorkspaceOf(shared),
+        unitPrice: { amount: '3000000', currency: 'VND' },
+      });
 
       const sent = await h.sent(design.member, shared);
 
@@ -85,7 +132,10 @@ describe('the amount and the term of a request (integration, real PostgreSQL)', 
     it('BR-MF1-07: with a subscription flagged primary is that one, whatever the others cost', async () => {
       const shared = await h.plan('K2');
       const cheap = await subscribe(shared, { unitPrice: { amount: '1000000', currency: 'VND' } });
-      await subscribe(shared, { unitPrice: { amount: '3000000', currency: 'VND' } });
+      await subscribe(shared, {
+        workspaceId: await secondWorkspaceOf(shared),
+        unitPrice: { amount: '3000000', currency: 'VND' },
+      });
       await h.ctx.sql.query(`UPDATE subscriptions SET is_primary_for_plan = true WHERE id = $1`, [cheap]);
 
       const sent = await h.sent(design.member, shared);
@@ -93,26 +143,8 @@ describe('the amount and the term of a request (integration, real PostgreSQL)', 
       expect(sent.pricing).toMatchObject({ unitPrice: { amount: '1000000' } });
     });
 
-    it('BR-MF1-07: a one-time price (a perpetual license, a key) is the price of the purchase, with no months (QĐ-106d)', async () => {
-      const application = await declareApplication(h.ctx, h.it1.accessToken, {
-        name: h.unique('Licensed'),
-        kind: 'LICENSED',
-        vendorName: h.unique('Vendor'),
-        dataSensitivity: 'LOW',
-        communication: { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false },
-      });
-      const key = await declarePlan(h.ctx, h.it1.accessToken, {
-        applicationId: application,
-        name: h.unique('Key'),
-        provisioningType: 'K4',
-        pricingModel: 'PER_SEAT',
-        controlLevel: 'FULL',
-      });
-      await subscribe(key, {
-        kind: 'PERPETUAL',
-        billingCycle: undefined,
-        unitPrice: { amount: '500000', currency: 'VND' },
-      });
+    it('BR-MF1-07: a one-time price (a license lot, a key) is the price of the purchase, with no months (QĐ-106d)', async () => {
+      const key = await keyPlan();
 
       const sent = await h.sent(design.member, key);
       const preview = await h.previewed(design.member, key);
@@ -123,7 +155,7 @@ describe('the amount and the term of a request (integration, real PostgreSQL)', 
   });
 
   describe('the time of use in months instead of an end date (QĐ-111i, FR-2.8, INV-07)', () => {
-    const year = Number(h.today().slice(0, 4));
+    const year = Number(TODAY.slice(0, 4));
     /** A plan of the kind asked for, with a subscription of 1 000 000 a seat a month. */
     const planOfKind = async (type: 'K1' | 'K2'): Promise<string> => h.planOf(await h.subscription(10, type));
     it('QĐ-111i: the end date is not a field of the form any more, on the preview and on the sending', async () => {
@@ -330,7 +362,7 @@ describe('the amount and the term of a request (integration, real PostgreSQL)', 
   });
 
   describe('RQ-2.4: the part of the year after is kept when the spend is approved (QĐ-111k, R-46)', () => {
-    const year = Number(h.today().slice(0, 4));
+    const year = Number(TODAY.slice(0, 4));
     const approved = async (body: Record<string, unknown>): Promise<string> => {
       const sent = await h.sent(design.member, plan, body);
       await h.decide(sent.id, { decision: 'APPROVE' }, design.head.account).expect(200);

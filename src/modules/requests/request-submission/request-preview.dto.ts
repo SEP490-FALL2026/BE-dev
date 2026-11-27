@@ -55,6 +55,8 @@ const previewSchema = z.strictObject({
       'TERM_NOT_ASKED',
       'TERM_LONG_TERM_NOT_ALLOWED',
       'TERM_CONTRACT_ENDED',
+      'K1_ANNUAL_TERM_FIXED',
+      'K1_ANNUAL_CONTRACT_TOO_SHORT',
     ])
     .nullable(),
   department: z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() }),

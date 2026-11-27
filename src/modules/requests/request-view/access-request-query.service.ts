@@ -4,7 +4,13 @@ import { CatalogApi } from '../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AssessmentReadRepo } from '../access-request/assessment-read.repo';
 import type { ProposalRecord } from '../access-request/assessment-record.types';
-import { PricingViewService, type CostView, type MoneyView, type PricingView } from './pricing-view.service';
+import {
+  PricingViewService,
+  type CostView,
+  type MoneyView,
+  type PricingView,
+  type VendorChargeUntilRenewalView,
+} from './pricing-view.service';
 import { RequestCostViewService } from './request-cost-view.service';
 import type { BlockReason } from '../spend/budget-check.policy';
 import type { SpendStage } from '../access-request/access-request.types';
@@ -86,6 +92,7 @@ export interface AccessRequestView extends Omit<
   pricing: PricingView;
   /** The cost by the year before tax, with the part of the year after (`QĐ-111j`, `QĐ-111k`); null when nothing is priced by the month. */
   cost: CostView | null;
+  vendorChargeUntilRenewal?: VendorChargeUntilRenewalView;
   /** Where the request stands on its way to the spending approver, for a request that costs money; never what is left of the budget. */
   spend: SpendView | null;
   needStep: NeedStepView;
@@ -192,7 +199,7 @@ export class AccessRequestQueryService {
         ].filter((v) => v !== null),
       ),
     ];
-    const [people, plans, department, costCenters, proposal, spend] = await Promise.all([
+    const [people, plans, department, costCenters, proposal, spend, vendorChargeUntilRenewal] = await Promise.all([
       this.organizationReads.getEmployees(peopleIds),
       record.planId === null ? Promise.resolve([]) : this.catalog.getPlanSummaries([record.planId]),
       this.organizationReads.getDepartmentBrief(record.departmentId),
@@ -201,6 +208,9 @@ export class AccessRequestQueryService {
         : this.organizationReads.costCentersByIds([record.costCenterId]),
       record.branch === 'NEW_SOFTWARE' ? this.assessments.findProposal(record.id) : Promise.resolve(null),
       this.spendStatus.of(record),
+      record.branch === 'INTERNAL_FREE' || record.pricing.status === 'NOT_APPLICABLE'
+        ? Promise.resolve(undefined)
+        : this.pricing.vendorChargeUntilRenewalOf(record.planId),
     ]);
     const spendView = spend && (await this.spendViewOf(spend));
     const person = (id: string): EmployeeRefView => {
@@ -245,6 +255,7 @@ export class AccessRequestQueryService {
       budgetYear: record.pricing.budgetYear,
       pricing: await this.pricing.view(record.pricing),
       cost: await this.costs.of(record, record.pricing),
+      ...(vendorChargeUntilRenewal ? { vendorChargeUntilRenewal } : {}),
       policy: {
         version: record.policy.version,
         hasSpendStep: hasSpendStep(record.policy),

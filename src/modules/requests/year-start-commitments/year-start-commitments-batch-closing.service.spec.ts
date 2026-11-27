@@ -5,7 +5,12 @@ import type { YearStartCandidate } from './year-start-commitments.repo';
 const tx = { tx: true };
 const PASS: YearStartPassContext = { organizationId: 'org-1', year: 2027, now: new Date(), today: '2027-01-05' };
 /** 650 000 VND a month, the price of 01/01 of the plan of every request. */
-const PRICE = { kind: 'RECURRING', unitPrice: { amountMinor: 650_000n, currency: 'VND' }, billingCycle: 'MONTHLY' };
+const PRICE = {
+  kind: 'RECURRING',
+  unitPrice: { amountMinor: 650_000n, currency: 'VND' },
+  monthlyPriceMinor: 650_000n,
+  billingCycle: 'MONTHLY',
+};
 
 /** A request for 9 months approved in 2026 at 600.000 a month that kept 4.200.000 of 2027 (T-RQ2), unless a test says otherwise. */
 const candidate = (patch: Partial<YearStartCandidate> = {}): YearStartCandidate => ({
@@ -20,6 +25,7 @@ const candidate = (patch: Partial<YearStartCandidate> = {}): YearStartCandidate 
   nextYearAmountMinor: 4_200_000n,
   amountCurrency: 'VND',
   unitPriceMinor: 600_000n,
+  monthlyPriceMinor: 600_000n,
   billingCycle: 'MONTHLY',
   ...patch,
 });
@@ -51,6 +57,7 @@ async function held(
     foreignKeptPerpetualLines: jest.fn().mockResolvedValue([]),
     renewalSuccessors: jest.fn().mockResolvedValue([]),
     renewalsThatBegan: jest.fn().mockResolvedValue(new Map()),
+    confirmedInvoiceIdsByRequests: jest.fn().mockResolvedValue(new Map()),
   };
   const budgets = {
     listRequestsHoldingYear: jest.fn().mockResolvedValue(new Set()),
@@ -60,6 +67,7 @@ async function held(
   };
   const catalog = {
     getPlanRevocationInfo: jest.fn().mockResolvedValue([{ planId: 'plan-1', provisioningType: 'K2' }]),
+    findPlanSeatTargets: jest.fn().mockResolvedValue([]),
     getPlanPrice: jest.fn().mockResolvedValue(PRICE),
   };
   const baseSeat = {
@@ -97,7 +105,7 @@ describe('YearStartCommitmentsBatchService: a seat that closes before the term i
   });
 
   it('holds what the approval kept when the request carries no price to count with (nothing is worked out at the price of 01/01)', async () => {
-    const unpriced = candidate({ unitPriceMinor: null, billingCycle: null });
+    const unpriced = candidate({ unitPriceMinor: null, monthlyPriceMinor: null, billingCycle: null });
 
     expect(await held(unpriced, '2027-04-01')).toEqual([expect.objectContaining({ amountMinor: 4_200_000n })]);
   });
@@ -114,6 +122,7 @@ describe('YearStartCommitmentsBatchService: a seat that closes before the term i
       budgetYear: 2026,
       nextYearAmountMinor: 1_200_000n,
       unitPriceMinor: null,
+      monthlyPriceMinor: null,
       billingCycle: null,
     });
     const year2: YearStartPassContext = { organizationId: 'org-1', year: 2028, now: new Date(), today: '2028-01-05' };
@@ -131,6 +140,7 @@ describe('YearStartCommitmentsBatchService: a seat that closes before the term i
       budgetYear: 2026,
       nextYearAmountMinor: 1_200_000n,
       unitPriceMinor: null,
+      monthlyPriceMinor: null,
       billingCycle: null,
     });
     expect(
@@ -139,5 +149,50 @@ describe('YearStartCommitmentsBatchService: a seat that closes before the term i
         keptPerpetual: new Map([['r-1', new Map([['e-1', 1_200_000n]])]]),
       }),
     ).toEqual([expect.objectContaining({ requestId: 'r-1', amountMinor: 1_200_000n, seatMonthlyMinor: 100_000n })]);
+  });
+
+  it('B-5: approvalPriceOf reads stored monthlyPriceMinor directly without dividing unitPriceMinor / cycle', async () => {
+    const annualTerm = candidate({
+      unitPriceMinor: 10_000_000n,
+      monthlyPriceMinor: 833_333n,
+      billingCycle: 'ANNUAL',
+      nextYearAmountMinor: 5_000_000n,
+    });
+    expect(await held(annualTerm, '2027-03-01')).toEqual([
+      expect.objectContaining({ requestId: 'r-1', amountMinor: 1_666_666n, seatMonthlyMinor: 650_000n }),
+    ]);
+
+    // Mutation killer: stored monthlyPriceMinor (700.000) differs from unitPriceMinor / 12 (833.333).
+    const storedDistinct = candidate({
+      unitPriceMinor: 10_000_000n,
+      monthlyPriceMinor: 700_000n,
+      billingCycle: 'ANNUAL',
+      nextYearAmountMinor: 5_000_000n,
+    });
+    expect(await held(storedDistinct, '2027-03-01')).toEqual([
+      expect.objectContaining({ requestId: 'r-1', amountMinor: 1_400_000n }),
+    ]);
+
+    // When stored monthlyPriceMinor is null even with unitPriceMinor present, 01/01 does not divide unitPriceMinor / cycle.
+    const unbackfilled = candidate({
+      unitPriceMinor: 10_000_000n,
+      monthlyPriceMinor: null,
+      billingCycle: 'ANNUAL',
+      nextYearAmountMinor: 5_000_000n,
+    });
+    expect(await held(unbackfilled, '2027-03-01')).toEqual([
+      expect.objectContaining({ requestId: 'r-1', amountMinor: 5_000_000n }),
+    ]);
+
+    const annualPerpetual = candidate({
+      termMonths: null,
+      unitPriceMinor: null,
+      monthlyPriceMinor: null,
+      billingCycle: null,
+      nextYearAmountMinor: 10_000_000n,
+    });
+    expect(await held(annualPerpetual, '2027-03-01')).toEqual([
+      expect.objectContaining({ requestId: 'r-1', amountMinor: 1_666_666n, seatMonthlyMinor: 833_333n }),
+    ]);
   });
 });

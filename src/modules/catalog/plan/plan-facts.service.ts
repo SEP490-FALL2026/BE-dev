@@ -16,7 +16,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { PlanRepo } from './plan.repo';
 import { PlanQuotePriceService } from './plan-quote-price.service';
 import { PlanUsageRepo } from './plan-usage.repo';
-import { notYetBlocked } from './vendor-admin-roles.policy';
+import { notYetBlocked } from './vendor-admin/plan-vendor-admin.policy';
 import type { PlanLookup, WorkspaceMemberRecord } from './plan.types';
 
 export type LockedPlan = PlanLookup;
@@ -73,6 +73,11 @@ export class PlanFactsService implements ApplicationPlans {
   /** The plan, locked `FOR SHARE` until the transaction ends so its kind cannot change meanwhile; null if absent. */
   lockShared(tx: DbTx, id: string): Promise<LockedPlan | null> {
     return this.plans.lockSharedLookup(tx, id);
+  }
+
+  /** Locks the application `FOR SHARE` before locking the plan `FOR SHARE` so retirement cannot commit in between. */
+  lockSharedWithApplication(tx: DbTx, id: string): Promise<LockedPlan | null> {
+    return this.plans.lockSharedWithApplicationLookup(tx, id);
   }
 
   /** The plan, locked `FOR UPDATE` until the transaction ends; null if absent. */

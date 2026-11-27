@@ -2,25 +2,6 @@ import type { BusinessDate } from '../../../core/business-date';
 import type { BaselineVersionRefusal } from '../budget/budget.errors';
 
 /**
- * The monthly price of one seat from the unit price in the reporting currency and the cycle it is paid in (`R-I03`): a year's price
- * divided by 12, a quarter's by 3, rounded to the nearest minor unit (half up). A cycle that is not one of those (`OTHER`) or a price
- * not known gives none.
- */
-export function monthlyUnitPrice(unitPriceMinor: bigint | null, billingCycle: string | null): bigint | null {
-  if (unitPriceMinor === null) return null;
-  switch (billingCycle) {
-    case 'MONTHLY':
-      return unitPriceMinor;
-    case 'QUARTERLY':
-      return (unitPriceMinor * 2n + 3n) / 6n;
-    case 'ANNUAL':
-      return (unitPriceMinor * 2n + 12n) / 24n;
-    default:
-      return null;
-  }
-}
-
-/**
  * The months of `year` a subscription runs, counting each month it touches: no end date means it runs to the end of the year, no start
  * date that it ran from the start; one that ends before the year or starts after it runs none (`R-I03`).
  */
@@ -82,32 +63,48 @@ export function shouldSuggestRenewal(
   );
 }
 
-/**
- * What one subscription is estimated to cost over a year at the prices of today (`R-I03`): the seats it HOLDS (what is assigned; the
- * seats bought and idle are the shared pool's, `QĐ-103k`), the monthly price of a seat and the months it runs; a subscription that will
- * be renewed counts for the twelve months of the year (`Q-162`), any other only for the months it runs, to the day it stops.
- */
-export function subscriptionCost(
-  year: number,
-  today: BusinessDate,
-  seatsHeld: number,
-  subscription: RenewalFacts & { unitPriceReportingMinor: bigint | null; billingCycle: string | null },
-  terminated = false,
-): { monthlyMinor: bigint | null; months: number; costMinor: bigint | null } {
-  const monthlyMinor = monthlyUnitPrice(subscription.unitPriceReportingMinor, subscription.billingCycle);
-  const months = willRenew(today, subscription, terminated)
+/** The months of `year` a subscription counts for: twelve when it will be renewed (`Q-162`), otherwise the months it still runs. */
+function monthsCounted(year: number, today: BusinessDate, subscription: RenewalFacts, terminated: boolean): number {
+  return willRenew(today, subscription, terminated)
     ? 12
     : monthsRunning(year, subscription.startDate, endOf(subscription));
+}
 
-  return { monthlyMinor, months, costMinor: estimatedCost(seatsHeld, monthlyMinor, months) };
+/**
+ * What the seats held of one subscription are estimated to cost over a year when the period has several plans: each seat is charged the
+ * monthly price of its own plan (`priceOf`, the line that serves it), never the price of the first plan. Seats are the ones HELD (what
+ * is assigned; the seats bought and idle are the shared pool's, `QĐ-103k`); a subscription that will be renewed counts for the twelve
+ * months of the year (`Q-162`), any other only for the months it runs, to the day it stops. None when a plan that has seats has no price.
+ */
+export function subscriptionCostByPlan(
+  year: number,
+  today: BusinessDate,
+  seatsByPlan: ReadonlyMap<string, number>,
+  priceOf: (planId: string) => bigint | null,
+  subscription: RenewalFacts,
+  terminated = false,
+): { months: number; costMinor: bigint | null } {
+  const months = monthsCounted(year, today, subscription, terminated);
+  let total = 0n;
+  for (const [planId, seats] of seatsByPlan) {
+    const cost = estimatedCost(seats, priceOf(planId), months);
+    if (cost === null) return { months, costMinor: null };
+    total += cost;
+  }
+
+  return { months, costMinor: total };
 }
 
 /** The seats of each subscription held as of a day, for each department and in all: a seat is charged to the department of its holder (`QĐ-103k`). */
 export interface SeatAllocation {
   /** By department, the seats its people hold (or answer for, a service account), by subscription. */
   byDepartment: Map<string, Map<string, number>>;
+  /** The same seats by department, subscription and the plan of the seat: each plan of a period is priced by its own line. */
+  byDepartmentPlan: Map<string, Map<string, Map<string, number>>>;
   /** The seats held in all, by subscription, a holder placed in no department included. */
   held: Map<string, number>;
+  /** The same seats held in all, by subscription and the plan of the seat: what each plan of a period has left idle. */
+  heldByPlan: Map<string, Map<string, number>>;
 }
 
 /**
@@ -116,21 +113,31 @@ export interface SeatAllocation {
  * only (the seat is taken, so it is not idle), never in a department.
  */
 export function allocateSeats(
-  holdings: readonly { subscriptionId: string; employeeId: string; seats: number }[],
+  holdings: readonly { subscriptionId: string; planId: string; employeeId: string; seats: number }[],
   departmentOf: ReadonlyMap<string, string>,
 ): SeatAllocation {
   const byDepartment = new Map<string, Map<string, number>>();
+  const byDepartmentPlan = new Map<string, Map<string, Map<string, number>>>();
   const held = new Map<string, number>();
+  const heldByPlan = new Map<string, Map<string, number>>();
   for (const holding of holdings) {
     held.set(holding.subscriptionId, (held.get(holding.subscriptionId) ?? 0) + holding.seats);
+    const plansHeld = heldByPlan.get(holding.subscriptionId) ?? new Map<string, number>();
+    plansHeld.set(holding.planId, (plansHeld.get(holding.planId) ?? 0) + holding.seats);
+    heldByPlan.set(holding.subscriptionId, plansHeld);
     const departmentId = departmentOf.get(holding.employeeId);
     if (departmentId === undefined) continue;
     const seats = byDepartment.get(departmentId) ?? new Map<string, number>();
     seats.set(holding.subscriptionId, (seats.get(holding.subscriptionId) ?? 0) + holding.seats);
     byDepartment.set(departmentId, seats);
+    const plansOf = byDepartmentPlan.get(departmentId) ?? new Map<string, Map<string, number>>();
+    const plans = plansOf.get(holding.subscriptionId) ?? new Map<string, number>();
+    plans.set(holding.planId, (plans.get(holding.planId) ?? 0) + holding.seats);
+    plansOf.set(holding.subscriptionId, plans);
+    byDepartmentPlan.set(departmentId, plansOf);
   }
 
-  return { byDepartment, held };
+  return { byDepartment, byDepartmentPlan, held, heldByPlan };
 }
 
 /** A `K2` or `K4` purchase is the shared pool of the company (`QĐ-103d`): its idle seats belong to no department. */

@@ -16,7 +16,7 @@ describe('RequestCostViewService', () => {
   const finance = { findCurrency: jest.fn(() => Promise.resolve({ minorUnit: 0 })) };
   const service = new RequestCostViewService(
     organization as unknown as OrganizationReadApi,
-    new PricingViewService(finance as never),
+    new PricingViewService(finance as never, { getVendorChargeContext: jest.fn().mockResolvedValue(null) } as never),
   );
 
   const dong = (amountMinor: bigint) => ({ amountMinor, currency: 'VND' });

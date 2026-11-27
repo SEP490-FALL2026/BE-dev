@@ -310,6 +310,7 @@ const budgetNumbersSchema = {
   committed: moneyView,
   spent: moneyView,
   pendingSpend: moneyView,
+  runningUncommitted: moneyView,
   remainingBase: moneyView.nullable(),
   remainingWithReserve: moneyView.nullable(),
   overBudget: z.boolean(),
@@ -341,6 +342,10 @@ const tableRowSchema = z.strictObject({
   ...budgetNumbersSchema,
   remaining: moneyView.nullable(),
   overCommitted: z.boolean(),
+  noPriceRightCount: z.number().int().nonnegative().meta({
+    description:
+      'Direct-license rights in force without an associated request or plan reference price, excluded from running uncommitted cost.',
+  }),
   priorPeriodAdjustment: moneyView.meta({
     description: 'Invoices of the commitment year recorded on or after local midnight on 1 January of the next year.',
   }),
@@ -355,11 +360,26 @@ const summaryTotalSchema = z.strictObject({
   spent: moneyView,
   remaining: moneyView,
   pendingSpend: moneyView,
+  runningUncommitted: moneyView,
   remainingBase: moneyView,
   remainingWithReserve: moneyView,
   costCenterCount: z.number().int().nonnegative(),
   /** The Cost Centers whose budget is less than what is held and spent against it. */
   overBudgetCount: z.number().int().nonnegative(),
+  noPriceRightCount: z.number().int().nonnegative().meta({
+    description:
+      'Direct-license rights in force without an associated request or plan reference price, excluded from running uncommitted cost.',
+  }),
+});
+const sharedPoolLinesSummarySchema = z.strictObject({
+  idleCost: moneyView,
+  invoiceVariance: moneyView,
+  invoiceVarianceInReview: moneyView,
+  deviceLotPurchases: moneyView,
+  replacementKeys: moneyView,
+  total: moneyView,
+  reserve: moneyView.nullable(),
+  overReserve: z.boolean().nullable(),
 });
 /** The company-wide figures of a year, added up for each currency: Cost Centers of two currencies are never added together. */
 const budgetSummarySchema = z.strictObject({
@@ -372,10 +392,12 @@ const budgetSummarySchema = z.strictObject({
   lastInvoiceRecordedAt: z.iso.datetime().nullable(),
   /** What the year cost the company: every invoice of the year, those of the shared pool included, whatever they are booked to (`MG-03`). Null when the year has no cycle currency to say it in. */
   companySpent: moneyView.nullable(),
-  /** The line of the shared pool: the invoices of the pool of the year less the seat-months charged to departments; it counts against the pool reserve of the cycle. */
+  /** Total shared-pool line for ended months of the year; counts against the cycle pool reserve. */
   sharedPoolUnallocated: moneyView.nullable(),
   /** Whether the line of the pool is more than the pool reserve of the cycle (Finance is warned); null when the cycle sets no reserve. */
   sharedPoolOverReserve: z.boolean().nullable(),
+  /** Breakdown of the shared-pool line for ended months of the year against the cycle reserve; null when no cycle exists. */
+  sharedPoolLines: sharedPoolLinesSummarySchema.nullable(),
   /** The line "not allocated to a Cost Center": the seat-months of the year that fell to a department with no Cost Center yet (`SM1-05`); in no Cost Center and not in the line of the pool. */
   seatMonthsWithoutCostCenter: moneyView.nullable(),
 });

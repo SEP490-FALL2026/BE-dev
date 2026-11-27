@@ -12,6 +12,7 @@ import { CatalogApi } from './public/catalog.api';
 import { CatalogContractApi } from './public/catalog-contract.api';
 import { CatalogPlanTermsApi } from './public/catalog-plan-terms.api';
 import { CatalogResponsibilityApi } from './public/catalog-responsibility.api';
+import { LicenseLotStockApi } from './public/license-lot-stock.api';
 import { SeatBaselinePhaseHook, SeatOccupancyHook } from './public/catalog.extension-points';
 import { ApplicationIntakeController } from './application-intake/application-intake.controller';
 import { ApplicationIntakeService } from './application-intake/application-intake.service';
@@ -48,8 +49,8 @@ import { FunctionalGroupsController } from './functional-group/functional-groups
 import { PlanFactsService } from './plan/plan-facts.service';
 import { PlanUsageRepo } from './plan/plan-usage.repo';
 import { PlanWorkspaceService } from './plan/plan-workspace.service';
-import { VendorAdminMinimumService } from './plan/vendor-admin-minimum.service';
-import { VendorAdminRolesService } from './plan/vendor-admin-roles.service';
+import { VendorAdminMinimumService } from './plan/vendor-admin/vendor-admin-minimum.service';
+import { VendorAdminRolesService } from './plan/vendor-admin/vendor-admin-roles.service';
 import { PlanRepo } from './plan/plan.repo';
 import { PlanService } from './plan/plan.service';
 import { PlanQuotePriceService } from './plan/plan-quote-price.service';
@@ -65,7 +66,6 @@ import { OnboardingFactsService } from './subscription/onboarding-facts.service'
 import { SeatTargetService } from './subscription/seat-target.service';
 import { SubscriptionFactsService } from './subscription/subscription-facts.service';
 import { SubscriptionNoticeService } from './subscription/subscription-notice.service';
-import { SubscriptionPeriodRepo } from './subscription/period/subscription-period.repo';
 import { SubscriptionPeriodService } from './subscription/period/subscription-period.service';
 import { SubscriptionPeriodApi } from './public/subscription-period.api';
 import { SubscriptionSeatIncreaseService } from './subscription/seat-increase/subscription-seat-increase.service';
@@ -75,8 +75,10 @@ import { SubscriptionChangeService } from './subscription/subscription-change.se
 import { SubscriptionService } from './subscription/subscription.service';
 import { SubscriptionPoolService } from './subscription/pool/subscription-pool.service';
 import { SubscriptionPricingService } from './subscription/subscription-pricing.service';
+import { SubscriptionPriceService } from './subscription/price/subscription-price.service';
 import { SubscriptionViewService } from './subscription/subscription-view.service';
 import { SubscriptionWindowsService } from './subscription/subscription-windows.service';
+import { LicenseLotStockService } from './license-lot/license-lot-stock.service';
 import { SubscriptionsController } from './subscription/subscriptions.controller';
 import { SubscriptionResponsibleController } from './subscription/responsible/subscription-responsible.controller';
 import { SubscriptionResponsibleService } from './subscription/responsible/subscription-responsible.service';
@@ -95,6 +97,37 @@ import { VendorQueryService } from './vendor/vendor-query.service';
 import { VendorTaxService } from './vendor/vendor-tax.service';
 import { VendorsController } from './vendor/vendors.controller';
 import { VendorRepo } from './vendor/vendor.repo';
+import { WorkspaceApi } from './public/workspace.api';
+import { WorkspaceAdminsService } from './workspace/workspace-admins.service';
+import { WorkspaceForSubscriptionService } from './workspace/workspace-for-subscription.service';
+import { WorkspaceResponsibleService } from './workspace/workspace-responsible.service';
+import { WorkspaceService } from './workspace/workspace.service';
+import { WorkspaceRepo } from './workspace/workspace.repo';
+import { LicenseLotLockService } from './license-lot/license-lot-lock.service';
+import { LicenseLotCreateService } from './license-lot/license-lot-create.service';
+import { LicenseLotPriceService } from './license-lot/license-lot-price.service';
+import { LicenseLotResponsibleService } from './license-lot/license-lot-responsible.service';
+import { LicenseLotViewService } from './license-lot/license-lot-view.service';
+import { SubscriptionLotResponsibleService } from './subscription/responsible/subscription-lot-responsible.service';
+import { LicenseLotService } from './license-lot/license-lot.service';
+import { LicenseLotsController } from './license-lot/license-lots.controller';
+import { LicenseLotRepo } from './license-lot/license-lot.repo';
+import { LicenseLotApi } from './public/license-lot.api';
+import { SeatLedgerRepo } from './subscription-line/ledger/seat-ledger.repo';
+import { SeatLedgerService } from './subscription-line/ledger/seat-ledger.service';
+import { SeatPurchaseRepo } from './subscription-line/purchase/seat-purchase.repo';
+import { SeatPurchaseService } from './subscription-line/purchase/seat-purchase.service';
+import { SubscriptionLineSeatsService } from './subscription-line/subscription-line-seats.service';
+import { SeatChangeQueryService } from './subscription-line/seat-change-query.service';
+import { SubscriptionLineService } from './subscription-line/subscription-line.service';
+import { SubscriptionLineCorrectionService } from './subscription-line/correction/subscription-line-correction.service';
+import { SubscriptionLineSeatsController } from './subscription-line/correction/subscription-line-seats.controller';
+import { SubscriptionLinesController } from './subscription-line/subscription-lines.controller';
+import { SubscriptionPeriodLinesService } from './subscription-line/subscription-period-lines.service';
+import { SubscriptionMultiLineService } from './subscription/lines/subscription-lines.service';
+import { SeatLedgerApi } from './public/seat-ledger.api';
+import { WorkspaceViewService } from './workspace/workspace-view.service';
+import { WorkspacesController } from './workspace/workspaces.controller';
 
 /**
  * The catalog context (C1, G3 part): the shared vendor dictionary, the application catalog and its vendors and
@@ -115,6 +148,7 @@ import { VendorRepo } from './vendor/vendor.repo';
     ObjectStorageModule,
   ],
   controllers: [
+    LicenseLotsController,
     VendorDictionaryController,
     ApplicationsController,
     ApplicationIntakeController,
@@ -123,7 +157,10 @@ import { VendorRepo } from './vendor/vendor.repo';
     PlanTermsController,
     VendorsController,
     SubscriptionsController,
+    SubscriptionLinesController,
+    SubscriptionLineSeatsController,
     SubscriptionResponsibleController,
+    WorkspacesController,
     ApplicationRetirementController,
     ApplicationResponsibilityController,
     ContractsController,
@@ -159,6 +196,35 @@ import { VendorRepo } from './vendor/vendor.repo';
     PlanService,
     PlanQuotePriceService,
     PlanWorkspaceService,
+    WorkspaceService,
+    WorkspaceAdminsService,
+    WorkspaceResponsibleService,
+    WorkspaceViewService,
+    WorkspaceForSubscriptionService,
+    WorkspaceRepo,
+    SubscriptionLineSeatsService,
+    SubscriptionLineService,
+    SubscriptionLineCorrectionService,
+    SeatChangeQueryService,
+    SubscriptionPeriodLinesService,
+    SubscriptionMultiLineService,
+    SubscriptionLotResponsibleService,
+    LicenseLotRepo,
+    LicenseLotLockService,
+    LicenseLotService,
+    LicenseLotCreateService,
+    LicenseLotPriceService,
+    LicenseLotViewService,
+    LicenseLotStockService,
+    LicenseLotResponsibleService,
+    LicenseLotApi,
+    LicenseLotStockApi,
+    SeatLedgerRepo,
+    SeatLedgerService,
+    SeatPurchaseRepo,
+    SeatPurchaseService,
+    SeatLedgerApi,
+    WorkspaceApi,
     VendorAdminRolesService,
     VendorAdminMinimumService,
     PlanRepo,
@@ -177,11 +243,11 @@ import { VendorRepo } from './vendor/vendor.repo';
     SubscriptionPoolService,
     SubscriptionSeatIncreaseService,
     SubscriptionPricingService,
+    SubscriptionPriceService,
     SubscriptionGrantingRepo,
     SubscriptionViewService,
     SubscriptionNoticeService,
     SubscriptionWindowsService,
-    SubscriptionPeriodRepo,
     SubscriptionPeriodService,
     SeatTargetService,
     OnboardingFactsService,
@@ -210,12 +276,15 @@ import { VendorRepo } from './vendor/vendor.repo';
   ],
   // The facade licensing reads the seat targets through (ADR-0013), and the hook licensing binds its reader of occupied seats to
   // (`public/catalog.extension-points.ts`), and the facade the hand-over of an IT Admin who leaves moves their subscriptions and applications through
-  // (`public/catalog-responsibility.api.ts`), and the facade `usage` reads the applications of a contract through (`public/catalog-contract.api.ts`); the capability services and repos stay private.
+  // (`public/catalog-responsibility.api.ts`), and the facade `usage` reads the applications of a contract through (`public/catalog-contract.api.ts`), and the facade licensing reads and locks the lots of licenses through (`public/license-lot.api.ts`); the capability services and repos stay private.
   exports: [
     CatalogApi,
     CatalogPlanTermsApi,
     CatalogContractApi,
     CatalogResponsibilityApi,
+    LicenseLotApi,
+    LicenseLotStockApi,
+    SeatLedgerApi,
     SubscriptionPeriodApi,
     SeatOccupancyHook,
     SeatBaselinePhaseHook,

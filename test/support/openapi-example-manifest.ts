@@ -22,6 +22,7 @@ import { SUCCESS_MESSAGES_DEVICES } from './openapi-example-messages-devices';
 import { SUCCESS_MESSAGES_OPTIMIZATION } from './openapi-example-messages-optimization';
 import { SUCCESS_MESSAGES_PURCHASE_INVOICE } from './openapi-example-messages-purchase-invoice';
 import { SUCCESS_MESSAGES_USAGE } from './openapi-example-messages-usage';
+import { SUCCESS_MESSAGES_WAVE3_TECH } from './openapi-example-route-codes-wave3-tech';
 import { ROUTE_ERROR_CODES_DEVICES } from './openapi-example-route-codes-devices';
 import { ROUTE_ERROR_CODES_HEALTH } from './openapi-example-route-codes-health';
 import { ROUTE_ERROR_CODES_IDENTITY_ACCESS } from './openapi-example-route-codes-identity-access';
@@ -43,6 +44,7 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   ...SUCCESS_MESSAGES_POLICIES,
   ...SUCCESS_MESSAGES_PURCHASE_INVOICE,
   ...SUCCESS_MESSAGES_USAGE,
+  ...SUCCESS_MESSAGES_WAVE3_TECH,
   accessRequestAssessmentComplete: 'ACCESS_REQUEST.ASSESSMENT_COMPLETED',
   accessRequestAssessmentGet: 'ACCESS_REQUEST.ASSESSMENT_FETCHED',
   accessRequestAssessmentReject: 'ACCESS_REQUEST.ASSESSMENT_REJECTED',
@@ -346,6 +348,7 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   subscriptionRenewalAdjustmentGet: 'SUBSCRIPTION_RENEWAL.ADJUSTMENT_FOUND',
   subscriptionRenewalGet: 'SUBSCRIPTION_RENEWAL.FOUND',
   subscriptionRenewalList: 'SUBSCRIPTION_RENEWAL.LISTED',
+  subscriptionRenewalMissedAdjustmentKpiGet: 'SUBSCRIPTION_RENEWAL.KPI4_RETRIEVED',
   subscriptionRenewalPropose: 'SUBSCRIPTION_RENEWAL.OUTCOME_RECORDED',
   subscriptionRenewalRecordOutcome: 'SUBSCRIPTION_RENEWAL.OUTCOME_RECORDED',
   subscriptionRenewalSeatRanking: 'SUBSCRIPTION_RENEWAL.SEATS_RANKED',
@@ -373,10 +376,7 @@ export const BODYLESS_RESPONSES: Readonly<Record<string, string>> = {
   'importTemplateGet 200': 'A file (xlsx or csv) sent as raw bytes with its own content type (@RawResponse).',
 };
 export const NO_EXAMPLE_RESPONSES: Readonly<Record<string, string>> = {};
-/**
- * The route-specific codes, in one file per owning module to keep each support file small (TEST-HARDEN.1); a module whose
- * routes do not fit one file has a second named by its area. An operationId listed twice is a mistake the inventory test reports.
- */
+/** Route-specific error codes per owning module; duplicates are reported by the inventory test. */
 const PARTS = [
   ROUTE_ERROR_CODES_AI_ASSIST,
   ROUTE_ERROR_CODES_BUDGETS,

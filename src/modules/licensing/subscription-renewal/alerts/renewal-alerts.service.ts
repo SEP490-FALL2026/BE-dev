@@ -7,6 +7,7 @@ import type { InAppNotificationCode, InAppParamValue } from '../../../notificati
 import { RenewalNotifier } from '../subscription-renewal-notifier.service';
 import type { RenewalPeople } from '../subscription-renewal-parties.service';
 import { noticeRecipients, type DataQualityProblem, type DueNoticeKind } from './renewal-adjustment-alerts.policy';
+import { WorkspaceAdminAlertService } from './workspace-admin-alert.service';
 
 /** The notices of the point of adjustment: the ones that are not an event of the renewal day. */
 export type AlertKind = Extract<DueNoticeKind, 'ADJUSTMENT_POINT' | 'RED_ALERT' | 'KEPT'>;
@@ -39,7 +40,13 @@ export class RenewalAlertsService {
     private readonly notifier: RenewalNotifier,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
+    private readonly workspaceAdmins: WorkspaceAdminAlertService,
   ) {}
+
+  /** Emits `WORKSPACE_ADMIN_NOT_WORKING` once per `(workspace, admin)` during the hourly renewal sweep. */
+  sweepWorkspaceAdmins(organizationId: string): Promise<number> {
+    return this.workspaceAdmins.sweep(organizationId);
+  }
 
   /** Writes what is due for the period; returns how many people were told now. */
   async sendDue(subject: AlertSubject): Promise<number> {

@@ -38,28 +38,26 @@ describe('device retirement and voiding (integration, real PostgreSQL)', () => {
     ).id;
   };
 
-  const purchaseOf = async (planId: string, purchasedQuantity: number): Promise<string> =>
+  const purchaseOf = async (planId: string, licenseCount: number): Promise<string> =>
     h.dataOf<{ id: string }>(
       await request(server())
-        .post('/api/v1/subscriptions')
+        .post('/api/v1/license-lots')
         .set(as(h.it1))
         .send({
           planId,
-          kind: 'PERPETUAL',
-          purchasedQuantity,
+          purpose: 'STOCK',
+          licenseCount,
           unitPrice: { amount: '1000000', currency: 'VND' },
-          startDate: '2026-03-15',
-          responsibleItAdminEmployeeId: h.it1.employeeId,
+          purchasedOn: '2026-03-15',
         })
         .expect(201),
     ).id;
 
-  const importKey = async (subscriptionId: string, maxActivations: number): Promise<string> => {
+  const importKey = async (lotId: string, maxActivations: number): Promise<string> => {
     await request(server())
-      .post('/api/v1/license-keys/imports')
+      .post(`/api/v1/license-lots/${lotId}/keys`)
       .set(as(h.it1))
       .send({
-        subscriptionId,
         keys: [`RVD-${randomUUID().replace(/-/g, '').slice(0, 18).toUpperCase()}`],
         maxActivations,
       })
@@ -67,8 +65,8 @@ describe('device retirement and voiding (integration, real PostgreSQL)', () => {
 
     return (
       await h.ctx.sql.query<{ id: string }>(
-        `SELECT id FROM license_keys WHERE subscription_id = $1 ORDER BY imported_at DESC, id DESC LIMIT 1`,
-        [subscriptionId],
+        `SELECT id FROM license_keys WHERE license_lot_id = $1 ORDER BY imported_at DESC, id DESC LIMIT 1`,
+        [lotId],
       )
     ).rows[0].id;
   };
@@ -154,10 +152,10 @@ describe('device retirement and voiding (integration, real PostgreSQL)', () => {
     );
     expect(retiredDisposed).toMatchObject({ custody: 'RETIRED', retirementKind: 'DISPOSED', holder: null });
 
-    const subAfterDispose = h.dataOf<{ occupied: number }>(
-      await request(server()).get(`/api/v1/subscriptions/${subId}/seat-usage`).set(as(h.it1)).expect(200),
+    const lotAfterDispose = h.dataOf<{ assigned: number }>(
+      await request(server()).get(`/api/v1/license-lots/${subId}`).set(as(h.it1)).expect(200),
     );
-    expect(subAfterDispose.occupied).toBe(0);
+    expect(lotAfterDispose.assigned).toBe(0);
 
     // Retire LOST with LOST_WITH_DEVICE keeps seat occupied.
     const lostDev = await h.registered(await h.person('E-RET-LOST'));
@@ -176,10 +174,10 @@ describe('device retirement and voiding (integration, real PostgreSQL)', () => {
     );
     expect(retiredLost).toMatchObject({ custody: 'RETIRED', retirementKind: 'LOST', holder: null });
 
-    const subAfterLost = h.dataOf<{ occupied: number }>(
-      await request(server()).get(`/api/v1/subscriptions/${subId}/seat-usage`).set(as(h.it1)).expect(200),
+    const lotAfterLost = h.dataOf<{ assigned: number }>(
+      await request(server()).get(`/api/v1/license-lots/${subId}`).set(as(h.it1)).expect(200),
     );
-    expect(subAfterLost.occupied).toBe(1);
+    expect(lotAfterLost.assigned).toBe(1);
 
     // Awaiting return machine cannot be retired directly.
     const awaiting = await h.registered(await h.person('E-RET-AWAIT'));

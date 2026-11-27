@@ -20,3 +20,43 @@ export interface SeatOfMonth {
   /** The request whose grant made the seat; null for a seat of the baseline or one no grant task made. */
   requestId: string | null;
 }
+
+export type SeatInForceSource = 'BASELINE' | 'HANDOVER' | 'REQUEST' | 'RENEWAL_CARRY' | 'MACHINE_ACCOUNT_CONVERSION';
+
+/**
+ * A seat of a pool of K2 seats on a subscription that is in force on a given business day, with its assignment source
+ * and holder/owning-department facts used to classify running uncommitted cost.
+ */
+export interface SeatInForce {
+  assignmentId: string;
+  subscriptionId: string;
+  planId: string;
+  requestId: string | null;
+  source: SeatInForceSource;
+  kind: 'PERSONAL' | 'SERVICE';
+  employeeId: string;
+  owningDepartmentId: string | null;
+  heldFrom: BusinessDate;
+  heldUntil: BusinessDate | null;
+}
+
+/** Active K1 seat without a linked Request (`K-A2`), used to compute running uncommitted cost and `NO_PRICE` flags. */
+export interface UnrequestedK1SeatInForce {
+  assignmentId: string;
+  planId: string;
+  source: SeatInForceSource;
+  kind: 'PERSONAL' | 'SERVICE';
+  employeeId: string;
+  owningDepartmentId: string | null;
+  heldFrom: BusinessDate;
+  heldUntil: BusinessDate | null;
+  billingAnchorOn: BusinessDate | null;
+  referenceMonthlyPriceMinor: bigint | null;
+}
+
+/** Locked renewal target snapshot of a prior subscription line. */
+export interface PriorLineLockedTarget {
+  subscriptionLineId: string;
+  renewalOn: BusinessDate;
+  target: number;
+}

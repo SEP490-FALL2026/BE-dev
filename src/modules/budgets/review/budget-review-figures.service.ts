@@ -5,6 +5,7 @@ import { BudgetFactsRepo } from '../budget/budget-facts.repo';
 import { CommitmentRepo, heldKey } from '../budget/commitment.repo';
 import { InvoiceRepo } from '../budget/invoice.repo';
 import { PendingSpendContributions } from '../public/budgets.extension-points';
+import { RunningUncommittedFactsService } from '../running-uncommitted/running-uncommitted-facts.service';
 import { SeatMonthRepo } from '../seat-month/seat-month.repo';
 import { BudgetReviewPriceService } from './budget-review-price.service';
 import { knownPriceIncrease, reviewFiguresOf } from './budget-review.policy';
@@ -26,6 +27,7 @@ export class BudgetReviewFiguresService {
     private readonly pending: PendingSpendContributions,
     private readonly prices: BudgetReviewPriceService,
     private readonly seatMonths: SeatMonthRepo,
+    private readonly runningUncommitted: RunningUncommittedFactsService,
   ) {}
 
   /** What the company spent in the year, every invoice of it whatever it is booked to, the invoices of the shared pool in it (`MG-03`). */
@@ -39,12 +41,18 @@ export class BudgetReviewFiguresService {
   }
 
   /** The lines of the Cost Centers with a budget in `currency`, in order of id. A Cost Center with no budget has nothing to compare and no line. */
-  async linesOf(tx: DbTx, year: number, month: number, currency: string): Promise<NewReviewLine[]> {
+  async linesOf(
+    tx: DbTx,
+    year: number,
+    month: number,
+    currency: string,
+    today?: BusinessDate,
+  ): Promise<NewReviewLine[]> {
     const approved = [...(await this.budgets.approvedOfYear(year, tx))]
       .filter(([, budget]) => budget.currency === currency)
       .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
 
-    return this.linesFor(tx, year, month, approved);
+    return this.linesFor(tx, year, month, approved, today);
   }
 
   /**
@@ -62,7 +70,7 @@ export class BudgetReviewFiguresService {
     const approved = [...(await this.budgets.approvedOfCostCenters(costCenterIds, year, tx))];
     if (approved.length === 0) return forecasts;
     const month = year > Number(today.slice(0, 4)) ? 1 : Math.max(1, Number(today.slice(5, 7)) - 1);
-    for (const line of await this.linesFor(tx, year, month, approved))
+    for (const line of await this.linesFor(tx, year, month, approved, today))
       forecasts.set(line.costCenterId, line.forecastMinor);
 
     return forecasts;
@@ -73,6 +81,7 @@ export class BudgetReviewFiguresService {
     year: number,
     month: number,
     approved: readonly [string, { baseMinor: bigint; reserveMinor: bigint }][],
+    today?: BusinessDate,
   ): Promise<NewReviewLine[]> {
     if (approved.length === 0) return [];
     const costCenterIds = approved.map(([costCenterId]) => costCenterId);
@@ -85,8 +94,19 @@ export class BudgetReviewFiguresService {
     const pending = await this.pending.totals(pairs, tx);
     const basis = await this.invoices.priceBasisOf(pairs, tx, from);
     const increases = await this.prices.itemsOf(tx, costCenterIds, year, month);
+    const priorYearReleased =
+      month === 1 ? await this.budgets.priorYearReleasedOf(costCenterIds, year - 1, tx) : new Map<string, bigint>();
+    const runningUncommitted = await this.runningUncommitted.ofYear(year, today, tx);
 
-    const facts: YearFacts = { totals, spentThrough, pending, basis, increases };
+    const facts: YearFacts = {
+      totals,
+      spentThrough,
+      pending,
+      basis,
+      increases,
+      priorYearReleased,
+      runningUncommitted,
+    };
 
     return approved.map(([costCenterId, budget]) => lineOf(month, year, costCenterId, budget, facts));
   }
@@ -99,6 +119,8 @@ interface YearFacts {
   pending: Map<string, bigint>;
   basis: Map<string, { basisMinor: bigint; actualMinor: bigint }>;
   increases: Map<string, PriceIncreaseItem[]>;
+  priorYearReleased: Map<string, bigint>;
+  runningUncommitted: Map<string, bigint>;
 }
 
 /** The line of one Cost Center: its figures put in the policy and what the policy says kept with them. */
@@ -124,6 +146,7 @@ function lineOf(
     invoiceBasisMinor: invoiceBasis.basisMinor,
     invoiceActualMinor: invoiceBasis.actualMinor,
     priceIncreaseMinor: knownPriceIncrease(facts.increases.get(costCenterId) ?? []),
+    runningUncommittedMinor: facts.runningUncommitted.get(costCenterId) ?? 0n,
   };
   const figures = reviewFiguresOf(input);
 
@@ -133,6 +156,7 @@ function lineOf(
     reserveMinor: input.reserveMinor,
     spentMinor: input.spentMinor,
     spentAfterMonthMinor: input.spentAfterMonthMinor,
+    priorYearReleasedMinor: facts.priorYearReleased.get(costCenterId) ?? 0n,
     committedMinor: input.committedMinor,
     pendingSpendMinor: input.pendingMinor,
     remainingMinor: figures.remainingMinor,

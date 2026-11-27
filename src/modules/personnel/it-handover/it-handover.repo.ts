@@ -13,10 +13,14 @@ type ItemRow = {
   organizationId: string;
   subscriptionsAtRecord: number;
   applicationsAtRecord: number;
+  workspacesAtRecord: number;
+  licenseLotsAtRecord: number;
   doneAt: Date | null;
   doneToEmployeeId: string | null;
   doneSubscriptions: number | null;
   doneApplications: number | null;
+  doneWorkspaces: number | null;
+  doneLicenseLots: number | null;
 };
 
 const toItem = (row: ItemRow): HandoverItem => ({
@@ -24,16 +28,22 @@ const toItem = (row: ItemRow): HandoverItem => ({
   organizationId: row.organizationId,
   subscriptionsAtRecord: row.subscriptionsAtRecord,
   applicationsAtRecord: row.applicationsAtRecord,
+  workspacesAtRecord: row.workspacesAtRecord,
+  licenseLotsAtRecord: row.licenseLotsAtRecord,
   done:
     row.doneAt !== null &&
     row.doneToEmployeeId !== null &&
     row.doneSubscriptions !== null &&
-    row.doneApplications !== null
+    row.doneApplications !== null &&
+    row.doneWorkspaces !== null &&
+    row.doneLicenseLots !== null
       ? {
           at: row.doneAt,
           toEmployeeId: row.doneToEmployeeId,
           subscriptions: row.doneSubscriptions,
           applications: row.doneApplications,
+          workspaces: row.doneWorkspaces,
+          licenseLots: row.doneLicenseLots,
         }
       : null,
 });
@@ -55,7 +65,14 @@ export class ItHandoverRepo {
   /** Keeps what the person answered for when the file was recorded; a second call for the same file writes nothing. */
   async insertItem(
     tx: DbTx,
-    input: { organizationId: string; source: HandoverSource; subscriptions: number; applications: number },
+    input: {
+      organizationId: string;
+      source: HandoverSource;
+      subscriptions: number;
+      applications: number;
+      workspaces: number;
+      licenseLots: number;
+    },
   ): Promise<void> {
     await tx.itAdminHandover.createMany({
       data: [
@@ -65,6 +82,8 @@ export class ItHandoverRepo {
           ...whereSource(input.source),
           subscriptionsAtRecord: input.subscriptions,
           applicationsAtRecord: input.applications,
+          workspacesAtRecord: input.workspaces,
+          licenseLotsAtRecord: input.licenseLots,
         },
       ],
       skipDuplicates: true,
@@ -80,7 +99,14 @@ export class ItHandoverRepo {
     input: {
       organizationId: string;
       source: HandoverSource;
-      done: { at: Date; toEmployeeId: string; subscriptions: number; applications: number };
+      done: {
+        at: Date;
+        toEmployeeId: string;
+        subscriptions: number;
+        applications: number;
+        workspaces: number;
+        licenseLots: number;
+      };
     },
   ): Promise<void> {
     const { done } = input;
@@ -89,6 +115,8 @@ export class ItHandoverRepo {
       doneToEmployeeId: done.toEmployeeId,
       doneSubscriptions: done.subscriptions,
       doneApplications: done.applications,
+      doneWorkspaces: done.workspaces,
+      doneLicenseLots: done.licenseLots,
     };
     await tx.itAdminHandover.upsert({
       where: whereSource(input.source),
@@ -98,6 +126,8 @@ export class ItHandoverRepo {
         ...whereSource(input.source),
         subscriptionsAtRecord: done.subscriptions,
         applicationsAtRecord: done.applications,
+        workspacesAtRecord: done.workspaces,
+        licenseLotsAtRecord: done.licenseLots,
         ...columns,
       },
       update: columns,

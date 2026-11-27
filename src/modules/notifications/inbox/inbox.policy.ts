@@ -118,6 +118,8 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   BUDGET_REVIEW_DUE: ['year', 'month'],
   BUDGET_REVIEW_SUMMARY: ['periodId', 'year', 'month', 'kind', 'greenCount', 'yellowCount', 'redCount', 'underCount'],
   BUDGET_SHARED_POOL_OVER_RESERVE: ['year', 'month'],
+  IDLE_SEAT_COST_RATIO_HIGH: ['subscriptionId', 'month', 'ratioPercent'],
+  LICENSE_LOT_IDLE_COST_HIGH: ['lotId', 'month', 'ratioPercent'],
   // The use of the budget of a Cost Center reached 80 or 100 percent of its base (`QĐ-111af`, RV-2): the Cost Center, the year and the threshold, never a figure.
   BUDGET_THRESHOLD_REACHED: ['costCenterId', 'year', 'threshold'],
   // The head of a department is reminded to explain a Cost Center of a quarterly review (`QĐ-111ah`, B-7): on the due day and every Monday until they explain or Finance signs.
@@ -221,12 +223,40 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   DEPARTMENT_SOFTWARE_PROPOSAL_DECIDED: ['proposalId', 'departmentId', 'applicationId', 'planId', 'decision', 'reason'],
   // The admins a plan keeps at the vendor (`QĐ-110k`): how many are left; and a subscription that gained seats (`QĐ-110v`).
   VENDOR_ADMINS_BELOW_MINIMUM: ['planId', 'applicationId', 'adminCount'],
+  WORKSPACE_ADMIN_NOT_WORKING: ['workspaceId', 'employeeId', 'workingAdminCount'],
   DEPARTMENT_WITHOUT_HEAD: ['departmentId', 'waitingCount'],
   SUBSCRIPTION_SEATS_INCREASED: ['subscriptionId', 'fromQuantity', 'toQuantity', 'requestId', 'changedByEmployeeId'],
+  SUBSCRIPTION_SEATS_REDUCED: ['subscriptionId', 'fromQuantity', 'toQuantity', 'changedByEmployeeId'],
+  SUBSCRIPTION_SEATS_BOUGHT: [
+    'subscriptionId',
+    'subscriptionLineId',
+    'seatPurchaseId',
+    'quantity',
+    'recordedByEmployeeId',
+  ],
+  SEAT_PURCHASE_INVOICE_OVERDUE: ['seatPurchaseId', 'subscriptionId', 'dueOn'],
+  SEAT_LEDGER_VENDOR_RECORDED: [
+    'subscriptionId',
+    'subscriptionLineId',
+    'seatChangeId',
+    'delta',
+    'effectiveOn',
+    'recordedByEmployeeId',
+    'outOfProcess',
+  ],
+  SUBSCRIPTION_PRICE_REVIEW: ['subscriptionId', 'purchaseInvoiceId'],
   // What an IT Admin who leaves still answers for, once the day has come and the handover is not done (`QĐ-110j`, `R-26`).
   IT_ADMIN_HANDOVER_PENDING: ['sourceKind', 'sourceId', 'employeeId', 'dueOn'],
-  // The same, told to the IT Admin who took it all: from whom, and how many of each (`QĐ-110j`, SPEC P5).
-  IT_ADMIN_HANDOVER_RECEIVED: ['sourceKind', 'sourceId', 'fromEmployeeId', 'subscriptions', 'applications'],
+  // The same, told to the IT Admin who took it all: from whom, and how many of each: subscriptions, applications, workspaces and license lots.
+  IT_ADMIN_HANDOVER_RECEIVED: [
+    'sourceKind',
+    'sourceId',
+    'fromEmployeeId',
+    'subscriptions',
+    'applications',
+    'workspaces',
+    'licenseLots',
+  ],
   // A departure cancelled after the last working day: how many revocation tasks in progress the IT Admin closes by hand (`QĐ-110c`).
   DEPARTURE_REVOCATION_IT_CLOSE: ['caseId', 'employeeId', 'taskCount'],
   // A new version of a policy: which policy, which version, and whether the reader is asked to acknowledge it (`QĐ-111bi`).

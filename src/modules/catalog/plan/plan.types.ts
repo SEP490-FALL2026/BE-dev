@@ -7,6 +7,7 @@ export type SeatTracking = 'APPLICABLE' | 'NOT_APPLICABLE';
 export type ApplicationKind = 'SAAS' | 'LICENSED' | 'INTERNAL';
 /** How a K4 plan is bound once bought: to an account, to a machine by a key, or bundled with the machine (no key). */
 export type KeyBinding = 'ACCOUNT' | 'DEVICE_KEY' | 'DEVICE_BUNDLED';
+export type ReferenceCommitmentMonths = 1 | 12;
 
 /** The reference price of a plan, in minor units of dong (`QĐ-113a`). */
 export interface ReferencePrice {
@@ -34,6 +35,7 @@ export interface PlanRecord {
   hasAdminConsole: boolean;
   /** The price a request is counted by when no subscription of the plan has one (`QĐ-113a`); null when none is entered. */
   referencePrice: ReferencePrice | null;
+  referenceCommitmentMonths: ReferenceCommitmentMonths | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -116,6 +118,7 @@ export interface NewPlan {
   sharingPolicy: SharingPolicy | null;
   hasAdminConsole: boolean;
   referencePrice: ReferencePrice | null;
+  referenceCommitmentMonths: ReferenceCommitmentMonths | null;
 }
 
 export interface PlanChanges {
@@ -129,6 +132,7 @@ export interface PlanChanges {
   sharingPolicy?: SharingPolicy | null;
   hasAdminConsole?: boolean;
   referencePrice?: ReferencePrice | null;
+  referenceCommitmentMonths?: ReferenceCommitmentMonths | null;
 }
 
 /** The plan and the facts about it the capabilities that hang off it read: a subscription, the terms. */
@@ -140,9 +144,13 @@ export interface PlanLookup {
   pricingModel: PricingModel | null;
   sharingPolicy: SharingPolicy | null;
   hasAdminConsole: boolean;
+  referencePriceMinor?: bigint | null;
+  referenceCommitmentMonths: ReferenceCommitmentMonths | null;
   applicationId: string;
   applicationName: string;
   applicationKind: ApplicationKind;
   /** Whether the application is still in the catalog or has been retired. */
   applicationStatus: 'APPROVED' | 'RETIRED';
+  /** The vendor of the application (the workspace of a subscription is held at it); null for an internal application. */
+  applicationVendorId?: string | null;
 }

@@ -120,4 +120,16 @@ describe('the time of use a renewal asks for (QĐ-111l, QĐ-111i)', () => {
     expect(renewalTermMonthsOf({ extensionMonths: 12 })).toBe(12);
     expect(renewalTermMonthsOf({ longTerm: true })).toBeNull();
   });
+
+  it('QĐ-116d: fixes omitted K1 annual renewal to 12 months while leaving explicit non-12 values and K1 monthly intact', () => {
+    const k1Annual = { provisioningType: 'K1' as const, referenceCommitmentMonths: 12 };
+    const k1Monthly = { provisioningType: 'K1' as const, referenceCommitmentMonths: 1 };
+
+    expect(renewalTermMonthsOf({}, k1Annual)).toBe(12);
+    expect(renewalTermMonthsOf({ extensionMonths: 12 }, k1Annual)).toBe(12);
+    expect(renewalTermMonthsOf({ extensionMonths: 6 }, k1Annual)).toBe(6);
+    expect(renewalTermMonthsOf({ longTerm: true }, k1Annual)).toBeNull();
+    expect(renewalTermMonthsOf({}, k1Monthly)).toBeNull();
+    expect(renewalTermMonthsOf({ extensionMonths: 9 }, k1Monthly)).toBe(9);
+  });
 });

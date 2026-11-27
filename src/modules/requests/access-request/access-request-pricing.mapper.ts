@@ -1,7 +1,6 @@
 import type { Prisma } from '../../../generated/prisma/client';
 import { fromDateColumn, toDateColumn } from '../../../core/business-date';
-import type { PricingRecord } from './access-request.types';
-import type { MissingPriceReason } from './access-request.types';
+import type { MissingPriceReason, PricingRecord } from './access-request.types';
 
 /** The columns of a request that carry its price, as the database returns them. */
 type PricingRow = Pick<
@@ -15,6 +14,7 @@ type PricingRow = Pick<
   | 'amountMinor'
   | 'amountCurrency'
   | 'unitPriceMinor'
+  | 'monthlyPriceMinor'
   | 'billingCycle'
   | 'nextYearAmountMinor'
 >;
@@ -31,9 +31,20 @@ export function toPricing(row: PricingRow): PricingRecord {
     budgetYear: row.budgetYear,
     amount: row.amountMinor !== null && currency !== null ? { amountMinor: row.amountMinor, currency } : null,
     unitPrice: row.unitPriceMinor !== null && currency !== null ? { amountMinor: row.unitPriceMinor, currency } : null,
+    monthlyPriceMinor: row.priceKind === 'ONE_TIME' ? null : row.monthlyPriceMinor,
     billingCycle: row.billingCycle,
     nextYearAmount:
       row.nextYearAmountMinor !== null && currency !== null ? { amountMinor: row.nextYearAmountMinor, currency } : null,
+  };
+}
+
+function amountColumns(pricing: PricingRecord) {
+  return {
+    amountMinor: pricing.amount ? pricing.amount.amountMinor : null,
+    amountCurrency: pricing.amount ? pricing.amount.currency : null,
+    unitPriceMinor: pricing.unitPrice ? pricing.unitPrice.amountMinor : null,
+    monthlyPriceMinor: pricing.monthlyPriceMinor ?? null,
+    nextYearAmountMinor: pricing.nextYearAmount ? pricing.nextYearAmount.amountMinor : null,
   };
 }
 
@@ -46,10 +57,7 @@ export function pricingColumns(pricing: PricingRecord) {
     expectedEndDate: pricing.expectedEndDate ? toDateColumn(pricing.expectedEndDate) : null,
     amountMonths: pricing.amountMonths ?? null,
     budgetYear: pricing.budgetYear,
-    amountMinor: pricing.amount?.amountMinor ?? null,
-    amountCurrency: pricing.amount?.currency ?? null,
-    unitPriceMinor: pricing.unitPrice?.amountMinor ?? null,
     billingCycle: pricing.billingCycle,
-    nextYearAmountMinor: pricing.nextYearAmount?.amountMinor ?? null,
+    ...amountColumns(pricing),
   };
 }

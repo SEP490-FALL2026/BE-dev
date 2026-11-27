@@ -28,6 +28,10 @@ export class RenewalRecordTrail {
     private readonly notifier: RenewalNotifier,
   ) {}
 
+  recordingAccessOf(actor: AuthenticatedPrincipal, period: RenewalPeriodFacts, tx?: DbTx) {
+    return this.parties.recordingAccessOf(actor, period, tx);
+  }
+
   async proposed(
     tx: DbTx,
     actor: AuthenticatedPrincipal,

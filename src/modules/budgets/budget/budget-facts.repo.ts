@@ -51,6 +51,7 @@ export class BudgetFactsRepo {
         adjustmentMinor,
         heldMinor: held?.held ?? 0n,
         spentMinor: held?.spent ?? 0n,
+        runningUncommittedMinor: 0n,
       });
     }
 
@@ -158,6 +159,51 @@ export class BudgetFactsRepo {
     });
 
     return adjustmentDeltasOf(rows, versionIdOf);
+  }
+
+  /** Years strictly before `beforeYear` that still have at least one HELD commitment in the organization. */
+  async listHeldYearsBefore(organizationId: string, beforeYear: number, tx?: DbTx): Promise<number[]> {
+    const db = tx ?? this.prisma;
+    const rows = await db.budgetCommitment.findMany({
+      where: { organizationId, year: { lt: beforeYear }, state: 'HELD' },
+      distinct: ['year'],
+      select: { year: true },
+      orderBy: { year: 'asc' },
+    });
+    return rows.map((row) => row.year);
+  }
+
+  /** Held commitments of an organization in `year`, ordered by id for deterministic Tier 9 locking. */
+  async listHeldByYear(organizationId: string, year: number, tx?: DbTx) {
+    const db = tx ?? this.prisma;
+    return db.budgetCommitment.findMany({
+      where: { organizationId, year, state: 'HELD' },
+      select: { id: true, requestId: true },
+      orderBy: { id: 'asc' },
+    });
+  }
+
+  /** Prior-year year-end / December month-end seat-month releases grouped by cost center. */
+  async priorYearReleasedOf(
+    costCenterIds: readonly string[],
+    priorYear: number,
+    tx?: DbTx,
+  ): Promise<Map<string, bigint>> {
+    const sums = new Map<string, bigint>();
+    if (costCenterIds.length === 0) return sums;
+    const db = tx ?? this.prisma;
+    const rows = await db.budgetCommitmentRelease.findMany({
+      where: {
+        commitment: { costCenterId: { in: [...costCenterIds] }, year: priorYear },
+        OR: [{ reason: 'YEAR_END_SEAT_MONTHS' }, { reason: 'MONTH_END', reasonText: `month:${priorYear}-12-01` }],
+      },
+      select: { amountMinor: true, commitment: { select: { costCenterId: true } } },
+    });
+    for (const row of rows) {
+      const cc = row.commitment.costCenterId;
+      sums.set(cc, (sums.get(cc) ?? 0n) + row.amountMinor);
+    }
+    return sums;
   }
 }
 

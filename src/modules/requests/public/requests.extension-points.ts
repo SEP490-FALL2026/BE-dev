@@ -85,8 +85,8 @@ export interface InvoiceDiscrepancyReferral {
   /** The request or the subscription the invoice was for: one of them. */
   requestId: string | null;
   subscriptionId: string | null;
-  /** What differs: the count of seats, the price of one, or both; in a fixed order. */
-  mismatches: Array<'QUANTITY' | 'UNIT_PRICE'>;
+  /** What differs: seat count, unit price, or expected pool amount; in a fixed order. */
+  mismatches: Array<'QUANTITY' | 'UNIT_PRICE' | 'EXPECTED_AMOUNT'>;
   /** The count the invoice states and the count that was approved or bought; null for a side nobody knew. */
   quantity: { invoice: number; expected: number | null };
   /** The price of one the invoice states and the one of the plan or subscription, in the currency each is stated in, in minor units. */

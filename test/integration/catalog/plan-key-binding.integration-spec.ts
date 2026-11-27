@@ -184,7 +184,6 @@ describe('the key binding of a plan over HTTP (integration, real PostgreSQL)', (
           purchasedQuantity: 3,
           unitPrice: { amount: '2000000', currency: 'VND' },
           startDate: '2026-03-15',
-          responsibleItAdminEmployeeId: it1.employeeId,
         })
         .expect(201);
 
@@ -279,7 +278,6 @@ describe('the key binding of a plan over HTTP (integration, real PostgreSQL)', (
           purchasedQuantity: 3,
           unitPrice: { amount: '2000000', currency: 'VND' },
           startDate: '2026-03-15',
-          responsibleItAdminEmployeeId: it1.employeeId,
         })
         .expect(422);
 

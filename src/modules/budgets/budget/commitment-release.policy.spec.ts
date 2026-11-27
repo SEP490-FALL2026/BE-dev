@@ -163,4 +163,20 @@ describe('what is held once something became an expense (US-06-06 AC-4, AC-9)', 
 
     expect(plan).toEqual({ ok: true, items: [{ id: 'c2026', year: 2026, takeMinor: 3_000n, leftMinor: 5_000n }] });
   });
+
+  it('W3-07 F1: skips EXCEEDS_HELD refusal when monthly targets are supplied so spreadRelease can cap per month', () => {
+    const rows = [held(2027, 6_000_000n, 5_000_000n, 0n)];
+    const plan = planRelease(rows, [
+      {
+        year: 2027,
+        amountMinor: 5_145_161n,
+        months: [{ month: '2027-11-01', amountMinor: 145_161n }],
+      },
+    ]);
+
+    expect(plan).toEqual({
+      ok: true,
+      items: [{ id: 'c2027', year: 2027, takeMinor: 1_000_000n, leftMinor: 0n }],
+    });
+  });
 });

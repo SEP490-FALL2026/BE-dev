@@ -39,13 +39,33 @@ describe('G1: the free seats of a subscription (integration, real PostgreSQL)', 
     expect((await w.auditOf('GHOST_SEAT_RECOMMENDATION', g1.id))[0].actor_roles).toEqual([]);
   });
 
-  it('TẠM CHỌN (Q-12, K4): a K4 key pool is not supported yet, so it gets no G1', async () => {
-    const subscription = await w.worldSubscription(5, 'K4');
-    await w.fillSeats(subscription, 3);
+  it('W3-26 (K4 ACCOUNT vs DEVICE_KEY): K4 ACCOUNT lot emits G1 (REGRANT_BEFORE_PURCHASE, counts_toward_vacant_cost=false) and K4 DEVICE_KEY gets no G1', async () => {
+    const accountLotSub = await w.worldSubscription(5, 'K4');
+    await w.fillSeats(accountLotSub, 3);
+
+    const devicePlanId = await w.plan('K4');
+    await w.ctx.sql.query(`UPDATE plans SET key_binding = 'DEVICE_KEY' WHERE id = $1`, [devicePlanId]);
+    const { declareSubscription } = await import('../../support/builders/catalog.builder');
+    const deviceSub = await declareSubscription(w.ctx, w.it1.accessToken, {
+      planId: devicePlanId,
+      kind: 'PERPETUAL',
+      unitPrice: { amount: '1000000', currency: 'VND' },
+      startDate: '2026-01-05',
+      purchasedQuantity: 5,
+    });
 
     await w.runRules();
 
-    expect(await w.g1Of(subscription)).toEqual([]);
+    const [g1, ...others] = await w.g1Of(accountLotSub);
+    expect(others).toEqual([]);
+    expect(g1).toMatchObject({
+      group: 'G1',
+      state: 'OPEN',
+      counts_toward_vacant_cost: false,
+    });
+    expect(g1.evidence).toMatchObject({ group: 'G1', action: 'REGRANT_BEFORE_PURCHASE' });
+    expect(g1.free_seats).toBeGreaterThanOrEqual(2);
+    expect(await w.g1Of(deviceSub)).toEqual([]);
   });
 
   it('US-10-01 AC-9, INV-01: 10 seats all taken by assignments (those waiting for their grant included) give no G1; a failed grant frees its seat', async () => {

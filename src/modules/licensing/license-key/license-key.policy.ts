@@ -144,17 +144,29 @@ export const WITHDRAWAL_REASON_MAX_LENGTH = 500;
 /** What the rules of the pool read of a key. */
 export interface KeyState {
   subscriptionId: string;
+  licenseLotId?: string | null;
   status: 'IN_STORE' | 'ASSIGNED';
   withdrawnAt: Date | null;
 }
 
 /**
- * Whether a key may be given to the seat of a grant (`BR-MF1-09`, `QĐ-103d`): a free key of the store, not withdrawn, of the purchase the
- * seat sits on. Throws LicenseKeyStateError.
+ * Whether a key may be given to the seat of a grant (`BR-MF1-09`, `QĐ-103d`): a free key of the store, not withdrawn,
+ * belonging to the chosen lot (when `expectedLotId` is provided) or matching `seatSubscriptionId`. Throws LicenseKeyStateError.
  */
-export function assertAssignable(key: KeyState, seatSubscriptionId: string | null): void {
+export function assertAssignable(
+  key: KeyState,
+  seatSubscriptionId: string | null,
+  expectedLotId?: string | null,
+): void {
   if (key.withdrawnAt !== null) throw new LicenseKeyStateError('WITHDRAWN');
   if (key.status !== 'IN_STORE') throw new LicenseKeyStateError('NOT_IN_STORE');
+  if (expectedLotId !== undefined && expectedLotId !== null) {
+    if ((key.licenseLotId ?? key.subscriptionId) !== expectedLotId) {
+      throw new LicenseKeyStateError('SUBSCRIPTION_MISMATCH');
+    }
+
+    return;
+  }
   if (key.subscriptionId !== seatSubscriptionId) throw new LicenseKeyStateError('SUBSCRIPTION_MISMATCH');
 }
 
@@ -162,4 +174,41 @@ export function assertAssignable(key: KeyState, seatSubscriptionId: string | nul
 export function assertWithdrawable(key: KeyState): void {
   if (key.withdrawnAt !== null) throw new LicenseKeyStateError('ALREADY_WITHDRAWN');
   if (key.status === 'ASSIGNED') throw new LicenseKeyStateError('ASSIGNED');
+}
+
+/** What the keys of a purchase give: the capacity by how the plan is bound, what is taken of it and what is left. */
+export interface VaultSummary {
+  purchased: number | null;
+  usableKeys: number;
+  capacity: number;
+  warning: CapacityWarning | null;
+  /** How the plan of the purchase is bound; null for a plan that has no binding (read as bound to an account). */
+  keyBinding: KeyBinding;
+  /** What is taken of the capacity: the licenses held on machines for a key on a machine, the keys given to a seat otherwise. */
+  occupied: number;
+  /** What is left of the capacity. */
+  free: number;
+}
+
+/** The summary of a purchase from its figures: how many were bought, the keys usable and assigned, and the licenses held on machines. */
+export function vaultSummaryOf(input: {
+  purchased: number | null;
+  usableKeys: number;
+  keyBinding: KeyBinding;
+  assignedKeys: number;
+  deviceOccupied: number;
+}): VaultSummary {
+  const { purchased, usableKeys, keyBinding } = input;
+  const capacity = capacityOf({ purchased, usableKeys, keyBinding });
+  const occupied = occupiedOf(input);
+
+  return {
+    purchased,
+    usableKeys,
+    capacity,
+    warning: warningOf({ purchased, usableKeys, keyBinding }),
+    keyBinding,
+    occupied,
+    free: freeOf(capacity, occupied),
+  };
 }

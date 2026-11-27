@@ -68,7 +68,15 @@ describe('the notices of MF-2 and MF-3 and of what goes with them (QĐ-110, QĐ-
     ],
     [
       'IT_ADMIN_HANDOVER_RECEIVED',
-      { sourceKind: 'DEPARTMENT_TRANSFER', sourceId: ID, fromEmployeeId: OTHER, subscriptions: 3, applications: 2 },
+      {
+        sourceKind: 'DEPARTMENT_TRANSFER',
+        sourceId: ID,
+        fromEmployeeId: OTHER,
+        subscriptions: 3,
+        applications: 2,
+        workspaces: 1,
+        licenseLots: 1,
+      },
     ],
     ['DEPARTURE_REVOCATION_IT_CLOSE', { caseId: ID, employeeId: OTHER, taskCount: 2 }],
     // The reports of errors in SaaS rights (`FR-2.15`): ids and the words of the report's kind and states, never what was written in it.

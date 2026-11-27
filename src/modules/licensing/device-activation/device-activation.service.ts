@@ -5,6 +5,8 @@ import { AuditApi } from '../../audit/public/audit.api';
 import type { AuditValue } from '../../audit/public/audit.types';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import type { SeatTarget } from '../../catalog/public/catalog.types';
+import { LicenseLotApi } from '../../catalog/public/license-lot.api';
+import type { LicenseLotView } from '../../catalog/public/license-lot.types';
 import {
   DeviceActivationAlreadyOnDeviceError,
   DeviceActivationKeyNotAllowedError,
@@ -36,14 +38,15 @@ import type {
 /**
  * Coordinates opening device software activations while enforcing lot capacity, key usability, and lock hierarchy.
  *
- * Lock order: caller holds the machine lock (tier 2b); this service locks the perpetual purchase via
- * `CatalogApi.lockSeatTarget` (tier 6), then the key `FOR SHARE` (tier 6b), before inserting `device_activations` (tier 8).
+ * Lock order: caller holds the machine lock (tier 2b); this service locks the lot of licenses the key belongs to via
+ * `LicenseLotApi.lockLot` (tier 6a, then the plan, tier 7), then the key `FOR SHARE` (tier 7b), before inserting `device_activations` (tier 8).
  */
 @Injectable()
 export class DeviceActivationService {
   constructor(
     private readonly repo: DeviceActivationRepo,
     private readonly catalog: CatalogApi,
+    private readonly lots: LicenseLotApi,
     private readonly audit: AuditApi,
   ) {}
 
@@ -113,7 +116,7 @@ export class DeviceActivationService {
     if (!probe) throw new DeviceActivationKeyNotFoundError();
     if (probe.planId !== input.planId) throw new DeviceActivationKeyNotOfPlanError();
 
-    const purchase = await this.catalog.lockSeatTarget(tx, { subscriptionId: probe.subscriptionId });
+    const purchase = await this.lots.lockLot(tx, probe.subscriptionId);
     await this.repo.lockKeyForShare(tx, probe.id);
     const keyMeta = (await this.repo.findKeyWithMeta(tx, probe.id)) ?? probe;
     const occupiedCount = await this.repo.occupiedBySubscription(keyMeta.subscriptionId, tx);
@@ -146,16 +149,13 @@ export class DeviceActivationService {
   private assertOpenKeyedReady(
     planTarget: SeatTarget,
     keyMeta: KeyActivationMeta,
-    purchase: SeatTarget | null,
+    purchase: LicenseLotView | null,
     occupiedCount: number,
     input: OpenActivationInput,
   ): void {
-    const purchaseKind =
-      purchase && purchase.kind === 'SUBSCRIPTION' && purchase.provisioningType === 'K4' ? 'PERPETUAL' : null;
-    const freeCount =
-      purchase?.purchasedQuantity != null
-        ? freeLicenses({ purchasedQuantity: purchase.purchasedQuantity, occupiedCount })
-        : 0;
+    // A lot is a purchase of a K4 plan that can always give its licenses out: it has no draft state.
+    const purchaseKind = purchase ? 'PERPETUAL' : null;
+    const freeCount = purchase ? freeLicenses({ purchasedQuantity: purchase.licenseCount, occupiedCount }) : 0;
 
     this.assertOpenVerdict(
       judgeOpen({
@@ -166,7 +166,7 @@ export class DeviceActivationService {
         keyPlanId: keyMeta.planId,
         planId: input.planId,
         purchaseKind,
-        purchaseStatus: purchase?.status ?? null,
+        purchaseStatus: purchase ? 'ACTIVE' : null,
         keyWithdrawn: keyMeta.withdrawnAt !== null,
         freeLicenseCount: freeCount,
       }),

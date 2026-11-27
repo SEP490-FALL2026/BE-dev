@@ -43,32 +43,64 @@ export function isPricedInDong(state: { unitPrice: { currency: string } | null; 
 
 const CYCLE_MONTHS: Readonly<Record<string, number>> = { MONTHLY: 1, QUARTERLY: 3, ANNUAL: 12 };
 
-/** The price of one seat for a month in dong (the price of its cycle over the months of the cycle, rounded up) and the months a payment pays for. */
-export function monthlyCostOf(record: Pick<SubscriptionRecord, 'billingCycle' | 'priceSnapshot' | 'unitPrice'>): {
+/**
+ * The price of one seat for one month in dong, read directly from the stored `monthlyUnitPriceMinor` column (`QĐ-115e`).
+ * Returns null when no monthly price is stored (for example a perpetual purchase or an unpriced draft).
+ */
+export function monthlyPriceOf(record: Pick<SubscriptionRecord, 'monthlyUnitPriceMinor'>): bigint | null {
+  return record.monthlyUnitPriceMinor ?? null;
+}
+
+/** The price of one seat for a month in dong (from `monthlyPriceOf`) and the months a payment pays for. */
+export function monthlyCostOf(record: Pick<SubscriptionRecord, 'billingCycle' | 'monthlyUnitPriceMinor'>): {
   monthlyPriceMinor: bigint | null;
   cycleMonths: number | null;
 } {
   const cycleMonths = record.billingCycle === null ? null : (CYCLE_MONTHS[record.billingCycle] ?? null);
-  const price =
-    record.priceSnapshot?.reportingMinor ??
-    (record.unitPrice?.currency === 'VND' ? record.unitPrice.amountMinor : null);
-  if (cycleMonths === null || price === null) return { monthlyPriceMinor: null, cycleMonths };
-  const months = BigInt(cycleMonths);
+  if (cycleMonths === null) return { monthlyPriceMinor: null, cycleMonths: null };
 
-  return { monthlyPriceMinor: (price + months - 1n) / months, cycleMonths };
+  return { monthlyPriceMinor: monthlyPriceOf(record), cycleMonths };
 }
 
 /** What a plan is bought at, and where that price comes from: a subscription of the plan, or the reference price of the plan itself (`QĐ-113a`). */
 export interface PlanPriceFacts {
   kind: 'RECURRING' | 'ONE_TIME';
+  provisioningType?: 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
+  referenceCommitmentMonths?: 1 | 12 | null;
   unitPrice: Money;
   /** The unit price converted to the reporting currency when it was recorded (`M-17`); null when it was not converted. */
   reportingUnitPrice: Money | null;
+  /** The monthly price of one seat in dong from `monthly_unit_price_minor` (or `referencePriceMinor` for K1/K2); null for `ONE_TIME` or when unset. */
+  monthlyPriceMinor: bigint | null;
   billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER';
   /** The subscription may be cut before its term ends (`QĐ-96f`): a request on it runs to the end of the fiscal year at most. */
   allowsMidTermReduction: boolean;
   /** `SUBSCRIPTION`: the main subscription of the plan prices it; `PLAN_REFERENCE`: the plan has none that does and its own reference price stands in (`QĐ-113a`). */
   source: 'SUBSCRIPTION' | 'PLAN_REFERENCE';
+}
+
+export function subscriptionPlanPriceOf(priced: {
+  subscriptionKind: string;
+  provisioningType: 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
+  referenceCommitmentMonths: 1 | 12 | null;
+  unitPriceMinor: bigint;
+  currency: string;
+  reporting: Money | null;
+  monthlyUnitPriceMinor?: bigint | null;
+  billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER';
+  allowsMidTermReduction: boolean;
+}): PlanPriceFacts {
+  return {
+    kind: priced.subscriptionKind === 'PERPETUAL' ? 'ONE_TIME' : 'RECURRING',
+    provisioningType: priced.provisioningType,
+    referenceCommitmentMonths: priced.referenceCommitmentMonths,
+    unitPrice: { amountMinor: priced.unitPriceMinor, currency: priced.currency },
+    reportingUnitPrice: priced.reporting,
+    monthlyPriceMinor: monthlyPriceOf({ monthlyUnitPriceMinor: priced.monthlyUnitPriceMinor ?? null }),
+    billingCycle: priced.billingCycle,
+    allowsMidTermReduction: priced.allowsMidTermReduction,
+    source: 'SUBSCRIPTION',
+  };
 }
 
 /**
@@ -85,14 +117,21 @@ export function referenceCycleOf(kind: string): 'MONTHLY' | 'ONE_TIME' | undefin
  * The price facts the reference price of a plan gives when no subscription prices it (`QĐ-113a`): recurring by the month for K1 and K2, once for K4.
  * Dong is the reporting currency, so the reporting price is the price itself. Null when the plan has no reference price or its kind cannot have one.
  */
-export function referencePriceSourceOf(kind: string, price: Money | null): PlanPriceFacts | null {
+export function referencePriceSourceOf(
+  kind: string,
+  price: Money | null,
+  referenceCommitmentMonths?: 1 | 12 | null,
+): PlanPriceFacts | null {
   const cycle = referenceCycleOf(kind);
   if (price === null || cycle === undefined) return null;
 
   return {
     kind: cycle === 'MONTHLY' ? 'RECURRING' : 'ONE_TIME',
+    ...(kind === 'K1' || kind === 'K2' || kind === 'K4' ? { provisioningType: kind } : {}),
+    ...(referenceCommitmentMonths !== undefined ? { referenceCommitmentMonths } : {}),
     unitPrice: price,
     reportingUnitPrice: price,
+    monthlyPriceMinor: cycle === 'MONTHLY' ? price.amountMinor : null,
     billingCycle: cycle === 'MONTHLY' ? 'MONTHLY' : 'OTHER',
     allowsMidTermReduction: false,
     source: 'PLAN_REFERENCE',

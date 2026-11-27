@@ -1,5 +1,6 @@
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { CatalogApi } from '../../../catalog/public/catalog.api';
+import type { SeatLedgerApi } from '../../../catalog/public/seat-ledger.api';
 import type { AssignmentService } from '../../assignment/assignment.service';
 import type { GrantRequestGateHook } from '../../public/licensing.extension-points';
 import { GrantRequestRefusedError, ProvisioningPlanBoundToDeviceError } from '../../public/licensing.errors';
@@ -22,6 +23,9 @@ interface WriterOverrides {
   lockLiveRevocation?: jest.Mock;
   endReplacedRight?: jest.Mock;
   requireActingItAdmin?: jest.Mock;
+  recordMember?: jest.Mock;
+  futureMemberChanges?: jest.Mock;
+  createFromRequest?: jest.Mock;
 }
 
 function makeWriter(overrides: WriterOverrides = {}) {
@@ -49,12 +53,13 @@ function makeWriter(overrides: WriterOverrides = {}) {
     } as unknown as ProvisioningGrantTaskService,
     {
       lockPersonalEmployee: overrides.lockPersonalEmployee ?? jest.fn(),
+      requireActingItAdmin: overrides.requireActingItAdmin ?? jest.fn(() => Promise.resolve({ bySubstitute: false })),
       personal: jest.fn(() => Promise.resolve({ selfExecuted: null })),
       service: jest.fn(() => Promise.resolve({ selfExecuted: null })),
     } as unknown as ProvisioningHolderService,
     {
       assertSeatTargetUsable: jest.fn(),
-      createFromRequest: jest.fn(() => Promise.resolve({ id: 'asg-1' })),
+      createFromRequest: overrides.createFromRequest ?? jest.fn(() => Promise.resolve({ id: 'asg-1' })),
     } as unknown as AssignmentService,
     {
       lockSeatTarget:
@@ -63,28 +68,24 @@ function makeWriter(overrides: WriterOverrides = {}) {
     } as unknown as CatalogApi,
     { get: () => ({ claimForGrant }) } as unknown as GrantRequestGateHook,
     {
-      chooseSubscription: jest.fn(() => Promise.resolve('sub-1')),
+      chooseLine: jest.fn(() => Promise.resolve('sub-1')),
+      grantableOf: jest.fn(() => Promise.resolve([{ subscriptionId: 'sub-slack' }])),
       judgePurchase: jest.fn(() => Promise.resolve({ decision: { purchased: false }, stock: null })),
     } as unknown as SharedPoolService,
     {
       lockLiveRevocation: overrides.lockLiveRevocation ?? jest.fn(() => Promise.resolve(null)),
       endReplacedRight: overrides.endReplacedRight ?? jest.fn(() => Promise.resolve(null)),
+      k1TermsOfReplaced: jest.fn(() => Promise.resolve(null)),
     } as unknown as ProvisioningReplacementService,
     {
-      requireActingItAdmin: overrides.requireActingItAdmin ?? jest.fn(() => Promise.resolve({ bySubstitute: false })),
-    } as unknown as ProvisioningTaskFrame,
+      buyForItems: jest.fn(),
+      recordMember: overrides.recordMember ?? jest.fn().mockResolvedValue({ id: 'chg-m1' }),
+      futureMemberChanges: overrides.futureMemberChanges ?? jest.fn().mockResolvedValue([]),
+    } as unknown as SeatLedgerApi,
   );
 }
 
-const baseInput = {
-  requestId: 'req-1',
-  beneficiaryEmployeeId: 'emp-1',
-  subscriptionId: undefined,
-  accountIdentifier: undefined,
-  responsibleEmployeeId: undefined,
-  purchase: false,
-} as never;
-
+const baseInput = { requestId: 'req-1', beneficiaryEmployeeId: 'emp-1', purchase: false } as never;
 const plannedOf = (answer: Record<string, unknown>, serviceIdentifier: string | null = null) =>
   ({
     answer,

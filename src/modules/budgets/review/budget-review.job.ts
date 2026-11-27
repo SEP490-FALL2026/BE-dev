@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { describeForOperator, traceForOperator } from '../../../infrastructure/observability/operator-error';
-import { BudgetReviewReminderService } from './budget-review-reminder.service';
+import { BudgetReviewReminderService } from './reminder/budget-review-reminder.service';
 
 /** The first pass waits, so a short-lived process (a test, a command) never starts one. */
 const FIRST_PASS_AFTER_MS = 5 * 60 * 1000;

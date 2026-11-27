@@ -61,7 +61,7 @@ export function dueNotices(
 ): DueNoticeKind[] {
   return candidateNotices(adjustment, today, hasCase, autoRenew, eventRecorded).filter((kind) => {
     if (kind === 'KEPT') return purchased !== null && purchased > target;
-    if (kind === 'AUTO_RENEWAL_INCIDENT' || kind === 'EXPIRY_MARKED') return holdsSeats;
+    if (kind === 'AUTO_RENEWAL_INCIDENT') return holdsSeats;
 
     return true;
   });

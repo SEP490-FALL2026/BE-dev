@@ -1,13 +1,14 @@
-# Prompt dán sẵn cho chat code — Đợt 3 thiết kế lại (kho B1 → B2 → B3, chế độ tự quyết, bản 2)
+# Prompt dán sẵn cho chat code — Đợt 3 thiết kế lại (kho B1 → B2 → B3, chế độ tự quyết, bản 2.4)
 
-> Dán nguyên khối dưới vạch vào một chat Sonnet (model **sonnet**) hoặc Gemini mới **sau khi** Owner đã duyệt SPEC/PLAN bản 2 **và** đợt 2 đã ở
+> Dán nguyên khối dưới vạch vào một chat Sonnet (model **sonnet**) hoặc Gemini mới **sau khi** Owner đã duyệt SPEC/PLAN bản 2.4 **và** đợt 2 đã ở
 > `dev`. Sửa dòng `LÀN:` trước khi dán. Câu Owner đã trả lời nằm ở dòng `Owner đã chốt:` (mọi câu đã chốt). Quy trình chung:
 > `docs/guides/quy-trinh-code-ai.md`.
 
 ---
 
 **LÀN: tech** ← đổi thành `biz` nếu là làn nghiệp vụ
-**Nhánh:** làn `tech` = nhánh của Bảo `feat/redesign-w3-tech`; làn `biz` = làm **thẳng trên** `int/redesign-w3` · **Nhánh gộp:** `int/redesign-w3`
+**Nhánh:** làn `tech` = nhánh của Bảo `feat/redesign-w3-tech`; làn `biz` = làm **thẳng trên** `int/redesign-w3` · **Nhánh gộp:** `int/redesign-w3` ·
+**Hai làn chạy song song** (PLAN bản 2.4): `biz` làm trọn B1 (cả P1, P3) rồi B2/B3-biz; `tech` làm B2-tech ngay từ đầu (P9a) rồi B3-tech
 **Owner đã chốt:** T-1 = tháng lịch cho Request `K2` có ngày cuối · T-2 = route cũ đổi người phụ trách trên `PERPETUAL` ghi vào lô cùng id ·
 T-3 = `K1` không Request tính từ tháng hiện tại, không giá ⟹ 0 + cờ · T-7 = ngày hiệu lực sổ ghi tay ≥ ngày 1 tháng hiện tại · W3-Q1 = A (chia đều chi phí thực chịu của lô `K4`; tỷ lệ Trống trên giá chưa thuế (n−1)×giá; phần dư dồn license dư cuối; chênh do
 thuế báo riêng) · Q-A = bỏ `ROLE_RIGHT` khỏi đợt 3 (đợt 7) · Q-B = giữ mua seat cho kỳ sau, trên dòng kỳ sau, hiệu lực ngày bắt đầu kỳ sau, không 409
@@ -51,7 +52,7 @@ vụ của gói>` (không tin báo cáo của subagent), đối chiếu **từng
 9. **Không chạy full test, Docker, seed, migration trên máy.** Chỉ bộ kiểm nhanh + unit file sửa. http/integration/e2e chạy trên **CI GitHub cuối làn**
    (mục 7).
 10. **QĐ-118 (quyền theo phạm vi):** việc của **phòng** (mua seat cho mục chờ cấp, tạo lô `REQUEST`, cấp/thu hồi) chỉ người làm của phòng người thụ
-    hưởng — `ProvisioningTaskFrameService.requireActingItAdmin` / `OrganizationReadApi.itAdminsActingFor(departmentIds, usableAmong, tx?)` (truyền
+    hưởng — `ProvisioningTaskFrame.requireActingItAdmin` / `OrganizationReadApi.itAdminsActingFor(departmentIds, usableAmong, tx?)` (truyền
     `ids => identity.findUsableItAdminEmployeeIds(ids, tx)`); việc của **thuê bao/workspace/lô** (sửa dòng, ghi theo hãng, giảm giữa kỳ, sửa
     workspace/admin, sửa lô, nhập khóa vào lô) chỉ **IT phụ trách** bản ghi đó; đổi người phụ trách chỉ **Super Admin** (route riêng) hoặc `SBF-16`;
     người tạo là người phụ trách ban đầu. Route **đọc** catalog cấp tổ chức (`IT_ADMIN`, `FINANCE`, `SUPER_ADMIN`). Không viết nhánh "IT khác làm thay"
@@ -94,11 +95,13 @@ git -C D:/FPT/FALL2026/Code/BE-dev-software-license-management --no-pager ls-tre
 git -C D:/FPT/FALL2026/Code/BE-dev-software-license-management --no-pager diff --stat origin/dev origin/int/redesign-w2 -- src prisma
 git -C D:/FPT/FALL2026/Code/BE-dev-software-license-management --no-pager ls-tree --name-only origin/dev docs/reviews/redesign-w3-2026-11-22/SPEC.md
 git -C D:/FPT/FALL2026/Code/BE-dev-software-license-management config user.email   # phải là email của chính người làm
-# làn tech (Bảo):
+# làn tech (Bảo): bắt đầu ngay, không chờ làn biz
 git -C D:/FPT/FALL2026/Code/BE-dev-software-license-management checkout -b feat/redesign-w3-tech origin/dev
-# làn biz (Owner): nhánh gộp do Owner tạo từ dev mới nhất
+# làn biz (Owner, Neon): nhánh gộp do Owner tạo từ dev mới nhất; bắt đầu ngay bằng P1
 git -C D:/FPT/FALL2026/Code/BE-dev-software-license-management checkout -b int/redesign-w3 origin/int/redesign-w3
 ```
+
+- Hai làn bắt đầu **cùng lúc**: `biz` từ P1, `tech` từ P9a. Không làn nào chờ làn kia để bắt đầu.
 
 - Thiếu đợt 1, **thiếu đợt 2** (ít hơn 4 dòng, hoặc `diff --stat` không rỗng), hoặc thiếu thư mục việc ⟹ **dừng, báo lại** (không có nhánh "đợt 2 chưa merge").
 - Làn `biz`: chưa có `origin/int/redesign-w3` ⟹ dừng, báo Owner tạo từ `dev`.
@@ -110,19 +113,29 @@ git -C D:/FPT/FALL2026/Code/BE-dev-software-license-management checkout -b int/r
 
 ## 2. Thứ tự gói
 
-- **tech:** P1 → P3 → (G2) P9 → (G4) P11 → P12a → P20b → P12b → (G5) P14 → (G6) P15 → (G8) P21 → P22 → P23.
-- **biz:** (G1) P2 → P4 → P5 → P6 → P7 → P8 → (G3) P10 → (G5) P13a → P13b → P16a → (G7) P16b → P17 → P18 → P19 → P20 → P23.
-- Gói có điểm gộp (PLAN bảng _Điểm gộp_ G1…G8): chỉ bắt đầu khi người điều phối báo làn kia đã merge vào `int/redesign-w3`; khi đó (làn `tech`)
-  `git fetch origin && git merge origin/int/redesign-w3` (không rebase) hoặc (làn `biz`) `git pull --ff-only`, rồi `pnpm prisma:generate`,
-  `pnpm openapi:export`, bộ kiểm nhanh, rồi làm. **P9 chỉ sau khi PR B1 → `dev` đã mở** (PR B1 không kéo code B2). Chưa được báo ⟹ làm gói độc lập kế
-  của làn hoặc dừng chờ.
+- **biz:** P1 → P3 → P2 → P4 → P5 → P6 → P7 → P8 → (C1) P10 → (C2) P16a → P13a → P13b → P16b → P17 → P18 → P19 → P20 → P23.
+- **tech:** P9a → P9b → P11 → P12a → P20b → P12b → P21 → P14 → P15 → P22a → P22b → P23.
+- **Trước mỗi gói** — `biz`: `git pull --ff-only`; `tech`: `git fetch origin && git merge origin/int/redesign-w3` (không rebase; xung đột chỉ ở file
+  chung ⟹ giữ cả hai, `openapi.json` sinh lại). Rồi `pnpm prisma:generate`, `pnpm openapi:export`, bộ kiểm nhanh, rồi làm.
+- **Phụ thuộc "… ở int"** (PLAN bảng _Gói_, cột _Phụ thuộc_): P9b cần P1; P11 cần P3; P10 cần P9b (C1); P16a cần P11 (C2); P13a cần P12b, P21;
+  P14 bước cổng admin cần P10; P15 cần P16a; P20 cần P12a, P20b, P14; P22b cần P13a, P16b, P17, P18, P20. Chưa có ⟹ **không chờ**: làm phần không phụ thuộc
+  của gói (ghi _Bàn giao_) hoặc việc lấp ở PLAN _Cửa_ (`tech`: chạy integration/http/seed trên Docker cho phần đã cắt, trên nhánh `fix/redesign-w3-b<n>-tests` tách từ nhánh chụp,
+  chỉ sửa test/fixture, ghi `FIX-TEST-tech.md`), rồi quay lại.
+- **Cửa (người làm, không phải agent):** C1 — `biz` xong P8 ⟹ Owner cắt `pr/redesign-w3-b1` tại commit cuối P8, mở PR → `dev`; Owner hoặc Bảo merge commit
+  cuối P9b của nhánh `tech` vào `int`. C2 — `biz` xong P10 ⟹ cắt `pr/redesign-w3-b2`, mở PR; Owner hoặc Bảo merge các gói B3 đã xong vào `int`. Sau C2 mỗi gói `tech` xong
+  được merge vào `int` ngay. Trước C1 **không** merge gì của `tech` vào `int` (PR B1 không kéo code B2 — K-C3); giữa C1 và C2 chỉ P9a, P9b. Agent
+  không tự merge vào `int`, không mở PR; ghi `PROGRESS-<làn>.md` "sẵn để đẩy ở C<n>".
+- `biz` push ngay sau mỗi commit (pull bị từ chối ⟹ `git pull --rebase`, chỉ commit của mình). Sửa theo review PR B1/B2 chạm file đã sang `tech` ⟹
+  _Bàn giao_ (PLAN _Nền và nhánh_).
+- **Migration:** B1 (`20261201…`) chỉ làn `biz` ở P1, P3; B2 (`20261202…`), B3 (`20261203…`) chỉ làn `tech`. `catalog.prisma` lúc P1 ‖ P9a: P9a chỉ
+  thêm model **cuối file** + quan hệ ở khối `Vendor`.
 - **Chỉ sửa file trong danh sách của gói** (PLAN; `*` = file chung chỉ thêm dòng). Cần file khác ⟹ không sửa, ghi _Bàn giao_, làm tiếp phần không phụ
   thuộc.
 
 ## 3. Cách làm từng gói
 
 1. Đọc lại `PROGRESS-<làn>.md`, khối W3-xx của gói trong SPEC, mục gói trong PLAN. Mở code thật ở các `file:line` (SPEC đọc trên `int/redesign-w2`
-   `8a4c8b70`; dòng có thể đã dời) và xác nhận hiện trạng. Khác mà không đổi luật ⟹ làm theo _Hành vi đúng_, ghi `D-n` (tự chốt). Khác mà đổi luật ⟹
+   `8a4c8b70`, đã đối chiếu `70543271` ở `DELTA-W2-FINAL.md`; dòng có thể đã dời) và xác nhận hiện trạng. Khác mà không đổi luật ⟹ làm theo _Hành vi đúng_, ghi `D-n` (tự chốt). Khác mà đổi luật ⟹
    LUẬT CỨNG 1.
 2. Ghi gói vào `PROGRESS-<làn>.md` trạng thái `đang làm`.
 3. **Unit test đỏ trước** cho luật mới; `CI=true pnpm test -- <file>` thấy đỏ đúng lý do.
@@ -131,9 +144,9 @@ git -C D:/FPT/FALL2026/Code/BE-dev-software-license-management checkout -b int/r
    `*.http-errors.ts`, một mã một status; mọi đọc trong `runner.run` qua `tx`, không `Promise.all` trên `tx`; tiền `BigInt` đồng, `roundHalfAway`, không
    số thực; route mới sửa bản ghi bắt `expectedUpdatedAt`; collection mới đủ `API-LIST-DETAIL.1`; trần 500 dòng/file, 25 file/thư mục, `complexity` 12,
    hàm 60 dòng, 8 tham số — vượt thì tách theo chức năng (LUẬT CỨNG 2).
-5. Migration (chỉ làn `tech`): tên đúng SPEC §5; khối kiểm trước `RAISE EXCEPTION`; comment đầu file ghi SQL đảo; không nêu tên vai DB; **không sửa
+5. Migration (làn `biz` ở P1, P3 — dải `20261201…`; làn `tech` từ P9a — dải `20261202…`, `20261203…`): tên đúng SPEC §5; khối kiểm trước `RAISE EXCEPTION`; comment đầu file ghi SQL đảo; không nêu tên vai DB; **không sửa
    migration đã merge** (M6 `CREATE OR REPLACE` hàm của đợt 2 trong file **mới**); `pnpm prisma:validate` + `pnpm prisma:generate`.
-6. Seed (chỉ làn `tech`): sửa `src/cli/seed/**` theo gói, cập nhật spec unit của step; không nới luật cho seed; không chạy seed.
+6. Seed (làn `biz` phần B1 trong P1; còn lại làn `tech`): sửa `src/cli/seed/**` theo gói, cập nhật spec unit của step; không nới luật cho seed; không chạy seed.
 7. Viết test http/integration SPEC/PLAN nêu (≤ 800 dòng mỗi file). **Không chạy** ở máy. Luồng khóa mới: 2 connection, barrier, lặp 20, không `40P01`.
 8. **Bộ kiểm nhanh**, tất cả xanh:
 
@@ -180,7 +193,7 @@ nhận thông báo, mã lỗi mới FE thấy ngoài SPEC. Còn < 10 % context �
 Dừng gói đó, ghi `PROGRESS-<làn>.md` kèm `file:line`, 2–3 lựa chọn và khuyến nghị, báo người điều phối, làm tiếp gói độc lập nếu có:
 
 1. Luật không rõ mà mục 4 không giải được; code thật khác SPEC theo cách đổi hành vi nghiệp vụ; một ví dụ số của SPEC không ra đúng công thức SPEC.
-2. Cần migration ngoài SPEC §5, sửa `prisma/models` ở làn `biz`, sửa migration đã merge, migration phá dữ liệu.
+2. Cần migration ngoài SPEC §5, sửa `prisma/models` ở làn `biz` ngoài P1, P3, sửa `catalog.prisma`/`licensing|budgets|requests.prisma` ở làn `tech` khi chưa kéo P1/P3 về (trừ phần P9a được phép), sửa migration đã merge, migration phá dữ liệu.
 3. Cần cạnh module mới, extension point mới, đổi tầng, dependency npm mới.
 4. Gate chỉ xanh khi nới gate/thêm suppression/thêm mục registry mà gate từ chối (LUẬT CỨNG 4).
 5. Đường khóa thật trái SPEC §6.2 (ngoài E1–E4).
@@ -190,7 +203,7 @@ Dừng gói đó, ghi `PROGRESS-<làn>.md` kèm `file:line`, 2–3 lựa chọn 
 ## 6. Không được làm
 
 - Không chạy `pnpm check`, `test:http`, `test:integration`, `test:e2e`, seed, Docker, migration trên DB.
-- Chỉ push **nhánh của làn mình**. Không merge vào `dev`, `main`; làn `tech` không merge vào `int/redesign-w3`; không mở PR; không deploy.
+- Chỉ push **nhánh của làn mình**. Không merge vào `dev`, `main`; agent làn `tech` không tự merge vào `int/redesign-w3` (Bảo đẩy ở cửa — mục 2); không mở PR; không deploy.
 - Không sửa `openapi.json`, `docs/generated/*`, `src/generated/*` bằng tay.
 - Không xóa/`skip` test; không `eslint-disable`; không co-author; không commit bằng identity người khác.
 - Không làm ngoài phạm vi (SPEC §2.2 — đặc biệt quyền theo vai `ROLE_RIGHT`, hóa đơn âm), kể cả thấy lỗi gần đó — ghi vào báo cáo cuối.

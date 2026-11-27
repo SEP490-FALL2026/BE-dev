@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { termEndOf } from '../../../src/core/term-limit';
 import { GroupHarness } from '../../support/group-harness';
+import { pretendBusinessToday } from '../../support/pretend-today';
 import type { AccessRequestWire } from '../../support/request-harness';
 
 const h = new GroupHarness();
@@ -11,10 +12,13 @@ describe('BR-MF1-02 one-step reserve, supplementary files and a price left outsi
   let plan: string;
   beforeAll(async () => {
     await h.start();
+    pretendBusinessToday(h.ctx.app, '2026-06-01');
+    jest.spyOn(h, 'today').mockReturnValue('2026-06-01');
     await h.withApprover();
     plan = await h.planOf(await h.subscription(100));
   }, 240000);
   afterAll(async () => {
+    jest.restoreAllMocks();
     await h.stop();
   });
   const unit = () => h.departmentWithHead(`P-OSX${++serial}`);

@@ -33,6 +33,8 @@ export interface DemoAccountsPort {
   create(specs: readonly DemoAccountSpec[]): Promise<DemoAccountPlanItem[]>;
   /** Moves the submission deadline of the cycle of `year` to a day that has passed and leaves it there. */
   lockBudgetCycle(year: number, lockedDeadline: string): Promise<void>;
+  /** Records idempotent `seat_month_runs` marks for closed months `1..upToMonth` before request spend checks. */
+  markClosedSeatMonths?(year: number, upToMonth: number, subscriptionIds: readonly string[]): Promise<number>;
 }
 
 /** The ids the steps find or create, by the fixture's keys and codes. */
@@ -44,8 +46,11 @@ export interface DemoIds {
   vendors: Map<string, string>;
   plans: Map<string, string>;
   subscriptions: Map<string, string>;
+  /** The lots of licenses of the K4 plans, by the key of the lot. */
+  lots: Map<string, string>;
   costCenters: Map<string, string>;
   requests: Map<string, string>;
+  seatPurchases: Map<string, string>;
   usageSources: Map<string, string>;
 }
 
@@ -79,8 +84,10 @@ export function emptyIds(): DemoIds {
     vendors: new Map(),
     plans: new Map(),
     subscriptions: new Map(),
+    lots: new Map(),
     costCenters: new Map(),
     requests: new Map(),
+    seatPurchases: new Map(),
     usageSources: new Map(),
   };
 }

@@ -29,6 +29,9 @@ export interface AssignmentRecord {
   /** A personal seat of an IT Admin used for a machine account (`QĐ-110m`, `R-9`): INV-02 leaves it out; `machineAccountNote` says why. */
   isMachineAccount: boolean;
   machineAccountNote: string | null;
+  /** A personal right of a K1 plan: the months it commits to (1 or 12) and the day its billing counts from; null for every other right. */
+  personalCommitmentMonths?: 1 | 12 | null;
+  billingAnchorOn?: BusinessDate | null;
   /** Set when the grant it was made for was closed as failed: the period is then empty and no seat is taken. */
   failedAt: Date | null;
   /** Set when the grant it was made for was cancelled because the request was withdrawn: the period is empty as well. */
@@ -116,9 +119,11 @@ export interface SeatHolder {
   seats: number;
 }
 
-/** How many seats of one subscription one person holds (or answers for, a service account): what the baseline charges to their department (`QĐ-103k`). */
+/** How many seats of one plan of one subscription one person holds (or answers for, a service account): what the baseline charges to their department (`QĐ-103k`). */
 export interface SeatHolding {
   subscriptionId: string;
+  /** The plan the seat was granted on: a period with several plans prices each seat by the line of its own plan. */
+  planId: string;
   employeeId: string;
   seats: number;
 }
@@ -457,6 +462,10 @@ export interface RevocationCompletedFacts {
   endedOn: BusinessDate | null;
   /** K1 only: the last day the provider was paid for; the access may run to it. */
   paidThroughOn: BusinessDate | null;
+  /** Personal commitment months (`1 | 12`) for subscription-free K1 rights; null/undefined otherwise. */
+  personalCommitmentMonths?: 1 | 12 | null;
+  /** Rolling billing anchor date for subscription-free K1 rights; null/undefined otherwise. */
+  billingAnchorOn?: BusinessDate | null;
   /** Every source that asked for the revocation. */
   sources: RevocationSource[];
   /** K1 only: the checklist the IT Admin ticked, so a listener can read `MAILBOX_LOCKED` (`QĐ-111az`); null for any other kind of provisioning. */
@@ -469,6 +478,8 @@ export interface RevocationCompletedFacts {
  * used) and the assignment it made.
  */
 export interface GrantOutcomeFacts {
+  /** Provisioning grant task id; present when reported by `ProvisioningGrantCompletion`. */
+  taskId?: string;
   fromPool: boolean;
   provisioningType: ProvisioningKind;
   grantedOn: BusinessDate;
@@ -476,6 +487,12 @@ export interface GrantOutcomeFacts {
   /** The day the seat began and the day it ends, as they stand once granted; the end is null when the seat has none (see `RevocationCompletedFacts.grantedStartDate`). */
   effectiveFrom: BusinessDate;
   expectedEndDate: BusinessDate | null;
+  /** The lot id of the assigned license key; null/undefined when not a K4 key grant. */
+  licenseLotId?: string | null;
+  /** The license key id assigned on grant completion. */
+  licenseKeyId?: string | null;
+  /** Whether the key's cost was already borne before this grant (`cost_borne` before transition). */
+  keyCostBorneBeforeGrant?: boolean | null;
 }
 
 /**
@@ -486,9 +503,13 @@ export interface RightChain {
   assignmentId: string;
   grantRequestId: string | null;
   chainAssignmentIds: string[];
+  /** Top-most ancestor across `predecessor_id` and `replaces_assignment_id`, used for Tier 0 `k1-allocation` locking. */
+  k1RootAssignmentId?: string;
   /** The start and the end of the seat the request's grant made, as in {@link RevocationCompletedFacts.grantedStartDate}. */
   grantedStartDate: BusinessDate | null;
   grantedEndDate: BusinessDate | null;
+  personalCommitmentMonths?: 1 | 12 | null;
+  billingAnchorOn?: BusinessDate | null;
 }
 
 /** The facts of a revocation task its listeners are told. */

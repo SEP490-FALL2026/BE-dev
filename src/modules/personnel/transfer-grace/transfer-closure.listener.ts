@@ -35,15 +35,18 @@ export class TransferClosureListener implements OnModuleInit {
 
   onModuleInit(): void {
     this.revocation.add(TRANSFER_CLOSURE_LISTENER, (tx, event) => this.revoked(tx, event));
+    const noop = () => Promise.resolve();
     this.hooks.add(TRANSFER_CLOSURE_LISTENER, {
       onRecorded: async (tx, event) => {
         if (event.fileKind !== 'OFFBOARDING') return;
         await this.closing.supersede(tx, { employeeId: event.employeeId, caseId: event.fileId });
       },
+      onDueChanged: noop,
       onCancelled: async (tx, event) => {
         if (event.fileKind !== 'OFFBOARDING') return;
         await this.closing.reopenSuperseded(tx, { caseId: event.fileId });
       },
+      onLeft: noop,
     });
   }
 

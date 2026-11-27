@@ -56,4 +56,12 @@ export class SubscriptionPricingService {
       priceSnapshot: uniformSnapshotOf(money, recordedOn),
     };
   }
+
+  getOrganization(tx?: DbTx) {
+    return this.organizationReads.getOrganization(tx);
+  }
+
+  businessToday(now = new Date(), tx?: DbTx) {
+    return this.organizationReads.businessToday(now, tx);
+  }
 }

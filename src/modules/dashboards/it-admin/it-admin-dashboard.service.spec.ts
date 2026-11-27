@@ -29,6 +29,7 @@ const PROGRESS = progressOf({
   },
   seats: { returned: 6, reused: 3 },
   plansBelowMinimum: 2,
+  workspacesBelowMinimum: 1,
 });
 
 const actor = (roles: readonly string[]): AuthenticatedPrincipal => ({
@@ -166,6 +167,7 @@ describe('ItAdminDashboardService', () => {
     expect(overview.sections.transfers.graceEndingSoon.count).toBe(2);
     expect(overview.sections.seatsReturned.reusedThisMonth.count).toBe(3);
     expect(overview.sections.plansBelowVendorAdminMinimum.count).toBe(2);
+    expect(overview.sections.workspacesBelowVendorAdminMinimum.count).toBe(1);
     // The old key is kept exactly once (QĐ-110 G2, REVIEW-SPEC-ARCH §5).
     expect(Object.keys(overview.sections).filter((key) => key === 'offboardingHandovers')).toEqual([
       'offboardingHandovers',

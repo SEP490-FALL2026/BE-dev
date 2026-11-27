@@ -1,5 +1,6 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
+import { responseBusinessDate } from '../../../infrastructure/http/dto/business-date.dto';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { READABLE_CANCEL_CAUSES } from './group-request.types';
 import { checklistBodySchema } from '../../policies/public/policy-checklist.types';
@@ -261,6 +262,14 @@ export const requestSchema = z.strictObject({
   pricing: pricingSchema,
   /** The cost by the year before tax, with the part of the year after (`QĐ-111j`, `QĐ-111k`); null when nothing is priced by the month. */
   cost: costViewSchema.nullable(),
+  vendorChargeUntilRenewal: z
+    .strictObject({
+      until: responseBusinessDate,
+      amount: moneySchema,
+      mode: z.enum(['ONE_OFF', 'MONTHLY']),
+      tierStepSeats: z.number().int().positive().optional(),
+    })
+    .optional(),
   policy: z.strictObject({
     version: z.number().int().positive(),
     hasSpendStep: z.boolean(),

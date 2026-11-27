@@ -14,14 +14,28 @@ import type {
 import { BudgetCommitmentNotHoldableError } from '../public/budgets.errors';
 import { BudgetYearLockRepo } from './budget-year-lock.repo';
 import { InvoiceRepo } from './invoice.repo';
-import type { CommitmentRow } from './commitment-release.policy';
+import {
+  buildReleaseMutation,
+  commitmentPageWhere,
+  heldKey,
+  mapHeldWithSeatPrices,
+  toLockedCommitment,
+  type AttachedCommitment,
+  type CommitmentOfRequest,
+  type CommitmentRow,
+  type CommitmentTotals,
+  type HeldWithSeatPrice,
+  type LockedCommitmentOfRequest,
+} from './commitment-release.policy';
 
-export interface AttachedCommitment {
-  id: string;
-  requestId: string;
-  amountMinor: bigint;
-  currency: string;
-}
+export {
+  heldKey,
+  type AttachedCommitment,
+  type CommitmentOfRequest,
+  type CommitmentTotals,
+  type HeldWithSeatPrice,
+  type LockedCommitmentOfRequest,
+};
 
 /**
  * The commitments of the budget, as far as the decision of a version needs them: attaching the ones that wait for a budget
@@ -130,26 +144,19 @@ export class CommitmentRepo {
     await tx.$queryRaw`SELECT id FROM budget_commitments WHERE request_id = ${requestId}::uuid ORDER BY year FOR UPDATE`;
     const rows = await tx.budgetCommitment.findMany({ where: { requestId }, orderBy: { year: 'asc' } });
 
-    return rows.map((row) => ({
-      id: row.id,
-      year: row.year,
-      amountMinor: row.amountMinor,
-      releasedMinor: row.releasedMinor,
-      appliedMinor: row.appliedMinor,
-      state: row.state,
-      organizationId: row.organizationId,
-      costCenterId: row.costCenterId,
-      origin: row.origin,
-      seatMonthlyMinor: row.seatMonthlyMinor,
-      attachedVersionId: row.attachedVersionId,
-    }));
+    return rows.map(toLockedCommitment);
   }
 
   /**
    * The commitments still held of these requests, for the years from `fromYear`, with their rows locked: the requests in order of id and the
    * years of each earliest first, as `lockOfRequest` takes them, so two releases queue and never wait for each other in a circle.
    */
-  async lockSeatCommitmentsOf(tx: DbTx, requestIds: readonly string[], fromYear: number): Promise<SeatCommitment[]> {
+  /** Locks held commitments from `fromYear` in deterministic request+year order, returning row IDs for Tier 9b slice locks. */
+  async lockSeatCommitmentsWithIds(
+    tx: DbTx,
+    requestIds: readonly string[],
+    fromYear: number,
+  ): Promise<Array<SeatCommitment & { id: string }>> {
     const found: (Omit<SeatCommitment, 'transferReleases'> & { id: string })[] = [];
     for (const requestId of [...new Set(requestIds)].sort()) {
       for (const row of await this.lockOfRequest(tx, requestId)) {
@@ -170,7 +177,10 @@ export class CommitmentRepo {
       found.map((item) => item.id),
     );
 
-    return found.map(({ id, ...commitment }) => ({ ...commitment, transferReleases: transferReleases.get(id) ?? [] }));
+    return found.map((commitment) => ({
+      ...commitment,
+      transferReleases: transferReleases.get(commitment.id) ?? [],
+    }));
   }
 
   /** For each of these commitments, the references of its releases for the day a transfer took effect; a commitment with none is absent. */
@@ -280,19 +290,7 @@ export class CommitmentRepo {
     const row = await tx.budgetCommitment.findUnique({ where: { id } });
     if (!row) return null;
 
-    return {
-      id: row.id,
-      requestId: row.requestId,
-      year: row.year,
-      amountMinor: row.amountMinor,
-      releasedMinor: row.releasedMinor,
-      appliedMinor: row.appliedMinor,
-      currency: row.currency,
-      state: row.state,
-      organizationId: row.organizationId,
-      costCenterId: row.costCenterId,
-      attachedVersionId: row.attachedVersionId,
-    };
+    return { ...toLockedCommitment(row), requestId: row.requestId, currency: row.currency };
   }
 
   /**
@@ -304,24 +302,22 @@ export class CommitmentRepo {
     row: CommitmentRow,
     input: {
       takeMinor: bigint;
-      reason: CommitmentReleaseReason | 'REMAINDER';
+      reason: CommitmentReleaseReason | 'REMAINDER' | 'MONTH_END' | 'YEAR_END_SEAT_MONTHS';
       reasonText: string | null;
       releasedByEmployeeId: string | null;
       now: Date;
     },
   ): Promise<{ released: boolean; heldMinor: bigint }> {
-    const releasedMinor = row.releasedMinor + input.takeMinor;
-    const heldMinor = row.amountMinor - releasedMinor - row.appliedMinor;
-    // Nothing is left to hold: the commitment is released when none of it became an expense, and an expense when some of it did.
-    const released = heldMinor === 0n;
-    const data: Prisma.BudgetCommitmentUpdateManyMutationInput = { releasedMinor };
-    if (released && row.appliedMinor === 0n) {
-      data.state = 'RELEASED';
-      data.releasedAt = input.now;
-    } else if (released) {
-      data.state = 'EXPENSED';
-    }
-    // The row is changed only if it is still as it was read, in what went back and in what became an expense.
+    const { released, heldMinor, releasedMinor, state, releasedAt } = buildReleaseMutation(
+      row,
+      input.takeMinor,
+      input.now,
+    );
+    const data: Prisma.BudgetCommitmentUpdateManyMutationInput = {
+      releasedMinor,
+      ...(state ? { state } : {}),
+      ...(releasedAt ? { releasedAt } : {}),
+    };
     const changed = await tx.budgetCommitment.updateMany({
       where: { id: row.id, state: 'HELD', releasedMinor: row.releasedMinor, appliedMinor: row.appliedMinor },
       data,
@@ -379,6 +375,47 @@ export class CommitmentRepo {
     if (changed.count !== 1) throw new Error(`The commitment ${row.id} changed while a seat-month gave back to it.`);
   }
 
+  /**
+   * Reflects an unreflected K1 transfer return on an `EXPENSED` commitment (`D-16`): shifts `transferMinor` from
+   * `applied_minor` to `released_minor` and increments `transfer_returned_minor` while keeping `state = 'EXPENSED'`,
+   * then records a `TRANSFER_EFFECTIVE` release ledger entry. `budget_commitments_guard()` rejects any mismatched sum.
+   */
+  async releaseExpensedTransfer(
+    tx: DbTx,
+    row: CommitmentRow & { transferReturnedMinor?: bigint },
+    input: { transferMinor: bigint; reference: string; now: Date },
+  ): Promise<void> {
+    if (input.transferMinor <= 0n) return;
+    const prevReturned = row.transferReturnedMinor ?? 0n;
+    const changed = await tx.budgetCommitment.updateMany({
+      where: {
+        id: row.id,
+        state: 'EXPENSED',
+        appliedMinor: row.appliedMinor,
+        releasedMinor: row.releasedMinor,
+        transferReturnedMinor: prevReturned,
+      },
+      data: {
+        appliedMinor: row.appliedMinor - input.transferMinor,
+        releasedMinor: row.releasedMinor + input.transferMinor,
+        transferReturnedMinor: prevReturned + input.transferMinor,
+      },
+    });
+    if (changed.count !== 1) {
+      throw new Error(`The EXPENSED commitment ${row.id} changed while recording a D-16 transfer return.`);
+    }
+    await tx.budgetCommitmentRelease.create({
+      data: {
+        commitmentId: row.id,
+        amountMinor: input.transferMinor,
+        reason: 'TRANSFER_EFFECTIVE',
+        reasonText: input.reference,
+        releasedByEmployeeId: null,
+        releasedAt: input.now,
+      },
+    });
+  }
+
   /** The commitments of the request, the oldest year first, with what is left of each to be invoiced against; locks nothing. */
   async ofRequest(requestId: string, tx?: DbTx): Promise<RequestCommitment[]> {
     const rows = await (tx ?? this.prisma).budgetCommitment.findMany({
@@ -433,7 +470,7 @@ export class CommitmentRepo {
 
     return (tx ?? this.prisma).budgetCommitment.findMany({
       where: { requestId: { in: [...requestIds] } },
-      select: { requestId: true, amountMinor: true, currency: true },
+      select: { requestId: true, year: true, amountMinor: true, currency: true },
       orderBy: [{ requestId: 'asc' }, { year: 'asc' }],
     });
   }
@@ -479,24 +516,15 @@ export class CommitmentRepo {
     skip: number;
     take: number;
   }) {
-    const where = {
-      ...(filter.state ? { state: filter.state } : {}),
-      ...(filter.attached === undefined ? {} : { attachedVersionId: filter.attached ? { not: null } : null }),
-      ...(filter.year ? { year: filter.year } : {}),
-      ...(filter.costCenterId ? { costCenterId: filter.costCenterId } : {}),
-      ...(filter.requestId ? { requestId: filter.requestId } : {}),
-      ...(filter.id ? { id: filter.id } : {}),
-      ...(filter.costCenterIds ? { AND: [{ costCenterId: { in: [...filter.costCenterIds] } }] } : {}),
-    };
-    const longTerm = filter.heldOnly ? { state: 'HELD' as const } : {};
+    const where = { AND: [commitmentPageWhere(filter), filter.heldOnly ? { state: 'HELD' as const } : {}] };
     const [rows, total] = await this.prisma.$transaction([
       this.prisma.budgetCommitment.findMany({
-        where: { AND: [where, longTerm] },
+        where,
         orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
         skip: filter.skip,
         take: filter.take,
       }),
-      this.prisma.budgetCommitment.count({ where: { AND: [where, longTerm] } }),
+      this.prisma.budgetCommitment.count({ where }),
     ]);
 
     return { rows, total };
@@ -567,20 +595,7 @@ export class CommitmentRepo {
       orderBy: { id: 'asc' },
     });
 
-    return rows.flatMap((row) => {
-      const heldMinor = row.amountMinor - row.releasedMinor - row.appliedMinor;
-      return heldMinor > 0n && row.seatMonthlyMinor !== null
-        ? [
-            {
-              costCenterId: row.costCenterId,
-              year: row.year,
-              requestId: row.requestId,
-              heldMinor,
-              seatMonthlyMinor: row.seatMonthlyMinor,
-            },
-          ]
-        : [];
-    });
+    return mapHeldWithSeatPrices(rows);
   }
 
   /**
@@ -604,34 +619,8 @@ export class CommitmentRepo {
 
     return { rows, total: await db.budgetCommitment.count({ where }) };
   }
-}
 
-export interface CommitmentOfRequest extends CommitmentRow {
-  organizationId: string;
-  costCenterId: string;
+  invoiceFiguresOf(commitmentIds: readonly string[]) {
+    return this.invoices.figuresOf(commitmentIds);
+  }
 }
-
-/** A commitment of a request as `lockOfRequest` reads it: with where it came from and what one seat costs a month in it. */
-export interface LockedCommitmentOfRequest extends CommitmentOfRequest {
-  origin: 'APPROVAL' | 'YEAR_START';
-  seatMonthlyMinor: bigint | null;
-  /** The version it is attached to; null while it waits for a budget (R-48). */
-  attachedVersionId: string | null;
-}
-
-/** A commitment still held that knows what one seat costs a month, with what it still holds. */
-export interface HeldWithSeatPrice {
-  costCenterId: string;
-  year: number;
-  requestId: string;
-  heldMinor: bigint;
-  seatMonthlyMinor: bigint;
-}
-
-/** What a commitment total says about the budget of a Cost Center and year. */
-export interface CommitmentTotals {
-  held: bigint;
-  spent: bigint;
-}
-
-export const heldKey = (costCenterId: string, year: number): string => `${costCenterId}:${year}`;

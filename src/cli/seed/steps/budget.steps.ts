@@ -4,7 +4,8 @@ import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
 import type { DemoBudget, DemoNextYear } from '../fixture/demo-fixture.types';
 import { yesChecklist } from './checklist-kit';
 import { proposalFile, versionFile } from './budget-files';
-import { baseFor } from './budget-targets';
+import { baseFor, lastClosedMonth, tightBaseFor } from './budget-targets';
+import { subscriptionPrimaryPlan } from './catalog.steps';
 import { uploadBudgetFile } from './file-kit';
 import { financePerson, money } from './finance-kit';
 
@@ -246,7 +247,11 @@ async function runYearPlans(ctx: DemoRunContext, year: number, entries: readonly
  */
 export function yearPlanOf(ctx: DemoRunContext, plan: DemoBudget): { base: string; label: string } {
   const choice = baseFor(ctx.fixture, plan.department, ctx.today);
-  if (!choice) return { base: plan.base, label: '' };
+  if (!choice) {
+    const tight = tightBaseFor(ctx.fixture, plan.department, ctx.today);
+
+    return { base: tight === null ? plan.base : String(tight), label: '' };
+  }
   const label = choice.reachable
     ? ` (đèn ${choice.wanted})`
     : ` (đèn ${choice.wanted} chưa đạt được ở ngày này, ra ${choice.light})`;
@@ -271,7 +276,29 @@ async function currentYear(ctx: DemoRunContext): Promise<StepOutcome> {
     };
   });
 
-  return summarize(await runYearPlans(ctx, year, entries));
+  const outcome = summarize(await runYearPlans(ctx, year, entries));
+  if (ctx.mode === 'apply' && outcome.status !== 'conflict' && ctx.accounts.markClosedSeatMonths) {
+    const closedMonth = lastClosedMonth(ctx.today);
+    if (closedMonth >= 1) {
+      const k2Plans = new Set(
+        ctx.fixture.applications.flatMap((app) =>
+          app.plans.filter((plan) => plan.provisioningType === 'K2').map((plan) => plan.key),
+        ),
+      );
+      const k2SubscriptionIds = ctx.fixture.subscriptions
+        .filter((sub) => k2Plans.has(subscriptionPrimaryPlan(sub)))
+        .flatMap((sub) => {
+          const id = ctx.ids.subscriptions?.get(sub.key);
+
+          return id ? [id] : [];
+        });
+      if (k2SubscriptionIds.length > 0) {
+        await ctx.accounts.markClosedSeatMonths(year, closedMonth, k2SubscriptionIds);
+      }
+    }
+  }
+
+  return outcome;
 }
 
 /**

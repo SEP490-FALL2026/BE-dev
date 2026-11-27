@@ -5,10 +5,6 @@ import { CommitmentRepo } from '../budget/commitment.repo';
 import { CommitmentRequestFactsHook } from '../public/budgets.extension-points';
 import type { PriceIncreaseItem } from './budget-review.types';
 
-const CYCLE_MONTHS = { MONTHLY: 1n, QUARTERLY: 3n, ANNUAL: 12n } as const;
-
-const ceilDiv = (numerator: bigint, denominator: bigint): bigint => (numerator + denominator - 1n) / denominator;
-
 /**
  * What a price of the catalog that rose since a commitment was made adds to the year (`R-52`, `US-12-21` AC-7), gathered for the Cost Centers of a review: each
  * commitment still held that knows what a seat cost a month when it was made, the seats and the plan of its request (the requests context tells them through the
@@ -80,8 +76,8 @@ export class BudgetReviewPriceService {
       for (let later = month + 1; later <= 12; later += 1) {
         const price = await this.catalog.getPlanPrice(planId, tx, `${year}-${String(later).padStart(2, '0')}-01`);
         const comparable =
-          price && price.kind === 'RECURRING' && price.billingCycle !== 'OTHER'
-            ? ceilDiv(price.unitPrice.amountMinor, CYCLE_MONTHS[price.billingCycle])
+          price && price.kind === 'RECURRING' && price.billingCycle !== 'OTHER' && price.monthlyPriceMinor != null
+            ? price.monthlyPriceMinor
             : (monthly[monthly.length - 1] ?? null);
         if (comparable === null) break;
         monthly.push(comparable);

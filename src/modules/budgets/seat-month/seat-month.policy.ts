@@ -1,4 +1,5 @@
 import { addDays, monthBoundsOf, type BusinessDate } from '../../../core/business-date';
+import { roundHalfAway as roundHalfAwayCore } from '../../../core/seat-month-cost';
 import type { HeldRange, PlacementPeriod, SeatMonthSegment } from './seat-month.types';
 
 /**
@@ -10,10 +11,7 @@ import type { HeldRange, PlacementPeriod, SeatMonthSegment } from './seat-month.
 
 /** `numerator ÷ denominator` rounded half away from zero; `denominator` is positive. */
 export function roundHalfAway(numerator: bigint, denominator: bigint): bigint {
-  const magnitude = numerator < 0n ? -numerator : numerator;
-  const rounded = (2n * magnitude + denominator) / (2n * denominator);
-
-  return numerator < 0n ? -rounded : rounded;
+  return roundHalfAwayCore(numerator, denominator);
 }
 
 const daysBetween = (from: BusinessDate, to: BusinessDate): number =>
@@ -85,10 +83,20 @@ export function commitmentApplication(input: {
   amountMinor: bigint;
   heldMinor: bigint;
   sameCostCenter: boolean;
+  sliceRemainingMinor?: bigint | null;
 }): bigint {
   if (!input.sameCostCenter || input.heldMinor <= 0n) return 0n;
+  const available =
+    input.sliceRemainingMinor === undefined
+      ? input.heldMinor
+      : input.sliceRemainingMinor === null
+        ? 0n
+        : input.sliceRemainingMinor < input.heldMinor
+          ? input.sliceRemainingMinor
+          : input.heldMinor;
+  if (available <= 0n) return 0n;
 
-  return input.amountMinor < input.heldMinor ? input.amountMinor : input.heldMinor;
+  return input.amountMinor < available ? input.amountMinor : available;
 }
 
 /**

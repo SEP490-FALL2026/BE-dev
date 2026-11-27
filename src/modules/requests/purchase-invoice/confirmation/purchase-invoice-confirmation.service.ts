@@ -1,16 +1,24 @@
 import { Injectable } from '@nestjs/common';
-import { fromDateColumn } from '../../../../core/business-date';
+import { businessDateAt, fromDateColumn } from '../../../../core/business-date';
 import { TransactionRunner, type DbTx } from '../../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../../audit/public/audit.api';
 import { BudgetsApi } from '../../../budgets/public/budgets.api';
 import { PurchaseInvoiceRecordRefusedError } from '../../../budgets/public/budgets.errors';
 import { NotificationsApi } from '../../../notifications/public/notifications.api';
-import { InvoiceDiscrepancyOpeningService } from '../../invoice-discrepancy/invoice-discrepancy-opening.service';
-import { mismatchesOfRow } from '../purchase-invoice-match.policy';
+import type { PurchaseInvoiceRecordInput } from '../../../budgets/public/budgets.types';
+import { OperatingParametersApi } from '../../../operating-parameters/public/operating-parameters.api';
+import { firstOfMonth } from '../labels/purchase-invoice-labels.policy';
+import {
+  evaluatePoolInvoiceExpectation,
+  type PoolInvoiceExpectationResult,
+} from '../pool-expectation/purchase-invoice-pool-expectation.policy';
 import { PurchaseInvoicePlanService } from '../purchase-invoice-plan.service';
 import { PurchaseInvoiceRefusedError } from '../purchase-invoice.errors';
 import { PurchaseInvoiceRepo, type PurchaseInvoiceRow } from '../purchase-invoice.repo';
+import { ConfirmationSettlementService } from './confirmation-settlement.service';
+
+const VARIANCE_THRESHOLD_PARAM = 'K2_INVOICE_VARIANCE_THRESHOLD_PERCENT';
 
 /**
  * Finance decides a purchase invoice, once (`PI-1.6`, `QĐ-111u`, `QĐ-111v`). Signing is the confirmation that the money may go out: the one invoice
@@ -18,8 +26,8 @@ import { PurchaseInvoiceRepo, type PurchaseInvoiceRow } from '../purchase-invoic
  * card) is not asked of anyone again. The person who submitted it never signs it. Returning needs a reason and writes nothing. The row is
  * locked first, so two decisions of one invoice queue and the second finds it decided.
  *
- * An invoice whose count or price of one differs from what was approved or bought (`PRICE_QUANTITY_EXCEPTION`) is signed all the same: its
- * mark goes onto the invoice it writes, and in the same transaction the case of `SBF-11a` that Finance works from it is opened (`RC-1`).
+ * An invoice whose count, unit price, or pooled-quota expected amount differs beyond threshold is signed all the same: its
+ * mark goes onto the invoice it writes, and in the same transaction one discrepancy case merging all mismatches is opened.
  */
 @Injectable()
 export class PurchaseInvoiceConfirmationService {
@@ -29,8 +37,9 @@ export class PurchaseInvoiceConfirmationService {
     private readonly budgets: BudgetsApi,
     private readonly notifications: NotificationsApi,
     private readonly audit: AuditApi,
-    private readonly discrepancies: InvoiceDiscrepancyOpeningService,
+    private readonly settlement: ConfirmationSettlementService,
     private readonly plans: PurchaseInvoicePlanService,
+    private readonly operatingParameters: OperatingParametersApi,
   ) {}
 
   /** Throws PurchaseInvoiceRefusedError (NOT_FOUND, NOT_SUBMITTED, SAME_PERSON, NUMBER_TAKEN, NO_PLACE). */
@@ -39,7 +48,17 @@ export class PurchaseInvoiceConfirmationService {
       const row = await this.submitted(tx, id);
       if (row.submittedByEmployeeId === actor.employeeId) throw new PurchaseInvoiceRefusedError('SAME_PERSON');
       const now = new Date();
-      const recorded = await this.record(tx, actor, row, now);
+      const poolFacts = await this.plans.poolExpectationFactsOf(row, tx);
+      const poolExpectation = await this.evaluatePoolExpectation(tx, row, poolFacts, now);
+      const poolSubscriptionId = row.linkKind === 'REQUEST' && poolFacts.isK2 ? poolFacts.poolSubscriptionId : null;
+      const k1Annual = await this.plans.k1AnnualAllocationFactsOf(row, tx);
+      const lotContext = await this.resolveLotContext(tx, row, now);
+      const recorded = await this.record(tx, actor, row, now, {
+        poolSubscriptionId,
+        poolFigures: poolExpectation?.poolFigures ?? null,
+        k1Annual,
+        lotContext,
+      });
       if (!(await this.invoices.markConfirmed(tx, id, actor.employeeId, now, recorded.invoiceId))) {
         throw new PurchaseInvoiceRefusedError('NOT_SUBMITTED');
       }
@@ -48,10 +67,29 @@ export class PurchaseInvoiceConfirmationService {
         booking: recorded.booking,
         ...(await this.selfSigned(tx, actor, row)),
       });
-      if (row.matchResult === 'PRICE_QUANTITY_EXCEPTION') await this.openCase(tx, actor, row, now);
+      await this.settlement.settle(tx, actor, row, recorded.invoiceId, poolExpectation?.exceedsThreshold ?? false, now);
       await this.tell(tx, row, 'PURCHASE_INVOICE_CONFIRMED');
 
       return (await this.invoices.find(id, tx)) as PurchaseInvoiceRow;
+    });
+  }
+
+  private async evaluatePoolExpectation(
+    tx: DbTx,
+    row: PurchaseInvoiceRow,
+    poolFacts: Awaited<ReturnType<PurchaseInvoicePlanService['poolExpectationFactsOf']>>,
+    now: Date,
+  ): Promise<PoolInvoiceExpectationResult | null> {
+    if (!poolFacts.isK2) return null;
+    const thresholdPercent = Number(await this.operatingParameters.getValue(VARIANCE_THRESHOLD_PARAM, tx));
+    const varianceMonth = firstOfMonth(businessDateAt(now, poolFacts.timeZone));
+
+    return evaluatePoolInvoiceExpectation({
+      source: poolFacts.source,
+      netMinor: row.netMinor,
+      nonDeductibleTaxMinor: row.nonDeductibleTaxMinor,
+      thresholdPercent,
+      varianceMonth,
     });
   }
 
@@ -80,16 +118,6 @@ export class PurchaseInvoiceConfirmationService {
       : {};
   }
 
-  /** The case Finance works from an invoice whose count or price differs, opened in the transaction that signs it (`RC-1`). */
-  private async openCase(tx: DbTx, actor: AuthenticatedPrincipal, row: PurchaseInvoiceRow, now: Date): Promise<void> {
-    await this.discrepancies.open(tx, actor, {
-      organizationId: row.organizationId,
-      purchaseInvoiceId: row.id,
-      mismatches: mismatchesOfRow(row),
-      now,
-    });
-  }
-
   /** The invoice locked, as long as it still waits for Finance. */
   private async submitted(tx: DbTx, id: string): Promise<PurchaseInvoiceRow> {
     const row = await this.invoices.lock(tx, id);
@@ -99,19 +127,25 @@ export class PurchaseInvoiceConfirmationService {
     return row;
   }
 
-  private async record(tx: DbTx, actor: AuthenticatedPrincipal, row: PurchaseInvoiceRow, now: Date) {
-    // An invoice of a request of a K2 plan is a line of the pool of the plan, not of the commitment or of a department (`QĐ-104c`(3), `B3B-01`).
-    const poolSubscriptionId =
-      row.linkKind === 'REQUEST' && row.requestId !== null
-        ? await this.plans.poolSubscriptionOfRequest(row.requestId, tx)
-        : null;
+  private async record(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    row: PurchaseInvoiceRow,
+    now: Date,
+    pool: {
+      poolSubscriptionId: string | null;
+      poolFigures: PoolInvoiceExpectationResult['poolFigures'] | null;
+      k1Annual: PurchaseInvoiceRecordInput['k1Annual'];
+      lotContext: { licenseLotId: string; allocationMonth: string; lotBeneficiaryCount: number } | null;
+    },
+  ) {
     const unallocated = await this.unallocatedOf(tx, row);
     try {
       return await this.budgets.recordPurchaseInvoice(tx, actor, {
         organizationId: row.organizationId,
         purchaseInvoiceId: row.id,
         requestId: row.requestId,
-        subscriptionId: row.linkKind === 'SUBSCRIPTION' ? row.subscriptionId : poolSubscriptionId,
+        subscriptionId: row.linkKind === 'SUBSCRIPTION' ? row.subscriptionId : pool.poolSubscriptionId,
         vendorId: row.vendorId,
         number: row.number,
         issuedOn: fromDateColumn(row.issuedOn),
@@ -120,16 +154,39 @@ export class PurchaseInvoiceConfirmationService {
         deductibleTaxMinor: row.deductibleTaxMinor,
         nonDeductibleTaxMinor: row.nonDeductibleTaxMinor,
         matchResult: row.matchResult === 'PRICE_QUANTITY_EXCEPTION' ? 'PRICE_QUANTITY_EXCEPTION' : 'MATCHED',
-        chargedCostCenterId: poolSubscriptionId === null ? row.chargedCostCenterId : null,
+        chargedCostCenterId: pool.poolSubscriptionId === null ? row.chargedCostCenterId : null,
         unallocated,
+        poolFigures: pool.poolFigures,
+        ...(pool.k1Annual ? { k1Annual: pool.k1Annual } : {}),
+        ...(pool.lotContext
+          ? {
+              licenseLotId: pool.lotContext.licenseLotId,
+              allocationMonth: pool.lotContext.allocationMonth,
+              lotBeneficiaryCount: pool.lotContext.lotBeneficiaryCount,
+            }
+          : {}),
         now,
       });
     } catch (error) {
       if (error instanceof PurchaseInvoiceRecordRefusedError) {
-        throw new PurchaseInvoiceRefusedError(error.reason === 'DUPLICATE_NUMBER' ? 'NUMBER_TAKEN' : 'NO_PLACE');
+        const mapped =
+          error.reason === 'DUPLICATE_NUMBER'
+            ? 'NUMBER_TAKEN'
+            : error.reason === 'LOT_ALREADY_INVOICED'
+              ? 'LOT_ALREADY_INVOICED'
+              : 'NO_PLACE';
+        throw new PurchaseInvoiceRefusedError(mapped);
       }
       throw error;
     }
+  }
+
+  private async resolveLotContext(
+    tx: DbTx,
+    row: PurchaseInvoiceRow,
+    now: Date,
+  ): Promise<{ licenseLotId: string; allocationMonth: string; lotBeneficiaryCount: number } | null> {
+    return this.plans.lotConfirmationContextOf(row, now, tx);
   }
 
   /** What the plan decided when the invoice was submitted: the line of the Cost Center not allocated, with the department of the user of the request. */

@@ -296,6 +296,10 @@ enum CommitmentReleaseReason {
   GRANTED_FROM_POOL
   // The holder moved to another department: what the seat would cost from the day the transfer takes effect goes back (`QĐ-111bg`).
   TRANSFER_EFFECTIVE
+  // Monthly pooled-quota seat-month reconciliation released an unspent remainder of this month's share.
+  MONTH_END
+  // Year-end reconciliation released remaining unapplied pool shares across seat-months.
+  YEAR_END_SEAT_MONTHS
 }
 
 // The electronic record of the decision of the spending approver on a version (US-06-11 AC-1): who, in which role, what,
@@ -352,6 +356,8 @@ model BudgetCommitment {
   seatMonthlyMinor  BigInt?         @map("seat_monthly_minor")
   // What the seat-months gave back so far (SM1-06): the sum of the reversals of the commitment, moving with `appliedMinor`; the guard of the table accepts a lower `appliedMinor` only by exactly this.
   seatMonthReversedMinor BigInt     @default(0) @map("seat_month_reversed_minor")
+  // What went to another Cost Center after confirmation (`D-16`): equals -SUM(invoice_year_applications) where source = 'TRANSFER' and applied_minor < 0; moves in lockstep with appliedMinor (-d) and releasedMinor (+d) while state stays EXPENSED.
+  transferReturnedMinor BigInt      @default(0) @map("transfer_returned_minor")
   createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt         DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -365,10 +371,32 @@ model BudgetCommitment {
   invoices        Invoice[]
   seatMonths      SeatMonthCharge[]
   seatMonthReversals BudgetCommitmentSeatMonthReversal[]
+  months          BudgetCommitmentMonth[]
+  licenseLotCharges LicenseLotCharge[]
+  invoiceAllocations InvoiceAllocation[]
+  invoiceYearApplications InvoiceYearApplication[]
 
   @@unique([requestId, year])
   @@index([costCenterId, year, state])
   @@map("budget_commitments")
+}
+
+/// Monthly slice of a K2 pooled-quota commitment across its service months (`share_minor`, `applied_minor`, `released_minor`).
+/// Composite key (`commitmentId`, `month`); `commitmentId`, `month`, `seatCount` and `shareMinor` are immutable after insert.
+model BudgetCommitmentMonth {
+  commitmentId  String    @map("commitment_id") @db.Uuid
+  month         DateTime  @db.Date
+  seatCount     Int       @map("seat_count")
+  shareMinor    BigInt    @map("share_minor")
+  appliedMinor  BigInt    @default(0) @map("applied_minor")
+  releasedMinor BigInt    @default(0) @map("released_minor")
+  settledAt     DateTime? @map("settled_at") @db.Timestamptz(3)
+
+  commitment BudgetCommitment @relation(fields: [commitmentId], references: [id], onDelete: Restrict)
+
+  @@id([commitmentId, month])
+  @@index([month, settledAt])
+  @@map("budget_commitment_months")
 }
 
 /// What went back to the budget from a commitment, one row for each time (US-06-06): how much, why, and who, when a person
@@ -433,18 +461,37 @@ model Invoice {
   // Both null for any other invoice; the CHECK `invoices_unallocated_check` keeps them together and the invoice with no other place.
   unallocatedReason     String?            @map("unallocated_reason")
   departmentId          String?            @map("department_id") @db.Uuid
+  poolExpectedMinor     BigInt?            @map("pool_expected_minor")
+  poolVarianceMinor     BigInt?            @map("pool_variance_minor")
+  poolVarianceMonth     DateTime?          @map("pool_variance_month") @db.Date
+  poolVarianceInReview  Boolean            @default(false) @map("pool_variance_in_review")
 
-  organization   Organization     @relation(fields: [organizationId], references: [id])
-  commitment     BudgetCommitment? @relation(fields: [commitmentId], references: [id], onDelete: Restrict)
-  vendor         Vendor           @relation(fields: [vendorId], references: [id], onDelete: Restrict)
-  currencyRecord Currency         @relation("InvoiceCurrency", fields: [currency], references: [code], onDelete: Restrict)
-  recordedBy     Employee         @relation("InvoiceRecorder", fields: [recordedByEmployeeId], references: [id], onDelete: Restrict)
+  organization           Organization                 @relation(fields: [organizationId], references: [id])
+  commitment             BudgetCommitment?            @relation(fields: [commitmentId], references: [id], onDelete: Restrict)
+  vendor                 Vendor                       @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  currencyRecord         Currency                     @relation("InvoiceCurrency", fields: [currency], references: [code], onDelete: Restrict)
+  recordedBy             Employee                     @relation("InvoiceRecorder", fields: [recordedByEmployeeId], references: [id], onDelete: Restrict)
+  poolVarianceResolution InvoicePoolVarianceResolution?
+  allocations            InvoiceAllocation[]
+  yearApplications       InvoiceYearApplication[]
 
   @@unique([organizationId, vendorId, number])
   @@index([commitmentId, recordedAt])
   @@index([costCenterId, serviceMonth])
   @@index([subscriptionId, serviceMonth])
+  @@index([poolVarianceMonth])
   @@map("invoices")
+}
+
+/// Append-only record marking that an invoice's `pool_variance_in_review` discrepancy case was closed (`W3-05`),
+/// keeping `invoices` strictly append-only (`INSERT`, `SELECT`) under H7 runtime role rules.
+model InvoicePoolVarianceResolution {
+  invoiceId  String   @id @map("invoice_id") @db.Uuid
+  resolvedAt DateTime @default(now()) @map("resolved_at") @db.Timestamptz(3)
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+
+  @@map("invoice_pool_variance_resolutions")
 }
 
 enum BudgetVersionHistoryKind {
@@ -644,12 +691,17 @@ model BudgetReviewPeriod {
   signedAt                   DateTime? @map("signed_at") @db.Timestamptz(3)
   note                       String?
   // What the company spent in the year up to the close, the shared pool in it (MG-03), and the line of the pool against the reserve of the cycle.
-  companySpentMinor          BigInt    @map("company_spent_minor")
-  sharedPoolUnallocatedMinor BigInt    @map("shared_pool_unallocated_minor")
-  sharedPoolReserveMinor     BigInt?   @map("shared_pool_reserve_minor")
-  annualCeilingMinor         BigInt?   @map("annual_ceiling_minor")
+  companySpentMinor                       BigInt    @map("company_spent_minor")
+  sharedPoolUnallocatedMinor              BigInt    @map("shared_pool_unallocated_minor")
+  sharedPoolReserveMinor                  BigInt?   @map("shared_pool_reserve_minor")
+  annualCeilingMinor                      BigInt?   @map("annual_ceiling_minor")
+  sharedPoolIdleMinor             BigInt?   @map("shared_pool_idle_minor")
+  sharedPoolDeviceLotMinor        BigInt?   @map("shared_pool_device_lot_minor")
+  sharedPoolReplacementMinor      BigInt?   @map("shared_pool_replacement_minor")
+  sharedPoolVarianceMinor         BigInt?   @map("shared_pool_variance_minor")
+  sharedPoolVarianceInReviewMinor BigInt?   @map("shared_pool_variance_in_review_minor")
   // RV-3: the last day the heads of departments are asked to explain a quarter by (the fifth working day from the close); null for a month and for a quarter closed before RV-3.
-  explanationsDueOn          DateTime? @map("explanations_due_on") @db.Date
+  explanationsDueOn                       DateTime? @map("explanations_due_on") @db.Date
 
   lines BudgetReviewLine[]
 
@@ -667,9 +719,10 @@ model BudgetReviewLine {
   baseMinor          BigInt  @map("base_minor")
   reserveMinor       BigInt  @map("reserve_minor")
   // Through the end of the month closed, by the month each invoice or seat-month pays for (FIX-RV1 RV1-03); what was already recorded for later months is `spentAfterMonthMinor`.
-  spentMinor         BigInt  @map("spent_minor")
-  spentAfterMonthMinor BigInt @default(0) @map("spent_after_month_minor")
-  committedMinor     BigInt  @map("committed_minor")
+  spentMinor             BigInt @map("spent_minor")
+  spentAfterMonthMinor   BigInt @default(0) @map("spent_after_month_minor")
+  priorYearReleasedMinor BigInt @default(0) @map("prior_year_released_minor")
+  committedMinor         BigInt @map("committed_minor")
   pendingSpendMinor  BigInt  @map("pending_spend_minor")
   remainingMinor     BigInt  @map("remaining_minor")
   // The price in the commitments of what the invoices of a commitment took down (their `applied`; named for what it held before FIX-RV1): the basis of k.
@@ -768,4 +821,81 @@ model BudgetThresholdAlert {
 
   @@unique([costCenterId, year, threshold, episode], map: "budget_threshold_alerts_episode_key")
   @@map("budget_threshold_alerts")
+}
+
+// What a lot cost that no invoice carries: a license left over in the store, given for the first time to a request (W3-25). One per key, written once.
+model LicenseLotCharge {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  licenseLotId   String   @map("license_lot_id") @db.Uuid
+  licenseKeyId   String   @unique @map("license_key_id") @db.Uuid
+  commitmentId   String?  @map("commitment_id") @db.Uuid
+  costCenterId   String   @map("cost_center_id") @db.Uuid
+  // The first day of the month the cost belongs to.
+  month          DateTime @db.Date
+  amountMinor    BigInt   @map("amount_minor")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  licenseLot   LicenseLot        @relation(fields: [licenseLotId], references: [id], onDelete: Restrict)
+  licenseKey   LicenseKey        @relation(fields: [licenseKeyId], references: [id], onDelete: Restrict)
+  commitment   BudgetCommitment? @relation(fields: [commitmentId], references: [id], onDelete: Restrict)
+  costCenter   CostCenter        @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+
+  @@index([licenseLotId])
+  @@index([costCenterId, month])
+  @@map("license_lot_charges")
+}
+
+// A line of the allocation of an invoice by month and bucket (W3-26). Added and never changed (a trigger); what corrects a line is another one that names it.
+// A pool bucket has no Cost Center. The unique index of the line and the checks are SQL in the migration (ADR-0005).
+model InvoiceAllocation {
+  id                  String   @id @default(uuid(7)) @db.Uuid
+  invoiceId           String   @map("invoice_id") @db.Uuid
+  // The first day of the month the line pays for.
+  month               DateTime @db.Date
+  // A share of what the invoice cost the company; negative only in the lines of kind TRANSFER_OUT, WITHDRAWAL and LOT_DIFFERENCE.
+  amountMinor         BigInt   @map("amount_minor")
+  // The part of the line that is tax that cannot be deducted.
+  taxPartMinor        BigInt   @default(0) @map("tax_part_minor")
+  // COST_CENTER, POOL_IDLE, POOL_DEVICE_LOT, POOL_REPLACEMENT or POOL_LOT_DIFFERENCE.
+  bucket              String
+  costCenterId        String?  @map("cost_center_id") @db.Uuid
+  commitmentId        String?  @map("commitment_id") @db.Uuid
+  // ORIGINAL, TRANSFER_OUT, TRANSFER_IN, WITHDRAWAL or LOT_DIFFERENCE.
+  kind                String   @default("ORIGINAL")
+  adjustsAllocationId String?  @map("adjusts_allocation_id") @db.Uuid
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  invoice     Invoice             @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  costCenter  CostCenter?         @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+  commitment  BudgetCommitment?   @relation(fields: [commitmentId], references: [id], onDelete: Restrict)
+  adjusts     InvoiceAllocation?  @relation("InvoiceAllocationAdjusts", fields: [adjustsAllocationId], references: [id], onDelete: Restrict)
+  adjustedBy  InvoiceAllocation[] @relation("InvoiceAllocationAdjusts")
+
+  @@index([invoiceId, month])
+  @@index([costCenterId, month])
+  @@map("invoice_allocations")
+}
+
+// What an invoice was applied to a Cost Center for in a year, as rows that are added (W3-26, F9): the sum by invoice, year and Cost Center is what was applied.
+model InvoiceYearApplication {
+  id               String   @id @default(uuid(7)) @db.Uuid
+  invoiceId        String   @map("invoice_id") @db.Uuid
+  year             Int
+  costCenterId     String   @map("cost_center_id") @db.Uuid
+  commitmentId     String?  @map("commitment_id") @db.Uuid
+  // CONFIRMATION, YEAR_START, TRANSFER or WITHDRAWAL.
+  source           String
+  appliedMinor     BigInt   @map("applied_minor")
+  taxVarianceMinor BigInt   @default(0) @map("tax_variance_minor")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  invoice    Invoice           @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  costCenter CostCenter        @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+  commitment BudgetCommitment? @relation(fields: [commitmentId], references: [id], onDelete: Restrict)
+
+  @@index([invoiceId, year, costCenterId])
+  @@index([costCenterId, year])
+  @@map("invoice_year_applications")
 }

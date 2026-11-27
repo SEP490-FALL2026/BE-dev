@@ -73,10 +73,12 @@ describe('the company-wide budget figures over PostgreSQL (US-12-01)', () => {
       spent: { amount: '0', currency: h.reporting },
       remaining: { amount: String(70 * M), currency: h.reporting },
       pendingSpend: { amount: '0', currency: h.reporting },
+      runningUncommitted: { amount: '0', currency: h.reporting },
       remainingBase: { amount: String(70 * M), currency: h.reporting },
       remainingWithReserve: { amount: String(70 * M), currency: h.reporting },
       costCenterCount: 2,
       overBudgetCount: 1,
+      noPriceRightCount: 0,
     });
     expect(summary.lastInvoiceRecordedAt).toBeNull();
   });

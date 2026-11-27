@@ -1,6 +1,16 @@
+import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { CatalogApi } from '../../catalog/public/catalog.api';
+import type { BudgetFactsRepo } from '../budget/budget-facts.repo';
 import type { CommitmentRepo, HeldWithSeatPrice } from '../budget/commitment.repo';
-import { CommitmentRequestFactsHook, type CommitmentRequestView } from '../public/budgets.extension-points';
+import type { InvoiceRepo } from '../budget/invoice.repo';
+import {
+  CommitmentRequestFactsHook,
+  type CommitmentRequestView,
+  type PendingSpendContributions,
+} from '../public/budgets.extension-points';
+import type { SeatMonthRepo } from '../seat-month/seat-month.repo';
+import type { RunningUncommittedFactsService } from '../running-uncommitted/running-uncommitted-facts.service';
+import { BudgetReviewFiguresService } from './budget-review-figures.service';
 import { BudgetReviewPriceService } from './budget-review-price.service';
 import { knownPriceIncrease } from './budget-review.policy';
 
@@ -27,10 +37,20 @@ const view = (over: Partial<CommitmentRequestView> = {}): CommitmentRequestView 
   vendorId: 'vendor-1',
   ...over,
 });
-type Price = { kind: 'RECURRING' | 'ONE_TIME'; unitPrice: { amountMinor: bigint }; billingCycle: string } | null;
-const monthly = (amountMinor: bigint, billingCycle = 'MONTHLY'): Price => ({
+type Price = {
+  kind: 'RECURRING' | 'ONE_TIME';
+  unitPrice: { amountMinor: bigint };
+  monthlyPriceMinor?: bigint | null;
+  billingCycle: string;
+} | null;
+const monthly = (
+  amountMinor: bigint,
+  billingCycle = 'MONTHLY',
+  monthlyPriceMinor: bigint | null = amountMinor,
+): Price => ({
   kind: 'RECURRING',
   unitPrice: { amountMinor },
+  monthlyPriceMinor,
   billingCycle,
 });
 
@@ -129,12 +149,12 @@ describe('the price increase already known of the commitments of a Cost Center (
     expect(knownPriceIncrease(items.get(CC) ?? [])).toBe(2_000_000n);
   });
 
-  it('turns the price of a quarter or a year into the price of a month, rounded up, as the commitment did', async () => {
-    const { service } = build([held()], [view()], { 'plan-1': monthly(18_000_001n, 'ANNUAL') });
+  it('reads stored monthlyPriceMinor directly without dividing unitPrice at read time', async () => {
+    const { service } = build([held()], [view()], { 'plan-1': monthly(18_000_001n, 'ANNUAL', 1_500_000n) });
 
     const items = await service.itemsOf(tx, [CC], YEAR, 8);
 
-    expect(items.get(CC)?.[0].monthlyMinor[0]).toBe(1_500_001n);
+    expect(items.get(CC)?.[0].monthlyMinor[0]).toBe(1_500_000n);
   });
 
   it('keeps the price of the month before for a month the catalog has no comparable price for: it is not known to have changed', async () => {
@@ -169,5 +189,53 @@ describe('the price increase already known of the commitments of a Cost Center (
 
     expect((await service.itemsOf(tx, [CC], YEAR, 12)).size).toBe(0);
     expect(getPlanPrice).not.toHaveBeenCalled();
+  });
+});
+
+describe('BudgetReviewFiguresService (W3-07 Q-G priorYearReleasedMinor)', () => {
+  const TX = {} as DbTx;
+
+  function buildFigures(priorYearReleasedMap: Map<string, bigint>) {
+    const budgets = {
+      approvedOfYear: jest
+        .fn()
+        .mockResolvedValue(new Map([['cc-1', { baseMinor: 10_000_000n, reserveMinor: 0n, currency: 'VND' }]])),
+      priorYearReleasedOf: jest.fn().mockResolvedValue(priorYearReleasedMap),
+    };
+    const commitments = {
+      totals: jest.fn().mockResolvedValue(new Map([['cc-1:2027', { held: 1_000_000n, spent: 0n }]])),
+    };
+    const service = new BudgetReviewFiguresService(
+      budgets as unknown as BudgetFactsRepo,
+      commitments as unknown as CommitmentRepo,
+      {
+        spentOf: jest.fn().mockResolvedValue(new Map()),
+        priceBasisOf: jest.fn().mockResolvedValue(new Map()),
+      } as unknown as InvoiceRepo,
+      { totals: jest.fn().mockResolvedValue(new Map()) } as unknown as PendingSpendContributions,
+      { itemsOf: jest.fn().mockResolvedValue(new Map()) } as unknown as BudgetReviewPriceService,
+      {} as SeatMonthRepo,
+      { ofYear: jest.fn().mockResolvedValue(new Map()) } as unknown as RunningUncommittedFactsService,
+    );
+
+    return { service, budgets };
+  }
+
+  it('Q-G: populates priorYearReleasedMinor from year-1 in January (month === 1)', async () => {
+    const { service, budgets } = buildFigures(new Map([['cc-1', 800_000n]]));
+
+    const lines = await service.linesOf(TX, 2027, 1, 'VND');
+
+    expect(budgets.priorYearReleasedOf).toHaveBeenCalledWith(['cc-1'], 2026, TX);
+    expect(lines[0].priorYearReleasedMinor).toBe(800_000n);
+  });
+
+  it('sets priorYearReleasedMinor to 0n when month > 1 without querying prior year releases', async () => {
+    const { service, budgets } = buildFigures(new Map([['cc-1', 800_000n]]));
+
+    const lines = await service.linesOf(TX, 2027, 2, 'VND');
+
+    expect(budgets.priorYearReleasedOf).not.toHaveBeenCalled();
+    expect(lines[0].priorYearReleasedMinor).toBe(0n);
   });
 });

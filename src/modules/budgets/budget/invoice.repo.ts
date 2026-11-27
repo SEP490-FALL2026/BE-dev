@@ -31,6 +31,13 @@ export interface NewInvoice {
   outOfProcessCaseId?: string | null;
   /** The line of the Cost Center not allocated: why, and the department of the user it is shown with (both or neither). */
   unallocated?: { reason: 'K1_GRANT_FAILED'; departmentId: string } | null;
+  /** Pool variance figures captured for a monthly pooled-quota seat purchase invoice (`SBF-11a` / K2). */
+  poolFigures?: {
+    expectedMinor: bigint | null;
+    varianceMinor: bigint;
+    varianceMonth: BusinessDate;
+    inReview: boolean;
+  } | null;
 }
 
 export interface InvoiceRecord {
@@ -50,6 +57,11 @@ export interface InvoiceRecord {
   recordedAt: Date;
   serviceMonth: BusinessDate | null;
   purchaseInvoiceId: string | null;
+  subscriptionId: string | null;
+  poolExpectedMinor: bigint | null;
+  poolVarianceMinor: bigint | null;
+  poolVarianceMonth: BusinessDate | null;
+  poolVarianceInReview: boolean;
 }
 
 /** What the invoices of one commitment cost, how many there are, and whether one is flagged as more than the commitment allowed. */
@@ -59,7 +71,7 @@ export interface InvoiceFigures {
   flagged: boolean;
 }
 
-const toRecord = (row: Prisma.InvoiceGetPayload<object>): InvoiceRecord => ({
+const toRecord = (row: Prisma.InvoiceGetPayload<object>, resolved = false): InvoiceRecord => ({
   id: row.id,
   commitmentId: row.commitmentId,
   number: row.number,
@@ -75,6 +87,44 @@ const toRecord = (row: Prisma.InvoiceGetPayload<object>): InvoiceRecord => ({
   recordedAt: row.recordedAt,
   serviceMonth: row.serviceMonth ? fromDateColumn(row.serviceMonth) : null,
   purchaseInvoiceId: row.purchaseInvoiceId,
+  subscriptionId: row.subscriptionId,
+  poolExpectedMinor: row.poolExpectedMinor,
+  poolVarianceMinor: row.poolVarianceMinor,
+  poolVarianceMonth: row.poolVarianceMonth ? fromDateColumn(row.poolVarianceMonth) : null,
+  poolVarianceInReview: row.poolVarianceInReview && !resolved,
+});
+
+const toPoolColumns = (poolFigures: NewInvoice['poolFigures']) => ({
+  poolExpectedMinor: poolFigures?.expectedMinor ?? null,
+  poolVarianceMinor: poolFigures?.varianceMinor ?? null,
+  poolVarianceMonth: poolFigures ? toDateColumn(poolFigures.varianceMonth) : null,
+  poolVarianceInReview: poolFigures?.inReview ?? false,
+});
+
+const toCreateData = (input: NewInvoice) => ({
+  organizationId: input.organizationId,
+  commitmentId: input.commitmentId,
+  vendorId: input.vendorId,
+  number: input.number,
+  issuedOn: toDateColumn(input.issuedOn),
+  currency: input.currency,
+  netMinor: input.netMinor,
+  deductibleTaxMinor: input.deductibleTaxMinor,
+  nonDeductibleTaxMinor: input.nonDeductibleTaxMinor,
+  actualCostMinor: input.actualCostMinor,
+  appliedMinor: input.appliedMinor,
+  matchResult: input.matchResult,
+  note: input.note,
+  recordedByEmployeeId: input.recordedByEmployeeId,
+  recordedAt: input.now,
+  serviceMonth: input.serviceMonth ? toDateColumn(input.serviceMonth) : null,
+  purchaseInvoiceId: input.purchaseInvoiceId ?? null,
+  subscriptionId: input.subscriptionId ?? null,
+  costCenterId: input.costCenterId ?? null,
+  outOfProcessCaseId: input.outOfProcessCaseId ?? null,
+  unallocatedReason: input.unallocated?.reason ?? null,
+  departmentId: input.unallocated?.departmentId ?? null,
+  ...toPoolColumns(input.poolFigures),
 });
 
 /**
@@ -86,34 +136,35 @@ export class InvoiceRepo {
   constructor(private readonly prisma: PrismaService) {}
 
   async insert(tx: DbTx, input: NewInvoice): Promise<InvoiceRecord> {
-    const created = await tx.invoice.create({
-      data: {
-        organizationId: input.organizationId,
-        commitmentId: input.commitmentId,
-        vendorId: input.vendorId,
-        number: input.number,
-        issuedOn: toDateColumn(input.issuedOn),
-        currency: input.currency,
-        netMinor: input.netMinor,
-        deductibleTaxMinor: input.deductibleTaxMinor,
-        nonDeductibleTaxMinor: input.nonDeductibleTaxMinor,
-        actualCostMinor: input.actualCostMinor,
-        appliedMinor: input.appliedMinor,
-        matchResult: input.matchResult,
-        note: input.note,
-        recordedByEmployeeId: input.recordedByEmployeeId,
-        recordedAt: input.now,
-        serviceMonth: input.serviceMonth ? toDateColumn(input.serviceMonth) : null,
-        purchaseInvoiceId: input.purchaseInvoiceId ?? null,
-        subscriptionId: input.subscriptionId ?? null,
-        costCenterId: input.costCenterId ?? null,
-        outOfProcessCaseId: input.outOfProcessCaseId ?? null,
-        unallocatedReason: input.unallocated?.reason ?? null,
-        departmentId: input.unallocated?.departmentId ?? null,
-      },
-    });
+    const created = await tx.invoice.create({ data: toCreateData(input) });
 
     return toRecord(created);
+  }
+
+  async findByPurchaseInvoiceId(purchaseInvoiceId: string, tx?: DbTx): Promise<InvoiceRecord | null> {
+    const row = await (tx ?? this.prisma).invoice.findUnique({
+      where: { purchaseInvoiceId },
+      include: { poolVarianceResolution: { select: { invoiceId: true } } },
+    });
+    return row ? toRecord(row, row.poolVarianceResolution !== null) : null;
+  }
+
+  /**
+   * Appends a resolution row for an invoice whose `pool_variance_in_review` discrepancy case closed,
+   * keeping `invoices` strictly append-only (`INSERT`, `SELECT`). Idempotent via `skipDuplicates`.
+   */
+  async markPoolVarianceResolved(
+    tx: DbTx,
+    purchaseInvoiceId: string,
+    resolvedAt: Date = new Date(),
+  ): Promise<InvoiceRecord | null> {
+    const row = await tx.invoice.findUnique({ where: { purchaseInvoiceId } });
+    if (!row || !row.poolVarianceInReview) return null;
+    await tx.invoicePoolVarianceResolution.createMany({
+      data: [{ invoiceId: row.id, resolvedAt }],
+      skipDuplicates: true,
+    });
+    return toRecord(row, true);
   }
 
   /**
@@ -144,7 +195,7 @@ export class InvoiceRepo {
           take,
         });
 
-        return { rows: rows.map(toRecord), total: await tx.invoice.count({ where: { commitmentId } }) };
+        return { rows: rows.map((row) => toRecord(row)), total: await tx.invoice.count({ where: { commitmentId } }) };
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
     );
@@ -186,7 +237,9 @@ export class InvoiceRepo {
    * expense belongs to its year even before the budget of that year is approved, every invoice booked to the Cost Center with no commitment
    * (`PI-1`, `R-51`), and the seat-months of the shared pool of seats (`K2`) that Cost Center bore (`SM-1`, `MG-03`): an invoice of the pool is a
    * line of the pool and costs no department anything, so what a department bears of it is its seat-months, once. The year is the one of the month
-   * the invoice or the seat-month pays for; an invoice of before has no such month and keeps the year of its commitment. With `before`, only what pays for a month
+   * the invoice or the seat-month pays for; an invoice of before has no such month and keeps the year of its commitment. An invoice that has allocation lines
+   * is read by its lines, month by month: what its Cost Center lines say for the month, in the year of that month; one with no line is read as it always was.
+   * With `before`, only what pays for a month
    * before that day (the month of an invoice with none is the one it was issued in): what had been spent through the end of a month, whenever it is asked (`RV1-03`).
    */
   async spentOf(
@@ -199,6 +252,8 @@ export class InvoiceRepo {
     const invoiceBound =
       before === undefined ? Prisma.empty : Prisma.sql`AND COALESCE(i.service_month, i.issued_on) < ${before}::date`;
     const seatBound = before === undefined ? Prisma.empty : Prisma.sql`AND s.month < ${before}::date`;
+    const lineBound = before === undefined ? Prisma.empty : Prisma.sql`AND l.month < ${before}::date`;
+    const lotBound = before === undefined ? Prisma.empty : Prisma.sql`AND c.month < ${before}::date`;
     const wanted = Prisma.join(pairs.map((pair) => Prisma.sql`(${pair.costCenterId}::uuid, ${pair.year}::int)`));
     const rows = await (tx ?? this.prisma).$queryRaw<{ cost_center_id: string; year: number; spent: string }[]>`
       SELECT cost_center_id, year, SUM(amount)::text AS spent
@@ -209,6 +264,15 @@ export class InvoiceRepo {
             FROM invoices i
             LEFT JOIN budget_commitments c ON c.id = i.commitment_id
            WHERE (COALESCE(i.cost_center_id, c.cost_center_id), COALESCE(EXTRACT(YEAR FROM i.service_month)::int, c.year)) IN (${wanted}) ${invoiceBound}
+             AND NOT EXISTS (SELECT 1 FROM invoice_allocations a WHERE a.invoice_id = i.id)
+          UNION ALL
+          SELECT l.cost_center_id, EXTRACT(YEAR FROM l.month)::int AS year, l.amount_minor AS amount
+            FROM invoice_allocations l
+           WHERE l.bucket = 'COST_CENTER' AND (l.cost_center_id, EXTRACT(YEAR FROM l.month)::int) IN (${wanted}) ${lineBound}
+          UNION ALL
+          SELECT c.cost_center_id, EXTRACT(YEAR FROM c.month)::int AS year, c.amount_minor AS amount
+            FROM license_lot_charges c
+           WHERE (c.cost_center_id, EXTRACT(YEAR FROM c.month)::int) IN (${wanted}) ${lotBound}
           UNION ALL
           SELECT s.cost_center_id, EXTRACT(YEAR FROM s.month)::int AS year, s.amount_minor AS amount
             FROM seat_month_charges s
@@ -239,13 +303,43 @@ export class InvoiceRepo {
     const rows = await (tx ?? this.prisma).$queryRaw<
       { cost_center_id: string; year: number; basis: string; actual: string }[]
     >`
-      SELECT COALESCE(i.cost_center_id, c.cost_center_id) AS cost_center_id,
-             COALESCE(EXTRACT(YEAR FROM i.service_month)::int, c.year) AS year,
-             SUM(i.applied_minor)::text AS basis, SUM(i.actual_cost_minor)::text AS actual
-        FROM invoices i
-        LEFT JOIN budget_commitments c ON c.id = i.commitment_id
-       WHERE i.commitment_id IS NOT NULL
-         AND (COALESCE(i.cost_center_id, c.cost_center_id), COALESCE(EXTRACT(YEAR FROM i.service_month)::int, c.year)) IN (${wanted}) ${bound}
+      SELECT cost_center_id, year, SUM(basis)::text AS basis, SUM(actual)::text AS actual
+        FROM (
+          SELECT COALESCE(i.cost_center_id, c.cost_center_id) AS cost_center_id,
+                 COALESCE(EXTRACT(YEAR FROM i.service_month)::int, c.year) AS year,
+                 i.applied_minor AS basis,
+                 i.actual_cost_minor AS actual
+            FROM invoices i
+            LEFT JOIN budget_commitments c ON c.id = i.commitment_id
+           WHERE i.commitment_id IS NOT NULL
+             AND (COALESCE(i.cost_center_id, c.cost_center_id), COALESCE(EXTRACT(YEAR FROM i.service_month)::int, c.year)) IN (${wanted}) ${bound}
+             AND NOT EXISTS (SELECT 1 FROM invoice_allocations a WHERE a.invoice_id = i.id)
+          UNION ALL
+          SELECT l.cost_center_id,
+                 EXTRACT(YEAR FROM l.month)::int AS year,
+                 0::bigint AS basis,
+                 l.amount_minor AS actual
+            FROM invoice_allocations l
+            JOIN invoices i ON i.id = l.invoice_id
+           WHERE l.bucket = 'COST_CENTER'
+             AND (l.cost_center_id, EXTRACT(YEAR FROM l.month)::int) IN (${wanted}) ${bound}
+             AND EXISTS (
+               SELECT 1 FROM invoice_year_applications ya
+                WHERE ya.invoice_id = l.invoice_id
+                  AND ya.year = EXTRACT(YEAR FROM l.month)::int
+                  AND ya.cost_center_id = l.cost_center_id
+                  AND ya.commitment_id IS NOT NULL
+             )
+          UNION ALL
+          SELECT a.cost_center_id,
+                 a.year,
+                 a.applied_minor AS basis,
+                 0::bigint AS actual
+            FROM invoice_year_applications a
+            JOIN invoices i ON i.id = a.invoice_id
+           WHERE a.commitment_id IS NOT NULL
+             AND (a.cost_center_id, a.year) IN (${wanted}) ${bound}
+        ) price_basis
        GROUP BY 1, 2`;
     for (const row of rows) {
       basis.set(`${row.cost_center_id}:${row.year}`, {

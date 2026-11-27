@@ -307,7 +307,7 @@ describe('the contracts, over HTTP (integration, real PostgreSQL)', () => {
   });
 
   describe('which subscriptions rest on a contract (AC-6, AC-7, AC-14; QĐ-111t)', () => {
-    it('links a K2 and a K4 subscription of its vendor, lists them with the applications and the logo, and audits each link', async () => {
+    it('links a K2 subscription of its vendor, lists it with the application and the logo and audits the link; a K4 subscription is refused: its lot has its own contract (W3-24)', async () => {
       const id = await h.contractWith({ name: 'Microsoft 2026', vendorId: vendorA, number: 'HD-MS-2026' });
       const k2 = await h.subscriptionOfVendor(NAME_A, 'K2');
       const k4 = await h.subscriptionOfVendor(NAME_A, 'K4');
@@ -322,33 +322,33 @@ describe('the contracts, over HTTP (integration, real PostgreSQL)', () => {
         planId: k2.planId,
         logoUrl: null,
       });
-      await h.linkSubscription(id, k4.subscriptionId).expect(201);
+      const keys = await h.linkSubscription(id, k4.subscriptionId);
+      expect([keys.status, h.codeOf(keys)]).toEqual([422, 'CONTRACT.SUBSCRIPTION_NOT_K2']);
 
       const contract = await h.contractOf(id, h.finance);
-      expect(contract.subscriptionCount).toBe(2);
-      expect(contract.subscriptions?.map((subscription) => subscription.provisioningType)).toEqual(['K4', 'K2']);
-      expect([...(contract.applicationIds ?? [])].sort()).toEqual([k2.applicationId, k4.applicationId].sort());
+      expect(contract.subscriptionCount).toBe(1);
+      expect(contract.subscriptions?.map((subscription) => subscription.provisioningType)).toEqual(['K2']);
+      expect(contract.applicationIds).toEqual([k2.applicationId]);
       expect(contract).not.toHaveProperty('usageSources');
       expect((await h.auditEvents('Contract', id)).map((event) => event.action)).toEqual([
         'CONTRACT.CREATED',
-        'CONTRACT.SUBSCRIPTION_LINKED',
         'CONTRACT.SUBSCRIPTION_LINKED',
       ]);
       expect((await h.auditEvents('Contract', id))[1].after).toEqual({ subscriptionId: k2.subscriptionId });
     });
 
-    it('lists an application once when two subscriptions of it, a K2 and a K4, rest on the contract', async () => {
+    it('lists an application once when two subscriptions of it, of two K2 plans, rest on the contract', async () => {
       const id = await h.contractWith({ name: 'Một ứng dụng hai thuê bao', vendorId: vendorA });
       const k2 = await h.subscriptionOfVendor(NAME_A, 'K2');
-      const k4 = await h.subscriptionOfVendor(NAME_A, 'K4', k2.applicationId);
+      const second = await h.subscriptionOfVendor(NAME_A, 'K2', k2.applicationId);
       await h.linkSubscription(id, k2.subscriptionId).expect(201);
-      await h.linkSubscription(id, k4.subscriptionId).expect(201);
+      await h.linkSubscription(id, second.subscriptionId).expect(201);
 
       const contract = await h.contractOf(id);
 
-      expect(k4.applicationId).toBe(k2.applicationId);
+      expect(second.applicationId).toBe(k2.applicationId);
       expect(contract.subscriptionCount).toBe(2);
-      expect(contract.subscriptions?.map((subscription) => subscription.provisioningType)).toEqual(['K4', 'K2']);
+      expect(contract.subscriptions?.map((subscription) => subscription.provisioningType)).toEqual(['K2', 'K2']);
       expect(contract.applicationIds).toEqual([k2.applicationId]);
     }, 120000);
 

@@ -28,6 +28,7 @@ export interface DashboardProgress {
     reusedThisMonth: DashboardSection;
   };
   plansBelowVendorAdminMinimum: DashboardSection;
+  workspacesBelowVendorAdminMinimum: DashboardSection;
 }
 
 /** What the progress is made of: the counts the three modules gave in the scope of the caller. */
@@ -36,6 +37,8 @@ export interface ProgressFacts {
   seats: SeatsReturnedFacts;
   /** The plans in use short of admins at the vendor, across the company. */
   plansBelowMinimum: number;
+  /** The workspaces in use short of working IT Admins, across the company. */
+  workspacesBelowMinimum: number;
 }
 
 const CASE_LIST = 'offboardingCaseList';
@@ -69,5 +72,6 @@ export function progressOf(facts: ProgressFacts): DashboardProgress {
       reusedThisMonth: counted(facts.seats.reused, null),
     },
     plansBelowVendorAdminMinimum: counted(facts.plansBelowMinimum, null),
+    workspacesBelowVendorAdminMinimum: counted(facts.workspacesBelowMinimum, null),
   };
 }

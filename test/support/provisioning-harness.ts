@@ -75,6 +75,34 @@ export class FakeGrantGate implements GrantRequestGate {
     this.outcomes.push({ requestId, outcome });
   }
 
+  checkSeatPurchaseItems(
+    _tx: DbTx,
+    items: readonly { requestId: string; beneficiaryEmployeeId: string }[],
+    expectedPlanId: string,
+  ): Promise<Set<string>> {
+    const valid = new Set<string>();
+    for (const item of items) {
+      const answer = this.answers.get(item.requestId);
+      if (
+        answer?.status === 'GRANTABLE' &&
+        answer.planId === expectedPlanId &&
+        answer.employeeId === item.beneficiaryEmployeeId
+      ) {
+        valid.add(`${item.requestId}:${item.beneficiaryEmployeeId}`);
+      }
+    }
+
+    return Promise.resolve(valid);
+  }
+
+  reservedForRequestLots(): Promise<Map<string, { beneficiaries: number; chargedExcess: number }>> {
+    return Promise.resolve(new Map<string, { beneficiaries: number; chargedExcess: number }>());
+  }
+
+  hasLotCharges(): Promise<boolean> {
+    return Promise.resolve(false);
+  }
+
   /** A request that is approved enough and not ended, for this person and plan, of this department (the seed one by default). */
   grantable(employeeId: string, planId: string, departmentId: string = this.defaultDepartmentId): string {
     return this.answer({
@@ -184,7 +212,7 @@ export class ProvisioningHarness extends SeatHarness {
         fullName: `Person ${code}`,
         workEmail: `${code.toLowerCase()}@acme.vn`,
         employmentType: 'STAFF',
-        hireDate: '2026-10-01',
+        hireDate: this.today() < '2026-10-01' ? this.today() : '2026-10-01',
         departmentCode,
         jobTitle,
       })

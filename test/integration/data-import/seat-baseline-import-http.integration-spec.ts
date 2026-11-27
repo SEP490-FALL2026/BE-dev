@@ -378,12 +378,12 @@ describe('the seat baseline import over HTTP (integration, real PostgreSQL)', ()
   });
 
   describe('AC-11, AC-12: which plans take a baseline and how', () => {
-    it('writes K1 and K2 rows as ordinary assignments on company accounts', async () => {
+    it('writes K1 (by planId per Owner 27/11) and K2 rows as ordinary assignments on company accounts', async () => {
       await h.person('KIN1');
-      const k1 = await h.subscription(5, 'K1');
+      const k1PlanId = await h.plan('K1');
       const k2 = await h.subscription(5, 'K2');
 
-      expect((await h.written({ subscriptionId: k1 }, [row('KIN1')])).import.result?.created).toBe(1);
+      expect((await h.written({ planId: k1PlanId }, [row('KIN1')])).import.result?.created).toBe(1);
       expect((await h.written({ subscriptionId: k2 }, [row('KIN1')])).import.result?.created).toBe(1);
     });
 

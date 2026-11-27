@@ -92,6 +92,10 @@ export const TARGET_BY_CODE: Readonly<Partial<Record<InAppNotificationCode, Rout
   IT_ADMIN_HANDOVER_RECEIVED: null, // the catalogue names two lists (subscriptions, applications)
   // SBF-20: the result of an adjustment is read as the renewal case; the other notices of a subscription open the subscription (its subject).
   SUBSCRIPTION_RENEWAL_OUTCOME_RECORDED: route('subscriptionRenewalGet', { id: 'renewalId' }),
+  SUBSCRIPTION_SEATS_BOUGHT: route('subscriptionGet', { id: 'subscriptionId' }),
+  SEAT_PURCHASE_INVOICE_OVERDUE: route('subscriptionGet', { id: 'subscriptionId' }),
+  SEAT_LEDGER_VENDOR_RECORDED: route('subscriptionGet', { id: 'subscriptionId' }),
+  SUBSCRIPTION_PRICE_REVIEW: route('subscriptionGet', { id: 'subscriptionId' }),
   // The incident is also told to the person who decides spending, who may not read a subscription: the list of deadline events is open to all three recipients.
   SUBSCRIPTION_AUTO_RENEWAL_INCIDENT: route('subscriptionDeadlineEventList'),
   // Operations round: a list for the notices whose subject is not one record the recipient can read.
@@ -107,6 +111,7 @@ export const TARGET_BY_CODE: Readonly<Partial<Record<InAppNotificationCode, Rout
   DEVICE_RETURN_WAITING: route('deviceReturnTaskList'),
   UNPLACED_WORK_WAITING: route('unplacedWorkDesignationList'),
   UNPLACED_WORK_DESIGNATED: route('unplacedWorkDesignationList'),
+  WORKSPACE_ADMIN_NOT_WORKING: route('workspaceGet', { id: 'workspaceId' }),
 };
 
 /**
@@ -136,6 +141,7 @@ export const ROUTE_READERS: Readonly<Record<string, readonly string[]>> = {
   ghostSeatExemptionList: ['MANAGER', 'IT_ADMIN'],
   ghostSeatQueueList: ['MANAGER'],
   ghostSeatRecommendationGet: ['IT_ADMIN', 'MANAGER'],
+  licenseLotGet: ['IT_ADMIN', 'FINANCE', 'SUPER_ADMIN'],
   longLeaveGet: ['SUPER_ADMIN', 'IT_ADMIN'],
   offboardingCaseGet: ['SUPER_ADMIN', 'IT_ADMIN'],
   personnelNoticeGet: ['SUPER_ADMIN', 'IT_ADMIN', 'MANAGER'],
@@ -149,6 +155,7 @@ export const ROUTE_READERS: Readonly<Record<string, readonly string[]>> = {
   unplacedWorkDesignationList: ['SUPER_ADMIN', 'IT_ADMIN'],
   usageSourceList: ['IT_ADMIN'],
   vendorAccountDiscrepancyList: ['IT_ADMIN'],
+  workspaceGet: ['IT_ADMIN', 'FINANCE', 'SUPER_ADMIN'],
 };
 
 /** Where a reader who may not read a route goes instead, tried in order; `selfOnly` is for a notice about the reader (their own record). */
@@ -183,6 +190,7 @@ export const TARGET_BY_SUBJECT_TYPE: Readonly<Record<string, RouteRef>> = {
   EMPLOYEE: route('employeeGet', { id: 'subject' }),
   EMPLOYEE_LEAVE: route('longLeaveGet', { id: 'subject' }),
   GHOST_SEAT_RECOMMENDATION: route('ghostSeatRecommendationGet', { id: 'subject' }),
+  LICENSE_LOT: route('licenseLotGet', { id: 'subject' }),
   OFFBOARDING_CASE: route('offboardingCaseGet', { id: 'subject' }),
   PERSONNEL_NOTICE: route('personnelNoticeGet', { id: 'subject' }),
   PLAN: route('planGet', { id: 'subject' }),
@@ -194,6 +202,7 @@ export const TARGET_BY_SUBJECT_TYPE: Readonly<Record<string, RouteRef>> = {
   SPEND_BATCH: route('spendBatchGet', { id: 'subject' }),
   SUBSCRIPTION: route('subscriptionGet', { id: 'subject' }),
   SUBSCRIPTION_RENEWAL: route('subscriptionRenewalGet', { id: 'subject' }),
+  WORKSPACE: route('workspaceGet', { id: 'subject' }),
 };
 
 /** The spellings that were written before `subject.type` became `UPPER_SNAKE`; hold rows and old notices still carry them. */

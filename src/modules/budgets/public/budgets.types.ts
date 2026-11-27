@@ -1,3 +1,5 @@
+import type { BusinessDate } from '../../../core/business-date';
+
 /** The current budget of a Cost Center and a year, as the check of a request reads it (`US-06-12`). */
 export interface YearBudgetFacts {
   versionId: string;
@@ -16,6 +18,18 @@ export interface YearBudgetFacts {
   heldMinor: bigint;
   /** What has become an expense in the year. */
   spentMinor: bigint;
+  /** Estimated remaining-year cost of active K2 seats not backed by a HELD commitment in this Cost Center. */
+  runningUncommittedMinor: bigint;
+}
+
+export interface MonthSliceInput {
+  month: BusinessDate;
+  seatCount: number;
+}
+
+export interface MonthReleaseInput {
+  month: BusinessDate;
+  amountMinor: bigint;
 }
 
 /** What a request holds against the budget of a Cost Center: one amount for each year its binding payments fall in. */
@@ -34,6 +48,8 @@ export interface CommitmentHoldInput {
    * for a price that is not by the month (a one-time price), whose commitment is never released by day.
    */
   seatMonthlyMinor?: bigint | null;
+  /** Monthly seat counts for K2 commitments; omitted or empty for K1/K4. */
+  months?: readonly MonthSliceInput[];
 }
 
 /**
@@ -54,6 +70,8 @@ export interface YearStartHoldInput {
     amountMinor: bigint;
     /** What one seat costs a month, kept for the release by day of a later slice. */
     seatMonthlyMinor: bigint;
+    /** Monthly seat counts for K2 commitments; omitted or empty for K1/K4. */
+    months?: readonly MonthSliceInput[];
   }[];
 }
 
@@ -96,14 +114,21 @@ export interface CommitmentReleaseInput {
   reason: CommitmentReleaseReason;
   /**
    * Absent: everything still held goes back, and the part that already became an expense stays. Present: these amounts go
-   * back, one for each year named, which is how a share, or what is not yet spent, is released.
+   * back, one for each year named, which is how a share, or what is not yet spent, is released. When `months` is present on
+   * a K2 monthly-sliced commitment, the release spreads per month and caps each month at its remaining held amount.
    */
-  amounts?: readonly { year: number; amountMinor: bigint }[];
+  amounts?: readonly { year: number; amountMinor: bigint; months?: readonly MonthReleaseInput[] }[];
   /**
    * What caused it, kept on the release (`revocationTask:<id>`, `grantTask:<id>`): a commitment that already gave money back for the same
    * reason and reference gives nothing again, so the event is released once whatever repeats it.
    */
   reference?: string;
+  /** Set for a license-lot invoice (`REQUEST`, `STOCK`, `REPLACEMENT`, `OPENING`) to allocate across CC and lot pool buckets. */
+  licenseLotId?: string | null;
+  /** Confirmation month (`YYYY-MM-01`) for license-lot invoice allocations; defaults to `serviceMonth`. */
+  allocationMonth?: BusinessDate | null;
+  /** Active non-withdrawn beneficiary count `m` of a `REQUEST` lot at confirmation time. */
+  lotBeneficiaryCount?: number | null;
   now: Date;
 }
 
@@ -118,6 +143,8 @@ export interface SeatCommitment {
   origin: 'APPROVAL' | 'YEAR_START';
   seatMonthlyMinor: bigint | null;
   heldMinor: bigint;
+  /** Monthly slice dates (`YYYY-MM-01`) when this commitment is monthly-sliced (K2); empty/absent otherwise. */
+  months?: readonly BusinessDate[];
   /**
    * The references of the releases this commitment already gave the day a transfer took effect (reason `TRANSFER_EFFECTIVE`,
    * `transfer:<transferId>:assignment:<assignmentId>`), read from its ledger under the same lock: what tells the release by day of a right
@@ -138,6 +165,7 @@ export interface ReleasedCommitment {
 /** What one commitment was made for, as another context counts it. */
 export interface CommittedAmount {
   requestId: string;
+  year: number;
   amountMinor: bigint;
   currency: string;
 }
@@ -188,7 +216,40 @@ export interface PurchaseInvoiceRecordInput {
    * allocated, shown with the department of the user, and no expense of any Cost Center; no commitment is taken down by it.
    */
   unallocated: { reason: 'K1_GRANT_FAILED'; departmentId: string } | null;
+  /** Pool variance figures captured for a pooled-quota seat invoice; null or omitted for K1/K4. */
+  poolFigures?: InvoicePoolFigures | null;
+  /** Per-month allocation plan for a K1 annual (12-month, qty 1) invoice; omitted for all other invoices. */
+  k1Annual?: {
+    /** Tier 0 advisory lock subject key: root assignment id, or `req:<requestId>` before an assignment exists. */
+    lockSubjectKey: string;
+    /** Optional per-month Cost Center & Request mapping when confirmed after one or more transfers. */
+    monthAllocations?: readonly {
+      month: BusinessDate;
+      costCenterId: string;
+      requestId: string | null;
+    }[];
+  } | null;
+  /** Set for a license-lot invoice (`REQUEST`, `STOCK`, `REPLACEMENT`, `OPENING`) to allocate across CC and lot pool buckets. */
+  licenseLotId?: string | null;
+  /** Confirmation month (`YYYY-MM-01`) for license-lot invoice allocations; defaults to `serviceMonth`. */
+  allocationMonth?: BusinessDate | null;
+  /** Active non-withdrawn beneficiary count `m` of a `REQUEST` lot at confirmation time. */
+  lotBeneficiaryCount?: number | null;
   now: Date;
+}
+
+/** Pool variance figures stored on an invoice row (`invoices.pool_*`). */
+export interface InvoicePoolFigures {
+  expectedMinor: bigint | null;
+  varianceMinor: bigint;
+  varianceMonth: BusinessDate;
+  inReview: boolean;
+}
+
+/** Recorded invoice metadata for a purchase invoice as read back by the requests module. */
+export interface RecordedPurchaseInvoiceInfo {
+  subscriptionId: string | null;
+  poolFigures: InvoicePoolFigures | null;
 }
 
 export interface PurchaseInvoiceRecorded {
@@ -223,4 +284,56 @@ export interface OutOfProcessSpendRecorded {
   invoiceId: string;
   /** Where it was booked: as an expense of a Cost Center, or of no Cost Center yet. */
   booking: 'COST_CENTER' | 'UNALLOCATED';
+}
+
+export interface K1YearStartApplyInput {
+  year: number;
+  items: readonly {
+    requestId: string;
+    commitmentId: string;
+    costCenterId: string;
+    invoiceIds: readonly string[];
+  }[];
+}
+
+export interface K1TransferAllocationInput {
+  lockSubjectKey: string;
+  invoiceIds: readonly string[];
+  billingAnchorOn: BusinessDate;
+  endedOn: BusinessDate;
+  oldCostCenterId: string;
+  newCostCenterId: string;
+  oldRequestIds: readonly string[];
+  newRequestId: string | null;
+  reference: string;
+  now: Date;
+}
+
+export interface ExcessLicenseGrantInput {
+  organizationId: string;
+  licenseLotId: string;
+  licenseKeyId: string;
+  grantRequestId: string;
+  costCenterId: string;
+  keyCostBorneBeforeGrant: boolean;
+  grantMonth: BusinessDate;
+  effectiveBeneficiaryCount: number;
+  reference: string;
+  now: Date;
+}
+
+export interface ExcessLicenseGrantRecorded {
+  kind: 'OWN_REQUEST' | 'ALREADY_BORNE' | 'EXCESS_LICENSE';
+  chargeMinor: bigint;
+  markCostBorne: boolean;
+  releaseCommitmentAll: boolean;
+}
+
+export interface LotWithdrawalAfterInvoiceInput {
+  licenseLotId: string;
+  requestId: string;
+  costCenterId: string;
+  withdrawalMonth: BusinessDate;
+  reference: string;
+  now: Date;
 }

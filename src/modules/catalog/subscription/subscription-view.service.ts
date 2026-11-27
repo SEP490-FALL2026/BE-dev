@@ -19,9 +19,14 @@ import {
 } from './obligation/subscription-obligation.policy';
 import { alertDates, deriveNotice, missingData, noticeInputOf, noticeWarnings } from './subscription.policy';
 import { isPricedInDong } from './price/subscription-price.policy';
-import { liveIdsByPlan, liveSiblingsOf, poolWarnings, vendorAdminFlags } from './pool/subscription-pool.policy';
+import { poolWarnings } from './pool/subscription-pool.policy';
+import { vendorAdminFlags } from './pool/subscription-vendor-admins-pool.policy';
+import {
+  SubscriptionLotResponsibleService,
+  type SubscriptionLineWithSeats,
+} from './responsible/subscription-lot-responsible.service';
 import { SubscriptionGrantingRepo } from './subscription-granting.repo';
-import { SubscriptionRepo } from './subscription.repo';
+import { WorkspaceForSubscriptionService } from '../workspace/workspace-for-subscription.service';
 import { SubscriptionWindowsService } from './subscription-windows.service';
 import type {
   DeadlineKind,
@@ -32,7 +37,6 @@ import type {
   VendorAdminView,
 } from './subscription.types';
 
-type LiveOfPlans = { byPlan: Map<string, string[]>; has: (id: string) => boolean };
 type SeatCounts = ReadonlyMap<string, { occupied: number; inRevocation: number }>;
 
 /** Where a subscription stands against its point of adjustment today (`QĐ-111o`). */
@@ -42,13 +46,13 @@ export interface ExpiryReadingView {
   deadlineKind: DeadlineKind | null;
 }
 
-/** The most live subscriptions of one plan an answer names: duplicates exist only while the seat baseline is open, a few at most. */
-const MERGE_CANDIDATES_MAX = 20;
-
-const mergeCandidatesOf = (live: LiveOfPlans, record: SubscriptionRecord): string[] =>
-  live.has(record.id) ? liveSiblingsOf(live.byPlan, record.planId, record.id).slice(0, MERGE_CANDIDATES_MAX) : [];
-
 /** The seats of a shared pool: only a K2 plan has them (a key, a personal right and an internal tool are counted by what they are, `IA-2`). */
+const listSeatsTodayOf = (lineCount: number, servingSeatsSum: number, record: SubscriptionRecord): number => {
+  if (lineCount > 0) return servingSeatsSum;
+
+  return record.planProvisioningType === 'K2' ? (record.purchasedQuantity ?? 0) : 0;
+};
+
 const seatsOfPool = (record: SubscriptionRecord, counts: SeatCounts): SubscriptionView['seats'] => {
   if (record.planProvisioningType !== 'K2') return null;
   const taken = counts.get(record.id);
@@ -86,8 +90,8 @@ const alertsOf = (
   };
 };
 
-const mergeWarnings = (mergeCandidateIds: readonly string[]): 'SHOULD_MERGE'[] =>
-  mergeCandidateIds.length > 0 ? ['SHOULD_MERGE'] : [];
+const monthlyUnitPriceWire = (minor: bigint | null | undefined) =>
+  minor !== null && minor !== undefined ? { amount: formatAmount(minor, 0), currency: 'VND' } : null;
 
 /**
  * A subscription as it is answered: the stored data with everything derived when it is read — the notice deadline and
@@ -98,12 +102,13 @@ const mergeWarnings = (mergeCandidateIds: readonly string[]): 'SHOULD_MERGE'[] =
 export class SubscriptionViewService {
   constructor(
     private readonly finance: FinanceApi,
-    private readonly subscriptions: SubscriptionRepo,
     private readonly organizationReads: OrganizationReadApi,
     private readonly planFacts: PlanFactsService,
     private readonly occupancy: SeatOccupancyHook,
     private readonly periods: SubscriptionGrantingRepo,
     private readonly windows: SubscriptionWindowsService,
+    private readonly lotFacts: SubscriptionLotResponsibleService,
+    private readonly workspaces: WorkspaceForSubscriptionService,
   ) {}
 
   /**
@@ -112,10 +117,10 @@ export class SubscriptionViewService {
    */
   async expiryReadings(records: readonly SubscriptionRecord[]): Promise<Map<string, ExpiryReadingView>> {
     const today = await this.organizationReads.businessToday();
-    const [seats, continued] = await Promise.all([this.seatsOf(records, today), this.continuedAmong(records)]);
+    const [seats, continued] = await Promise.all([this.seatsAndPlansOf(records, today), this.continuedAmong(records)]);
     const points = await this.pointsOf(records, today, continued);
 
-    return this.readingsAt(records, points.points, today, seats);
+    return this.readingsAt(records, points.points, today, seats.bySubscription);
   }
 
   /** Which of these subscriptions a later period continues: one read for all of them. */
@@ -162,11 +167,13 @@ export class SubscriptionViewService {
     );
   }
 
-  /** The seats each of these subscriptions holds from today on, and how many of them are being taken back: one read for all of them. */
-  private seatsOf(records: readonly SubscriptionRecord[], today: BusinessDate): Promise<SeatCounts> {
+  private seatsAndPlansOf(
+    records: readonly SubscriptionRecord[],
+    today: BusinessDate,
+  ): Promise<{ bySubscription: SeatCounts; bySubscriptionPlan: ReadonlyMap<string, number> }> {
     return records.length === 0
-      ? Promise.resolve(new Map())
-      : this.occupancy.get().seatsOfSubscriptions(
+      ? Promise.resolve({ bySubscription: new Map(), bySubscriptionPlan: new Map<string, number>() })
+      : this.occupancy.get().seatsAndPlansOfSubscriptions(
           records.map((record) => record.id),
           today,
         );
@@ -190,9 +197,28 @@ export class SubscriptionViewService {
     };
   }
 
-  /** The records as they are answered, with the derived notice, alerts, warnings, tax profile and estimate. */
+  /**
+   * The records as they are answered, with the derived notice, alerts, warnings, tax profile and estimate. A subscription that became a lot (a perpetual purchase)
+   * says who answers for the lot, which is where that is written.
+   */
   async viewAll(records: SubscriptionRecord[]): Promise<SubscriptionView[]> {
     if (records.length === 0) return [];
+    const lotOwners = await this.lotFacts.lotResponsibles(
+      records.filter((record) => record.kind === 'PERPETUAL').map((record) => record.id),
+    );
+
+    return this.viewResolved(
+      lotOwners.size === 0
+        ? records
+        : records.map((record) =>
+            lotOwners.has(record.id)
+              ? { ...record, responsibleItAdminEmployeeId: lotOwners.get(record.id) ?? null }
+              : record,
+          ),
+    );
+  }
+
+  private async viewResolved(records: SubscriptionRecord[]): Promise<SubscriptionView[]> {
     // A priced subscription answers its tax profile from the read its estimate came from, so the two are one version
     //; only the vendors of the subscriptions without a price are read for their profile alone.
     const unpricedVendors = records.filter((record) => record.unitPrice === null).map((record) => record.vendor.id);
@@ -223,33 +249,36 @@ export class SubscriptionViewService {
       ).map((estimate, index) => [priced[index].id, estimate]),
     );
 
-    const live = await this.liveOfPooledPlans(records);
     const vendorAdmins = await this.vendorAdminsOf(records);
     const today = await this.organizationReads.businessToday();
-    const seatCounts = await this.seatsOf(records, today);
+    const { bySubscription: seatCounts, bySubscriptionPlan } = await this.seatsAndPlansOf(records, today);
     const { points, windows } = await this.pointsOf(records, today, await this.continuedAmong(records));
     const readings = this.readingsAt(records, points, today, seatCounts);
     const answerer = await this.answerersOf(records);
-    const adjustment = (record: SubscriptionRecord) => ({
+    // A period that has lines is priced by its lines: the mark of the subscription that prices its plan is retired for it.
+    const lined = await this.lotFacts.withLines(records.map((record) => record.id));
+    const linesCtx = await this.readLinesContext(records, today, bySubscriptionPlan);
+    const adjustment = (record: SubscriptionRecord, effectivePurchasedQuantity: number | null) => ({
       logoUrl: record.applicationLogoUrl,
       responsibleItAdmin: answerer(record),
       expiry: readings.get(record.id)?.state ?? null,
       daysLeft: readings.get(record.id)?.daysLeft ?? null,
       deadlineKind: readings.get(record.id)?.deadlineKind ?? null,
-      seats: seatsOfPool(record, seatCounts),
+      seats: seatsOfPool({ ...record, purchasedQuantity: effectivePurchasedQuantity }, seatCounts),
+      isPrimaryForPlan: record.isPrimaryForPlan && !lined.has(record.id),
     });
     const views: SubscriptionView[] = [];
     for (const record of records) {
-      // The rule against a second live subscription of a K2 or K4 plan: answered at every phase of the baseline, so the IT Admin sees what to fold (`QĐ-104k`(3)).
-      const mergeCandidateIds = mergeCandidatesOf(live, record);
+      const { lineViews, listSeatsToday, lineCount, effectivePurchasedQuantity, hasPricedLine } =
+        this.resolveRecordLines(record, linesCtx);
       const notice = deriveNotice(noticeInputOf(record));
       const missing = missingData({
         kind: record.kind,
         planPricingModel: record.planPricingModel,
-        quantity: record.purchasedQuantity,
+        quantity: effectivePurchasedQuantity,
         startDate: record.startDate,
         billingCycle: record.billingCycle,
-        hasPrice: isPricedInDong(record),
+        hasPrice: isPricedInDong(record) || hasPricedLine,
       });
       let group: TaxEstimateResult['group'] | null = groups.get(record.vendor.id)?.group ?? null;
       let taxEstimate: TaxEstimateSummary | null = null;
@@ -289,8 +318,9 @@ export class SubscriptionViewService {
         status: record.status,
         missingFinancialData: record.status === 'DRAFT',
         missing,
-        purchasedQuantity: record.purchasedQuantity,
+        purchasedQuantity: effectivePurchasedQuantity,
         unitPrice,
+        monthlyUnitPrice: monthlyUnitPriceWire(record.monthlyUnitPriceMinor),
         originalPrice,
         billingCycle: record.billingCycle,
         commitmentTermMonths: record.commitmentTermMonths,
@@ -302,12 +332,18 @@ export class SubscriptionViewService {
         allowsMidTermReduction: record.allowsMidTermReduction,
         responsibleItAdminEmployeeId: record.responsibleItAdminEmployeeId,
         vendorMinimumSeats: record.vendorMinimumSeats,
-        isPrimaryForPlan: record.isPrimaryForPlan,
-        ...adjustment(record),
+        workspace: record.workspace,
+        seatCounting: record.seatCounting,
+        minimumSeatsTotal: record.minimumSeatsTotal,
+        invoicedLater: record.invoicedLater,
+        ...adjustment(record, effectivePurchasedQuantity),
         noticeDeadline: { value: notice.deadline, source: notice.source },
         alerts: alertsOf(points.get(record.id) ?? null, record, windows.get(record.id)),
-        warnings: [...noticeWarnings(notice.source), ...poolWarnings(record), ...mergeWarnings(mergeCandidateIds)],
-        mergeCandidateIds,
+        warnings: [...noticeWarnings(notice.source), ...poolWarnings(record)],
+        mergeCandidateIds: [],
+        lines: lineViews,
+        lineCount,
+        seatsToday: listSeatsToday,
         ...vendorAdmins(record),
         taxProfile: { status: group ? 'DECLARED' : 'MISSING', group },
         taxEstimate,
@@ -319,51 +355,139 @@ export class SubscriptionViewService {
     return views;
   }
 
-  /** Which of these subscriptions are live and which live subscriptions their plans have (only K2 and K4 plans, one read for all). */
-  private async liveOfPooledPlans(records: readonly SubscriptionRecord[]) {
-    const rows = await this.subscriptions.findLivenessOfPooledPlans([
-      ...new Set(records.map((record) => record.planId)),
-    ]);
-    const byPlan = liveIdsByPlan(rows, await this.organizationReads.businessToday());
-    const ids = new Set([...byPlan.values()].flat());
+  private async readLinesContext(
+    records: readonly SubscriptionRecord[],
+    today: BusinessDate,
+    lineOccupied: ReadonlyMap<string, number>,
+  ) {
+    const linesBySub: ReadonlyMap<string, SubscriptionLineWithSeats[]> = this.lotFacts.linesForSubscriptions
+      ? await this.lotFacts.linesForSubscriptions(records, today)
+      : new Map();
+    const allLinePlanIds = [...new Set([...linesBySub.values()].flat().map((entry) => entry.line.planId))];
+    const linePlans = allLinePlanIds.length > 0 ? await this.planFacts.lookups(allLinePlanIds) : [];
+    const planNameById = new Map(
+      linePlans.filter((plan): plan is NonNullable<typeof plan> => plan !== null).map((plan) => [plan.id, plan.name]),
+    );
 
-    return { byPlan, has: (id: string) => ids.has(id) };
+    return { linesBySub, planNameById, lineOccupied, today };
+  }
+
+  private resolveRecordLines(
+    record: SubscriptionRecord,
+    ctx: {
+      linesBySub: ReadonlyMap<string, SubscriptionLineWithSeats[]>;
+      planNameById: ReadonlyMap<string, string>;
+      lineOccupied: ReadonlyMap<string, number>;
+      today: BusinessDate;
+    },
+  ) {
+    const subLines = ctx.linesBySub.get(record.id) ?? [];
+    const lineViews = subLines.map(({ line, seatsToday }) => {
+      const assignedToday = ctx.lineOccupied.get(`${record.id}:${line.planId}`) ?? 0;
+
+      return {
+        id: line.id,
+        plan: { id: line.planId, name: ctx.planNameById.get(line.planId) ?? record.planName },
+        monthlyUnitPrice: { amount: formatAmount(line.monthlyUnitPriceMinor, 0), currency: 'VND' },
+        minimumSeats: line.minimumSeats,
+        seatsToday,
+        assignedToday,
+        freeToday: Math.max(0, seatsToday - assignedToday),
+        closedOn: line.closedOn,
+        closedReason: line.closedReason,
+      };
+    });
+    const servingSeatsSum = subLines.reduce((sum, entry) => (entry.isServing ? sum + entry.seatsToday : sum), 0);
+    const lineCount = subLines.length;
+    const hasOpenedLedger = subLines.some(
+      (entry) => entry.line.ledgerOpenedOn !== null && entry.line.ledgerOpenedOn <= ctx.today,
+    );
+
+    return {
+      lineViews,
+      listSeatsToday: listSeatsTodayOf(lineCount, servingSeatsSum, record),
+      lineCount,
+      hasPricedLine: lineCount > 0 && subLines.every((entry) => entry.line.monthlyUnitPriceMinor > 0n),
+      effectivePurchasedQuantity: hasOpenedLedger ? servingSeatsSum : record.purchasedQuantity,
+    };
   }
 
   /**
-   * Who administers the plan of each record at the vendor, read for all of them at once (`QĐ-110k`, `QĐ-110u`): the profiles of the plans that need
-   * admins, the names of the people and which of them still work as an IT Admin. A plan that needs none answers empty and quiet; a plan that
-   * needs them and has no profile (a subscription older than the rule) answers empty with both flags raised.
+   * Who administers the workspace (or legacy plan profile when `workspace` is null) of each record at the vendor (`QĐ-110k`, `QĐ-110u`):
+   * the names of the people and which of them work now as an IT Admin. A plan that needs none answers empty and quiet.
    */
   private async vendorAdminsOf(records: readonly SubscriptionRecord[]) {
     const needing = records.filter((record) =>
       needsVendorAdmins(record.planProvisioningType, record.planHasAdminConsole),
     );
-    const profiles = await this.planFacts.vendorAdminsOf([...new Set(needing.map((record) => record.planId))]);
+    const workspaceIds = [...new Set(needing.flatMap((record) => (record.workspace ? [record.workspace.id] : [])))];
+    const legacyPlanIds = [...new Set(needing.filter((r) => r.workspace === null).map((r) => r.planId))];
+    const [wsList, legacyProfiles] = await Promise.all([
+      workspaceIds.length > 0 ? this.workspaces.findMany(workspaceIds) : Promise.resolve([]),
+      legacyPlanIds.length > 0
+        ? this.planFacts.vendorAdminsOf(legacyPlanIds)
+        : Promise.resolve(new Map() as Awaited<ReturnType<PlanFactsService['vendorAdminsOf']>>),
+    ]);
+    const wsById = new Map(wsList.map((ws) => [ws.id, ws]));
     const ids = [
-      ...new Set([...profiles.values()].flatMap((profile) => profile.members.map((member) => member.employeeId))),
+      ...new Set([
+        ...wsList.flatMap((ws) => ws.admins.map((admin) => admin.employeeId)),
+        ...[...legacyProfiles.values()].flatMap((profile) => profile.members.map((member) => member.employeeId)),
+      ]),
     ];
-    const usable = await this.planFacts.workingAdminsAmong(ids);
+    const usable =
+      workspaceIds.length > 0
+        ? await this.workspaces.workingAdminsAmong(ids)
+        : await this.planFacts.workingAdminsAmong(ids);
     const people = new Map((await this.organizationReads.getEmployees(ids)).map((employee) => [employee.id, employee]));
 
-    return (record: SubscriptionRecord) => {
-      const needs = needsVendorAdmins(record.planProvisioningType, record.planHasAdminConsole);
-      const profile = needs ? profiles.get(record.planId) : undefined;
-      const admins: VendorAdminView[] = (profile?.members ?? []).map((member) => ({
-        employeeId: member.employeeId,
-        employeeCode: people.get(member.employeeId)?.employeeCode ?? '',
-        fullName: people.get(member.employeeId)?.fullName ?? '',
-        role: member.role,
-        working: usable.has(member.employeeId),
-      }));
-      const ownerAccountEmail = profile?.ownerAccountEmail ?? null;
+    return (record: SubscriptionRecord) => this.vendorAdminViewFor(record, wsById, legacyProfiles, usable, people);
+  }
+
+  private vendorAdminViewFor(
+    record: SubscriptionRecord,
+    wsById: ReadonlyMap<string, Awaited<ReturnType<WorkspaceForSubscriptionService['findMany']>>[number]>,
+    legacyProfiles: Awaited<ReturnType<PlanFactsService['vendorAdminsOf']>>,
+    usable: ReadonlySet<string>,
+    people: ReadonlyMap<string, { employeeCode: string; fullName: string }>,
+  ) {
+    const needs = needsVendorAdmins(record.planProvisioningType, record.planHasAdminConsole);
+    const source = this.adminSourceFor(record, needs, wsById, legacyProfiles);
+    const admins: VendorAdminView[] = source.members.map((member) => {
+      const person = people.get(member.employeeId);
 
       return {
-        vendorAdmins: admins,
-        ownerAccountEmail,
-        adminNote: profile?.adminNote ?? null,
-        ...vendorAdminFlags({ needs, admins, ownerAccountEmail }),
+        employeeId: member.employeeId,
+        employeeCode: person?.employeeCode ?? '',
+        fullName: person?.fullName ?? '',
+        role: member.role,
+        working: usable.has(member.employeeId),
       };
+    });
+
+    return {
+      vendorAdmins: admins,
+      ownerAccountEmail: source.ownerAccountEmail,
+      adminNote: source.adminNote,
+      ...vendorAdminFlags({ needs, admins, ownerAccountEmail: source.ownerAccountEmail }),
+    };
+  }
+
+  private adminSourceFor(
+    record: SubscriptionRecord,
+    needs: boolean,
+    wsById: ReadonlyMap<string, Awaited<ReturnType<WorkspaceForSubscriptionService['findMany']>>[number]>,
+    legacyProfiles: Awaited<ReturnType<PlanFactsService['vendorAdminsOf']>>,
+  ) {
+    if (!needs) return { members: [], ownerAccountEmail: null, adminNote: null };
+    const ws = record.workspace ? wsById.get(record.workspace.id) : undefined;
+    if (ws) return { members: ws.admins, ownerAccountEmail: ws.ownerAccountEmail, adminNote: ws.adminNote };
+    const legacy = !record.workspace ? legacyProfiles.get(record.planId) : undefined;
+
+    return {
+      members: legacy?.members ?? [],
+      ownerAccountEmail: legacy?.ownerAccountEmail ?? null,
+      adminNote: legacy?.adminNote ?? null,
     };
   }
 }

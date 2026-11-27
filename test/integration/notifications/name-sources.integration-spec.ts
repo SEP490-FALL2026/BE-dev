@@ -46,13 +46,23 @@ describe('notification name sources over PostgreSQL (N5b)', () => {
     await h.stop();
   });
 
-  it('is registered once for each of the seven kinds in the API graph', () => {
+  it('is registered once for each of the nine kinds in the API graph', () => {
     const kinds = sources()
       .all()
       .flatMap((source) => [...source.kinds])
       .sort();
 
-    expect(kinds).toEqual(['APPLICATION', 'COST_CENTER', 'DEPARTMENT', 'EMPLOYEE', 'PLAN', 'REQUEST', 'SUBSCRIPTION']);
+    expect(kinds).toEqual([
+      'APPLICATION',
+      'COST_CENTER',
+      'DEPARTMENT',
+      'EMPLOYEE',
+      'LICENSE_LOT',
+      'PLAN',
+      'REQUEST',
+      'SUBSCRIPTION',
+      'WORKSPACE',
+    ]);
   });
 
   it('names an employee by their full name and a department by its name, leaving out ids that do not exist', async () => {

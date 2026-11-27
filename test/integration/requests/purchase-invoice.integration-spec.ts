@@ -473,6 +473,45 @@ describe('purchase invoices over PostgreSQL (integration; PI-1.4, T-PI)', () => 
     const k2Request = await h.waitingForApprover(unit, await h.planOf(pool), { amount: 3 * M });
     await h.decideSpend(k2Request, { decision: 'APPROVE' }, h.boss.account).expect(200);
 
+    // Before a K2 top-up grant records its purchase date, `W3-05` flags NO_EXPECTED_AMOUNT on the request invoice.
+    expect(await flagsOf({ requestId: k2Request }, '09', '3000000', 1)).toMatchObject({
+      flags: ['NO_EXPECTED_AMOUNT'],
+    });
+    // Record the completed K2 pool top-up task for `01/09`: expected amount is known and `NO_EXPECTED_AMOUNT` clears.
+    const k2AssignmentId = randomUUID();
+    await h.ctx.sql.query(
+      `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id,
+         account_identifier, normalized_account_identifier, valid_from, valid_from_basis, granted_on, created_by_app_user_id)
+       VALUES ($1, $2, 'PERSONAL'::"AssignmentKind", 'REQUEST'::"AssignmentSource", $3, $4, $5,
+         $6, $6, $7::date, 'ACTUAL'::"AssignmentDateBasis", $7::date, $8)`,
+      [
+        k2AssignmentId,
+        h.seed.organizationId,
+        await h.planOf(pool),
+        pool,
+        unit.member.employeeId,
+        `pi-k2-${counter}@acme.vn`,
+        `${h.year}-09-01`,
+        h.it1.appUserId,
+      ],
+    );
+    await h.ctx.sql.query(
+      `INSERT INTO provisioning_tasks (id, organization_id, assignment_id, kind, channel, status, request_id,
+         max_attempts, purchase_kind, purchased_at, claimed_by_app_user_id, claimed_at,
+         completed_by_app_user_id, completed_at, evidence, created_by_system)
+       VALUES ($1, $2, $3, 'GRANT'::"ProvisioningTaskKind", 'MANUAL'::"ProvisioningChannel",
+         'COMPLETED'::"ProvisioningTaskStatus", $4, 3, 'POOL_TOP_UP'::"ProvisioningPurchaseKind",
+         $5::timestamptz, $6, $5::timestamptz, $6, $5::timestamptz, 'Granted K2 top-up', true)`,
+      [
+        randomUUID(),
+        h.seed.organizationId,
+        k2AssignmentId,
+        k2Request,
+        `${h.year}-09-01T02:00:00.000Z`,
+        h.it1.appUserId,
+      ],
+    );
+
     expect(await flagsOf({ requestId: k2Request }, '09', '4800000', 1)).toMatchObject({ flags: ['OVER_APPROVED'] });
     expect(await flagsOf({ requestId: k2Request }, '09', '3000000', 1)).toMatchObject({ flags: [] });
   });

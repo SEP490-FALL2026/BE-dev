@@ -165,39 +165,37 @@ describe('MF-1 blocking device-bound K4 plans and S-4 provisioning guard (integr
       .send({ keyBinding: 'DEVICE_KEY' })
       .expect(200);
 
-    const subscriptionId = h.dataOf<{ id: string }>(
+    const lotId = h.dataOf<{ id: string }>(
       await request(server())
-        .post('/api/v1/subscriptions')
+        .post('/api/v1/license-lots')
         .set(h.as(h.it1))
         .send({
           planId: convertibleAccountPlanId,
-          kind: 'PERPETUAL',
-          purchasedQuantity: 5,
+          purpose: 'STOCK',
+          licenseCount: 5,
           unitPrice: { amount: '1500000', currency: 'VND' },
-          startDate: h.today(),
-          responsibleItAdminEmployeeId: h.it1.employeeId,
+          purchasedOn: h.today(),
         })
         .expect(201),
     ).id;
 
     await request(server())
-      .post('/api/v1/license-keys/imports')
+      .post(`/api/v1/license-lots/${lotId}/keys`)
       .set(h.as(h.it1))
       .send({
-        subscriptionId,
         keys: [`S4KEY-${randomUUID().replace(/-/g, '').slice(0, 16).toUpperCase()}`],
         maxActivations: 5,
       })
       .expect(201);
 
     const grantRes = await h
-      .grant({ requestId: req.id, beneficiaryEmployeeId: designer2.employeeId, subscriptionId }, h.it1)
+      .grant({ requestId: req.id, beneficiaryEmployeeId: designer2.employeeId }, h.it1)
       .expect(409);
     expect(bodyOf(grantRes).error.code).toBe('PROVISIONING.PLAN_BOUND_TO_DEVICE');
 
     const { rows: keyRows } = await h.ctx.sql.query<{ assigned_count: string }>(
-      `SELECT COUNT(*) AS assigned_count FROM license_keys WHERE subscription_id = $1 AND assignment_id IS NOT NULL`,
-      [subscriptionId],
+      `SELECT COUNT(*) AS assigned_count FROM license_keys WHERE license_lot_id = $1 AND assignment_id IS NOT NULL`,
+      [lotId],
     );
     expect(Number(keyRows[0].assigned_count)).toBe(0);
 

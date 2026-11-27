@@ -248,7 +248,7 @@ describe('the seats the next period needs (integration, real PostgreSQL)', () =>
       });
       expect(
         (await countFor(subscriptionId, planId, { today: TODAY, renewalOn: RENEWAL_ON }, false)).approvedAwaitingGrant,
-      ).toBe(0);
+      ).toBe(1);
     });
 
     it('counts a request approved and not yet granted, and once the IT Admin grants it the seat is held by the subscription and not counted twice', async () => {

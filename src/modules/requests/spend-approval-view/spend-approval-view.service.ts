@@ -64,6 +64,10 @@ export class SpendApprovalViewService {
       }),
       nextYearBudget: sources.nextYearBudget,
       annualVendorAmount: await this.snapshots.annualVendorAmountOf(request),
+      vendorChargeUntilRenewal:
+        request.branch === 'INTERNAL_FREE' || request.pricing.status === 'NOT_APPLICABLE'
+          ? undefined
+          : await this.pricing.vendorChargeUntilRenewalOf(request.planId),
     });
   }
 

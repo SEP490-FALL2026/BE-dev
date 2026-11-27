@@ -41,7 +41,10 @@ export class InternalRulesG1Service {
       const vacancy = vacancies.get(subscriptionId) ?? null;
       const record = open.get(subscriptionId) ?? null;
       try {
-        const decision = decideG1(vacancy, record);
+        const normalized = vacancy
+          ? { ...vacancy, keyBinding: vacancy.keyBinding ?? (vacancy.subjectKind === 'LICENSE_LOT' ? 'ACCOUNT' : null) }
+          : null;
+        const decision = decideG1(normalized, record);
         if (decision.skip) {
           pass.tally.skip({ subjectType: 'SUBSCRIPTION', subjectId: subscriptionId, ...decision.skip });
         }

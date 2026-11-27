@@ -42,6 +42,7 @@ export class RoleDutiesHook implements OnModuleInit {
     this.hooks.add('personnel.role-duties', {
       onRecorded: (tx, event) => this.settle(tx, event, 'RECORDED'),
       onDueChanged: (tx, event) => this.settle(tx, event, 'DUE_CHANGED'),
+      onCancelled: () => Promise.resolve(),
       onLeft: (tx, event) => this.settle(tx, event, 'LEFT'),
     });
   }

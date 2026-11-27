@@ -78,3 +78,38 @@ export class LicenseKeyStaleError extends Error {
     this.name = 'LicenseKeyStaleError';
   }
 }
+
+/** The lot the keys are put in does not exist. */
+export class LicenseKeyLotNotFoundError extends Error {
+  constructor() {
+    super('The license lot does not exist.');
+    this.name = 'LicenseKeyLotNotFoundError';
+  }
+}
+
+/** Only the IT Admin who answers for the lot puts keys in it: another IT Admin does not stand in for them. */
+export class LicenseKeyLotNotResponsibleError extends Error {
+  constructor() {
+    super('Only the IT Admin who answers for the lot can put keys in it.');
+    this.name = 'LicenseKeyLotNotResponsibleError';
+  }
+}
+
+/** The keys of a lot of a plan bound to an account would pass its licenses. */
+export class LicenseKeyLotKeysExceedLicensesError extends Error {
+  constructor(
+    readonly licenseCount: number,
+    readonly keysNotWithdrawn: number,
+  ) {
+    super('The keys of the lot would pass its licenses: withdraw a key or add licenses first.');
+    this.name = 'LicenseKeyLotKeysExceedLicensesError';
+  }
+}
+
+/** A lot for a request needs a grant task of that request, still open, for this plan. */
+export class LicenseKeyLotRequestNotOpenError extends Error {
+  constructor() {
+    super('A lot for a request needs a grant task of that request that is still open for the plan.');
+    this.name = 'LicenseKeyLotRequestNotOpenError';
+  }
+}

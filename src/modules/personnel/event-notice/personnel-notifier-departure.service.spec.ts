@@ -208,32 +208,50 @@ describe('departure, transfer, and handover notifications', () => {
     expect(self.told).toEqual([]);
   });
 
-  it('notifies responsible IT Admins excluding leaver on vendorAdminsGone and falls back to usable Super Admin when none', async () => {
-    const named = notifierOf({ usableSuperAdmin: 'sa' });
-    const fallback = notifierOf({ usableSuperAdmin: 'sa' });
-
-    const countNamed = await named.notifier.vendorAdminsGone(TX, {
-      organizationId: ORGANIZATION,
-      planId: 'plan-1',
-      applicationId: 'app-1',
-      sourceId: 'c1',
-      responsibleItAdminEmployeeIds: ['it-1', 'leaver', 'it-1', 'it-2'],
-      leavingEmployeeId: 'leaver',
+  it('notifies usable responsible IT Admin once per (workspace, admin) and falls back to usable Super Admin when absent or affected', async () => {
+    const named = notifierOf({
+      superAdmin: 'sa',
+      usableSuperAdmin: 'sa',
+      actingByDept: { d1: { usable: ['it-1'] } },
     });
-    const countFallback = await fallback.notifier.vendorAdminsGone(TX, {
-      organizationId: ORGANIZATION,
-      planId: 'plan-1',
-      applicationId: 'app-1',
-      sourceId: 'c1',
-      responsibleItAdminEmployeeIds: ['leaver'],
-      leavingEmployeeId: 'leaver',
+    const fallback = notifierOf({
+      superAdmin: 'sa',
+      usableSuperAdmin: 'sa',
+      actingByDept: { d1: { usable: ['sa'] } },
     });
 
-    expect(countNamed).toBe(2);
-    expect(recipients(named.told, 'VENDOR_ADMINS_BELOW_MINIMUM')).toEqual(['it-1:-', 'it-2:-']);
-    expect(named.findAllUsableItAdminEmployeeIds).not.toHaveBeenCalled();
-    expect(countFallback).toBe(1);
-    expect(recipients(fallback.told, 'VENDOR_ADMINS_BELOW_MINIMUM')).toEqual(['sa:-']);
+    const countNamed = await named.notifier.workspaceAdminNotWorking(TX, {
+      organizationId: ORGANIZATION,
+      workspaceId: 'ws-1',
+      employeeId: 'leaver',
+      responsibleItAdminEmployeeId: 'it-1',
+      workingAdminCount: 1,
+    });
+    const countFallbackSelf = await fallback.notifier.workspaceAdminNotWorking(TX, {
+      organizationId: ORGANIZATION,
+      workspaceId: 'ws-1',
+      employeeId: 'leaver',
+      responsibleItAdminEmployeeId: 'leaver',
+      workingAdminCount: 0,
+    });
+    const countSuperAsResp = await fallback.notifier.workspaceAdminNotWorking(TX, {
+      organizationId: ORGANIZATION,
+      workspaceId: 'ws-2',
+      employeeId: 'leaver',
+      responsibleItAdminEmployeeId: 'sa',
+      workingAdminCount: 0,
+    });
+
+    expect(countNamed).toBe(1);
+    expect(recipients(named.told, 'WORKSPACE_ADMIN_NOT_WORKING')).toEqual(['it-1:-']);
+    expect(named.told.find((n) => n.code === 'WORKSPACE_ADMIN_NOT_WORKING')).toMatchObject({
+      subject: { type: 'WORKSPACE', id: 'ws-1' },
+      params: { workspaceId: 'ws-1', employeeId: 'leaver', workingAdminCount: 1 },
+      eventKey: 'WORKSPACE_ADMIN_NOT_WORKING:ws-1:leaver',
+    });
+    expect(countFallbackSelf).toBe(1);
+    expect(countSuperAsResp).toBe(1);
+    expect(recipients(fallback.told, 'WORKSPACE_ADMIN_NOT_WORKING')).toEqual(['sa:-', 'sa:-']);
   });
 
   it('notifies usable Super Admin with UNPLACED_WORK_WAITING for a never-placed offboarding case only', async () => {

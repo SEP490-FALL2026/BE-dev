@@ -36,7 +36,9 @@ export interface LineAmounts {
  * cannot be counted by the month.
  */
 export function lineAmountsOf(input: {
+  provisioningType?: 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
   unitPrice: Money;
+  monthlyPriceMinor?: bigint | null;
   billingCycle: BillingCycleCode;
   checkDate: BusinessDate;
   ends: readonly (BusinessDate | null)[];
@@ -47,7 +49,9 @@ export function lineAmountsOf(input: {
   for (const [endDate, indexes] of byEnd) {
     const priced = requestAmountOf({
       kind: 'RECURRING',
+      provisioningType: input.provisioningType,
       unitPrice: input.unitPrice,
+      monthlyPriceMinor: input.monthlyPriceMinor,
       billingCycle: input.billingCycle,
       beneficiaries: indexes.length,
       checkDate: input.checkDate,

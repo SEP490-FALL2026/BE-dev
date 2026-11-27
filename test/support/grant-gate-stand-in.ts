@@ -28,4 +28,7 @@ export const GATE_THAT_KNOWS_NO_REQUEST: GrantRequestGate = {
   reportExtended: () => Promise.resolve(),
   reportExtensionFailed: () => Promise.resolve(),
   reportRightReplaced: () => Promise.resolve(),
+  checkSeatPurchaseItems: () => Promise.resolve(new Set()),
+  reservedForRequestLots: () => Promise.resolve(new Map()),
+  hasLotCharges: () => Promise.resolve(false),
 };

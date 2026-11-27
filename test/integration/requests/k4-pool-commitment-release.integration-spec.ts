@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { SpendHarness, Unit } from '../../support/spend-harness';
 
@@ -55,6 +56,7 @@ describe('BR-MF1-09: the commitment of a K4 request granted from the key pool (i
   const approved = async (planId: string, amount: number): Promise<string> => {
     counter += 1;
     const u: Unit = await h.departmentWithHead(`P-K4C${counter}`);
+    await h.setItAdminInCharge(u.department, { employeeId: h.it1.employeeId, account: h.it1 });
     await h.budgetFor(u, { total: 100 * M, held: 0, spent: 0 });
     const id = await h.waitingForApprover(u, planId, { amount });
     await h.decideSpend(id, { decision: 'APPROVE' }, h.boss.account).expect(200);
@@ -129,5 +131,130 @@ describe('BR-MF1-09: the commitment of a K4 request granted from the key pool (i
     await h.complete(task.id, { evidence: 'done' }).expect(200);
 
     expect((await releasesOf(id)).filter((row) => row.reason === 'GRANTED_FROM_POOL')).toEqual([]);
+  });
+
+  it('F-17: refuses named K4 REQUEST lot reserved for another request (409 LICENSE_LOT.RESERVED_FOR_REQUEST) and lets grant with purchase proceed (201)', async () => {
+    const { planId } = await k4Pool(1, 0);
+    counter += 1;
+    const u = await h.departmentWithHead(`P-K4C${counter}`);
+    await h.setItAdminInCharge(u.department, { employeeId: h.it1.employeeId, account: h.it1 });
+    await h.budgetFor(u, { total: 200 * M, held: 0, spent: 0 });
+    const p2 = await h.staff(u.department, `K4C-P2-${counter}`);
+
+    const reqDuc = randomUUID();
+    const needStepId = randomUUID();
+    const spendStepId = randomUUID();
+    const members = [u.member.employeeId, p2.employeeId];
+    const policyJson = JSON.stringify({
+      version: 1,
+      branch: 'PAID_IN_CATALOG',
+      chain: ['NEED', 'SPEND_APPROVAL'],
+      slaWorkingDays: 3,
+    });
+    await h.ctx.sql.query(
+      `INSERT INTO access_requests
+         (id, organization_id, type, branch, state, plan_id, department_id, cost_center_id,
+          requester_employee_id, business_reason, submitted_at, budget_year, amount_months,
+          amount_currency, unit_price_minor, amount_minor, billing_cycle, pricing_status, policy, created_by_app_user_id)
+       VALUES ($1, $2, 'GROUP_GRANT', 'PAID_IN_CATALOG', 'AWAITING_EXECUTION', $3, $4, $5, $6,
+               'K4 request lot test', now(), $7, 1, 'VND', 12000000, 24000000, 'ANNUAL', 'PRICED', $8::jsonb, $9)`,
+      [
+        reqDuc,
+        h.seed.organizationId,
+        planId,
+        u.department.id,
+        u.department.unitId,
+        u.head.employeeId,
+        h.year,
+        policyJson,
+        u.head.account.appUserId,
+      ],
+    );
+    await h.ctx.sql.query(
+      `INSERT INTO access_request_steps
+         (id, request_id, kind, sequence, state, assignee_employee_id, routing_row, sla_working_days, assigned_at, decided_at)
+       VALUES ($1, $2, 'NEED', 1, 'APPROVED', $3, 1, 3, now(), now()),
+              ($4, $2, 'SPEND_APPROVAL', 2, 'APPROVED', $5, 1, 3, now(), now())`,
+      [needStepId, reqDuc, u.head.employeeId, spendStepId, h.boss.employeeId],
+    );
+    const checkId = randomUUID();
+    await h.ctx.sql.query(
+      `INSERT INTO request_budget_checks
+         (id, organization_id, request_id, number, trigger, route, outcome, stale_cost_evidence,
+          plan_line_overdue, period_closed, off_plan, currency, binding_total_minor, ran_by_employee_id)
+       VALUES ($1, $2, $3, 1, 'SUBMISSION', 'SPEND_APPROVAL', 'WITHIN_BASE'::"BudgetCheckOutcome",
+               false, false, false, false, 'VND', 24000000, $4)`,
+      [checkId, h.seed.organizationId, reqDuc, h.boss.employeeId],
+    );
+    await h.ctx.sql.query(
+      `INSERT INTO spend_decisions (step_id, request_id, check_id, decision, decided_by_employee_id, decided_at)
+       VALUES ($1, $2, $3, 'APPROVED', $4, now())`,
+      [spendStepId, reqDuc, checkId, h.boss.employeeId],
+    );
+    for (let i = 0; i < members.length; i += 1) {
+      await h.ctx.sql.query(
+        `WITH b AS (
+           INSERT INTO access_request_beneficiaries (request_id, employee_id, position)
+           VALUES ($1, $2, $3)
+           RETURNING request_id, employee_id
+         )
+         INSERT INTO access_request_lines (request_id, employee_id, state, need_step_id)
+         SELECT request_id, employee_id, 'NEED_CONFIRMED', $4 FROM b`,
+        [reqDuc, members[i], i + 1, needStepId],
+      );
+      await h.ctx.sql.query(
+        `UPDATE access_request_lines SET state = 'APPROVED' WHERE request_id = $1 AND employee_id = $2`,
+        [reqDuc, members[i]],
+      );
+      await h.ctx.sql.query(
+        `INSERT INTO access_request_line_amounts (request_id, employee_id, budget_year, amount_minor, currency, held)
+         VALUES ($1, $2, $3, 12000000, 'VND', true)`,
+        [reqDuc, members[i], h.year],
+      );
+    }
+    await h.ctx.sql.query(
+      `INSERT INTO budget_commitments
+         (id, organization_id, request_id, cost_center_id, year, amount_minor, currency, state, origin, unattached_reason)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, 24000000, 'VND', 'HELD', 'APPROVAL', 'NO_BUDGET')`,
+      [h.seed.organizationId, reqDuc, u.department.unitId, h.year],
+    );
+
+    await h
+      .grant({ requestId: reqDuc, beneficiaryEmployeeId: u.member.employeeId, purchase: { reason: 'Buy Duc lot' } })
+      .expect(201);
+
+    const lotDucId = h.dataOf<{ id: string }>(
+      await request(h.server())
+        .post('/api/v1/license-lots')
+        .set(h.as(h.it1))
+        .send({
+          planId,
+          purchasedOn: h.today(),
+          licenseCount: 2,
+          unitPrice: { amount: '12000000', currency: 'VND' },
+          purpose: 'REQUEST',
+          requestId: reqDuc,
+        })
+        .expect(201),
+    ).id;
+    batch += 1;
+    await request(h.server())
+      .post(`/api/v1/license-lots/${lotDucId}/keys`)
+      .set(h.as(h.it1))
+      .send({
+        keys: [`K4C-${batch}-001-ABCDE-12345`, `K4C-${batch}-002-ABCDE-12345`],
+      })
+      .expect(201);
+
+    const reqMinh = await approved(planId, 12 * M);
+    const namedRefused = await h.grant({ requestId: reqMinh, subscriptionId: lotDucId }).expect(409);
+    expect(h.codeOf(namedRefused)).toBe('LICENSE_LOT.RESERVED_FOR_REQUEST');
+
+    const withPurchase = await h
+      .grant({ requestId: reqMinh, purchase: { reason: 'Reserved for Duc request lot' } })
+      .expect(201);
+    expect(h.dataOf<{ task: { purchase: { kind: string } | null } }>(withPurchase).task.purchase).toMatchObject({
+      kind: 'KEY_PURCHASE',
+    });
   });
 });

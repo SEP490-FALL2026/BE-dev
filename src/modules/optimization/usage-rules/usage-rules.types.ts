@@ -33,7 +33,7 @@ export interface UsageApplicationContext {
   usableOn: ReadonlyMap<string, BusinessDate | null>;
   leaves: ReadonlyMap<string, readonly LeaveSpan[]>;
   price: (planId: string) => Promise<{
-    amountMinor: bigint;
+    monthlyPriceMinor: bigint | null;
     currency: string;
     billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER';
   } | null>;

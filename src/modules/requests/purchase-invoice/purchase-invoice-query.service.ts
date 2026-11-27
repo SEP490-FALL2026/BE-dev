@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { BudgetsApi } from '../../budgets/public/budgets.api';
 import { FinanceApi } from '../../finance/public/finance.api';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
@@ -20,13 +21,14 @@ export class PurchaseInvoiceQueryService {
     private readonly organizationReads: OrganizationReadApi,
     private readonly identity: IdentityAccessApi,
     private readonly finance: FinanceApi,
+    private readonly budgets: BudgetsApi,
   ) {}
 
   async page(
     actor: AuthenticatedPrincipal,
     query: {
       state?: 'SUBMITTED' | 'CONFIRMED' | 'RETURNED';
-      label?: 'NEW_PURCHASE' | 'PERIOD' | 'RENEWAL';
+      label?: 'NEW_PURCHASE' | 'PERIOD' | 'RENEWAL' | 'SEAT_PURCHASE';
       vendorId?: string;
       subscriptionId?: string;
       requestId?: string;
@@ -62,16 +64,18 @@ export class PurchaseInvoiceQueryService {
 
   /** One invoice with its files and what was submitted in its place, as the detail shows it. */
   async detailOf(row: PurchaseInvoiceRow): Promise<PurchaseInvoiceDetailWire> {
-    const [documents, resubmitted, currency] = await Promise.all([
+    const [documents, resubmitted, currency, invoiceInfo] = await Promise.all([
       this.invoices.documentsOf([row.id]),
       row.state === 'RETURNED' ? this.invoices.resubmittedAs([row.id]) : Promise.resolve(new Map<string, string>()),
       this.finance.findCurrency(row.unitPriceOriginalCurrency),
+      row.state === 'CONFIRMED' ? this.budgets.purchaseInvoiceInfo(row.id) : Promise.resolve(null),
     ]);
 
     return toDetail(row, {
       documents: documents.get(row.id) ?? [],
       resubmittedAsId: resubmitted.get(row.id) ?? null,
       originalMinorUnits: currency?.minorUnit ?? 2,
+      poolFigures: invoiceInfo?.poolFigures ?? null,
     });
   }
 

@@ -40,18 +40,20 @@ export class RepricingService {
       const { renewal } = request;
       // A request that keeps its months of use is worked out from the day it is checked on, each person for their own end (`QĐ-111i`, R-38).
       const ends = await this.termEnds.of(tx, request, asOf);
+      const price = await this.catalog.getPlanPrice(request.planId, tx);
 
       return pricingRecordFor(
         {
           planId: request.planId,
           free: false,
+          provisioningType: price?.provisioningType,
           beneficiaries: peopleOf(request),
           checkDate: asOf,
           endDate: renewal ? renewal.newExpectedEndDate : request.expectedEndDate,
           ...(ends === null ? {} : { endsByPerson: ends, endIsDerived: true }),
           from: renewal ? renewalStartOf({ previousEnd: renewal.previousExpectedEndDate, today: asOf }) : undefined,
         },
-        await this.catalog.getPlanPrice(request.planId, tx),
+        price,
       );
     }
     if (request.branch !== 'NEW_SOFTWARE') throw new AccessRequestNotPriceableError();

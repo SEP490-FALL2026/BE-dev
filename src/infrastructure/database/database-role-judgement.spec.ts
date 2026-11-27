@@ -1,4 +1,5 @@
 import {
+  RUNTIME_TABLE_EXCEPTIONS,
   RoleFacts,
   RuntimeIdentityFacts,
   SeparationFacts,
@@ -96,6 +97,22 @@ describe('judgeSeparation', () => {
     ]);
     // The records added to and never changed: a ticket of the Super Admin procedure, the history of a budget version (F66, L.2) and an invoice.
     for (const name of ['super_admin_event_tickets', 'budget_version_history', 'invoices']) {
+      const withTable = (privileges: string[]): SeparationFacts => ({
+        ...healthy(),
+        tables: [...healthy().tables, { name, privileges }],
+      });
+
+      expect(judgeSeparation(withTable(['INSERT', 'SELECT']))).toEqual([]);
+      expect(judgeSeparation(withTable([...DML]))).toEqual([
+        {
+          code: 'RUNTIME_TABLE_PRIVILEGES',
+          subject: `${name}: expected INSERT, SELECT, has DELETE, INSERT, SELECT, UPDATE`,
+        },
+      ]);
+    }
+    // Append-only seat ledger and invoice allocations: runtime role holds INSERT and SELECT only.
+    for (const name of ['seat_changes', 'invoice_allocations'] as const) {
+      expect(RUNTIME_TABLE_EXCEPTIONS[name]).toEqual(['INSERT', 'SELECT']);
       const withTable = (privileges: string[]): SeparationFacts => ({
         ...healthy(),
         tables: [...healthy().tables, { name, privileges }],

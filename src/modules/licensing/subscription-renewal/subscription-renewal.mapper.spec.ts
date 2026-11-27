@@ -48,6 +48,9 @@ describe('the seats needed as the route reads them (SBF-20 §5)', () => {
       responsibleItAdminEmployeeId: null,
       callerIsResponsible: false,
       recordedRenewalId: null,
+      lines: [],
+      minimumSeatsTotal: null,
+      shortfall: 0,
     });
   });
 

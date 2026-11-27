@@ -42,13 +42,20 @@ export function forecastOfYear(
     | 'invoiceBasisMinor'
     | 'invoiceActualMinor'
     | 'priceIncreaseMinor'
+    | 'runningUncommittedMinor'
   >,
 ): bigint {
   const open = input.committedMinor + input.pendingMinor;
   const grownOpen =
     input.invoiceBasisMinor > 0n ? roundHalfAway(open * input.invoiceActualMinor, input.invoiceBasisMinor) : open;
 
-  return input.spentMinor + input.spentAfterMonthMinor + grownOpen + input.priceIncreaseMinor;
+  return (
+    input.spentMinor +
+    input.spentAfterMonthMinor +
+    grownOpen +
+    input.priceIncreaseMinor +
+    (input.runningUncommittedMinor ?? 0n)
+  );
 }
 
 /**

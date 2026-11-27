@@ -1,5 +1,6 @@
 import { addDays, type BusinessDate } from '../../../core/business-date';
 import { DONG, MAX_AMOUNT_MINOR, type Money } from '../../../core/money/money';
+import { roundHalfAway } from '../../../core/seat-month-cost';
 import type { BillingCycleCode } from '../access-request/access-request.types';
 import { monthlyPriceOf, requestAmountOf } from '../access-request/pricing.policy';
 
@@ -31,16 +32,17 @@ export interface YearStartSeat {
   /** What the approval kept of this seat for the year that begins (`QĐ-111k`, M-13): null when it kept nothing (a request of an older release). */
   savedMinor: bigint | null;
   /**
-   * The price of a seat the approval worked the kept number out at, in dong (the unit price and billing cycle the request carries): a seat that
+   * The price of a seat the approval worked the kept number out at, in dong (the unit price, monthly price, and billing cycle the request carries): a seat that
    * closes before its term is counted at this price, never at the price of 01/01 (`QĐ-111ak`). Null when the request does not carry one.
    */
-  approvalPrice: Pick<YearStartPrice, 'unitPrice' | 'billingCycle'> | null;
+  approvalPrice: Pick<YearStartPrice, 'unitPrice' | 'monthlyPriceMinor' | 'billingCycle'> | null;
 }
 
 /** What a plan is bought at, as the catalog says it. */
 export interface YearStartPrice {
   kind: 'RECURRING' | 'ONE_TIME';
   unitPrice: Money;
+  monthlyPriceMinor?: bigint | null;
   billingCycle: BillingCycleCode | null;
 }
 
@@ -81,16 +83,18 @@ export function seatCountsOn(seat: YearStartSeat, yearStart: BusinessDate): bool
   return last === null || last >= yearStart;
 }
 
-const ceilDiv = (dividend: bigint, divisor: bigint): bigint => (dividend + divisor - 1n) / divisor;
+/** The price of a month a right with no end was approved at, from what the approval kept of the year (twelve months, rounded half away from zero). */
+export const approvalMonthlyFromSaved = (savedMinor: bigint): bigint => roundHalfAway(savedMinor, 12n);
 
-/** The price of a month a right with no end was approved at, from what the approval kept of the year (twelve months, rounded up to the minor unit). */
-export const approvalMonthlyFromSaved = (savedMinor: bigint): bigint => ceilDiv(savedMinor, 12n);
-
-function approvalPriceOfSeat(seat: YearStartSeat): Pick<YearStartPrice, 'unitPrice' | 'billingCycle'> | null {
+function approvalPriceOfSeat(
+  seat: YearStartSeat,
+): Pick<YearStartPrice, 'unitPrice' | 'monthlyPriceMinor' | 'billingCycle'> | null {
   if (seat.approvalPrice !== null) return seat.approvalPrice;
   if (!seat.termLimited && seat.savedMinor !== null) {
+    const monthly = approvalMonthlyFromSaved(seat.savedMinor);
     return {
-      unitPrice: { amountMinor: approvalMonthlyFromSaved(seat.savedMinor), currency: DONG },
+      unitPrice: { amountMinor: monthly, currency: DONG },
+      monthlyPriceMinor: monthly,
       billingCycle: 'MONTHLY',
     };
   }
@@ -120,6 +124,7 @@ function keptAmountOf(seat: YearStartSeat, yearStart: BusinessDate): bigint | nu
   const monthsToClose = requestAmountOf({
     kind: 'RECURRING',
     unitPrice: price.unitPrice,
+    monthlyPriceMinor: price.monthlyPriceMinor ?? null,
     billingCycle: price.billingCycle,
     beneficiaries: 1,
     checkDate: yearStart,
@@ -142,6 +147,7 @@ function priceSeatsByEnd(
     const priced = requestAmountOf({
       kind: 'RECURRING',
       unitPrice: price.unitPrice,
+      monthlyPriceMinor: price.monthlyPriceMinor,
       billingCycle: price.billingCycle,
       beneficiaries,
       checkDate: yearStart,
@@ -163,7 +169,11 @@ function priceAtToday(
   yearStart: BusinessDate,
 ): { ok: true; total: bigint; monthlyMinor: bigint } | { ok: false; reason: 'AMOUNT_TOO_LARGE' | 'NO_PRICE' } {
   if (!isRecurringPriceInDong(price)) return { ok: false, reason: 'NO_PRICE' };
-  const monthly = monthlyPriceOf({ unitPrice: price.unitPrice, billingCycle: price.billingCycle });
+  const monthly = monthlyPriceOf({
+    unitPrice: price.unitPrice,
+    monthlyPriceMinor: price.monthlyPriceMinor,
+    billingCycle: price.billingCycle,
+  });
   if (monthly === null || monthly.amountMinor <= 0n) return { ok: false, reason: 'NO_PRICE' };
   const remainder = priceSeatsByEnd(seatsByEnd, price, yearStart);
 
@@ -282,4 +292,60 @@ export function carriedOverByCostCenter(
   }
 
   return totals;
+}
+
+/** Monthly seat counts in `year` from 01/01 through each counted seat's end month (for K2). */
+export function yearStartMonthsOf(input: {
+  year: number;
+  seats: readonly YearStartSeat[];
+}): { month: BusinessDate; seatCount: number }[] {
+  const yearStart: BusinessDate = `${input.year}-01-01`;
+  const counts = new Map<number, number>();
+  for (const seat of input.seats) {
+    if (!seatCountsOn(seat, yearStart)) continue;
+    const last = lastDayOfSeat(seat);
+    const lastYear = last === null ? input.year + 1 : Number(last.slice(0, 4));
+    const lastMonth = last === null || lastYear > input.year ? 12 : Number(last.slice(5, 7));
+    for (let m = 1; m <= lastMonth; m++) {
+      counts.set(m, (counts.get(m) ?? 0) + 1);
+    }
+  }
+
+  return [...counts.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([m, seatCount]) => ({
+      month: `${input.year}-${String(m).padStart(2, '0')}-01`,
+      seatCount,
+    }));
+}
+
+/** Extracts `planId`s for K1 annual (`12`-month commitment) plans from seat targets. */
+export function k1AnnualPlanIdsOf(
+  targets: readonly { planId: string; provisioningType: string; referenceCommitmentMonths?: number | null }[],
+): Set<string> {
+  return new Set(
+    targets.filter((t) => t.provisioningType === 'K1' && t.referenceCommitmentMonths === 12).map((t) => t.planId),
+  );
+}
+
+/** Builds Tier 0 lock subject keys and per-candidate chain request IDs for K1 annual `01/01` pairing (`F-7`). */
+export function buildK1ChainMapping(
+  k1Candidates: readonly { id: string }[],
+  details: ReadonlyMap<string, { rootAssignmentId: string; chainAssignmentIds: string[]; chainRequestIds: string[] }>,
+  renewals: readonly { requestId: string; assignmentId: string }[],
+): { subjectKeys: string[]; chainMap: Map<string, string[]> } {
+  const chainMap = new Map<string, string[]>();
+  const renByAsg = new Map<string, string[]>();
+  for (const r of renewals) renByAsg.set(r.assignmentId, [...(renByAsg.get(r.assignmentId) ?? []), r.requestId]);
+  const subjectKeys = k1Candidates.map((c) => {
+    const detail = details.get(c.id);
+    const reqIds = detail
+      ? [c.id, ...detail.chainRequestIds, ...detail.chainAssignmentIds.flatMap((id) => renByAsg.get(id) ?? [])]
+      : [c.id];
+    chainMap.set(c.id, [...new Set(reqIds)]);
+
+    return detail?.rootAssignmentId ?? `req:${c.id}`;
+  });
+
+  return { subjectKeys, chainMap };
 }

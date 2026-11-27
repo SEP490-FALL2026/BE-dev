@@ -7,6 +7,14 @@ import type { OpenSeatHoldings } from './catalog.types';
 // The points the catalog opens for the modules above it (`core/extension`): they bind them from a `*.listener.ts` when their
 // module starts, so the catalog never imports them. One instance of each per application.
 
+export interface OpenK4GrantTask {
+  taskId: string;
+  planId: string;
+  requestId: string | null;
+  subscriptionId: string | null;
+  createdAt: Date;
+}
+
 /**
  * What the catalog needs to know of the seats that licensing holds, without importing it (ADR-0013 item 4). An assignment holds
  * a seat from the day it is made until it ends or fails; one that has not ended counts, a future start included.
@@ -42,6 +50,34 @@ export interface SeatOccupancyReader {
     day: BusinessDate,
     tx?: DbTx,
   ): Promise<ReadonlyMap<string, { occupied: number; inRevocation: number }>>;
+  /**
+   * Combined single-query read for `GET /subscriptions`: returns both subscription-level peak/revocation occupancy and
+   * per-`(subscription, plan)` today occupancy (`G-8`).
+   */
+  seatsAndPlansOfSubscriptions(
+    subscriptionIds: readonly string[],
+    day: BusinessDate,
+    tx?: DbTx,
+  ): Promise<{
+    bySubscription: ReadonlyMap<string, { occupied: number; inRevocation: number }>;
+    bySubscriptionPlan: ReadonlyMap<string, number>;
+  }>;
+  occupiedBySubscriptionPlans(
+    subscriptionIds: readonly string[],
+    day: BusinessDate,
+    tx?: DbTx,
+  ): Promise<ReadonlyMap<string, number>>;
+  /**
+   * For each of these lots, the keys in the store and not withdrawn, those given to a person and those withdrawn, in one read. A lot with no key is
+   * absent. What the list of lots says of the keys of each (`keysInStore`, and what can be granted at once).
+   */
+  keyCountsOfLots(
+    lotIds: readonly string[],
+    tx?: DbTx,
+  ): Promise<ReadonlyMap<string, { inStore: number; assigned: number; withdrawn: number }>>;
+  /** Whether any key of the lot has ever been assigned, activated on a device, or recorded in lot charges. */
+  hasLotBeenUsed(lotId: string, tx?: DbTx): Promise<boolean>;
+  openGrantTasksWithoutKeyOfPlans(planIds: readonly string[], tx?: DbTx): Promise<OpenK4GrantTask[]>;
 }
 
 /**

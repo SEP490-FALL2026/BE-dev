@@ -1,98 +1,18 @@
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
-import type { AuditApi } from '../../../audit/public/audit.api';
-import type { OrganizationReadApi } from '../../../organization/public/organization-read.api';
-import type { OperatingParametersApi } from '../../../operating-parameters/public/operating-parameters.api';
-import type { PlanFactsService } from '../../plan/plan-facts.service';
 import { SubscriptionPeriodRefusedError } from '../../public/subscription-period.errors';
-import type { SubscriptionPoolService } from '../pool/subscription-pool.service';
-import type { SubscriptionPeriodRepo } from './subscription-period.repo';
-import { SubscriptionPeriodService } from './subscription-period.service';
-import type { SubscriptionPricingService } from '../subscription-pricing.service';
-import type { SubscriptionRepo } from '../subscription.repo';
-import { SubscriptionWindowsService } from '../subscription-windows.service';
 import type { SubscriptionRecord } from '../subscription.types';
-
-const TODAY = '2026-11-17';
-
-/** A K2 subscription of the shared pool by the year: the shape the renewal now reads (S20-T2). */
-function record(extra: Partial<SubscriptionRecord> = {}): SubscriptionRecord {
-  return {
-    id: 'sub-1',
-    planId: 'plan-1',
-    planName: 'Team',
-    planPricingModel: 'PER_SEAT',
-    planProvisioningType: 'K2',
-    planHasAdminConsole: false,
-    applicationId: 'app-1',
-    applicationName: 'Slack',
-    applicationLogoUrl: null,
-    applicationKind: 'SAAS',
-    vendor: { id: 'vendor-1', name: 'Vendor' },
-    kind: 'TERM',
-    status: 'ACTIVE',
-    purchasedQuantity: 10,
-    unitPrice: { amountMinor: 100000n, currency: 'VND', recordedOn: '2026-01-01' },
-    priceSnapshot: null,
-    originalPrice: null,
-    billingCycle: 'ANNUAL',
-    commitmentTermMonths: 12,
-    startDate: '2026-01-01',
-    endDate: null,
-    renewalDate: '2027-01-01',
-    noticeDeadline: '2026-12-01',
-    noticePeriodDays: null,
-    autoRenew: true,
-    allowsMidTermReduction: false,
-    responsibleItAdminEmployeeId: 'emp-1',
-    vendorMinimumSeats: 5,
-    isPrimaryForPlan: true,
-    renewedFromId: null,
-    createdAt: new Date('2026-01-01T00:00:00Z'),
-    updatedAt: new Date('2026-01-01T00:00:00Z'),
-    ...extra,
-  };
-}
+import {
+  periodServiceHarness,
+  record,
+  STANDARD_DAYS,
+} from '../../../../../test/support/subscription-period-service-harness';
 
 describe('SubscriptionPeriodService: the periods the renewal reads, the shared pool included (S20-T2)', () => {
-  const subscriptions = {
-    findMany: jest.fn(),
-    find: jest.fn(),
-    lock: jest.fn(),
-    successorsOf: jest.fn(),
-    insert: jest.fn(),
-  };
-  const periodRepo = { listAdjustmentSubjectIds: jest.fn() };
-  const plans = { lockShared: jest.fn() };
-  const pricing = { read: jest.fn(), priceToday: jest.fn() };
-  const organization = { businessToday: jest.fn(), getOrganization: jest.fn() };
-  const audit = { record: jest.fn() };
-  const pool = { releasePrimary: jest.fn() };
-  const STANDARD_DAYS: Record<string, number> = {
-    SUBSCRIPTION_ADJUSTMENT_DAYS_MONTHLY: 7,
-    SUBSCRIPTION_ADJUSTMENT_DAYS_ANNUAL: 30,
-    SUBSCRIPTION_RED_ALERT_DAYS_ANNUAL: 7,
-  };
-  const parameters = { getValuesAt: jest.fn() };
-  const service = new SubscriptionPeriodService(
-    subscriptions as unknown as SubscriptionRepo,
-    periodRepo as unknown as SubscriptionPeriodRepo,
-    plans as unknown as PlanFactsService,
-    pricing as unknown as SubscriptionPricingService,
-    organization as unknown as OrganizationReadApi,
-    audit as unknown as AuditApi,
-    pool as unknown as SubscriptionPoolService,
-    new SubscriptionWindowsService(parameters as unknown as OperatingParametersApi),
-  );
+  const h = periodServiceHarness();
+  const { subscriptions, periodRepo, plans, pricing, organization, parameters, service } = h;
 
-  beforeEach(() => {
-    jest.resetAllMocks();
-    subscriptions.successorsOf.mockResolvedValue(new Map());
-    organization.businessToday.mockResolvedValue(TODAY);
-    parameters.getValuesAt.mockImplementation((key: string, instants: Date[]) =>
-      Promise.resolve(instants.map(() => STANDARD_DAYS[key])),
-    );
-  });
+  beforeEach(h.reset);
 
   it('returns the facts of a shared-pool subscription with no owner department, not leaving it out', async () => {
     subscriptions.findMany.mockResolvedValue([record()]);
@@ -269,7 +189,9 @@ describe('SubscriptionPeriodService: the periods the renewal reads, the shared p
       subscriptions.find.mockResolvedValue(record());
       subscriptions.successorsOf.mockResolvedValue(new Map([['sub-1', 'sub-2']]));
 
-      await expect(service.recordNext(tx, actor, input)).rejects.toThrow(SubscriptionPeriodRefusedError);
+      const err = await service.recordNext(tx, actor, input).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(SubscriptionPeriodRefusedError);
+      expect(err).toMatchObject({ reason: 'ALREADY_RENEWED' });
     });
   });
 });

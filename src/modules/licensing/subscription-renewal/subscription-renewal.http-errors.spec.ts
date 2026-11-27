@@ -12,6 +12,7 @@ describe('NOT_RENEWABLE message (F4)', () => {
       NOT_ACTIVE: true,
       ALREADY_CONTINUED: true,
       CANCELLED: true,
+      MEMBER_COUNTED: true,
     };
     const exception = toRenewalApiException(new RenewalError('NOT_RENEWABLE', { reason: 'CANCELLED' })) as ApiException;
     const message = (exception.getResponse() as { message: string }).message;
@@ -25,4 +26,13 @@ describe('NOT_RENEWABLE message (F4)', () => {
     expect(exception.getStatus()).toBe(403);
     expect(exception.getResponse()).toMatchObject({ code: 'SUBSCRIPTION_RENEWAL.NOT_RESPONSIBLE' });
   });
+
+  it.each(['LINE_QUANTITY_NOT_TARGET', 'REDUCTION_AFTER_DEADLINE', 'LINES_REQUIRED'] as const)(
+    'maps %s to 422 SUBSCRIPTION_RENEWAL.%s',
+    (problem) => {
+      const exception = toRenewalApiException(new RenewalError(problem, { lines: [] })) as ApiException;
+      expect(exception.getStatus()).toBe(422);
+      expect(exception.getResponse()).toMatchObject({ code: `SUBSCRIPTION_RENEWAL.${problem}` });
+    },
+  );
 });

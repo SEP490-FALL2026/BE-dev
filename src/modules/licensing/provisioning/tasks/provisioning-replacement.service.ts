@@ -78,10 +78,30 @@ export class ProvisioningReplacementService {
         provisioningType: target.provisioningType,
         endedOn: today,
         now: new Date(),
+        newRequestId: requestId,
       });
     }
 
     return ended;
+  }
+
+  /** Reads the replaced K1 assignment's commitment months, billing anchor, and expected end date so a transfer regrant preserves them (`QĐ-117c`). */
+  async k1TermsOfReplaced(
+    tx: DbTx,
+    assignmentId: string,
+  ): Promise<{
+    personalCommitmentMonths: 1 | 12 | null;
+    billingAnchorOn: BusinessDate | null;
+    expectedEndDate: BusinessDate | null;
+  } | null> {
+    const record = await this.assignments.findRecord(assignmentId, tx);
+    if (!record) return null;
+
+    return {
+      personalCommitmentMonths: record.personalCommitmentMonths ?? null,
+      billingAnchorOn: record.billingAnchorOn ?? null,
+      expectedEndDate: record.expectedEndDate,
+    };
   }
 
   private async resolveRevocation(

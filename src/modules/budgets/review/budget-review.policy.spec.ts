@@ -121,6 +121,59 @@ describe('the review of the budget of a Cost Center at the close of a month (RV-
     it('with nothing held and nothing waiting the forecast is what was spent, whatever k is: the tax is never multiplied into what was spent', () => {
       expect(forecastOfYear({ ...base, committedMinor: 0n })).toBe(168n * TR);
     });
+
+    it('W3-08 (D-11): adds runningUncommittedMinor to forecastMinor without multiplying by invoice variance k', () => {
+      // W3-08: base 120M, reserve 12M, spent 60M, held 50M, pending 10M, 2 Figma seats x 375k x 6 months = 4.5M -> forecast 124.5M (> base -> YELLOW)
+      const w308 = reviewFiguresOf({
+        month: 6,
+        baseMinor: 120n * TR,
+        reserveMinor: 12n * TR,
+        spentMinor: 60n * TR,
+        spentAfterMonthMinor: 0n,
+        committedMinor: 50n * TR,
+        pendingMinor: 10n * TR,
+        invoiceBasisMinor: 0n,
+        invoiceActualMinor: 0n,
+        priceIncreaseMinor: 0n,
+        runningUncommittedMinor: 4_500_000n,
+      });
+
+      expect(w308.forecastMinor).toBe(124_500_000n);
+      expect(w308.light).toBe('YELLOW');
+
+      // Mutant killer: with k = 5% (168/160), open (100M) grows to 105M, while runningUncommitted (4.5M) is added flat (NOT 4.725M).
+      const withVariance = reviewFiguresOf({
+        month: 6,
+        baseMinor: 300n * TR,
+        reserveMinor: 30n * TR,
+        spentMinor: 168n * TR,
+        spentAfterMonthMinor: 0n,
+        committedMinor: 100n * TR,
+        pendingMinor: 0n,
+        invoiceBasisMinor: 160n * TR,
+        invoiceActualMinor: 168n * TR,
+        priceIncreaseMinor: 0n,
+        runningUncommittedMinor: 4_500_000n,
+      });
+      expect(withVariance.forecastMinor).toBe(168n * TR + 105n * TR + 4_500_000n);
+
+      // Boundary: runningUncommitted pushes forecast from exactly base+reserve (YELLOW) to base+reserve+1 (RED).
+      const atRed = reviewFiguresOf({
+        month: 6,
+        baseMinor: 120n * TR,
+        reserveMinor: 12n * TR,
+        spentMinor: 120n * TR,
+        spentAfterMonthMinor: 0n,
+        committedMinor: 12n * TR,
+        pendingMinor: 0n,
+        invoiceBasisMinor: 0n,
+        invoiceActualMinor: 0n,
+        priceIncreaseMinor: 0n,
+        runningUncommittedMinor: 1n,
+      });
+      expect(atRed.forecastMinor).toBe(132_000_001n);
+      expect(atRed.light).toBe('RED');
+    });
   });
 
   describe('variancePpm (the difference of the invoices since the start of the year, in millionths)', () => {

@@ -2,12 +2,12 @@ import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 
-/** What differs in one case: the count, the price of one, or both (`R-44`); there are two kinds, each at most once. */
-export const INVOICE_DISCREPANCY_MISMATCHES_MAX = 2;
+/** What differs in one case: the count, the price of one, or the expected pool amount; each at most once. */
+export const INVOICE_DISCREPANCY_MISMATCHES_MAX = 3;
 
 const state = z.enum(['OPEN', 'CLOSED']);
-const outcome = z.enum(['EXPLAINED', 'OUT_OF_PROCESS_SUSPECTED']);
-const mismatch = z.enum(['QUANTITY', 'UNIT_PRICE']);
+const outcome = z.enum(['EXPLAINED', 'OUT_OF_PROCESS_SUSPECTED', 'EXCHANGE_RATE_LINE_PRICE_UPDATED']);
+const mismatch = z.enum(['QUANTITY', 'UNIT_PRICE', 'EXPECTED_AMOUNT']);
 
 const moneyView = z.strictObject({ amount: z.string(), currency: z.string() });
 /** An amount in dong, as typed: no currency (`QĐ-111an`). */
@@ -17,7 +17,7 @@ const dongInput = z.strictObject({ amount: z.string().max(40) });
 export const invoiceDiscrepancyClosureSchema = z.strictObject({
   outcome: outcome.meta({
     description:
-      'EXPLAINED when the difference has a reason; OUT_OF_PROCESS_SUSPECTED when someone may have paid for the software outside the process (it needs a difference above nothing, and is sent on to the review of the accounts at the vendor).',
+      'EXPLAINED when the difference has a reason; OUT_OF_PROCESS_SUSPECTED when someone may have paid for the software outside the process (it needs a difference above nothing, and is sent on to the review of the accounts at the vendor); the third outcome when currency or card fee differences require the responsible IT Admin to review the subscription monthly price.',
   }),
   reason: z
     .string()
@@ -49,7 +49,7 @@ const summarySchema = z.strictObject({
     vendorId: z.uuid(),
     vendorInvoiceNumber: z.string(),
     servicePeriodMonth: z.string().meta({ description: 'The month the invoice pays for, as YYYY-MM.' }),
-    linkKind: z.enum(['REQUEST', 'SUBSCRIPTION']),
+    linkKind: z.enum(['REQUEST', 'SUBSCRIPTION', 'LICENSE_LOT']),
     requestId: z.uuid().nullable(),
     subscriptionId: z.uuid().nullable(),
     netAmount: moneyView.meta({ description: 'What was taken out of the company in dong, before tax.' }),

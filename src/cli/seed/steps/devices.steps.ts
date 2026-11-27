@@ -38,15 +38,15 @@ export function bundledPlanIds(ctx: DemoRunContext, bundled: readonly string[]):
   });
 }
 
-/** The first key of the store of a purchase bought per machine, listed by the IT Admin who answers for the purchase. */
-export async function storeKeyId(ctx: DemoRunContext, subscriptionKey: string): Promise<string | null> {
-  const subscription = ctx.fixture.subscriptions.find(({ key }) => key === subscriptionKey);
-  const subscriptionId = ctx.ids.subscriptions.get(subscriptionKey);
-  if (!subscription || !subscriptionId) return null;
+/** The first key of the store of a lot bought per machine, listed by the IT Admin who answers for the lot. */
+export async function storeKeyId(ctx: DemoRunContext, lotKey: string): Promise<string | null> {
+  const lot = ctx.fixture.lots.find(({ key }) => key === lotKey);
+  const lotId = ctx.ids.lots.get(lotKey);
+  if (!lot || !lotId) return null;
   const keys = await listAll<{ id: string }>(
     ctx,
-    await as(ctx, subscription.responsible),
-    `/license-keys?subscriptionId=${subscriptionId}`,
+    await as(ctx, lot.responsible),
+    `/license-keys?licenseLotId=${lotId}`,
   );
 
   return keys[0]?.id ?? null;

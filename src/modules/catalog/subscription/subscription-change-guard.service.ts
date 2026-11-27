@@ -2,7 +2,11 @@ import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { SeatOccupancyHook } from '../public/catalog.extension-points';
-import { SubscriptionSeatIncreaseService, type SeatIncrease } from './seat-increase/subscription-seat-increase.service';
+import {
+  SubscriptionSeatIncreaseService,
+  type SeatIncrease,
+  type SeatReduction,
+} from './seat-increase/subscription-seat-increase.service';
 import { assertQuantityNotBelowOccupied } from './seat-guard.policy';
 import { SubscriptionPoolService, type PoolChange } from './pool/subscription-pool.service';
 
@@ -26,6 +30,21 @@ export class SubscriptionChangeGuard {
   /** What a change tells the others: a rise of the seats of a K2 or K4 pool goes to the IT Admin who answers for it (`QĐ-110v`, SPEC P24). */
   tellSeatIncrease(tx: DbTx, rise: SeatIncrease): Promise<number> {
     return this.seatIncrease.told(tx, rise);
+  }
+
+  /** Notifies R1 + Finance when an active K2 subscription reduces purchasedQuantity. */
+  tellSeatReduction(tx: DbTx, reduction: SeatReduction): Promise<number> {
+    return this.seatIncrease.toldReduction(tx, reduction);
+  }
+
+  /** The workspace of a subscription of this plan, locked: see `SubscriptionPoolService.workspaceFor`. */
+  workspaceFor(...args: Parameters<SubscriptionPoolService['workspaceFor']>): Promise<string | null> {
+    return this.poolRules.workspaceFor(...args);
+  }
+
+  /** The workspaces of a move, locked in id order: see `SubscriptionPoolService.lockWorkspaces`. */
+  lockWorkspaces(...args: Parameters<SubscriptionPoolService['lockWorkspaces']>): Promise<void> {
+    return this.poolRules.lockWorkspaces(...args);
   }
 
   /** The rules of the shared pool on the state a change leaves (`QĐ-103e`): see `SubscriptionPoolService.judgeChange`. */

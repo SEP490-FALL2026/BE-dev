@@ -47,7 +47,7 @@ export interface DeviceInitialRecordInput {
  *
  * Lock order: seat baseline row FOR SHARE (tier 0b) -> asset-code counter (tier 0c, when generated) ->
  * holder employee FOR SHARE (tier 1) -> machine/registration inserts (tier 2b) -> purchase/key locks sorted by
- * `(subscriptionId, licenseKeyId)` (tier 6/6b/8).
+ * `(subscriptionId, licenseKeyId)` (tier 6/7b/8).
  */
 @Injectable()
 export class InitialRecordService {

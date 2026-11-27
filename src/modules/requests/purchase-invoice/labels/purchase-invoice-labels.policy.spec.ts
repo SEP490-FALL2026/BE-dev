@@ -1,6 +1,7 @@
 import {
   expenseYearOf,
   firstOfMonth,
+  flagsOfPurchaseInvoice,
   labelOfPurchaseInvoice,
   monthsBetween,
   type PurchaseInvoiceLabelInput,
@@ -108,6 +109,20 @@ describe('purchase invoice label and period (QĐ-111w, R-50; T-PI)', () => {
       ).toEqual({ label: 'RENEWAL', periodIndex: null, periodCount: null, outsideTerm: false });
     });
 
+    it('is "SEAT_PURCHASE" for a subscription invoice tied to a seatPurchaseId (N9)', () => {
+      expect(
+        labelOfPurchaseInvoice({
+          link: 'SUBSCRIPTION',
+          hasSeatPurchase: true,
+          continuation: false,
+          startMonth: null,
+          termMonths: null,
+          serviceMonth: '2026-11-01',
+          hasEarlierInvoice: false,
+        }),
+      ).toEqual({ label: 'SEAT_PURCHASE', periodIndex: null, periodCount: null, outsideTerm: false });
+    });
+
     it('is "Gia hạn" for an invoice of a request that goes on using (QĐ-111l), first or not', () => {
       for (const hasEarlierInvoice of [false, true]) {
         expect(
@@ -132,6 +147,15 @@ describe('purchase invoice label and period (QĐ-111w, R-50; T-PI)', () => {
       expect(monthsBetween('2026-11-01', '2027-02-01')).toBe(3);
       expect(monthsBetween('2027-02-01', '2026-11-01')).toBe(-3);
       expect(monthsBetween('2027-03-01', '2027-03-01')).toBe(0);
+    });
+
+    it('emits flags in fixed order including NO_EXPECTED_AMOUNT when pool expectation is missing', () => {
+      expect(flagsOfPurchaseInvoice({ outsideTerm: true, overApproved: true, noExpectedAmount: true })).toEqual([
+        'OVER_APPROVED',
+        'OUTSIDE_TERM',
+        'NO_EXPECTED_AMOUNT',
+      ]);
+      expect(flagsOfPurchaseInvoice({ outsideTerm: false, overApproved: false })).toEqual([]);
     });
   });
 });
