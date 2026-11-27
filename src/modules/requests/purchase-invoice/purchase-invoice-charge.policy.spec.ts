@@ -1,4 +1,9 @@
-import { bearsByHolder, chargedCostCenterOf, holderDayOf } from './purchase-invoice-charge.policy';
+import {
+  bearsByHolder,
+  chargedCostCenterOf,
+  holderDayOf,
+  isOverApprovedInvoice,
+} from './purchase-invoice-charge.policy';
 
 describe('which department bears a purchase invoice (R-51, QĐ-55b)', () => {
   describe('the day whose holder is asked', () => {
@@ -59,5 +64,35 @@ describe('which department bears a purchase invoice (R-51, QĐ-55b)', () => {
     it('is nothing when there is neither', () => {
       expect(chargedCostCenterOf({ holderCostCenterIds: [], requestCostCenterId: null })).toBeNull();
     });
+  });
+});
+
+describe('whether an invoice of the pool is over what was approved (QĐ-103w)', () => {
+  const standard = { quantity: 10, pricing: { monthlyMinor: 500_000n, cycleMonths: 1, renewalDate: '2026-12-05' } };
+  const premium = { quantity: 5, pricing: { monthlyMinor: 800_000n, cycleMonths: 1, renewalDate: '2026-12-05' } };
+  const over = (netMinor: bigint, ceilingParts: Parameters<typeof isOverApprovedInvoice>[0]['ceilingParts']) =>
+    isOverApprovedInvoice({ netMinor, commitmentRemainingMinor: null, ceilingParts, serviceMonth: '2026-09-01' });
+
+  it('adds the ceiling of each line at its own price: (10 x 500.000 + 5 x 800.000) x 3 months is 27.000.000', () => {
+    expect(over(27_000_000n, [standard, premium])).toBe(false);
+    expect(over(27_000_001n, [standard, premium])).toBe(true);
+  });
+
+  it('is never over when nothing is judged, and not judged when the price of one part is not known', () => {
+    expect(over(1n, [])).toBe(false);
+    expect(over(99_000_000n, [standard, { quantity: 5, pricing: { ...premium.pricing, monthlyMinor: null } }])).toBe(
+      false,
+    );
+  });
+
+  it('follows the commitment when there is one, whatever the parts say', () => {
+    expect(
+      isOverApprovedInvoice({
+        netMinor: 10n,
+        commitmentRemainingMinor: 9n,
+        ceilingParts: [standard],
+        serviceMonth: '2026-09-01',
+      }),
+    ).toBe(true);
   });
 });

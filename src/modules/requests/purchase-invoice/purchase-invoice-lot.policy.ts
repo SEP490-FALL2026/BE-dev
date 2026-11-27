@@ -36,7 +36,10 @@ export function assembleRequestLinkFacts(args: {
     holderBound: heldByPerson(request.state, provisioningType),
     failedGrantDepartmentId,
     poolSubscriptionId: pool.id,
-    seatPricing: pool.pricing,
+    ceilingParts:
+      pool.pricing === null
+        ? []
+        : [{ quantity: requestLot ? requestLot.licenseCount : request.beneficiaryCount, pricing: pool.pricing }],
     poolSource: pool.poolSource,
     renewedAssignmentId: request.renewedAssignmentId,
     licenseLotId: requestLot?.id ?? null,

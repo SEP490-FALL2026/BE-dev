@@ -272,6 +272,11 @@ describe('PurchaseInvoicePlanService acting scope (S2-2)', () => {
         seatPricingOf: jest
           .fn()
           .mockResolvedValue({ monthlyMinor: 500_000n, cycleMonths: 12, renewalDate: '2027-07-01' }),
+        ceilingPartsOf: jest
+          .fn()
+          .mockResolvedValue([
+            { quantity: 10, pricing: { monthlyMinor: 500_000n, cycleMonths: 12, renewalDate: '2027-07-01' } },
+          ]),
         isPoolExpectedMissing: jest.fn().mockResolvedValue(false),
       } as never,
       {} as never,

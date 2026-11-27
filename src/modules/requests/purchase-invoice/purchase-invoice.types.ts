@@ -13,6 +13,12 @@ export interface SeatPricing {
   renewalDate: BusinessDate | null;
 }
 
+/** One part of what an invoice of the pool may cost: the seats of a line (or of a purchase) at the price of that line. */
+export interface CeilingPart {
+  quantity: number | null;
+  pricing: SeatPricing;
+}
+
 export interface LinkFacts {
   organizationId: string;
   link: PurchaseInvoiceLink;
@@ -27,7 +33,8 @@ export interface LinkFacts {
   holderBound: boolean;
   failedGrantDepartmentId: string | null;
   poolSubscriptionId: string | null;
-  seatPricing: SeatPricing | null;
+  /** What the invoice of the pool is judged by, part by part; empty when the link is not judged by a ceiling. */
+  ceilingParts: readonly CeilingPart[];
   poolSource: PoolInvoiceExpectationSource | null;
   renewedAssignmentId: string | null;
   licenseLotId: string | null;

@@ -19,6 +19,8 @@ interface Preview {
  */
 describe('over-approved ceiling of a pool invoice follows the price of the line (integration, real PostgreSQL; W3 audit B-1)', () => {
   let pool: string;
+  let twoPlans: string;
+  let premiumLineId: string;
   let counter = 0;
 
   beforeAll(async () => {
@@ -32,6 +34,41 @@ describe('over-approved ceiling of a pool invoice follows the price of the line 
     await h.ctx.sql.query(
       `UPDATE subscriptions SET renewal_date = $2, original_unit_price_minor = 1500, original_currency = 'USD' WHERE id = $1`,
       [pool, `${h.year}-12-05`],
+    );
+    // A second pool with two plans, each its own line and its own seats: Standard 10 x 500.000 and Premium 5 x 800.000.
+    twoPlans = await takeOwnerOff(h, await h.subscription(10, 'K2'));
+    await h.ctx.sql.query(
+      `UPDATE subscription_lines SET monthly_unit_price_minor = 500000 WHERE subscription_id = $1`,
+      [twoPlans],
+    );
+    await h.ctx.sql.query(
+      `UPDATE subscriptions SET renewal_date = $2, original_unit_price_minor = 1500, original_currency = 'USD' WHERE id = $1`,
+      [twoPlans, `${h.year}-12-05`],
+    );
+    const standardPlanId = await h.planOf(twoPlans);
+    const premiumPlanId = (
+      await h.ctx.sql.query<{ id: string }>(
+        `INSERT INTO plans (id, organization_id, application_id, name, normalized_name, provisioning_type, pricing_model, control_level, key_binding)
+         SELECT gen_random_uuid(), organization_id, application_id, 'Premium ceiling', 'premium ceiling', provisioning_type,
+                pricing_model, control_level, key_binding
+           FROM plans WHERE id = $1
+         RETURNING id`,
+        [standardPlanId],
+      )
+    ).rows[0].id;
+    premiumLineId = (
+      await h.ctx.sql.query<{ id: string }>(
+        `INSERT INTO subscription_lines (id, organization_id, subscription_id, workspace_id, plan_id, monthly_unit_price_minor,
+           ledger_opened_on, updated_at)
+         SELECT gen_random_uuid(), organization_id, id, workspace_id, $2, 800000, '2026-01-05', now() FROM subscriptions WHERE id = $1
+         RETURNING id`,
+        [twoPlans, premiumPlanId],
+      )
+    ).rows[0].id;
+    await h.ctx.sql.query(
+      `INSERT INTO seat_changes (id, organization_id, subscription_line_id, effective_on, delta, reason, source, basis)
+       VALUES (gen_random_uuid(), $1, $2, '2026-01-05', 5, 'INITIAL', 'ADJUSTMENT', 'NONE')`,
+      [h.seed.organizationId, premiumLineId],
     );
   }, 240000);
 
@@ -97,5 +134,33 @@ describe('over-approved ceiling of a pool invoice follows the price of the line 
 
     expect(await flagsOf({ requestId }, '1500001', 1)).toMatchObject({ flags: ['OVER_APPROVED'] });
     expect(await flagsOf({ requestId }, '1500000', 1)).toMatchObject({ flags: [] });
+  });
+
+  it('marks the invoice of the whole period with two plans by the sum of its lines: (10 x 500.000 + 5 x 800.000) x three months is 27.000.000', async () => {
+    expect(await flagsOf({ subscriptionId: twoPlans }, '27000001', 15)).toMatchObject({ flags: ['OVER_APPROVED'] });
+    expect(await flagsOf({ subscriptionId: twoPlans }, '27000000', 15)).toMatchObject({ flags: [] });
+  });
+
+  it('marks the invoice of the selected line by that line: five Premium seats x 800.000 x three months is 12.000.000', async () => {
+    const link = { subscriptionId: twoPlans, subscriptionLineIds: [premiumLineId] };
+
+    expect(await flagsOf(link, '12000001', 5)).toMatchObject({ flags: ['OVER_APPROVED'] });
+    expect(await flagsOf(link, '12000000', 5)).toMatchObject({ flags: [] });
+  });
+
+  it('marks the invoice of a seat purchase of the Premium line by the price of that line: two seats x 800.000 x three months is 4.800.000', async () => {
+    const purchaseId = (
+      await h.ctx.sql.query<{ id: string }>(
+        `INSERT INTO seat_purchases (id, organization_id, subscription_line_id, code, kind, purchased_on, quantity, invoice_obligation,
+           invoice_due_on, recorded_by_employee_id)
+         VALUES (gen_random_uuid(), $1, $2, 'MUA-000901', 'TOP_UP', $3::date, 2, 'WORKING_DAYS', $3::date + 9, $4)
+         RETURNING id`,
+        [h.seed.organizationId, premiumLineId, `${h.year}-09-01`, h.it1.employeeId],
+      )
+    ).rows[0].id;
+    const link = { subscriptionId: twoPlans, seatPurchaseId: purchaseId };
+
+    expect(await flagsOf(link, '4800001', 2)).toMatchObject({ flags: ['OVER_APPROVED'] });
+    expect(await flagsOf(link, '4800000', 2)).toMatchObject({ flags: [] });
   });
 });

@@ -11,7 +11,7 @@ import { LicensingOpenGrantsApi } from '../../../licensing/public/licensing-open
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { PurchaseInvoiceRefusedError } from '../purchase-invoice.errors';
 import type { PurchaseInvoiceRepo } from '../purchase-invoice.repo';
-import type { LinkFacts, PoolExpectationFacts } from '../purchase-invoice.types';
+import type { CeilingPart, LinkFacts, PoolExpectationFacts } from '../purchase-invoice.types';
 import { expectedPoolAmountOf, type PoolInvoiceExpectationSource } from './purchase-invoice-pool-expectation.policy';
 import { pricingOf } from '../purchase-invoice-charge.policy';
 import type { SeatPricing } from '../purchase-invoice.types';
@@ -167,6 +167,60 @@ export class PurchaseInvoicePoolService {
     });
   }
 
+  /**
+   * What an invoice of a period is judged by, one part for each line it pays for: a seat purchase is the seats bought at the price of its
+   * line; otherwise the lines chosen (all of them when none is chosen) each with its seats on the day of billing at the price of that line.
+   * A period with no line is one part at the columns of the period.
+   */
+  async ceilingPartsOf(input: {
+    period: SubscriptionPurchaseFacts;
+    serviceMonth: BusinessDate;
+    seatPurchaseId: string | null;
+    subscriptionLineIds: readonly string[];
+    expectedQuantity: number | null;
+    tx?: DbTx;
+  }): Promise<CeilingPart[]> {
+    const { period, serviceMonth, seatPurchaseId, tx } = input;
+    const priced = (monthlyPriceMinor: bigint | null) => pricingOf({ ...period, monthlyPriceMinor });
+    if (seatPurchaseId !== null) {
+      const purchase = await this.seatLedger.findSeatPurchase(seatPurchaseId, tx);
+      const [line] = purchase ? await this.seatLedger.linesOfIds([purchase.subscriptionLineId], tx) : [];
+
+      return [{ quantity: input.expectedQuantity, pricing: priced(line?.monthlyUnitPriceMinor ?? null) }];
+    }
+    const lines = await this.seatsOfSelectedLines(period, serviceMonth, input.subscriptionLineIds, tx);
+    if (lines.length === 0) {
+      return [{ quantity: input.expectedQuantity, pricing: await this.seatPricingOf(period, period.planId, tx) }];
+    }
+
+    return lines.map((entry) => ({ quantity: entry.seats, pricing: priced(entry.line.monthlyUnitPriceMinor) }));
+  }
+
+  /** The lines a period invoice pays for (the chosen ones, all when none is chosen) with their seats on the day of billing. */
+  private async seatsOfSelectedLines(
+    period: SubscriptionPurchaseFacts,
+    serviceMonth: BusinessDate,
+    subscriptionLineIds: readonly string[],
+    tx?: DbTx,
+  ) {
+    const lines = (await this.seatLedger.linesOfSubscription(period.subscriptionId, tx)).filter(
+      (l) => l.closedReason !== 'REMOVED',
+    );
+    const selected = subscriptionLineIds.length > 0 ? lines.filter((l) => subscriptionLineIds.includes(l.id)) : lines;
+    const billingDay = period.startDate !== null && serviceMonth < period.startDate ? period.startDate : serviceMonth;
+    const seatsMap = await this.seatLedger.seatsOnDays(
+      selected.map((l) => l.id),
+      billingDay,
+      billingDay,
+      tx,
+    );
+
+    return selected.map((line) => ({
+      line,
+      seats: seatsMap.get(line.id)?.get(billingDay) ?? period.purchasedQuantity ?? 0,
+    }));
+  }
+
   async isPoolExpectedMissing(
     poolSource: PoolInvoiceExpectationSource | null,
     requestId: string | null,
@@ -216,36 +270,21 @@ export class PurchaseInvoicePoolService {
     subscriptionLineIds: readonly string[],
     tx?: DbTx,
   ): Promise<PoolInvoiceExpectationSource> {
-    const lines = (await this.seatLedger.linesOfSubscription(subscriptionId, tx)).filter(
-      (l) => l.closedReason !== 'REMOVED',
-    );
-    if (lines.length === 0) return this.wholeSubscriptionSource(period);
+    const selected = await this.seatsOfSelectedLines(period, serviceMonth, subscriptionLineIds, tx);
+    if (selected.length === 0) return this.wholeSubscriptionSource(period);
 
-    const selectedLines =
-      subscriptionLineIds.length > 0 ? lines.filter((l) => subscriptionLineIds.includes(l.id)) : lines;
-    const billingDay = period.startDate !== null && serviceMonth < period.startDate ? period.startDate : serviceMonth;
-    const seatsMap = await this.seatLedger.seatsOnDays(
-      selectedLines.map((l) => l.id),
-      billingDay,
-      billingDay,
-      tx,
-    );
-    const lineEntries = selectedLines.map((l) => ({
-      seats: seatsMap.get(l.id)?.get(billingDay) ?? period.purchasedQuantity ?? 0,
-      monthlyPriceMinor: l.monthlyUnitPriceMinor,
-    }));
     const foldedPurchases = await this.foldedMonthlyPurchases(
       subscriptionId,
       period,
       serviceMonth,
-      new Set(selectedLines.map((l) => l.id)),
+      new Set(selected.map((entry) => entry.line.id)),
       tx,
     );
 
     return {
       kind: 'SUBSCRIPTION_LINES',
       billingCycle: period.billingCycle,
-      lines: lineEntries,
+      lines: selected.map((entry) => ({ seats: entry.seats, monthlyPriceMinor: entry.line.monthlyUnitPriceMinor })),
       ...(foldedPurchases.length > 0 ? { foldedPurchases } : {}),
     };
   }
@@ -319,7 +358,7 @@ export class PurchaseInvoicePoolService {
       holderBound: false,
       failedGrantDepartmentId: null,
       poolSubscriptionId: null,
-      seatPricing: null,
+      ceilingParts: [],
       poolSource: null,
       renewedAssignmentId: null,
       licenseLotId: lot.id,

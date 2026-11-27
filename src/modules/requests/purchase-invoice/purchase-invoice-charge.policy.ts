@@ -1,6 +1,6 @@
 import { addDays, monthBoundsOf, type BusinessDate } from '../../../core/business-date';
 import { pooledInvoiceCeilingMinor } from './purchase-invoice-match.policy';
-import type { SeatPricing } from './purchase-invoice.types';
+import type { CeilingPart, SeatPricing } from './purchase-invoice.types';
 
 const PURCHASABLE_STATES: ReadonlySet<string> = new Set(['AWAITING_EXECUTION', 'EXECUTING', 'COMPLETED']);
 const FAILED_AFTER_PURCHASE_STATES: ReadonlySet<string> = new Set(['FAILED', 'AWAITING_IT_CLOSE']);
@@ -29,24 +29,32 @@ export function pricingOf(facts: {
   };
 }
 
+/**
+ * Whether the invoice is over what was approved: the net is above what the commitment has left or, with none, above the ceiling of the pool,
+ * the sum of the ceiling of each part (each line at its own price). One part with no figure to judge by leaves the whole invoice unjudged.
+ */
 export function isOverApprovedInvoice(input: {
   netMinor: bigint;
   commitmentRemainingMinor: bigint | null;
-  seatPricing: SeatPricing | null;
-  expectedQuantity: number | null;
+  ceilingParts: readonly CeilingPart[];
   serviceMonth: BusinessDate;
 }): boolean {
   if (input.commitmentRemainingMinor !== null) return input.netMinor > input.commitmentRemainingMinor;
-  if (input.seatPricing === null) return false;
-  const ceiling = pooledInvoiceCeilingMinor({
-    quantity: input.expectedQuantity,
-    monthlyMinor: input.seatPricing.monthlyMinor,
-    cycleMonths: input.seatPricing.cycleMonths,
-    serviceMonth: input.serviceMonth,
-    renewalDate: input.seatPricing.renewalDate,
-  });
+  if (input.ceilingParts.length === 0) return false;
+  let ceiling = 0n;
+  for (const part of input.ceilingParts) {
+    const partCeiling = pooledInvoiceCeilingMinor({
+      quantity: part.quantity,
+      monthlyMinor: part.pricing.monthlyMinor,
+      cycleMonths: part.pricing.cycleMonths,
+      serviceMonth: input.serviceMonth,
+      renewalDate: part.pricing.renewalDate,
+    });
+    if (partCeiling === null) return false;
+    ceiling += partCeiling;
+  }
 
-  return ceiling !== null && input.netMinor > ceiling;
+  return input.netMinor > ceiling;
 }
 
 /**
