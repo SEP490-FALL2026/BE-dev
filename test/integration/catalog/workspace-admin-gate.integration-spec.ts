@@ -470,4 +470,52 @@ describe('workspace >= 2 working admin gate and WORKSPACE_ADMIN_NOT_WORKING aler
       }
     });
   });
+
+  describe('X-IT-R3: PUT /workspaces/:id/admins and PATCH /workspaces/:id reject departure-blocked IT Admin', () => {
+    it('refuses an IT Admin whose departure already blocks access, and allows a future block', async () => {
+      const leaving = await buildActivatedAccount(h.ctx, h.seed, {
+        code: 'E-WS-BLK',
+        email: 'ws-blk@acme.vn',
+        role: 'IT_ADMIN',
+      });
+      const future = await buildActivatedAccount(h.ctx, h.seed, {
+        code: 'E-WS-FUT',
+        email: 'ws-fut@acme.vn',
+        role: 'IT_ADMIN',
+      });
+      await h.ctx.sql.query(
+        `INSERT INTO employee_access_blocks (employee_id, organization_id, blocked_from, cause)
+         VALUES ($1, $3, '2000-01-01'::date, 'DEPARTURE_LAST_DAY'),
+                ($2, $3, '2999-12-31'::date, 'DEPARTURE_LAST_DAY')`,
+        [leaving.employeeId, future.employeeId, h.seed.organizationId],
+      );
+      const ws = h.dataOf<{ id: string; updatedAt: string }>(await postWorkspace(h.unique('WS-Block')).expect(201));
+
+      const asAdmin = await setAdmins(ws.id, ws.updatedAt, [
+        { employeeId: khoa.employeeId, role: 'OWNER' },
+        { employeeId: leaving.employeeId, role: 'ADMIN' },
+      ]).expect(422);
+      expect(h.codeOf(asAdmin)).toBe('WORKSPACE.ADMIN_NOT_IT_ADMIN');
+
+      const asHolder = await request(h.server())
+        .patch(`/api/v1/workspaces/${ws.id}`)
+        .set(h.as(khoa))
+        .send({
+          expectedUpdatedAt: ws.updatedAt,
+          emergencyAccount: {
+            identity: 'emergency@acme.vn',
+            occupiesSeat: false,
+            holderEmployeeId: leaving.employeeId,
+            lastReviewedOn: '2026-11-25',
+          },
+        })
+        .expect(422);
+      expect(h.codeOf(asHolder)).toBe('WORKSPACE.ADMIN_NOT_IT_ADMIN');
+
+      await setAdmins(ws.id, ws.updatedAt, [
+        { employeeId: khoa.employeeId, role: 'OWNER' },
+        { employeeId: future.employeeId, role: 'ADMIN' },
+      ]).expect(200);
+    });
+  });
 });

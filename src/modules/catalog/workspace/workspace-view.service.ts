@@ -58,20 +58,35 @@ export class WorkspaceViewService {
   }
 
   /**
-   * The person must be an employee still working with a usable IT Admin account. The employee is locked first and the account second (the lock order
-   * of the identity facade), so a departure or a lock cannot slip in. Throws WorkspaceAdminNotItAdminError.
+   * Every person must be an active employee with a usable IT Admin account not yet blocked by a departure. Employees are locked `FOR SHARE`
+   * in ascending `employeeId` order (tier 1) before the accounts and departure blocks are checked. Throws WorkspaceAdminNotItAdminError.
+   */
+  async requireItAdmins(tx: DbTx, employeeIds: readonly string[]): Promise<void> {
+    const ordered = [...new Set(employeeIds)].sort();
+    if (ordered.length === 0) return;
+    for (const employeeId of ordered) {
+      try {
+        await this.organizationReads.lockEmployeeForShare(tx, employeeId);
+      } catch (error) {
+        if (error instanceof EmployeeNotFoundError) throw new WorkspaceAdminNotItAdminError(employeeId);
+        throw error;
+      }
+      const employee = await this.organizationReads.getEmployee(employeeId, tx);
+      if (!employee || employee.status !== 'ACTIVE') throw new WorkspaceAdminNotItAdminError(employeeId);
+      const account = await this.identity.inspectEmployeeAccount(tx, employeeId);
+      if (!account.usable || !account.roles.includes('IT_ADMIN')) throw new WorkspaceAdminNotItAdminError(employeeId);
+    }
+    const working = await this.workingAdminsAmong(ordered, tx);
+    const gone = ordered.find((employeeId) => !working.has(employeeId));
+    if (gone !== undefined) throw new WorkspaceAdminNotItAdminError(gone);
+  }
+
+  /**
+   * The person must be an employee still working with a usable IT Admin account not yet blocked by a departure. The employee is locked first
+   * and the account second (the lock order of the identity facade), so a departure or a lock cannot slip in. Throws WorkspaceAdminNotItAdminError.
    */
   async requireItAdmin(tx: DbTx, employeeId: string): Promise<void> {
-    try {
-      await this.organizationReads.lockEmployeeForShare(tx, employeeId);
-    } catch (error) {
-      if (error instanceof EmployeeNotFoundError) throw new WorkspaceAdminNotItAdminError(employeeId);
-      throw error;
-    }
-    const employee = await this.organizationReads.getEmployee(employeeId, tx);
-    if (!employee || employee.status !== 'ACTIVE') throw new WorkspaceAdminNotItAdminError(employeeId);
-    const account = await this.identity.inspectEmployeeAccount(tx, employeeId);
-    if (!account.usable || !account.roles.includes('IT_ADMIN')) throw new WorkspaceAdminNotItAdminError(employeeId);
+    await this.requireItAdmins(tx, [employeeId]);
   }
 
   /** The context of these workspaces, built with one read of the names, one of the accounts and one of the counts, whatever their number. */

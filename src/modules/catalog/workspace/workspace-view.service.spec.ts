@@ -19,7 +19,7 @@ describe('WorkspaceViewService', () => {
     } = {},
   ) {
     const identity = {
-      findUsableItAdminEmployeeIds: jest.fn().mockResolvedValue(new Set(options.usable ?? [])),
+      findUsableItAdminEmployeeIds: jest.fn().mockResolvedValue(new Set(options.usable ?? ['khoa', 'nam', 'lan'])),
       findDepartureBlocks: jest
         .fn()
         .mockResolvedValue(new Map((options.blocks ?? []).map(([id, blockedFrom]) => [id, { blockedFrom }]))),
@@ -139,6 +139,45 @@ describe('WorkspaceViewService', () => {
       const { service } = setup({ lockFails: new Error('db down') });
 
       await expect(service.requireItAdmin(tx, 'khoa')).rejects.toThrow('db down');
+    });
+
+    it('refuses a person whose departure already blocks them today or earlier, and allows a future block', async () => {
+      const { service } = setup({
+        usable: ['khoa', 'lan'],
+        blocks: [
+          ['khoa', '2026-12-09'],
+          ['lan', '2026-12-10'],
+        ],
+      });
+
+      await expect(service.requireItAdmin(tx, 'khoa')).rejects.toBeInstanceOf(WorkspaceAdminNotItAdminError);
+      await expect(service.requireItAdmin(tx, 'lan')).resolves.toBeUndefined();
+    });
+  });
+
+  describe('requireItAdmins', () => {
+    it('locks distinct employees in ascending order and refuses any blocked by departure', async () => {
+      const order: string[] = [];
+      const { service, organizationReads } = setup({
+        usable: ['khoa', 'lan'],
+        blocks: [
+          ['khoa', '2026-12-08'],
+          ['lan', '2026-12-10'],
+        ],
+      });
+      (organizationReads as unknown as { lockEmployeeForShare: jest.Mock }).lockEmployeeForShare.mockImplementation(
+        (_t: unknown, id: string) => {
+          order.push(id);
+          return Promise.resolve();
+        },
+      );
+
+      await expect(service.requireItAdmins(tx, ['lan', 'khoa', 'lan'])).rejects.toMatchObject({
+        employeeId: 'khoa',
+      });
+      expect(order).toEqual(['khoa', 'lan']);
+
+      await expect(service.requireItAdmins(tx, ['lan'])).resolves.toBeUndefined();
     });
   });
 

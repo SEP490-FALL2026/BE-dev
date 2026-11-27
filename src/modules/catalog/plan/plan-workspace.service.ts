@@ -156,6 +156,7 @@ export class PlanWorkspaceService {
 
     const employeeIds = [
       ...new Set([
+        profile.primaryOwnerEmployeeId,
         ...profile.members.map((member) => member.employeeId),
         ...(profile.emergencyAccount ? [profile.emergencyAccount.holderEmployeeId] : []),
       ]),

@@ -56,13 +56,13 @@ describe('WorkspaceAdminsService', () => {
       replaceAdmins: jest.fn().mockResolvedValue(undefined),
       find: jest.fn().mockResolvedValue({ id: 'ws-1' }),
     } as unknown as WorkspaceRepo;
-    const requireItAdmin = jest.fn((_tx: unknown, employeeId: string) =>
-      employeeId === options.notItAdmin
-        ? Promise.reject(new WorkspaceAdminNotItAdminError(employeeId))
+    const requireItAdmins = jest.fn((_tx: unknown, employeeIds: readonly string[]) =>
+      options.notItAdmin && employeeIds.includes(options.notItAdmin)
+        ? Promise.reject(new WorkspaceAdminNotItAdminError(options.notItAdmin))
         : Promise.resolve(),
     );
     const detail = { id: 'ws-1' };
-    const views = { requireItAdmin, detail: jest.fn().mockResolvedValue(detail) } as unknown as WorkspaceViewService;
+    const views = { requireItAdmins, detail: jest.fn().mockResolvedValue(detail) } as unknown as WorkspaceViewService;
     const organizationReads = {
       getOrganization: jest.fn().mockResolvedValue({ id: 'org-1' }),
     } as unknown as OrganizationReadApi;
@@ -71,15 +71,15 @@ describe('WorkspaceAdminsService', () => {
     return {
       service: new WorkspaceAdminsService(repo, views, organizationReads, audit, runner),
       repo,
-      requireItAdmin,
+      requireItAdmins,
       audit,
       detail,
     };
   }
 
-  it('locks employees in ascending id order via requireItAdmin (tier 1) before locking the workspace (tier 5b)', async () => {
+  it('locks employees via requireItAdmins (tier 1) before locking the workspace (tier 5b)', async () => {
     const order: string[] = [];
-    const { service, repo, requireItAdmin } = setup();
+    const { service, repo, requireItAdmins } = setup();
     (repo.lock as jest.Mock).mockImplementation(() => {
       order.push('repo.lock');
       return Promise.resolve({
@@ -92,8 +92,8 @@ describe('WorkspaceAdminsService', () => {
         updatedAt: version,
       } as WorkspaceRecord);
     });
-    requireItAdmin.mockImplementation((_tx: unknown, employeeId: string) => {
-      order.push(`requireItAdmin:${employeeId}`);
+    requireItAdmins.mockImplementation((_tx: unknown, employeeIds: readonly string[]) => {
+      order.push(`requireItAdmins:${employeeIds.join(',')}`);
       return Promise.resolve();
     });
 
@@ -106,11 +106,11 @@ describe('WorkspaceAdminsService', () => {
       ],
     });
 
-    expect(order).toEqual(['requireItAdmin:emp-khoa', 'requireItAdmin:emp-nam', 'repo.lock']);
+    expect(order).toEqual(['requireItAdmins:emp-nam,emp-khoa,emp-nam', 'repo.lock']);
   });
 
-  it('replaces the administrators as a whole, judges each person in id order and audits the change', async () => {
-    const { service, repo, requireItAdmin, audit, detail } = setup();
+  it('replaces the administrators as a whole, judges each person and audits the change', async () => {
+    const { service, repo, requireItAdmins, audit, detail } = setup();
 
     await expect(service.set(khoa, 'ws-1', body)).resolves.toBe(detail);
 
@@ -120,7 +120,7 @@ describe('WorkspaceAdminsService', () => {
       body.admins,
       'emp-khoa',
     );
-    expect(requireItAdmin.mock.calls.map((call) => call[1])).toEqual(['emp-khoa', 'emp-nam']);
+    expect(requireItAdmins).toHaveBeenCalledWith(tx, ['emp-khoa', 'emp-nam']);
     expect((audit as unknown as { record: jest.Mock }).record).toHaveBeenCalledWith(
       tx,
       expect.objectContaining({
@@ -179,7 +179,7 @@ describe('WorkspaceAdminsService', () => {
 
   describe('setInTx', () => {
     it('validates against caller-supplied limits and skips employee re-locking when employeesChecked is true', async () => {
-      const { service, repo, requireItAdmin } = setup({
+      const { service, repo, requireItAdmins } = setup({
         locked: { adminLimit: 1 },
       });
       const current = {
@@ -207,7 +207,7 @@ describe('WorkspaceAdminsService', () => {
         { current, limits: { ownerLimit: 1, adminLimit: 3 }, employeesChecked: true },
       );
 
-      expect(requireItAdmin).not.toHaveBeenCalled();
+      expect(requireItAdmins).not.toHaveBeenCalled();
       expect((repo as unknown as { lock: jest.Mock }).lock).not.toHaveBeenCalled();
       expect((repo as unknown as { replaceAdmins: jest.Mock }).replaceAdmins).toHaveBeenCalledWith(
         tx,

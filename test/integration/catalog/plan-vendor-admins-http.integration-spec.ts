@@ -184,9 +184,12 @@ describe('the vendor admins of a plan: the workspace profile (integration, real 
       'PLAN.WORKSPACE_PERSON_INVALID',
       'PLAN.WORKSPACE_PERSON_INVALID',
     ]);
-    expect(await h.ctx.sql.query('SELECT 1 FROM plan_workspace_profiles WHERE plan_id = $1', [planId])).toMatchObject({
-      rowCount: 0,
-    });
+    expect(
+      await h.ctx.sql.query('SELECT 1 FROM workspace_admins WHERE employee_id = $1', [leaving.employeeId]),
+    ).toMatchObject({ rowCount: 0 });
+    expect(
+      await h.ctx.sql.query('SELECT 1 FROM workspaces WHERE emergency_holder_employee_id = $1', [leaving.employeeId]),
+    ).toMatchObject({ rowCount: 0 });
     // A block that begins later does not refuse the person yet.
     await put(
       planId,

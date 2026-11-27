@@ -161,11 +161,9 @@ export class WorkspaceService {
     return this.get(id);
   }
 
-  /** Locks distinct employee ids `FOR SHARE` in ascending order (tier 1) before a workspace lock (tier 5b). */
+  /** Locks distinct employee ids `FOR SHARE` in ascending order (tier 1) and enforces active, non-blocked IT Admin before a workspace lock (tier 5b). */
   async requireItAdmins(tx: DbTx, employeeIds: readonly string[]): Promise<void> {
-    for (const employeeId of [...new Set(employeeIds)].sort()) {
-      await this.views.requireItAdmin(tx, employeeId);
-    }
+    await this.views.requireItAdmins(tx, employeeIds);
   }
 
   /**

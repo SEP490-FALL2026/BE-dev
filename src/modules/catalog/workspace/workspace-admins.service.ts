@@ -17,11 +17,11 @@ const snapshot = (admins: readonly WorkspaceAdminRecord[], primaryOwnerEmployeeI
 
 /**
  * Who administers a workspace at the vendor (`QĐ-110k`): recorded as a whole and replaced as a whole, by the IT Admin who answers for the
- * workspace alone (`QĐ-118f`). At least two different people, the primary owner among them as an owner, every one an IT Admin with an account that
- * can sign in; whether they still work is not judged here: a reader sees it in the flags (`QĐ-117e`).
+ * workspace alone (`QĐ-118f`). At least two different people, the primary owner among them as an owner, every one an active IT Admin with an
+ * account that can sign in and is not yet blocked by a departure.
  *
- * Lock order: tier 1 `employees` `FOR SHARE` (and account second) in ascending `employeeId` order via `requireItAdmin`, BEFORE tier 5b `workspaces`
- * `FOR UPDATE` (`docs/rules/database-business.md`).
+ * Lock order: tier 1 `employees` `FOR SHARE` (and account + departure block check) in ascending `employeeId` order via `requireItAdmins`,
+ * BEFORE tier 5b `workspaces` `FOR UPDATE` (`docs/rules/database-business.md`).
  */
 @Injectable()
 export class WorkspaceAdminsService {
@@ -70,9 +70,10 @@ export class WorkspaceAdminsService {
     } = {},
   ): Promise<WorkspaceRecord> {
     if (!options.employeesChecked) {
-      for (const employeeId of [...new Set(input.admins.map((admin) => admin.employeeId))].sort()) {
-        await this.views.requireItAdmin(tx, employeeId);
-      }
+      await this.views.requireItAdmins(
+        tx,
+        input.admins.map((admin) => admin.employeeId),
+      );
     }
     const current = options.current ?? (await this.repo.lock(tx, id));
     if (!current) throw new WorkspaceNotFoundError();

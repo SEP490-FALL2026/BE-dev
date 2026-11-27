@@ -64,8 +64,10 @@ describe('WorkspaceService', () => {
       page: jest.fn().mockResolvedValue({ items: [{ id: 'ws-1' }], total: 1 }),
     } as unknown as WorkspaceRepo;
     const requireItAdmin = jest.fn().mockResolvedValue(undefined);
+    const requireItAdmins = jest.fn().mockResolvedValue(undefined);
     const views = {
       requireItAdmin,
+      requireItAdmins,
       detail: jest.fn().mockResolvedValue({ id: 'ws-1' }),
       summaries: jest.fn().mockResolvedValue([{ id: 'ws-1', flags: [] }]),
     } as unknown as WorkspaceViewService;
@@ -276,17 +278,12 @@ describe('WorkspaceService', () => {
   });
 
   describe('updateInTx and requireItAdmins', () => {
-    it('locks distinct employee ids in ascending order via requireItAdmins', async () => {
-      const order: string[] = [];
+    it('delegates requireItAdmins to WorkspaceViewService', async () => {
       const { service, views } = setup();
-      views.requireItAdmin.mockImplementation((_tx: unknown, employeeId: string) => {
-        order.push(employeeId);
-        return Promise.resolve();
-      });
 
       await service.requireItAdmins(tx as never, ['emp-nam', 'emp-khoa', 'emp-nam']);
 
-      expect(order).toEqual(['emp-khoa', 'emp-nam']);
+      expect(views.requireItAdmins).toHaveBeenCalledWith(tx, ['emp-nam', 'emp-khoa', 'emp-nam']);
     });
 
     it('updates inside caller tx using provided current record without re-locking when employeeChecked is true', async () => {

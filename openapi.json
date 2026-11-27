@@ -32482,7 +32482,7 @@
         },
         "responses": {
           "200": {
-            "description": "The administrators are replaced as a whole on the version the caller read. At least two different IT Admins, the primary owner among them as an owner; whether they still work shows in the flags, not here.",
+            "description": "The administrators are replaced as a whole on the version the caller read. At least two different working IT Admins (active, usable account, not blocked by a departure), the primary owner among them as an owner.",
             "content": {
               "application/json": {
                 "schema": {

@@ -188,7 +188,7 @@ export class WorkspacesController {
   @ApiSuccessResponse(WorkspaceDetailResponseDto, {
     message: 'WORKSPACE.ADMINS_SET',
     description:
-      'The administrators are replaced as a whole on the version the caller read. At least two different IT Admins, the primary owner among them as an owner; whether they still work shows in the flags, not here.',
+      'The administrators are replaced as a whole on the version the caller read. At least two different working IT Admins (active, usable account, not blocked by a departure), the primary owner among them as an owner.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
