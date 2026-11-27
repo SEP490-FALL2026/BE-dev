@@ -29,6 +29,7 @@ function lotOf(changes: Partial<LicenseLotView> = {}): LicenseLotView {
     planId: 'plan-1',
     legacySubscriptionId: 'lot-1',
     licenseCount: 3,
+    planProvisioningType: 'K4',
     keyBinding: 'ACCOUNT',
     purpose: 'OPENING',
     applicationStatus: 'APPROVED',

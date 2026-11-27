@@ -29,6 +29,8 @@ export interface LicenseLotView {
   applicationId: string;
   applicationName: string;
   applicationKind: 'SAAS' | 'LICENSED' | 'INTERNAL';
+  /** The provisioning type of the plan at the moment the lot was read or locked (`K4`). */
+  planProvisioningType: 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
   /** How the key of the plan is bound once bought. */
   keyBinding: 'ACCOUNT' | 'DEVICE_KEY' | 'DEVICE_BUNDLED' | null;
   /** Whether the application of the plan is still in the catalog; a retired one takes no license. */

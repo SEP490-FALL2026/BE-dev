@@ -5,7 +5,7 @@ import type { CatalogApi } from '../../catalog/public/catalog.api';
 import type { LicenseLotApi } from '../../catalog/public/license-lot.api';
 import type { LicenseLotView } from '../../catalog/public/license-lot.types';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import { SeatTargetNotFoundError } from '../public/licensing.errors';
+import { LicenseKeyPlanNotK4Error, SeatTargetNotFoundError } from '../public/licensing.errors';
 import {
   LicenseKeyApplicationRetiredError,
   LicenseKeyLotKeysExceedLicensesError,
@@ -34,6 +34,7 @@ function lotOf(changes: Partial<LicenseLotView> = {}): LicenseLotView {
     planId: 'plan-1',
     legacySubscriptionId: null,
     licenseCount: 3,
+    planProvisioningType: 'K4',
     keyBinding: 'ACCOUNT',
     purpose: 'REPLACEMENT',
     applicationStatus: 'ACTIVE',
@@ -233,6 +234,14 @@ describe('LicenseLotKeyImportService (the keys of a lot of licenses)', () => {
     expect(
       (toLicenseKeyApiException(noKeysErr) as { getResponse?: () => { code?: string } }).getResponse?.().code,
     ).toBe('LICENSE_KEY.PLAN_HAS_NO_KEYS');
+
+    const notK4Err = await setup(lotOf({ planProvisioningType: 'K1', keyBinding: null }))
+      .service.import(actor, 'lot-1', { keys: ['AAAA-0001'] }, { responsibleOnly: true })
+      .catch((e: unknown) => e);
+    expect(notK4Err).toBeInstanceOf(LicenseKeyPlanNotK4Error);
+    expect((toLicenseKeyApiException(notK4Err) as { getResponse?: () => { code?: string } }).getResponse?.().code).toBe(
+      'LICENSE_KEY.PLAN_NOT_K4',
+    );
 
     const retiredErr = await setup(lotOf({ applicationStatus: 'RETIRED' }))
       .service.import(actor, 'lot-1', { keys: ['AAAA-0001'] }, { responsibleOnly: true })

@@ -398,13 +398,14 @@ export class SubscriptionViewService {
     });
     const servingSeatsSum = subLines.reduce((sum, entry) => (entry.isServing ? sum + entry.seatsToday : sum), 0);
     const lineCount = subLines.length;
+    const hasOpenedLedger = subLines.some((entry) => entry.line.ledgerOpenedOn !== null);
 
     return {
       lineViews,
       listSeatsToday: listSeatsTodayOf(lineCount, servingSeatsSum, record),
       lineCount,
       hasPricedLine: lineCount > 0 && subLines.every((entry) => entry.line.monthlyUnitPriceMinor > 0n),
-      effectivePurchasedQuantity: lineCount > 0 ? servingSeatsSum : record.purchasedQuantity,
+      effectivePurchasedQuantity: hasOpenedLedger ? servingSeatsSum : record.purchasedQuantity,
     };
   }
 

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
+import { isCheckViolation } from '../../../infrastructure/database/unique-violation';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { catalogAuditEvent } from '../catalog-audit-event.mapper';
@@ -166,12 +167,23 @@ export class SubscriptionChangeService {
     await this.guard.judgePool(tx, { plan, current, state, input, actor, organizationId });
     if (sameState(state, stateOf(current))) return current;
 
-    const updated = await this.subscriptions.update(tx, id, state);
+    const updated = await this.saveState(tx, id, state);
     await this.syncLinesAfterChange(tx, actor, organizationId, current, updated);
     await this.auditChange(tx, actor, { current, updated, organizationId, quantityChangeReason });
     await this.notifySeatChange(tx, actor, current, updated, organizationId);
 
     return updated;
+  }
+
+  private async saveState(tx: DbTx, id: string, state: SubscriptionState): Promise<SubscriptionRecord> {
+    try {
+      return await this.subscriptions.update(tx, id, state);
+    } catch (error) {
+      if (isCheckViolation(error, 'subscriptions_active_term_monthly_price')) {
+        throw new SubscriptionStillDraftError(['UNIT_PRICE']);
+      }
+      throw error;
+    }
   }
 
   private async syncLinesAfterChange(

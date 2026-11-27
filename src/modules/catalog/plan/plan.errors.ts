@@ -193,6 +193,7 @@ export class PlanTermsBlockTypeChangeError extends Error {
 export type PlanChangeBlock =
   | 'ACTIVE_SUBSCRIPTION_WITHOUT_QUANTITY'
   | 'LICENSE_KEYS'
+  | 'LICENSE_LOTS'
   | 'PERPETUAL_SUBSCRIPTIONS'
   | 'TERM_SUBSCRIPTIONS'
   | 'CONTRACT_LINKS'

@@ -1,4 +1,5 @@
 import { formatAmount } from '../../../core/money/money';
+import type { WorkspaceDuty } from '../public/catalog.types';
 import { seatTrackingOf } from './plan.policy';
 import type { PlanRecord, PlanSummaryRecord, ReferencePrice } from './plan.types';
 
@@ -55,3 +56,41 @@ export const planAuditSnapshot = (plan: PlanRecord) => ({
   },
   referenceCommitmentMonths: plan.referenceCommitmentMonths,
 });
+
+export interface WorkspaceDutyRow {
+  workspace_id: string;
+  workspace_name: string;
+  vendor_id: string;
+  primary_owner_employee_id: string | null;
+  responsible_it_admin_employee_id: string | null;
+  emergency_account_declared: boolean;
+  members: ReadonlyArray<{ employeeId: string; role: 'OWNER' | 'ADMIN' }>;
+  plan_id: string;
+  plan_name: string;
+  application_name: string;
+}
+
+/** Maps one workspace row returned by `PlanRepo.findWorkspaceDuties` into `WorkspaceDuty` items for matching `ids`. */
+export function mapWorkspaceDutyRow(row: WorkspaceDutyRow, ids: readonly string[]): WorkspaceDuty[] {
+  const named = {
+    planId: row.plan_id,
+    planName: row.plan_name,
+    applicationName: row.application_name,
+    emergencyAccountDeclared: row.emergency_account_declared,
+    workspace: {
+      id: row.workspace_id,
+      name: row.workspace_name,
+      vendorId: row.vendor_id,
+      responsibleItAdminEmployeeId: row.responsible_it_admin_employee_id,
+      members: row.members,
+    },
+  };
+  const owner =
+    row.primary_owner_employee_id && ids.includes(row.primary_owner_employee_id) ? row.primary_owner_employee_id : null;
+  const members = row.members.filter((member) => ids.includes(member.employeeId) && member.employeeId !== owner);
+
+  return [
+    ...(owner ? [{ ...named, employeeId: owner, role: 'PRIMARY_OWNER' as const }] : []),
+    ...members.map((member) => ({ ...named, employeeId: member.employeeId, role: member.role })),
+  ];
+}

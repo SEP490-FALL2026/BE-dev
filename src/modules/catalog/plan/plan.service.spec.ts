@@ -1,3 +1,4 @@
+import { Prisma } from '../../../generated/prisma/client';
 import type { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { AuditApi } from '../../audit/public/audit.api';
@@ -5,6 +6,7 @@ import type { FinanceApi } from '../../finance/public/finance.api';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { ApplicationFactsService } from '../catalog-entry/application-facts.service';
 import {
+  PlanInUseBlocksChangeError,
   PlanNotFoundError,
   PlanReferenceCommitmentNotApplicableError,
   PlanReferencePriceNotApplicableError,
@@ -86,6 +88,7 @@ function setup(
           ...current,
         },
       ),
+      findProfile: jest.fn().mockResolvedValue(null),
       insert,
       update,
     } as unknown as PlanRepo,
@@ -185,5 +188,29 @@ describe('W3-02: referenceCommitmentMonths on plan declare & update', () => {
 
     await service.update(ACTOR, 'plan-1', { referenceCommitmentMonths: null });
     expect(update).toHaveBeenCalledWith(TX, 'plan-1', expect.objectContaining({ referenceCommitmentMonths: null }));
+  });
+
+  it('H-4: maps plan_change_blocked: LICENSE_LOTS to PlanInUseBlocksChangeError (409)', async () => {
+    const { service, update } = setup({ provisioningType: 'K4' });
+    update.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError('check failed', {
+        code: 'P2004',
+        clientVersion: 'test',
+        meta: {
+          driverAdapterError: {
+            cause: { originalCode: '23514', originalMessage: 'plan_change_blocked: LICENSE_LOTS' },
+          },
+        },
+      }),
+    );
+
+    const err = await service
+      .update(ACTOR, 'plan-1', { provisioningType: 'K1', pricingModel: 'PER_SEAT', controlLevel: 'FULL' })
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(PlanInUseBlocksChangeError);
+    expect(toPlanApiException(err)).toMatchObject({
+      status: 409,
+      response: { code: 'PLAN.IN_USE_BLOCKS_CHANGE', details: { reason: 'LICENSE_LOTS' } },
+    });
   });
 });

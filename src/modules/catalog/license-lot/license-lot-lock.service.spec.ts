@@ -70,6 +70,7 @@ describe('LicenseLotLockService (tier 6a, then the plan at tier 7)', () => {
       unitPriceMinor: 1500000n,
       planId: 'plan-1',
       planName: 'IntelliJ',
+      planProvisioningType: 'K4',
       keyBinding: 'ACCOUNT',
       applicationName: 'JetBrains',
       applicationStatus: 'APPROVED',

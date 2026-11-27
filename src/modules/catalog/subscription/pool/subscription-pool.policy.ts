@@ -272,8 +272,10 @@ export function isPooledPlan(type: ProvisioningType): boolean {
 export function withoutPeriodsAhead<T extends { id: string; renewedFromId: string | null; startDate: Date | null }>(
   rows: readonly T[],
   today: BusinessDate,
+  knownIds?: ReadonlySet<string>,
 ): T[] {
   const ids = new Set(rows.map((row) => row.id));
+  if (knownIds) for (const id of knownIds) ids.add(id);
 
   return rows.filter(
     (row) =>

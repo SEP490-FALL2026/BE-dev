@@ -9,7 +9,7 @@ import { LicenseLotApi } from '../../catalog/public/license-lot.api';
 import type { LicenseLotView } from '../../catalog/public/license-lot.types';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { licensingAuditEvent } from '../licensing-audit-event.mapper';
-import { SeatTargetNotFoundError } from '../public/licensing.errors';
+import { LicenseKeyPlanNotK4Error, SeatTargetNotFoundError } from '../public/licensing.errors';
 import { LicenseKeyCipher } from './license-key-cipher.service';
 import { LicenseKeyImportSettingsService } from './license-key-import-settings.service';
 import {
@@ -190,6 +190,7 @@ export class LicenseLotKeyImportService {
     if (options.responsibleOnly && held.responsibleItAdminEmployeeId !== actor.employeeId) {
       throw new LicenseKeyLotNotResponsibleError();
     }
+    if (held.planProvisioningType !== 'K4') throw new LicenseKeyPlanNotK4Error(held.planProvisioningType);
     if (held.keyBinding === 'DEVICE_BUNDLED') throw new LicenseKeyPlanHasNoKeysError();
     if (held.applicationStatus === 'RETIRED') throw new LicenseKeyApplicationRetiredError();
     if (held.keyBinding !== 'DEVICE_KEY') {

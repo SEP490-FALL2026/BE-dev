@@ -123,7 +123,7 @@ export class SubscriptionGrantingRepo {
     const grantable = new Map<string, PoolSubscription[]>();
     if (planIds.length === 0) return grantable;
 
-    await this.collectGrantableLines(planIds, today, grantable, tx);
+    const linedSubIds = await this.collectGrantableLines(planIds, today, grantable, tx);
 
     const rows = await (tx ?? this.prisma).subscription.findMany({
       where: {
@@ -148,7 +148,7 @@ export class SubscriptionGrantingRepo {
     });
     type Source = ReturnType<typeof withPriceSource<(typeof rows)[number]>>;
     const byPlan = new Map<string, Source[]>();
-    for (const row of withoutPeriodsAhead(rows, today)) {
+    for (const row of withoutPeriodsAhead(rows, today, linedSubIds)) {
       byPlan.set(row.planId, [...(byPlan.get(row.planId) ?? []), withPriceSource(row)]);
     }
     for (const [planId, sources] of byPlan) {
@@ -168,7 +168,7 @@ export class SubscriptionGrantingRepo {
     today: BusinessDate,
     grantable: Map<string, PoolSubscription[]>,
     tx?: DbTx,
-  ): Promise<void> {
+  ): Promise<ReadonlySet<string>> {
     const day = toDateColumn(today);
     const lineRows = await (tx ?? this.prisma).subscriptionLine.findMany({
       where: {
@@ -210,7 +210,9 @@ export class SubscriptionGrantingRepo {
       .map((row) => row.id);
     const ledgerSeats = await this.ledger.seatsOnOfLines(openedIds, today, tx);
 
+    const subIds = new Set<string>();
     for (const row of serving) {
+      subIds.add(row.subscription.id);
       const opened = row.ledgerOpenedOn !== null && fromDateColumn(row.ledgerOpenedOn) <= today;
       const entry: PoolSubscription = {
         subscriptionId: row.subscription.id,
@@ -221,6 +223,8 @@ export class SubscriptionGrantingRepo {
       };
       grantable.set(row.planId, [...(grantable.get(row.planId) ?? []), entry]);
     }
+
+    return subIds;
   }
 
   /** Which of these subscriptions a later period continues (`renewed_from_id`): they are no longer the period that runs. One statement. */

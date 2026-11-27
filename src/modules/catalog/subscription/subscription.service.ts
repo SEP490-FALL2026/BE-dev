@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
 import type { BusinessDate } from '../../../core/business-date';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
+import { isCheckViolation } from '../../../infrastructure/database/unique-violation';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import type { EmptyState } from '../public/catalog.types';
@@ -366,11 +367,19 @@ export class SubscriptionService {
 
       // A draft renewal period takes the flag that prices the plan from the period it continues, now that it is active (F-012).
       const takesPrimary = await this.poolRules.takePrimaryFromPrevious(tx, actor, organizationId, current);
-      const completed = await this.subscriptions.update(tx, id, {
-        ...state,
-        status: 'ACTIVE',
-        isPrimaryForPlan: takesPrimary || state.isPrimaryForPlan,
-      });
+      let completed: SubscriptionRecord;
+      try {
+        completed = await this.subscriptions.update(tx, id, {
+          ...state,
+          status: 'ACTIVE',
+          isPrimaryForPlan: takesPrimary || state.isPrimaryForPlan,
+        });
+      } catch (error) {
+        if (isCheckViolation(error, 'subscriptions_active_term_monthly_price')) {
+          throw new SubscriptionStillDraftError(['UNIT_PRICE']);
+        }
+        throw error;
+      }
       await this.multiLine.activatePeriod(tx, completed, actor.employeeId);
       await this.audit.record(
         tx,

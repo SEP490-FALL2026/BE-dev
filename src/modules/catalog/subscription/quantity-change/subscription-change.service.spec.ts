@@ -1,9 +1,14 @@
+import { Prisma } from '../../../../generated/prisma/client';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { LockedPlan } from '../../plan/plan-facts.service';
 import type { SubscriptionPeriodLinesService } from '../../subscription-line/subscription-period-lines.service';
 import { SubscriptionChangeService } from '../subscription-change.service';
-import { SubscriptionPrimaryRetiredError, SubscriptionUpdateEmptyError } from '../subscription.errors';
+import {
+  SubscriptionPrimaryRetiredError,
+  SubscriptionStillDraftError,
+  SubscriptionUpdateEmptyError,
+} from '../subscription.errors';
 import { toSubscriptionApiException } from '../subscription.http-errors';
 import { SEAT_LEDGER_ROUTES } from '../subscription.policy';
 import type { SubscriptionRecord, SubscriptionView } from '../subscription.types';
@@ -208,5 +213,27 @@ describe('SubscriptionChangeService', () => {
     expect(recordAudit).toHaveBeenCalledTimes(1);
     const event = recordAudit.mock.calls[0][1];
     expect(event.after).not.toHaveProperty('quantityChangeReason');
+  });
+
+  it('K-3: maps subscriptions_active_term_monthly_price CHECK violation to SubscriptionStillDraftError (422)', async () => {
+    const { service, subscriptions } = makeSut();
+    subscriptions.update.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError('check failed', {
+        code: 'P2004',
+        clientVersion: 'test',
+        meta: {
+          driverAdapterError: {
+            cause: { originalCode: '23514', constraint: 'subscriptions_active_term_monthly_price' },
+          },
+        },
+      }),
+    );
+
+    const err = await service.update(actor, 'sub-1', { endDate: '2027-01-31' }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(SubscriptionStillDraftError);
+    expect((err as SubscriptionStillDraftError).missing).toEqual(['UNIT_PRICE']);
+    expect((toSubscriptionApiException(err) as { getResponse?: () => unknown }).getResponse?.()).toMatchObject({
+      code: 'SUBSCRIPTION.STILL_DRAFT',
+    });
   });
 });

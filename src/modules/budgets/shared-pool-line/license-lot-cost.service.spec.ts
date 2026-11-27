@@ -27,6 +27,7 @@ const makeLot = (extra: Partial<LicenseLotView> = {}): LicenseLotView => ({
   applicationId: 'app-1',
   applicationName: 'AutoCAD',
   applicationKind: 'LICENSED',
+  planProvisioningType: 'K4',
   keyBinding: 'ACCOUNT',
   applicationStatus: 'APPROVED',
   updatedAt: new Date('2027-04-01T00:00:00Z'),

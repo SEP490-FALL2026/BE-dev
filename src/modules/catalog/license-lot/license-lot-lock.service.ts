@@ -24,6 +24,7 @@ export const viewOfLot = (lot: LicenseLotRecord, plan: LockedPlan): LicenseLotVi
   applicationId: plan.applicationId,
   applicationName: plan.applicationName,
   applicationKind: plan.applicationKind,
+  planProvisioningType: plan.provisioningType,
   keyBinding: plan.keyBinding,
   applicationStatus: plan.applicationStatus,
   updatedAt: lot.updatedAt,

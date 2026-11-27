@@ -19,6 +19,7 @@ import type {
   WorkspaceProfileRecord,
 } from './plan.types';
 import { applicationPlanName } from './plan.policy';
+import { mapWorkspaceDutyRow, type WorkspaceDutyRow } from './plan.mapper';
 
 const WITH_APPLICATION = { application: { select: { name: true, kind: true, logoUrl: true } } } as const;
 type PlanRow = Prisma.PlanGetPayload<{ include: typeof WITH_APPLICATION }>;
@@ -533,66 +534,42 @@ export class PlanRepo {
   /**
    * The workspaces these people own or administer, one row for each person and workspace, the primary owner first (one read, `US-03-04` AC-28). A
    * row names the plan the workspace is known by: the first plan (by name) with a live subscription in it, else the first plan of the vendor the company
-   * administers at the vendor; a workspace with no such plan is left out.
+   * administers at the vendor; a workspace with no such plan is left out. One constant SQL query regardless of how many workspaces match.
    */
   async findWorkspaceDuties(employeeIds: readonly string[], tx?: DbTx): Promise<WorkspaceDuty[]> {
     if (employeeIds.length === 0) return [];
-    const db = tx ?? this.prisma;
     const ids = [...employeeIds];
-    const workspaces = await db.workspace.findMany({
-      where: { OR: [{ primaryOwnerEmployeeId: { in: ids } }, { admins: { some: { employeeId: { in: ids } } } }] },
-      include: { admins: true },
-      orderBy: { id: 'asc' },
-    });
-    if (workspaces.length === 0) return [];
-    const plans = await db.plan.findMany({
-      where: {
-        application: { vendorId: { in: [...new Set(workspaces.map((workspace) => workspace.vendorId))] } },
-        OR: [{ provisioningType: 'K2' }, { provisioningType: 'K4', hasAdminConsole: true }],
-      },
-      select: { id: true, name: true, application: { select: { name: true, vendorId: true } } },
-      orderBy: [{ name: 'asc' }, { id: 'asc' }],
-    });
-    const live = await db.subscription.findMany({
-      where: {
-        workspaceId: { in: workspaces.map((workspace) => workspace.id) },
-        status: { in: ['DRAFT', 'ACTIVE'] },
-        renewedBy: null,
-      },
-      select: { planId: true, workspaceId: true },
-    });
+    const rows = await (tx ?? this.prisma).$queryRaw<WorkspaceDutyRow[]>`
+      WITH matched_ws AS (
+        SELECT w.id, w.name, w.vendor_id, w.primary_owner_employee_id,
+               w.responsible_it_admin_employee_id, (w.emergency_identity IS NOT NULL) AS emergency_account_declared
+          FROM workspaces w
+         WHERE w.primary_owner_employee_id = ANY(${ids}::uuid[])
+            OR EXISTS (SELECT 1 FROM workspace_admins wa WHERE wa.workspace_id = w.id AND wa.employee_id = ANY(${ids}::uuid[]))
+      ),
+      ws_admins AS (
+        SELECT wa.workspace_id,
+               COALESCE(jsonb_agg(jsonb_build_object('employeeId', wa.employee_id::text, 'role', wa.role::text) ORDER BY wa.employee_id), '[]'::jsonb) AS members
+          FROM workspace_admins wa JOIN matched_ws mw ON mw.id = wa.workspace_id GROUP BY wa.workspace_id
+      ),
+      picked_plan AS (
+        SELECT DISTINCT ON (mw.id) mw.id AS workspace_id, p.id AS plan_id, p.name AS plan_name, a.name AS application_name
+          FROM matched_ws mw JOIN applications a ON a.vendor_id = mw.vendor_id JOIN plans p ON p.application_id = a.id
+         WHERE p.provisioning_type = 'K2' OR (p.provisioning_type = 'K4' AND p.has_admin_console = true)
+         ORDER BY mw.id,
+                  EXISTS (SELECT 1 FROM subscriptions s WHERE s.workspace_id = mw.id AND s.plan_id = p.id
+                             AND s.status IN ('DRAFT', 'ACTIVE') AND NOT EXISTS (SELECT 1 FROM subscriptions r WHERE r.renewed_from_id = s.id)) DESC,
+                  p.name ASC, p.id ASC
+      )
+      SELECT mw.id::text AS workspace_id, mw.name AS workspace_name, mw.vendor_id::text AS vendor_id,
+             mw.primary_owner_employee_id::text AS primary_owner_employee_id, mw.responsible_it_admin_employee_id::text AS responsible_it_admin_employee_id,
+             mw.emergency_account_declared, COALESCE(wa.members, '[]'::jsonb) AS members,
+             pp.plan_id::text AS plan_id, pp.plan_name, pp.application_name
+        FROM matched_ws mw JOIN picked_plan pp ON pp.workspace_id = mw.id LEFT JOIN ws_admins wa ON wa.workspace_id = mw.id
+       ORDER BY mw.id ASC
+    `;
 
-    return workspaces.flatMap((workspace) => {
-      const livePlans = new Set(live.filter((row) => row.workspaceId === workspace.id).map((row) => row.planId));
-      const ofVendor = plans.filter((plan) => plan.application.vendorId === workspace.vendorId);
-      const plan = ofVendor.find((candidate) => livePlans.has(candidate.id)) ?? ofVendor[0];
-      if (!plan) return [];
-      const named = {
-        planId: plan.id,
-        planName: plan.name,
-        applicationName: plan.application.name,
-        emergencyAccountDeclared: workspace.emergencyIdentity !== null,
-        workspace: {
-          id: workspace.id,
-          name: workspace.name,
-          vendorId: workspace.vendorId,
-          responsibleItAdminEmployeeId: workspace.responsibleItAdminEmployeeId,
-          members: workspace.admins.map((member) => ({ employeeId: member.employeeId, role: member.role })),
-        },
-      };
-      const owner =
-        workspace.primaryOwnerEmployeeId && ids.includes(workspace.primaryOwnerEmployeeId)
-          ? workspace.primaryOwnerEmployeeId
-          : null;
-      const members = workspace.admins.filter(
-        (member) => ids.includes(member.employeeId) && member.employeeId !== owner,
-      );
-
-      return [
-        ...(owner ? [{ ...named, employeeId: owner, role: 'PRIMARY_OWNER' as const }] : []),
-        ...members.map((member) => ({ ...named, employeeId: member.employeeId, role: member.role })),
-      ];
-    });
+    return rows.flatMap((row) => mapWorkspaceDutyRow(row, ids));
   }
 
   /** The name of each of these plans as a sentence names it ("application – plan"), by id, in one read; an id that does not exist is absent. */
