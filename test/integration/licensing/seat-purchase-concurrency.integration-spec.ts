@@ -8,6 +8,10 @@ import { RevocationHarness } from '../../support/revocation-harness';
 
 const h = new RevocationHarness();
 
+/** The business day of the test; the budget year of a request is the year of that day. */
+const TODAY = '2026-11-21';
+const BUDGET_YEAR = Number(TODAY.slice(0, 4));
+
 const isDeadlockError = (error: unknown): boolean => {
   if (!error || typeof error !== 'object') return false;
   const record = error as { code?: unknown; meta?: { driverAdapterError?: { cause?: { originalCode?: unknown } } } };
@@ -74,8 +78,8 @@ async function seedPendingK2GrantItem(
         amount_currency, term_months, unit_price_minor, monthly_price_minor, price_kind, billing_cycle, pricing_status)
      VALUES ($1, $2, 'GRANT', 'PAID_IN_CATALOG', 'EXECUTING', $3, $4, (SELECT id FROM cost_centers WHERE department_id = $4 LIMIT 1), $5, 'seat purchase concurrency',
              now(), '{"version":1,"branch":"PAID_IN_CATALOG","chain":["NEED"],"slaWorkingDays":3}'::jsonb, $6,
-             2026, 6, 3000000, 'VND', 6, 500000, 500000, 'RECURRING', 'MONTHLY', 'PRICED')`,
-    [requestId, h.seed.organizationId, planId, h.seed.departmentId, employeeId, h.it1.appUserId],
+             $7, 6, 3000000, 'VND', 6, 500000, 500000, 'RECURRING', 'MONTHLY', 'PRICED')`,
+    [requestId, h.seed.organizationId, planId, h.seed.departmentId, employeeId, h.it1.appUserId, BUDGET_YEAR],
   );
   const assignmentId = randomUUID();
   const taskId = randomUUID();
@@ -135,8 +139,7 @@ describe('Seat purchase concurrency (integration, real PostgreSQL, W3-18)', () =
   });
 
   it('20x barrier: 2 concurrent POST /subscription-lines/:id/purchases on same line never hit 40P01', async () => {
-    const today = '2026-11-21';
-    pretendBusinessToday(h.ctx.app, today);
+    pretendBusinessToday(h.ctx.app, TODAY);
 
     const subId = await h.subscription(0, 'K2');
     const planId = await h.planOf(subId);
@@ -179,7 +182,7 @@ describe('Seat purchase concurrency (integration, real PostgreSQL, W3-18)', () =
         return request(h.server())
           .post(`/api/v1/subscription-lines/${lineId}/purchases`)
           .set(h.as(h.it1))
-          .send({ purchasedOn: today, items: [item] });
+          .send({ purchasedOn: TODAY, items: [item] });
       };
 
       const [resA, resB] = await Promise.allSettled([
