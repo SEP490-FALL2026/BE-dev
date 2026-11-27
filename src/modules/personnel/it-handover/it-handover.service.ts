@@ -21,6 +21,8 @@ export interface ItHandoverResult {
   toEmployeeId: string;
   subscriptions: number;
   applications: number;
+  workspaces: number;
+  licenseLots: number;
   at: Date;
 }
 
@@ -92,6 +94,8 @@ export class ItHandoverService {
         toEmployeeId,
         subscriptions: moved.subscriptions,
         applications: moved.applications,
+        workspaces: moved.workspaces,
+        licenseLots: moved.licenseLots,
       });
 
       return {
@@ -100,6 +104,8 @@ export class ItHandoverService {
         toEmployeeId,
         subscriptions: moved.subscriptions,
         applications: moved.applications,
+        workspaces: moved.workspaces,
+        licenseLots: moved.licenseLots,
         at,
       };
     });

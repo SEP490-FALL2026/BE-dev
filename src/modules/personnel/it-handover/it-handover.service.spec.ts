@@ -93,7 +93,13 @@ describe('ItHandoverService', () => {
 
     const result = await service.handOver(SUPER_ADMIN, SOURCE, 'target');
 
-    expect(result).toMatchObject({ subscriptions: 0, applications: 0, toEmployeeId: 'target' });
+    expect(result).toMatchObject({
+      subscriptions: 0,
+      applications: 0,
+      workspaces: 1,
+      licenseLots: 1,
+      toEmployeeId: 'target',
+    });
     expect(recordDone).toHaveBeenCalledWith(expect.anything(), {
       organizationId: 'org',
       source: SOURCE,
@@ -105,7 +111,13 @@ describe('ItHandoverService', () => {
         licenseLots: 1,
       }) as unknown,
     });
-    expect(tell).toHaveBeenCalledTimes(1);
+    expect(tell).toHaveBeenCalledWith(
+      expect.anything(),
+      SUPER_ADMIN,
+      'org',
+      SOURCE,
+      expect.objectContaining({ subscriptions: 0, applications: 0, workspaces: 1, licenseLots: 1 }),
+    );
   });
 
   it('is refused with NOTHING_TO_HAND_OVER, not recorded and nobody told, when the catalog moved no subscription and no application', async () => {

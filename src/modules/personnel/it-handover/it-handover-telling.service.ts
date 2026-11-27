@@ -31,13 +31,22 @@ export class ItHandoverTellingService {
     actor: AuthenticatedPrincipal,
     organizationId: string,
     source: HandoverSource,
-    moved: { employeeId: string; toEmployeeId: string; subscriptions: number; applications: number },
+    moved: {
+      employeeId: string;
+      toEmployeeId: string;
+      subscriptions: number;
+      applications: number;
+      workspaces: number;
+      licenseLots: number;
+    },
   ): Promise<void> {
     const after = {
       employeeId: moved.employeeId,
       toItAdminEmployeeId: moved.toEmployeeId,
       subscriptions: moved.subscriptions,
       applications: moved.applications,
+      workspaces: moved.workspaces,
+      licenseLots: moved.licenseLots,
     };
     if (source.kind === 'OFFBOARDING_CASE')
       await this.items.insertCaseChange(tx, {
@@ -46,6 +55,8 @@ export class ItHandoverTellingService {
           toItAdminEmployeeId: moved.toEmployeeId,
           subscriptions: moved.subscriptions,
           applications: moved.applications,
+          workspaces: moved.workspaces,
+          licenseLots: moved.licenseLots,
         },
         changedByAppUserId: actor.appUserId,
       });
@@ -61,6 +72,8 @@ export class ItHandoverTellingService {
       toEmployeeId: moved.toEmployeeId,
       subscriptions: moved.subscriptions,
       applications: moved.applications,
+      workspaces: moved.workspaces,
+      licenseLots: moved.licenseLots,
     });
   }
 }

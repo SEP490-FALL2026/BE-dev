@@ -15354,7 +15354,7 @@
         },
         "responses": {
           "200": {
-            "description": "Only the Super Admin hands responsibilities over. Every subscription and every application the person answers for now goes to the IT Admin named, in one operation: the Audit Trail names the person who gave them up, the one who took them and the departure, the log of the case says so, and the one who took them is told. The case is read again for its itHandover section.",
+            "description": "Only the Super Admin hands responsibilities over. Every subscription, application, workspace and license lot the person answers for now goes to the IT Admin named, in one operation, and the answer and the notice of the one who took them count each kind: the Audit Trail names the person who gave them up, the one who took them and the departure, the log of the case says so, and the one who took them is told. The case is read again for its itHandover section.",
             "content": {
               "application/json": {
                 "schema": {
@@ -15650,7 +15650,7 @@
         },
         "responses": {
           "200": {
-            "description": "Only the Super Admin hands responsibilities over. Every subscription and every application the person answers for now goes to the IT Admin named, in one operation: the Audit Trail names the person who gave them up, the one who took them and the transfer, and the one who took them is told. The transfer is read again for its itHandover section.",
+            "description": "Only the Super Admin hands responsibilities over. Every subscription, application, workspace and license lot the person answers for now goes to the IT Admin named, in one operation, and the answer and the notice of the one who took them count each kind: the Audit Trail names the person who gave them up, the one who took them and the transfer, and the one who took them is told. The transfer is read again for its itHandover section.",
             "content": {
               "application/json": {
                 "schema": {
@@ -119252,6 +119252,8 @@
               "toItAdminEmployeeId": { "type": "string", "format": "uuid" },
               "subscriptions": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
               "applications": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "workspaces": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "licenseLots": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
               "handedOverAt": { "type": "string" }
             },
             "required": [
@@ -119261,6 +119263,8 @@
               "toItAdminEmployeeId",
               "subscriptions",
               "applications",
+              "workspaces",
+              "licenseLots",
               "handedOverAt"
             ],
             "additionalProperties": false,

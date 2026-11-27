@@ -320,12 +320,13 @@ export const ORG_TEXTS = {
   IT_ADMIN_HANDOVER_RECEIVED: {
     vi: {
       title: 'Bạn đã nhận bàn giao từ IT Admin khác',
-      message: '{fromEmployeeId:name} đã bàn giao cho bạn {subscriptions} thuê bao và {applications} ứng dụng.',
+      message:
+        '{fromEmployeeId:name} đã bàn giao cho bạn {subscriptions} thuê bao, {applications} ứng dụng, {workspaces} workspace và {licenseLots} lô khóa.',
     },
     en: {
       title: 'You received an IT Admin handover',
       message:
-        '{fromEmployeeId:name} handed over {subscriptions} subscriptions and {applications} applications to you.',
+        '{fromEmployeeId:name} handed over {subscriptions} subscriptions, {applications} applications, {workspaces} workspaces and {licenseLots} license lots to you.',
     },
   },
   POLICY_PUBLISHED: {
