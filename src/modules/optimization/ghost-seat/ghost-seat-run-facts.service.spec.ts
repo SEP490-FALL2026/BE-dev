@@ -1,9 +1,9 @@
 import { businessDateAt } from '../../../core/business-date';
-import { GhostSeatRunReads } from './ghost-seat-run-reads.service';
+import { GhostSeatRunFacts } from './ghost-seat-run-facts.service';
 
 describe('the day a head kept or exempted a seat is the day of the organization', () => {
   it('is the Vietnamese day of the instant it was closed, not the UTC day: 01:00 on the 29th is still the 28th in UTC', async () => {
-    const reads = new GhostSeatRunReads(
+    const reads = new GhostSeatRunFacts(
       {
         lastKeptOrExemptedOf: jest
           .fn()

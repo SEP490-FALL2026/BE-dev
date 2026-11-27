@@ -6,7 +6,7 @@ import type { GhostSeatRecord } from './ghost-seat.types';
 
 /** What the weekly pass reads of the recommendations that exist, with the days told as the organization counts them. */
 @Injectable()
-export class GhostSeatRunReads {
+export class GhostSeatRunFacts {
   constructor(
     private readonly repo: GhostSeatRepo,
     private readonly organizationReads: OrganizationReadApi,

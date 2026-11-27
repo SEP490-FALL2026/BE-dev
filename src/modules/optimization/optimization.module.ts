@@ -33,7 +33,7 @@ import { EscalationService } from './escalation/escalation.service';
 import { GhostSeatDecisionRepo } from './ghost-seat/ghost-seat-decision.repo';
 import { GhostSeatOpenWorkReader } from './ghost-seat/department-open-work.listener';
 import { GhostSeatSeatStateRepo } from './ghost-seat/ghost-seat-seat-state.repo';
-import { GhostSeatRunReads } from './ghost-seat/ghost-seat-run-reads.service';
+import { GhostSeatRunFacts } from './ghost-seat/ghost-seat-run-facts.service';
 import { GhostSeatRepo } from './ghost-seat/ghost-seat.repo';
 import { GhostSeatRevocationListener } from './ghost-seat/ghost-seat-revocation.listener';
 import { GhostSeatService } from './ghost-seat/ghost-seat.service';
@@ -86,7 +86,7 @@ import { UsageRulesService } from './usage-rules/usage-rules.service';
     OptimizationApi,
     RuleRunQueryService,
     GhostSeatRepo,
-    GhostSeatRunReads,
+    GhostSeatRunFacts,
     GhostSeatOpenWorkReader,
     GhostSeatService,
     GhostSeatRevocationListener,

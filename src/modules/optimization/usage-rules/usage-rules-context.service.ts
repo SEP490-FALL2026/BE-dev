@@ -8,7 +8,7 @@ import { PersonnelApi } from '../../personnel/public/personnel.api';
 import type { TransferFact } from '../../personnel/public/personnel.types';
 import { UsageEvidenceApi } from '../../usage/public/usage-evidence.api';
 import { GhostSeatDecisionRepo } from '../ghost-seat/ghost-seat-decision.repo';
-import { GhostSeatRunReads } from '../ghost-seat/ghost-seat-run-reads.service';
+import { GhostSeatRunFacts } from '../ghost-seat/ghost-seat-run-facts.service';
 import type { GhostSeatRecord } from '../ghost-seat/ghost-seat.types';
 import type { RulePass } from '../internal-rules/internal-rules.types';
 import { thresholdsOf } from './usage-assessment.policy';
@@ -39,7 +39,7 @@ export class UsageRulesContextService {
     private readonly usage: UsageEvidenceApi,
     private readonly licensingUsage: LicensingUsageApi,
     private readonly catalog: CatalogApi,
-    private readonly ghostSeats: GhostSeatRunReads,
+    private readonly ghostSeats: GhostSeatRunFacts,
     private readonly decisions: GhostSeatDecisionRepo,
     private readonly rules: UsageRulesRepo,
   ) {}
