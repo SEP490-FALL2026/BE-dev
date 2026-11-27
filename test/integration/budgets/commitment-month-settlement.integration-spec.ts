@@ -608,7 +608,7 @@ describe('K2 monthly commitment settlement & year-end sweep (integration; W3-07 
       }
       for (const id of [cA.commitmentId, cB.commitmentId]) {
         const snap = await commitmentSnapshot(id);
-        expect(snap.row.appliedMinor + snap.row.releasedMinor).toBeLessThanOrEqual(STD);
+        expect(snap.row.appliedMinor + snap.row.releasedMinor).toBe(STD);
       }
     }
 
