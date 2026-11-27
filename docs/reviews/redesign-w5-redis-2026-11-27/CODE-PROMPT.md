@@ -80,7 +80,7 @@ git -C D:/FPT/FALL2026/Code/BE-dev-software-license-management checkout -b feat/
 
 ## 2. Thứ tự gói
 
-**T1 → T2 → T3 → T4 → T5 → T6 → C1 → T7 → T8 → T9 → T10 → T11 → C2** (PLAN mục _Gói_). Ở C1: push, CI GitHub tay, đối chiếu, báo điều phối; **làm tiếp nhóm 2** trừ khi điều
+**T1 → T2 → T3 → T4 → T5 → T6 → C1 → T7 → T8 → T9 → T9b → T10 → T11 → C2** (PLAN mục _Gói_). Ở C1: push, CI GitHub tay, đối chiếu, báo điều phối; **làm tiếp nhóm 2** trừ khi điều
 phối bảo dừng. **Chỉ sửa file trong danh sách của gói** (PLAN _Chi tiết gói_, _Tự kiểm chéo_). Cần file khác ⟹ không sửa, ghi _Bàn giao_ trong PROGRESS, làm tiếp phần
 không phụ thuộc.
 
@@ -137,7 +137,10 @@ thấy, nới CSP, thêm đếm lần sai, dùng Redis cho thứ ngoài SPEC. C�
 Dừng gói đó, ghi `PROGRESS-tech.md` kèm `file:line`, 2–3 lựa chọn và khuyến nghị, báo điều phối, làm tiếp gói độc lập nếu có:
 
 1. Luật không rõ mà mục 4 không giải được; code thật khác SPEC theo cách đổi hành vi nghiệp vụ.
-2. Cần migration, sửa `prisma/`, hoặc sửa `src/modules/**` ngoài `notifications` (email, repo, `public/email-delivery.*`, module, README).
+2. Cần migration, sửa `prisma/`, hoặc sửa `src/modules/**` ngoài `notifications` (email, repo, `public/email-delivery.*`, module, README) và — **chỉ ở T9b** —
+   `identity-access` (`public/auth-housekeeping.api.ts`, `auth/session.repo.ts`, `accounts/action-token.repo.ts`, `identity-access-housekeeping-facade.module.ts` (mới), README).
+   **T9b:** bảng cần xóa nằm trong `RUNTIME_TABLE_EXCEPTIONS` (`src/infrastructure/database/database-role-judgement.ts:14-41`), có trigger chặn xóa, hoặc cần cấp
+   quyền `DELETE` mới cho vai runtime ⟹ dừng; việc dọn chạm sweeper nghiệp vụ ⟹ dừng.
 3. Cần gói npm ngoài `ioredis`, `@nest-lab/throttler-storage-redis`, `@bull-board/api`, `@bull-board/express`; hoặc `@nest-lab/throttler-storage-redis` không có bản khai hỗ
    trợ `@nestjs/throttler` 6.x phát hành ≥ 14 ngày, hoặc không nhận client `ioredis` dựng sẵn; hoặc `@bull-board/api`/`@bull-board/express` không có bản (≥ 14 ngày) hợp
    `bullmq` 6 và Express 5.
@@ -152,6 +155,7 @@ Dừng gói đó, ghi `PROGRESS-tech.md` kèm `file:line`, 2–3 lựa chọn v�
 - Không chạy `pnpm check`, full `test:integration`/`test:http`/`test:e2e`, seed, migration trên DB thật; không đụng DB/Redis của VPS.
 - Chỉ push `feat/redesign-w5-redis`. Không merge vào `dev`, `main`, `int/*`; không mở PR; không deploy.
 - Không sửa `openapi.json`, `docs/generated/*`, `src/generated/*` bằng tay; không sửa `pnpm-lock.yaml` bằng tay.
+- Job dọn đêm (T9b) chỉ làm việc dọn kỹ thuật SPEC §5.16 liệt kê; không xóa Audit Trail, thông báo, dấu chạy `*_runs`, nội dung AI.
 - Không sửa 28 sweeper `*.job.ts`, `RequestWorkLoop`, `src/modules/notifications/public/notifications.types.ts`, `inbox/**`, `notifications.extension-points.ts` (đợt 3).
 - Không xóa/`skip` test; không `eslint-disable`; không co-author; không commit bằng identity người khác.
 - Không làm ngoài phạm vi (SPEC §2.2 — đặc biệt đối soát, `jobId` cố định, backoff tùy biến, đếm lần sai Bull Board, nới CSP, giờ Việt Nam trong mail), kể cả thấy lỗi gần

@@ -1,5 +1,9 @@
-# PLAN — Đợt 5 phần 1: Redis, BullMQ qua outbox relay, rate-limit Redis (27/11/2026, bản 1.1)
+# PLAN — Đợt 5 phần 1: Redis, BullMQ qua outbox relay, rate-limit Redis (27/11/2026, bản 1.3)
 
+> **Bản 1.3 (27/11):** Owner chốt OQ-W5R-7 → 9 = A; T9b áp review R-11 (SPEC §14.3) — chạy khi khởi động là cơ chế bù duy nhất, C2 hai bước, facade riêng.
+>
+> **Bản 1.2 (27/11):** thêm gói **T9b — job dọn đêm** (SPEC R-11, §5.16) sau T9, trước T10/T11; Owner đã chốt OQ-W5R-7 → 9 = A (27/11).
+>
 > **Bản 1.1 (27/11):** áp review lượt 2 (SPEC §14.2) — T1 liệt kê spec env đổi kỳ vọng; `WorkerModule.forTransport`; client không chặn `connect()` lúc
 > bootstrap; ca `CLIENT PAUSE` sang `_serial`; mã lỗi job `jobErrorCodeFor`; `export-environment.ts`; Bull Board là Nest module; Caddy thay `X-Request-Id`; GP-6, GP-7.
 
@@ -62,46 +66,51 @@ removeOnFail: { age: 2592000, count: 5000 } }`; lỗi ném từ processor chỉ 
 
 ## Cấu trúc file
 
-| File                                                                                                                                     | Trách nhiệm                                                                                             | Gói             |
-| ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | --------------- |
-| `src/infrastructure/redis/redis.config.ts` (+spec)                                                                                       | khóa env Redis, kiểm production, `RedisSettings`                                                        | T1              |
-| `src/infrastructure/config/{env-matrix,env-example,env-schema}.spec.ts`                                                                  | spec env cũ đổi kỳ vọng đúng như T1 liệt kê                                                             | T1              |
-| `scripts/dev/export-environment.ts`                                                                                                      | `RATE_LIMIT_STORE=memory` khi xuất OpenAPI                                                              | T4              |
-| `Caddyfile`                                                                                                                              | `header_up X-Request-Id {http.request.uuid}`                                                            | T5              |
-| `test/integration/_serial/redis-client-pause.integration-spec.ts`                                                                        | ca `CLIENT PAUSE` (cả server)                                                                           | T4              |
-| `src/infrastructure/redis/redis-client.factory.ts` (+spec)                                                                               | dựng client chặn / không chặn, theo dõi kết nối (log chuyển trạng thái)                                 | T2              |
-| `src/infrastructure/config/env-schema.ts`                                                                                                | khóa mới, mặc định theo `NODE_ENV`, `TRUST_PROXY_HOPS ≥ 1` prod                                         | T1              |
-| `src/infrastructure/queue/queue.config.ts` (+spec)                                                                                       | **xóa** — chuyển sang `redis.config.ts`                                                                 | T1              |
-| `src/infrastructure/observability/operator-error.ts` (+spec)                                                                             | lỗi kết nối `ioredis` ⟹ `retryable=true`                                                                | T2              |
-| `.dependency-cruiser.cjs`                                                                                                                | luật `no-redis-in-modules`                                                                              | T1              |
-| `test/support/redis-harness.ts`, `test/README.md`                                                                                        | harness Redis, lệnh Docker local                                                                        | T3              |
-| `.github/workflows/ci.yml`, `nightly.yml`                                                                                                | service Redis, `TEST_REDIS_URL`, chọn suite, kiểm compose prod                                          | T3, T5          |
-| `src/infrastructure/security/fallback-throttler.storage.ts` (+spec)                                                                      | lớp dự phòng bọc storage Redis                                                                          | T4              |
-| `src/infrastructure/security/{rate-limit.options,security.module}.ts`                                                                    | đăng ký storage theo `RATE_LIMIT_STORE`                                                                 | T4              |
-| `compose.yaml`, `docker-compose.prod.yml`, `scripts/ops/deploy-release.sh`                                                               | Redis local/prod, worker grace, `TRUST_PROXY_HOPS`                                                      | T5              |
-| `test/gates/deployment-roles.gate-spec.ts`                                                                                               | gói phụ thuộc, compose prod, thứ tự deploy                                                              | T2, T5, T8, T10 |
-| `src/modules/notifications/notifications.repo.ts`                                                                                        | `DUE_CONDITION`, `dueIds`, `claimById`, M4                                                              | T7              |
-| `src/modules/notifications/email/email-dispatcher.service.ts` (+spec)                                                                    | `deliver()` trả `DeliveryResult`, `deliverOne`                                                          | T7              |
-| `src/modules/notifications/public/email-delivery.{api,types}.ts`                                                                         | cửa worker: `dueIds`, `deliverOne`, kiểu kết quả                                                        | T7              |
-| `src/infrastructure/queue/{queue-registry,relay-source.types}.ts` (+spec registry)                                                       | danh sách hàng + tùy chọn; hợp đồng nguồn                                                               | T8              |
-| `src/infrastructure/queue/queue-infrastructure.module.ts`, `queue-producers.ts` (+spec), `queue-worker-factory.ts` (+spec)               | Nest module; mỗi `@Injectable` một file: `QueueProducers`, `QueueWorkerFactory` trên `bullmq` trực tiếp | T8              |
-| `src/worker/outbox-relay.job.ts` (+spec)                                                                                                 | vòng relay                                                                                              | T8              |
-| `src/worker/email-queue.job.ts` (+spec)                                                                                                  | consumer mail                                                                                           | T9              |
-| `src/worker/worker.module.ts`, `src/worker.ts`, `test/support/process-graphs.ts`, `test/gates/module-graph.gate-spec.ts`                 | công tắc vận chuyển, gate hai biến thể                                                                  | T8, T9          |
-| `src/infrastructure/queue/queue-board.module.ts`, `queue-board.mount.ts` (+spec), `queue-board-auth.ts` (+spec), `src/app/app.module.ts` | Bull Board là Nest module gắn có điều kiện                                                              | T10             |
-| docs (SPEC §12), `docs/decisions/0020-…md`                                                                                               | tài liệu, ADR                                                                                           | T6, T11         |
+| File                                                                                                                                            | Trách nhiệm                                                                                             | Gói             |
+| ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | --------------- |
+| `src/infrastructure/redis/redis.config.ts` (+spec)                                                                                              | khóa env Redis, kiểm production, `RedisSettings`                                                        | T1              |
+| `src/infrastructure/config/{env-matrix,env-example,env-schema}.spec.ts`                                                                         | spec env cũ đổi kỳ vọng đúng như T1 liệt kê                                                             | T1              |
+| `scripts/dev/export-environment.ts`                                                                                                             | `RATE_LIMIT_STORE=memory` khi xuất OpenAPI                                                              | T4              |
+| `Caddyfile`                                                                                                                                     | `header_up X-Request-Id {http.request.uuid}`                                                            | T5              |
+| `test/integration/_serial/redis-client-pause.integration-spec.ts`                                                                               | ca `CLIENT PAUSE` (cả server)                                                                           | T4              |
+| `src/infrastructure/redis/redis-client.factory.ts` (+spec)                                                                                      | dựng client chặn / không chặn, theo dõi kết nối (log chuyển trạng thái)                                 | T2              |
+| `src/infrastructure/config/env-schema.ts`                                                                                                       | khóa mới, mặc định theo `NODE_ENV`, `TRUST_PROXY_HOPS ≥ 1` prod                                         | T1              |
+| `src/infrastructure/queue/queue.config.ts` (+spec)                                                                                              | **xóa** — chuyển sang `redis.config.ts`                                                                 | T1              |
+| `src/infrastructure/observability/operator-error.ts` (+spec)                                                                                    | lỗi kết nối `ioredis` ⟹ `retryable=true`                                                                | T2              |
+| `.dependency-cruiser.cjs`                                                                                                                       | luật `no-redis-in-modules`                                                                              | T1              |
+| `test/support/redis-harness.ts`, `test/README.md`                                                                                               | harness Redis, lệnh Docker local                                                                        | T3              |
+| `.github/workflows/ci.yml`, `nightly.yml`                                                                                                       | service Redis, `TEST_REDIS_URL`, chọn suite, kiểm compose prod                                          | T3, T5          |
+| `src/infrastructure/security/fallback-throttler.storage.ts` (+spec)                                                                             | lớp dự phòng bọc storage Redis                                                                          | T4              |
+| `src/infrastructure/security/{rate-limit.options,security.module}.ts`                                                                           | đăng ký storage theo `RATE_LIMIT_STORE`                                                                 | T4              |
+| `compose.yaml`, `docker-compose.prod.yml`, `scripts/ops/deploy-release.sh`                                                                      | Redis local/prod, worker grace, `TRUST_PROXY_HOPS`                                                      | T5              |
+| `test/gates/deployment-roles.gate-spec.ts`                                                                                                      | gói phụ thuộc, compose prod, thứ tự deploy                                                              | T2, T5, T8, T10 |
+| `src/modules/notifications/notifications.repo.ts`                                                                                               | `DUE_CONDITION`, `dueIds`, `claimById`, M4                                                              | T7              |
+| `src/modules/notifications/email/email-dispatcher.service.ts` (+spec)                                                                           | `deliver()` trả `DeliveryResult`, `deliverOne`                                                          | T7              |
+| `src/modules/notifications/public/email-delivery.{api,types}.ts`                                                                                | cửa worker: `dueIds`, `deliverOne`, kiểu kết quả                                                        | T7              |
+| `src/infrastructure/queue/{queue-registry,relay-source.types}.ts` (+spec registry)                                                              | danh sách hàng + tùy chọn; hợp đồng nguồn                                                               | T8              |
+| `src/infrastructure/queue/queue-infrastructure.module.ts`, `queue-producers.ts` (+spec), `queue-worker-factory.ts` (+spec)                      | Nest module; mỗi `@Injectable` một file: `QueueProducers`, `QueueWorkerFactory` trên `bullmq` trực tiếp | T8              |
+| `src/worker/outbox-relay.job.ts` (+spec)                                                                                                        | vòng relay                                                                                              | T8              |
+| `src/worker/email-queue.job.ts` (+spec)                                                                                                         | consumer mail                                                                                           | T9              |
+| `src/worker/nightly-maintenance.runner.ts` (+spec), `src/worker/nightly-maintenance.job.ts` (+spec)                                             | điều phối việc dọn đêm; scheduler / vòng hẹn giờ `poll`                                                 | T9b             |
+| `src/modules/identity-access/public/auth-housekeeping.api.ts`, repo phiên/token/throttle, `identity-access-housekeeping-facade.module.ts` (mới) | dọn C2–C4                                                                                               | T9b             |
+| `src/worker/worker.module.ts`, `src/worker.ts`, `test/support/process-graphs.ts`, `test/gates/module-graph.gate-spec.ts`                        | công tắc vận chuyển, gate hai biến thể                                                                  | T8, T9          |
+| `src/infrastructure/queue/queue-board.module.ts`, `queue-board.mount.ts` (+spec), `queue-board-auth.ts` (+spec), `src/app/app.module.ts`        | Bull Board là Nest module gắn có điều kiện                                                              | T10             |
+| docs (SPEC §12), `docs/decisions/0020-…md`                                                                                                      | tài liệu, ADR                                                                                           | T6, T11         |
 
 ### Tự kiểm chéo (file ở nhiều gói — cùng làn, tuần tự, mỗi gói chỉ sửa phần của mình)
 
-| File                                       | Gói                                                                                                                        | Phần                                             |
-| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| `test/gates/deployment-roles.gate-spec.ts` | T2 (thêm `ioredis`), T4 (`@nest-lab/…`), T5 (compose prod, deploy script), T8 (bỏ `@nestjs/bullmq`), T10 (`@bull-board/*`) | mỗi gói chỉ `it` của mình                        |
-| `.github/workflows/ci.yml`                 | T3 (services, env, chọn suite), T5 (bước kiểm compose prod)                                                                | hai bước khác nhau                               |
-| `src/infrastructure/config/env-schema.ts`  | T1 (mọi khóa)                                                                                                              | các gói sau chỉ đọc                              |
-| `package.json`, `pnpm-lock.yaml`           | T2, T4, T8, T10                                                                                                            | chỉ `pnpm add -E` / `pnpm remove`, không sửa tay |
-| `src/worker/worker.module.ts`              | T8 (biến thể + relay), T9 (consumer)                                                                                       | T9 chỉ thêm provider                             |
-| `test/gates/module-graph.gate-spec.ts`     | T8 (queue ở worker `bullmq`), T10 (API khi board bật)                                                                      | hai `it` dòng 518-543                            |
-| `docs/rules/security-jobs.md`              | T6 (rate-limit 44-48), T11 (_Storage and jobs_ 53-58)                                                                      | khác đoạn                                        |
+| File                                                                              | Gói                                                                                                                        | Phần                                                                        |
+| --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `test/gates/deployment-roles.gate-spec.ts`                                        | T2 (thêm `ioredis`), T4 (`@nest-lab/…`), T5 (compose prod, deploy script), T8 (bỏ `@nestjs/bullmq`), T10 (`@bull-board/*`) | mỗi gói chỉ `it` của mình                                                   |
+| `.github/workflows/ci.yml`                                                        | T3 (services, env, chọn suite), T5 (bước kiểm compose prod)                                                                | hai bước khác nhau                                                          |
+| `src/infrastructure/config/env-schema.ts`                                         | T1 (mọi khóa)                                                                                                              | các gói sau chỉ đọc                                                         |
+| `package.json`, `pnpm-lock.yaml`                                                  | T2, T4, T8, T10                                                                                                            | chỉ `pnpm add -E` / `pnpm remove`, không sửa tay                            |
+| `src/worker/worker.module.ts`                                                     | T8 (biến thể + relay), T9 (consumer)                                                                                       | T9 chỉ thêm provider                                                        |
+| `src/worker/worker.module.ts` (lần 2)                                             | T9b                                                                                                                        | thêm runner + scheduler (biến thể `bullmq`), vòng hẹn giờ (biến thể `poll`) |
+| `src/infrastructure/queue/queue-registry.ts`                                      | T8 (`email-delivery`), T9b (`nightly-maintenance`)                                                                         | T9b chỉ thêm một mục                                                        |
+| `src/modules/notifications/notifications.repo.ts`, `public/email-delivery.api.ts` | T7, T9b (`purgeFinished`)                                                                                                  | T9b chỉ thêm method                                                         |
+| `test/gates/module-graph.gate-spec.ts`                                            | T8 (queue ở worker `bullmq`), T10 (API khi board bật)                                                                      | hai `it` dòng 518-543                                                       |
+| `docs/rules/security-jobs.md`                                                     | T6 (rate-limit 44-48), T11 (_Storage and jobs_ 53-58)                                                                      | khác đoạn                                                                   |
 
 ## Bộ kiểm nhanh (mỗi gói, mỗi commit — `be-quick-check`)
 
@@ -133,23 +142,24 @@ Full suite chỉ chạy trên CI GitHub (C1, C2).
 
 ## Gói
 
-| Gói    | Nội dung                                                                                         | Mục SPEC                          | Cỡ  | Phụ thuộc | Nhóm |
-| ------ | ------------------------------------------------------------------------------------------------ | --------------------------------- | --- | --------- | ---- |
-| T1     | Cấu hình Redis + khóa env + luật `no-redis-in-modules`                                           | R-01 (a)(b)(c)(f)                 | S   | —         | 1    |
-| T2     | Client Redis + theo dõi kết nối + `retryable` của `ioredis`                                      | R-01, R-08 (a)(b)                 | S   | T1        | 1    |
-| T3     | CI service Redis + harness Redis                                                                 | R-09                              | S   | T2        | 1    |
-| T4     | Rate-limit Redis + dự phòng bộ nhớ                                                               | R-02                              | M   | T2, T3    | 1    |
-| T5     | Compose local/prod, `deploy-release.sh`, gate triển khai, bước CI kiểm compose prod              | R-07                              | S   | T1        | 1    |
-| T6     | ADR-0020 + tài liệu nhóm 1                                                                       | R-10 (a)(e) phần nhóm 1           | S   | T4, T5    | 1    |
-| **C1** | push, CI full tay, đối chiếu tiêu chí nhóm 1                                                     | —                                 | —   | T1–T6     | 1    |
-| T7     | Notifications: `DUE_CONDITION`, `dueIds`, `claimById`, M4, `deliver()` trả kết quả, `deliverOne` | R-04 (g), R-05 (a), nền R-03/R-04 | M   | C1        | 2    |
-| T8     | Hạ tầng queue (`bullmq` trực tiếp) + vòng relay + công tắc vận chuyển ở worker                   | R-03, R-05 (b)(c)                 | M   | T7        | 2    |
-| T9     | Consumer mail ở worker                                                                           | R-04, R-05 (d), R-08 (c)          | M   | T8        | 2    |
-| T10    | Bull Board                                                                                       | R-06                              | S   | T8        | 2    |
-| T11    | Chốt: tài liệu nhóm 2, generator, ca diệt đột biến                                               | R-10                              | S   | T9, T10   | 2    |
-| **C2** | push, CI full tay, đối chiếu tiêu chí toàn đợt                                                   | —                                 | —   | T7–T11    | 2    |
+| Gói    | Nội dung                                                                                                          | Mục SPEC                          | Cỡ  | Phụ thuộc | Nhóm |
+| ------ | ----------------------------------------------------------------------------------------------------------------- | --------------------------------- | --- | --------- | ---- |
+| T1     | Cấu hình Redis + khóa env + luật `no-redis-in-modules`                                                            | R-01 (a)(b)(c)(f)                 | S   | —         | 1    |
+| T2     | Client Redis + theo dõi kết nối + `retryable` của `ioredis`                                                       | R-01, R-08 (a)(b)                 | S   | T1        | 1    |
+| T3     | CI service Redis + harness Redis                                                                                  | R-09                              | S   | T2        | 1    |
+| T4     | Rate-limit Redis + dự phòng bộ nhớ                                                                                | R-02                              | M   | T2, T3    | 1    |
+| T5     | Compose local/prod, `deploy-release.sh`, gate triển khai, bước CI kiểm compose prod                               | R-07                              | S   | T1        | 1    |
+| T6     | ADR-0020 + tài liệu nhóm 1                                                                                        | R-10 (a)(e) phần nhóm 1           | S   | T4, T5    | 1    |
+| **C1** | push, CI full tay, đối chiếu tiêu chí nhóm 1                                                                      | —                                 | —   | T1–T6     | 1    |
+| T7     | Notifications: `DUE_CONDITION`, `dueIds`, `claimById`, M4, `deliver()` trả kết quả, `deliverOne`                  | R-04 (g), R-05 (a), nền R-03/R-04 | M   | C1        | 2    |
+| T8     | Hạ tầng queue (`bullmq` trực tiếp) + vòng relay + công tắc vận chuyển ở worker                                    | R-03, R-05 (b)(c)                 | M   | T7        | 2    |
+| T9     | Consumer mail ở worker                                                                                            | R-04, R-05 (d), R-08 (c)          | M   | T8        | 2    |
+| T9b    | Job dọn đêm `nightly-maintenance` (scheduler 00:00 `Asia/Ho_Chi_Minh`, chạy khi khởi động, vòng hẹn giờ ở `poll`) | R-11                              | M   | T9        | 2    |
+| T10    | Bull Board                                                                                                        | R-06                              | S   | T8        | 2    |
+| T11    | Chốt: tài liệu nhóm 2, generator, ca diệt đột biến                                                                | R-10                              | S   | T9, T10   | 2    |
+| **C2** | push, CI full tay, đối chiếu tiêu chí toàn đợt                                                                    | —                                 | —   | T7–T11    | 2    |
 
-Thứ tự: **T1 → T2 → T3 → T4 → T5 → T6 → C1 → T7 → T8 → T9 → T10 → T11 → C2.** Gói rủi ro cao nhất của mỗi nhóm đặt sớm trong nhóm (T4 thư viện mới; T7 sửa đường gửi
+Thứ tự: **T1 → T2 → T3 → T4 → T5 → T6 → C1 → T7 → T8 → T9 → T9b → T10 → T11 → C2.** Gói rủi ro cao nhất của mỗi nhóm đặt sớm trong nhóm (T4 thư viện mới; T7 sửa đường gửi
 mail đang chạy).
 
 ## Điểm gộp với đợt 3 (`int/redesign-w3` `b235e6d6`)
@@ -164,6 +174,9 @@ mail đang chạy).
 
 | GP-6 | `src/app/app.module.spec.ts` | **thêm mới** ở đợt 3 | T10 thêm `QueueBoardModule` vào `app.module.ts`; sau khi cả hai ở `dev` chạy lại spec đó, nếu nó liệt kê module thì thêm `QueueBoardModule` (commit riêng) |
 | GP-7 | `docs/generated/module-graph.md` | sinh lại | không gộp tay: `pnpm arch:graph` sinh lại rồi commit |
+
+T9b sửa `src/modules/identity-access/**` (facade housekeeping, repo `auth/session.repo.ts`, `accounts/action-token.repo.ts`): đợt 3 **không** đụng `identity-access`
+(`git diff --stat origin/dev...origin/int/redesign-w3 -- src/modules/identity-access` rỗng); đợt 4 không đụng theo SPEC w4 §6. Kiểm lại diff đó trước khi làm T9b.
 
 Không gói nào sửa `src/modules/notifications/public/notifications.types.ts`, `inbox/**`, `notifications.extension-points.ts` (đợt 3 đang sửa).
 
@@ -500,6 +513,64 @@ R-04 (a)–(f), (j) theo SPEC §6 ((j): SMTP sink trả 421 năm lần ⟹ dòng
 `EMAIL_JOB_ERROR_CODES` ∪ {thông báo _stalled_ của BullMQ (`job stalled more than allowable limit`)}; R-01 (d) khóa `:bull:`; R-05 (d) worker `poll` + consumer `bullmq` cùng DB, 5 dòng ⟹ 5 thư; Trọng tâm review 4: thêm tay job cho dòng đã `SENT` ⟹ `completed`
 `NOT_CLAIMED`, 0 thư; R-08 (c) bắt log ⟹ không có địa chỉ.
 
+### T9b — Job dọn đêm (M) — Owner đã chốt OQ-W5R-7 → 9 = A
+
+**Files:** Create `src/worker/nightly-maintenance.runner.ts` (+spec), `src/worker/nightly-maintenance.job.ts` (+spec),
+`src/modules/identity-access/public/auth-housekeeping.api.ts` (+spec nếu có logic), `test/integration/platform/nightly-maintenance.integration-spec.ts`. Modify
+`src/modules/identity-access/auth/session.repo.ts` (xóa phiên chết + refresh token, xóa `login_throttles` cũ), `src/modules/identity-access/accounts/action-token.repo.ts`
+(xóa token đã dùng/hết hạn trừ `INVITE` mới nhất), Create `src/modules/identity-access/identity-access-housekeeping-facade.module.ts` (provider `AuthHousekeepingApi`, `SessionRepo`, repo token; mẫu
+`identity-access-inspection-facade.module.ts`; worker import module này),
+`src/modules/notifications/notifications.repo.ts` + `public/email-delivery.api.ts` (`purgeFinished`), `src/infrastructure/queue/queue-registry.ts`
+(`'nightly-maintenance'`, `concurrency: 1`), `src/worker/worker.module.ts`, `src/modules/{notifications,identity-access}/README.md`. Việc C6 chỉ nếu OQ-W5R-7 = C
+(thêm `data-import` vào danh sách, ghi D-n).
+
+**Interfaces — Consumes:** `QueueProducers`, `QueueWorkerFactory` (T8), `trySessionAdvisoryLock` (`src/infrastructure/database/session-advisory-lock.ts:15`).
+**Produces:**
+
+```ts
+// EmailDeliveryApi thêm
+purgeFinished(before: Date, limit: number): Promise<number>; // SENT/CANCELLED/FAILED, updated_at < before
+// public/auth-housekeeping.api.ts
+export class AuthHousekeepingApi {
+  purgeDeadSessionTokens(before: Date, limit: number): Promise<number>; // bước 1: 500 refresh_tokens (token_hash) của phiên đã chết
+  purgeDeadSessions(before: Date, limit: number): Promise<number>;      // bước 2: 500 phiên đã chết không còn token
+  purgeSpentActionTokens(before: Date, limit: number): Promise<number>; // theo token_hash; giữ INVITE mới nhất (created_at DESC) mỗi app_user_id
+  purgeIdleLoginThrottles(now: Date, limit: number): Promise<number>;   // khóa ghép (organization_id, email_key_hash)
+}
+// nightly-maintenance.runner.ts
+export const MAINTENANCE_BATCH = 500;
+export const MAINTENANCE_MAX_BATCHES = 50;
+export class NightlyMaintenanceRunner {
+  run(now: Date): Promise<MaintenanceReport | 'BUSY'>; // BUSY khi không lấy được khóa phiên
+}
+export interface MaintenanceReport { tasks: { name: string; deleted: number; moreRemain: boolean; failed: boolean }[] }
+// nightly-maintenance.job.ts
+export function nextMidnightInVietnam(now: Date): Date;                // Intl.DateTimeFormat 'Asia/Ho_Chi_Minh'
+export class NightlyMaintenanceScheduler implements OnApplicationBootstrap, OnModuleDestroy { } // bullmq: (nền, thử lại 30 s) upsert → rồi tạo Worker → sau 60 s job khởi động
+export class NightlyMaintenanceTimer implements OnApplicationBootstrap, OnModuleDestroy { } // poll: setTimeout tới nextMidnightInVietnam
+```
+
+Thời gian giữ là hằng ở module sở hữu: `EMAIL_OUTBOX_RETENTION_DAYS = 30`, `DEAD_SESSION_RETENTION_DAYS = 30`, `SPENT_ACTION_TOKEN_RETENTION_DAYS = 30` (Owner
+27/11). Runner gọi C2 theo thứ tự `purgeDeadSessionTokens` rồi `purgeDeadSessions`. Khóa phiên: `trySessionAdvisoryLock(config DATABASE_URL, 'nightly-maintenance')`.
+Sửa chú thích `delivery` ở `account-query.service.ts:33` và mô tả OpenAPI của trường (`null` cả khi mail lời mời đã bị dọn sau 30 ngày) ⟹ `pnpm openapi:export`, commit
+`openapi.json` nếu chỉ mô tả đổi.
+
+**Test trước:** `notifications` spec hằng: `EMAIL_OUTBOX_RETENTION_DAYS * 86400 > 1_209_600` (max `AUTH_INVITATION_TTL_SECONDS`, đọc từ schema — R-11 j);
+`nightly-maintenance.job.spec.ts`: upsert được gọi **trước** khi tạo `Worker` (spy thứ tự); bootstrap không `await` upsert, upsert lỗi ⟹ thử lại sau 30 s (đồng hồ giả, R-11 i);
+`nightly-maintenance.runner.spec.ts` — 1 200 dòng giả ⟹ 3 lô (R-11 e); việc thứ hai ném ⟹ việc thứ ba vẫn chạy, `failed: true` (f); log không chứa
+email/uuid (g); khóa không lấy được ⟹ `'BUSY'`, không gọi việc nào. `nightly-maintenance.job.spec.ts` — `nextMidnightInVietnam` `it.each`: `2026-11-27T16:59:00Z` →
+`2026-11-27T17:00:00Z`; `2026-11-27T17:00:01Z` → `2026-11-28T17:00:00Z`; `2026-12-31T18:00:00Z` → `2027-01-01T17:00:00Z` (h).
+
+**Integration** (`nightly-maintenance.integration-spec.ts`, Redis + PostgreSQL thật): R-11 (a) upsert hai lần ⟹ một scheduler, `pattern`/`tz` đúng, job kế _delayed_;
+(b) mỗi việc: dòng quá mốc 1 phút xóa, dưới mốc 1 phút giữ; `INVITE` mới nhất đã hết hạn 60 ngày vẫn giữ; refresh token của phiên còn sống giữ; (c) **chạy khi khởi động**: dựng dòng quá hạn, bật worker ⟹ trong ≤ 70 s đúng một lượt, dòng bị xóa (không dùng `every`/cron — nhánh đó không chứng minh được cơ
+chế bù, RV3-1); C2: một phiên chết có 1 200 token ⟹ token xóa theo lô, phiên xóa khi hết token, không lỗi FK; (d) hai worker cùng bootstrap ⟹ một lượt chạy khi khởi động;
+(e) chạy lại ngay ⟹ xóa 0; (g) bắt log ⟹ chỉ số đếm; (i) worker bật khi Redis không tới được ⟹ khởi động xong, đổi sang Redis thật ⟹ scheduler có.
+
+**Kiểm:** `pnpm arch:capabilities --module identity-access`, `--module notifications`; gate `module-graph` (facade mới chỉ ở `identity-access-housekeeping-facade.module.ts`, chỉ worker import;
+`extension-wiring` hai biến thể worker); `deployment-roles`/`database-role-judgement` **không** đổi (bốn bảng đã có `DELETE`).
+
+**Dừng nếu:** FK khác `ON DELETE RESTRICT` ngoài `refresh_tokens_session_id_fkey` chặn xóa; bảng cần xóa nằm trong `RUNTIME_TABLE_EXCEPTIONS` hoặc có trigger chặn xóa (cần quyền `DELETE` mới cho vai runtime); cần đụng sweeper nghiệp vụ.
+
 ### T10 — Bull Board (S)
 
 **Files:** Create `src/infrastructure/queue/queue-board.module.ts`, `src/infrastructure/queue/queue-board.mount.ts` (+spec), `src/infrastructure/queue/queue-board-auth.ts`
@@ -552,19 +623,20 @@ chạy test sở hữu ⟹ **đỏ**, hoàn tác, ghi PROGRESS. `grep -rn "stand
 
 ## Rủi ro
 
-| Rủi ro                                                   | Mức        | Giảm (gói)                                                    |
-| -------------------------------------------------------- | ---------- | ------------------------------------------------------------- |
-| BullMQ 6 `deduplication`/`stackTraceLimit` khác mong đợi | Cao        | T8 (c)(d)(f), T9 (i) chạy sớm trên Docker trước khi viết tiếp |
-| Thứ tự tắt worker                                        | Cao        | T9 (h); provider vòng đời tường minh                          |
-| `@nest-lab/throttler-storage-redis` không hợp            | Trung bình | T4 đặt đầu nhóm sau hạ tầng; điều kiện dừng                   |
-| CSP chặn Bull Board                                      | Trung bình | T10 để sau cùng nhóm 2, điều kiện dừng không chặn T11         |
-| Test Redis chập chờn trên CI                             | Trung bình | chờ theo điều kiện; tiền tố riêng; T3 có CI sớm               |
-| Gộp với đợt 3                                            | Thấp       | mục _Điểm gộp_ GP-1 → GP-5                                    |
+| Rủi ro                                                       | Mức        | Giảm (gói)                                                    |
+| ------------------------------------------------------------ | ---------- | ------------------------------------------------------------- |
+| BullMQ 6 `deduplication`/`stackTraceLimit` khác mong đợi     | Cao        | T8 (c)(d)(f), T9 (i) chạy sớm trên Docker trước khi viết tiếp |
+| Thứ tự tắt worker                                            | Cao        | T9 (h); provider vòng đời tường minh                          |
+| `@nest-lab/throttler-storage-redis` không hợp                | Trung bình | T4 đặt đầu nhóm sau hạ tầng; điều kiện dừng                   |
+| CSP chặn Bull Board                                          | Trung bình | T10 để sau cùng nhóm 2, điều kiện dừng không chặn T11         |
+| Test Redis chập chờn trên CI                                 | Trung bình | chờ theo điều kiện; tiền tố riêng; T3 có CI sớm               |
+| Gộp với đợt 3                                                | Thấp       | mục _Điểm gộp_ GP-1 → GP-7                                    |
+| Job scheduler BullMQ 6 chạy bù khác mô tả khi worker offline | Trung bình | T9b I-6 (c); chạy khi khởi động làm lưới an toàn              |
 
 ## Tự rà theo `superpowers:writing-plans` + `planning-and-task-breakdown`
 
 1. **Phủ SPEC:** R-01 → T1, T2; R-02 → T4; R-03 → T8; R-04 → T7, T9; R-05 → T7 (a), T8 (b)(c), T9 (d); R-06 → T10; R-07 → T5; R-08 → T2 (a)(b), T9 (c); R-09 → T3;
-   R-10 → T2/T4/T8/T10 (gate gói), T6, T11. SPEC §7 U-1 → U-7, I-1 → I-5, G-1, H-1 đều có gói. Không hở.
+   R-10 → T2/T4/T8/T10 (gate gói), T6, T11; R-11 → T9b. SPEC §7 U-1 → U-7, I-1 → I-5, G-1, H-1 đều có gói. Không hở.
 2. **Bước:** mỗi gói có file, chữ ký, test trước với giá trị SPEC, lệnh kiểm; không bước "xử lý biên chung chung".
 3. **Kiểu nhất quán:** `RedisSettings` (T1) → T2, T3, T4, T8, T10; `DeliveryResult`/`DeliveryOutcome` (T7) → T9; `QueueName`, `jobOptionsFor`, `QueueWorkerFactory` (T8) → T9,
    T10; `RelaySource.dueIds(limit, now)` khớp `EmailDeliveryApi.dueIds(limit, now)`.

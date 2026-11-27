@@ -14,7 +14,7 @@ phê duyệt.
 - [ADR-0012](../../decisions/0012-account-email-delivery.md) **§Decision 2** (vòng thăm dò là cách gửi duy nhất) và câu hệ quả _"Delivery needs PostgreSQL and a
   reachable SMTP server, without Redis queue operations"_. **Giữ** §1 (outbox PostgreSQL ghi cùng transaction), §3 → §7 và tính _at-least-once_.
 - [ADR-0018](../../decisions/0018-sweepers-stay-in-the-api-process.md) **câu hệ quả** _"worker chỉ có outbox mail và `RequestWorkLoop`"_. **Giữ** quyết định: sweeper
-  chạy trong tiến trình API.
+  nghiệp vụ chạy trong tiến trình API; thêm **một ngoại lệ có giới hạn** — job dọn kỹ thuật đêm ở worker (Quyết định 11).
 - Quy ước R-07 ở `docs/rules/security-jobs.md` (rate-limit toàn cục trong bộ nhớ từng tiến trình, Owner 14/10/2026) và trạng thái "hạ tầng dự phòng, chưa có consumer"
   của `src/infrastructure/queue` (`OD-R5`, `E2 = A`).
 
@@ -62,7 +62,12 @@ phê duyệt.
    API/worker khởi động được khi Redis chưa sẵn sàng; `/health/ready` không phụ thuộc Redis.
 10. **Bull Board** gắn ở API tại `/ops/queues`, tắt mặc định, **chỉ đọc**, Basic Auth bằng tài khoản vận hành riêng, so sánh thời gian hằng trên hash; không đếm lần sai,
     không nới CSP. Đây là công cụ vận hành để demo, không phải màn nghiệp vụ.
-11. Dùng lớp `Queue`/`Worker` của `bullmq` 6 trực tiếp trong provider có vòng đời tường minh; gỡ `@nestjs/bullmq`; thêm `ioredis` (peer của `bullmq` 6 và của thư viện
+11. **Ngoại lệ có giới hạn của ADR-0018** (Owner 27/11/2026): một job **dọn kỹ thuật** `nightly-maintenance` chạy ở **worker** lúc 00:00 giờ Việt Nam bằng job
+    scheduler của BullMQ (`pattern '0 0 * * *'`, `tz 'Asia/Ho_Chi_Minh'`), và **một lượt khi worker khởi động — cơ chế chạy bù duy nhất**: `upsertJobScheduler` luôn ghi đè và tính mốc kế từ lúc gọi, nên lượt 00:00 lỡ
+    khi máy tắt không được BullMQ chạy bù; upsert chạy nền, không chặn khởi động khi Redis chết; chế độ `poll` dùng vòng hẹn giờ. Chỉ xóa dữ liệu kỹ
+    thuật hết dùng (mail đã xong, phiên/token đã chết, bộ đếm đăng nhập cũ), mỗi việc ở module sở hữu bảng, theo lô, idempotent, một khóa phiên chống chạy trùng. Thời gian giữ 30 ngày (Owner 27/11). Mọi
+    sweeper nghiệp vụ — kể cả các sweeper dọn nghiệp vụ — vẫn ở API.
+12. Dùng lớp `Queue`/`Worker` của `bullmq` 6 trực tiếp trong provider có vòng đời tường minh; gỡ `@nestjs/bullmq`; thêm `ioredis` (peer của `bullmq` 6 và của thư viện
     storage).
 
 ## Hệ quả
@@ -80,6 +85,7 @@ phê duyệt.
 - `TRUST_PROXY_HOPS = 1` ở production làm API tin header `x-request-id` gửi vào; Caddy phải thay header đó (`header_up X-Request-Id {http.request.uuid}`).
 - Job lỗi mang mã gộp (`SMTP_5xx`, `ATTEMPTS_EXHAUSTED`, …) còn dòng outbox giữ mã gốc; dòng hết lượt khi đang gửi ghi `ATTEMPTS_EXHAUSTED`, giá trị mới FE có thể
   thấy ở `invitation.delivery.lastErrorCode` (kiểu chữ, không đổi hợp đồng).
+- Dữ liệu kỹ thuật cũ bị xóa theo thời gian giữ Owner chọn; màn tài khoản có thể mất trạng thái gửi của lời mời đã hết hạn lâu (kiểu đã cho phép null).
 - Không migration; hoàn tác ở mức vận hành: `BACKGROUND_JOBS_TRANSPORT=poll`, `RATE_LIMIT_STORE=memory`.
 - Tài liệu phải sửa: `ARCHITECTURE.md`, `security-jobs.md`, `runtime-details.md`, `containers.md`, `src/README.md`, `.env.example`, module card `notifications`; ADR-0012 và
   ADR-0018 thêm dòng "thay một phần bởi ADR-0020".
