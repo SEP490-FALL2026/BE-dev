@@ -71,6 +71,9 @@ SELECT count(*) FROM access_requests WHERE state <> 'DRAFT' AND pricing_status =
 SELECT count(*) FROM organizations WHERE time_zone IS NULL;
 ```
 
+Ghi chú: phần bù dữ liệu của `20261203000100` (dòng 226, 245) và `20261203000200` (dòng 134) giả định tổ chức ở giờ `Asia/Ho_Chi_Minh` (chạy một lần lúc
+migrate; dữ liệu hiện có đều giờ VN; code app đọc `organizations.time_zone`). Không sửa migration đã commit (Owner 28/11).
+
 M4 (ứng dụng không vendor) và M6 (K4 `PERPETUAL`): câu kiểm nằm trong comment đầu `20261202000000_w3_workspaces/migration.sql` và khối `DO` đầu
 `20261203000200_w3_license_lots/migration.sql` — chạy phần `SELECT` của chúng. Chỉ để biết: số thuê bao K1 bị đóng (M7) và dòng NOTICE "perpetual
 purchases … became no lot" (M6).
