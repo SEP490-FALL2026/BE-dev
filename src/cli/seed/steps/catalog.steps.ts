@@ -414,10 +414,10 @@ function termOrPerpetualPriceFields(subscription: DemoSubscription): Record<stri
 }
 
 async function subscriptions(ctx: DemoRunContext): Promise<StepOutcome> {
-  const admin = await as(ctx, catalogAdmin(ctx));
   const results: Result[] = [];
   for (const subscription of ctx.fixture.subscriptions) {
-    results.push(await oneSubscription(ctx, admin, subscription));
+    // The IT Admin who declares a subscription is the one who answers for it: the dataset declares each with the person it names.
+    results.push(await oneSubscription(ctx, await as(ctx, subscription.responsible), subscription));
   }
 
   return summarize(results);
