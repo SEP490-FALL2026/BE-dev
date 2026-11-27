@@ -25,6 +25,7 @@ import { OperatingParametersHttpModule } from '../modules/operating-parameters/o
 import { OrganizationHttpModule } from '../modules/organization/organization-http.module';
 import { OrganizationModule } from '../modules/organization/organization.module';
 import { BudgetsModule } from '../modules/budgets/budgets.module';
+import { RequestsHttpModule } from '../modules/requests/requests-http.module';
 import { RequestsModule } from '../modules/requests/requests.module';
 import { ObservabilityModule } from '../infrastructure/observability/observability.module';
 import { HttpInfrastructureModule } from '../infrastructure/http/http-infrastructure.module';
@@ -53,6 +54,7 @@ import { HttpInfrastructureModule } from '../infrastructure/http/http-infrastruc
     NotificationsHttpModule,
     AiAssistHttpModule,
     RequestsModule,
+    RequestsHttpModule,
     BudgetsModule,
     OnboardingModule,
     PoliciesModule,

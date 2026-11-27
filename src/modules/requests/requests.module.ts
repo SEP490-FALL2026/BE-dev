@@ -21,12 +21,10 @@ import { GrantSettlementService } from './grant/grant-settlement.service';
 import { SeatReleaseRepo } from './grant/seat-release.repo';
 import { SeatReleaseService } from './grant/seat-release.service';
 import { SeatRevocationHook } from './grant/seat-revocation.listener';
-import { GrantQueueController } from './grant-queue/grant-queue.controller';
 import { GrantQueueRepo } from './grant-queue/grant-queue.repo';
 import { GrantQueueService } from './grant-queue/grant-queue.service';
 import { AssessmentDecisionsRepo } from './assessment-queue/assessment-decisions.repo';
 import { AssessmentDecisionsService } from './assessment-queue/assessment-decisions.service';
-import { AssessmentQueueController } from './assessment-queue/assessment-queue.controller';
 import { AssessmentQueueRepo } from './assessment-queue/assessment-queue.repo';
 import { AssessmentQueueReachService } from './assessment-queue/assessment-queue-reach.service';
 import { AssessmentQueueService } from './assessment-queue/assessment-queue.service';
@@ -34,7 +32,6 @@ import { RequestCommitmentReleaseGuard } from './spend/commitment-release.listen
 import { RequestCommitmentFacts } from './spend/commitment-request-facts.listener';
 import { RequestDraftService } from './draft/request-draft.service';
 import { RequestDraftSubmitService } from './draft/request-draft-submit.service';
-import { RequestDraftsController } from './draft/request-drafts.controller';
 import {
   InvoiceDiscrepancyReferralListeners,
   RequestOutcomeListeners,
@@ -60,25 +57,18 @@ import { QuoteService } from './assessment/quote.service';
 import { InternalRegistrationService } from './assessment/internal-registration.service';
 import { ProposalDeclarationService } from './assessment/proposal-declaration.service';
 import { ProposalService } from './assessment/proposal.service';
-import { ProposalsController } from './proposal-review/proposals.controller';
 import { AccessRequestQueryService } from './request-view/access-request-query.service';
 import { AccessRequestService } from './request-intake/access-request.service';
 import { RequestLimitsRepo } from './request-limits/request-limits.repo';
 import { RequestLimitsService } from './request-limits/request-limits.service';
 import { RequestSenderService } from './request-intake/request-sender.service';
-import { AccessRequestsController } from './request-submission/access-requests.controller';
-import { NeedDecisionController } from './need-decision/need-decision.controller';
-import { NeedDecisionQueueController } from './need-decision-queue/need-decision-queue.controller';
 import { NeedDecisionQueueRepo } from './need-decision-queue/need-decision-queue.repo';
 import { NeedDecisionQueueService } from './need-decision-queue/need-decision-queue.service';
-import { SimilarSeatsController } from './need-decision/similar-seats.controller';
-import { WithdrawalController } from './withdraw/withdrawal.controller';
 import { NeedDecisionEffects } from './need-decision/need-decision-effects.service';
 import { NeedDecisionService } from './need-decision/need-decision.service';
 import { WithdrawalPreconditions } from './withdraw/withdrawal-preconditions.service';
 import { WithdrawalWriter } from './withdraw/withdrawal-writer.service';
 import { WithdrawalService } from './withdraw/withdrawal.service';
-import { CancellationController } from './cancellation/cancellation.controller';
 import { DepartureCancellationService } from './cancellation/departure-cancellation.service';
 import { BeneficiaryGoneCancellation } from './cancellation/beneficiary-gone-cancellation.service';
 import { BeneficiaryGoneClosing } from './cancellation/beneficiary-gone-closing.service';
@@ -99,16 +89,13 @@ import { SimilarSeatsService } from './need-decision/similar-seats.service';
 import { GroupCandidateService } from './group-request-submission/group-candidate.service';
 import { GroupGrantService } from './group-request/group-grant.service';
 import { GroupLineQueryService } from './group-line-decisions/group-line-query.service';
-import { GroupLineClosureController } from './line-closure/group-line-closure.controller';
 import { GroupLineCloser } from './line-closure/group-line-closer.service';
 import { GroupLineClosureService } from './line-closure/group-line-closure.service';
-import { GroupLinesController } from './group-line-decisions/group-lines.controller';
 import { GroupNeedPreconditions } from './group-line-decisions/group-need-preconditions.service';
 import { GroupNeedVerdictWriter } from './group-line-decisions/group-need-verdict-writer.service';
 import { GroupNeedDecisionService } from './group-line-decisions/group-need-decision.service';
 import { GroupRequestWriter } from './group-request-submission/group-request-writer.service';
 import { GroupRequestService } from './group-request-submission/group-request.service';
-import { GroupRequestsController } from './group-request-submission/group-requests.controller';
 import { GroupResolutionEnding } from './group-request/group-resolution-ending.service';
 import { GroupResolutionService } from './group-request/group-resolution.service';
 import { GroupSpendChecklist } from './group-line-decisions/group-spend-checklist.service';
@@ -126,8 +113,6 @@ import { LineAmountRepo } from './group-request/line-amount.repo';
 import { LineDecisionRepo } from './group-request/line-decision.repo';
 import { RequestLineRepo } from './group-request/request-line.repo';
 import { SupplementDropRepo } from './group-request/supplement-drop.repo';
-import { ControlledWaitController } from './reassignment/controlled-wait.controller';
-import { CongestionController } from './sla/congestion.controller';
 import { CongestionService } from './sla/congestion.service';
 import { RequestsWorkFacadeModule } from './requests-work-facade.module';
 import { CarriedOverListener } from './year-start-commitments/carried-over.listener';
@@ -136,7 +121,6 @@ import { YearStartCommitmentsBatchService } from './year-start-commitments/year-
 import { YearStartCommitmentsSweeper } from './year-start-commitments/year-start-commitments.job';
 import { YearStartCommitmentsRepo } from './year-start-commitments/year-start-commitments.repo';
 import { YearStartCommitmentsService } from './year-start-commitments/year-start-commitments.service';
-import { BudgetCheckController } from './budget-check/budget-check.controller';
 import { BudgetCheckViewService } from './budget-check/budget-check-view.service';
 import { BudgetCheckYearsViewService } from './budget-check/budget-check-years-view.service';
 import { ReserveConfirmationRepo } from './reserve-confirmation/reserve-confirmation.repo';
@@ -146,7 +130,6 @@ import { SpendApprovalQueueService } from './spend-approval-view/spend-approval-
 import { SpendApprovalSourcesService } from './spend-approval-view/spend-approval-sources.service';
 import { SpendApprovalViewService } from './spend-approval-view/spend-approval-view.service';
 import { StepDueOnService } from './spend-approval-view/step-due-on.service';
-import { SpendApprovalsController } from './spend-approval/spend-approvals.controller';
 import { SpendBatchDecisionService } from './spend-approval/spend-batch-decision.service';
 import { SpendBatchRepo } from './spend/spend-batch.repo';
 import { SpendDecisionRepo } from './spend/spend-decision.repo';
@@ -165,7 +148,6 @@ import { SpendApprovalSnapshotService } from './spend-approval-view/spend-approv
 import { NextYearBudgetRepo } from './spend-approval-view/next-year-budget.repo';
 import { NextYearBudgetService } from './spend-approval-view/next-year-budget.service';
 import { SpendWireViewService } from './spend/spend-wire-view.service';
-import { SpendSubmissionController } from './spend-submission/spend-submission.controller';
 import { SupplementRepo } from './spend-submission/supplement.repo';
 import { SupplementPricing } from './spend-submission/supplement-pricing.service';
 import { SupplementQueryService } from './spend-submission/supplement-query.service';
@@ -180,22 +162,15 @@ import { RenewalRequestTrail } from './renewal-request/renewal-request-trail.ser
 import { RenewalSeatFactsService } from './renewal-request/renewal-seat-facts.service';
 import { RenewalRequestWriter } from './renewal-request/renewal-request-writer.service';
 import { RenewalRequestService } from './renewal-request/renewal-request.service';
-import { RenewalRequestsController } from './renewal-request/renewal-requests.controller';
 import { ReturnRequestQueryService } from './return-request/return-request-query.service';
 import { ReturnRequestRepo } from './return-request/return-request.repo';
 import { ReturnSeatGate } from './return-request/return-seat-gate.service';
 import { ReturnRequestService } from './return-request/return-request.service';
-import { ReturnRequestsController } from './return-request/return-requests.controller';
 import { ReturnRevocationHook } from './return-request/return-revocation.listener';
 import { RequestTimingRepo } from './timing/request-timing.repo';
 import { RequestTimingService } from './timing/request-timing.service';
-import { RequestTimingsController } from './timing/request-timings.controller';
-import { MyRequestsController } from './request-history/request-history-mine.controller';
-import { AccessRequestEventsController } from './request-history/access-request-events.controller';
-import { RequestAuditFlagsController } from './request-history/request-audit-flags.controller';
 import { RequestAuditFlagsService } from './request-history/request-audit-flags.service';
 import { RequestEventsService } from './request-history/request-events.service';
-import { RequestHistoryController } from './request-history/request-history.controller';
 import { RequestHistoryRepo } from './request-history/request-history.repo';
 import { RequestHistoryService } from './request-history/request-history.service';
 import { RequestReadAccessService } from './request-view/request-read-access.service';
@@ -204,7 +179,6 @@ import { MyRequestsFactsRepo } from './my-requests/my-requests-facts.repo';
 import { MyRequestsRepo } from './my-requests/my-requests.repo';
 import { RequestNotificationNamesListener } from './my-requests/request-notification-names.listener';
 import { MyRequestsService } from './my-requests/my-requests.service';
-import { InvoiceDiscrepanciesController } from './invoice-discrepancy-queue/invoice-discrepancies.controller';
 import { InvoiceDiscrepancyQueryService } from './invoice-discrepancy-queue/invoice-discrepancy-query.service';
 import { InvoiceDiscrepancyClosureService } from './invoice-discrepancy/invoice-discrepancy-closure.service';
 import { InvoiceDiscrepancyNotifierService } from './invoice-discrepancy/invoice-discrepancy-notifier.service';
@@ -217,10 +191,8 @@ import { PurchaseInvoiceMissingPeriodsQueryService } from './purchase-invoice/pu
 import { PurchaseInvoiceQueryService } from './purchase-invoice/purchase-invoice-query.service';
 import { ConfirmationSettlementService } from './purchase-invoice/confirmation/confirmation-settlement.service';
 import { PurchaseInvoiceConfirmationService } from './purchase-invoice/confirmation/purchase-invoice-confirmation.service';
-import { PurchaseInvoiceDecisionsController } from './purchase-invoice/purchase-invoice-decisions.controller';
 import { PurchaseInvoiceRepo } from './purchase-invoice/purchase-invoice.repo';
 import { PurchaseInvoiceSubmissionService } from './purchase-invoice/purchase-invoice-submission.service';
-import { PurchaseInvoicesController } from './purchase-invoice/purchase-invoices.controller';
 
 /**
  * The requests context (C4, ADR-0015): the request for access to software, the people it is for and the steps that decide
@@ -250,37 +222,6 @@ import { PurchaseInvoicesController } from './purchase-invoice/purchase-invoices
     LicensingModule,
     OperatingParametersModule,
     RequestsWorkFacadeModule,
-  ],
-  controllers: [
-    // The path `access-requests/drafts` is declared before `access-requests/:id`, so that it is a route of its own and never an id.
-    RequestDraftsController,
-    AccessRequestsController,
-    NeedDecisionController,
-    WithdrawalController,
-    SimilarSeatsController,
-    CancellationController,
-    ProposalsController,
-    BudgetCheckController,
-    SpendSubmissionController,
-    SpendApprovalsController,
-    NeedDecisionQueueController,
-    GrantQueueController,
-    AssessmentQueueController,
-    ReturnRequestsController,
-    RenewalRequestsController,
-    PurchaseInvoicesController,
-    PurchaseInvoiceDecisionsController,
-    InvoiceDiscrepanciesController,
-    ControlledWaitController,
-    RequestTimingsController,
-    CongestionController,
-    GroupRequestsController,
-    GroupLinesController,
-    GroupLineClosureController,
-    MyRequestsController,
-    RequestHistoryController,
-    AccessRequestEventsController,
-    RequestAuditFlagsController,
   ],
   providers: [
     RequestFactsService,
@@ -478,6 +419,64 @@ import { PurchaseInvoicesController } from './purchase-invoice/purchase-invoices
     InvoiceDiscrepancyReferralListeners,
     RequestsDashboardApi,
     RequestsAiSourceApi,
+    // Internal services exported solely for `RequestsHttpModule` within `src/modules/requests/` (enforced by R10).
+    AccessRequestQueryService,
+    AccessRequestService,
+    AssessmentCompletionService,
+    AssessmentDecisionService,
+    AssessmentDecisionsService,
+    AssessmentQueryService,
+    AssessmentQueueService,
+    AssessmentService,
+    BudgetCheckViewService,
+    BudgetCheckYearsViewService,
+    CatalogLinkService,
+    CongestionService,
+    DepartureCancellationService,
+    GrantQueueService,
+    GroupCandidateService,
+    GroupLineClosureService,
+    GroupLineQueryService,
+    GroupNeedDecisionService,
+    GroupRequestService,
+    GroupSpendDecisionService,
+    GroupWithdrawalService,
+    InternalRegistrationService,
+    InvoiceDiscrepancyClosureService,
+    InvoiceDiscrepancyQueryService,
+    MyRequestsService,
+    NeedDecisionQueueService,
+    NeedDecisionService,
+    PricingViewService,
+    ProposalService,
+    PurchaseInvoiceConfirmationService,
+    PurchaseInvoiceMissingPeriodsQueryService,
+    PurchaseInvoiceQueryService,
+    PurchaseInvoiceSubmissionService,
+    RenewalRequestService,
+    RequestAuditFlagsService,
+    RequestDraftService,
+    RequestDraftSubmitService,
+    RequestEventsService,
+    RequestHistoryService,
+    RequestPreviewService,
+    RequestResubmissionService,
+    RequestTimingService,
+    ReserveConfirmationService,
+    ReturnRequestQueryService,
+    ReturnRequestService,
+    SimilarSeatsService,
+    SpendApprovalQueueService,
+    SpendApprovalViewService,
+    SpendBatchDecisionService,
+    SpendBatchListService,
+    SpendBatchService,
+    SpendBatchViewService,
+    SpendDecisionService,
+    SpendQueueService,
+    SupplementQueryService,
+    SupplementService,
+    WithdrawalService,
   ],
 })
 export class RequestsModule {}
