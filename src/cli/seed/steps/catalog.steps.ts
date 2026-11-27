@@ -332,7 +332,6 @@ export function subscriptionStartDate(ctx: DatedContext, subscription: DemoSubsc
 function subscriptionSharedTerms(ctx: DemoRunContext, subscription: DemoSubscription): Record<string, unknown> {
   const base = {
     ...(subscription.originalPrice ? { originalPrice: subscription.originalPrice } : {}),
-    responsibleItAdminEmployeeId: ctx.ids.employees.get(subscription.responsible),
     ...(subscription.seatCounting ? { seatCounting: subscription.seatCounting } : {}),
     ...(subscription.invoicedLater !== undefined ? { invoicedLater: subscription.invoicedLater } : {}),
     ...(subscription.minimumSeatsTotal !== undefined ? { minimumSeatsTotal: subscription.minimumSeatsTotal } : {}),

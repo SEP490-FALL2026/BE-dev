@@ -21,7 +21,7 @@ describe('the body of a subscription the dataset declares', () => {
   } as unknown as DemoRunContext;
   const subscription = (key: string) => SHARED_DEMO_V4.subscriptions.find((candidate) => candidate.key === key)!;
 
-  it('names the IT Admin who answers for it, no owner department, and MEMBERS + invoicedLater for Jira & Figma (L-2)', () => {
+  it('names no person to answer for it (the declarer does), no owner department, and MEMBERS + invoicedLater for Jira & Figma (L-2)', () => {
     for (const key of ['jira', 'figma']) {
       const body = subscriptionBody(ctx, subscription(key), 'plan-1');
       expect(body).toMatchObject({
@@ -29,12 +29,13 @@ describe('the body of a subscription the dataset declares', () => {
         commitmentTermMonths: 1,
         seatCounting: 'MEMBERS',
         invoicedLater: true,
-        responsibleItAdminEmployeeId: `id-${subscription(key).responsible}`,
         startDate: '2026-01-01',
         endDate: '2026-12-31',
         renewalDate: '2026-11-30',
       });
       expect(body).not.toHaveProperty('ownerDepartmentId');
+      // The IT Admin who declares answers for it (the declaration cannot name another person): the dataset declares with the one it names.
+      expect(body).not.toHaveProperty('responsibleItAdminEmployeeId');
     }
   });
 
