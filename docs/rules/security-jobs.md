@@ -41,12 +41,12 @@
 - Never trust client-supplied privileges. A signed JWT alone does not establish
   current account status or resource permission.
 - Distinguish invalid credentials from unavailable dependencies. Do not log secrets.
-- Global rate limiting uses per-process memory, with a separate counter for each route and IP
-  (Owner decision 14/10/2026, R-07; pinned by `test/http/platform/rate-limit.http-spec.ts`).
+- Global rate limiting uses Redis for shared counters per route and IP, with per-process memory as a fallback.
+  `RATE_LIMIT_STORE=memory` selects the in-memory store directly.
   Login failure throttling is separately keyed by normalized email: only failed logins increase
   its failure counter, after the password check (Owner confirmed the existing spec, R-06).
-  See [G0/G1 remediation review](../reviews/g0-g1-remediation-2026-10-15/README.md). Redis is queue infrastructure.
-- Configure TRUST_PROXY_HOPS only for trusted ingress that overwrites client headers.
+  See [ADR-0020](../decisions/0020-redis-bullmq-outbox-relay-and-rate-limit.md).
+- Production requires `TRUST_PROXY_HOPS` of at least 1 and a trusted ingress that overwrites client headers.
 
 ## Storage and jobs
 

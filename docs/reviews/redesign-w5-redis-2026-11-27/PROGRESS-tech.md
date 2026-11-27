@@ -21,8 +21,8 @@ Tracker sống qua compact context. Người code đọc lại file này **đầ
 | T2  | R-01 client, R-08 (a)(b)                                           | xong       | `b69f737d` | Unit 29/29. Redis Docker trả PONG cho 3 kiểu client. Typecheck, lint file sửa, arch:check, rules:check, 335 gate, OpenAPI không drift. Audit production sạch, một bản ioredis. | — | Client cấp cho BullMQ kết nối ngay. |
 | T3  | R-09 CI + harness                                                  | đang làm    | `6511f4fc` | Integration Redis Docker 3/3, typecheck, lint file sửa, arch:check, rules:check, rules:format, 335 gate, OpenAPI không drift. | — | Run GitHub `45971009063` đang chạy để xác minh R-09 (b). |
 | T4  | R-02 rate-limit Redis                                              | đang làm   | `d06578dd` | Unit 5/5, integration 4/4 và serial 1/1 trên Docker, không open handle. Typecheck, lint file sửa, arch:check, rules:check, 335 gate đạt. OpenAPI export khi Redis tắt không drift. Audit sạch, một bản ioredis. | — | Chờ chạy lại rate-limit HTTP spec ở C1. |
-| T5  | R-07 compose, deploy, gate                                         | xong       | commit T5 | 5 ca gate đỏ trước khi sửa, 340 gate xanh sau. Typecheck, lint file sửa, arch:check, rules:check, rules:format, OpenAPI không drift. Regression deploy trên Linux xanh. Compose config local/prod đạt, thiếu mật khẩu bị từ chối. | — | PostgreSQL và Redis local healthy. Redis production fixture chạy UID 999. |
-| T6  | ADR-0020 + tài liệu nhóm 1                                         | chưa       |     |                                                 |               |                          |
+| T5  | R-07 compose, deploy, gate                                         | xong       | `173b0f11` | 5 ca gate đỏ trước khi sửa, 340 gate xanh sau. Typecheck, lint file sửa, arch:check, rules:check, rules:format, OpenAPI không drift. Regression deploy trên Linux xanh. Compose config local/prod đạt, thiếu mật khẩu bị từ chối. | — | PostgreSQL và Redis local healthy. Redis production fixture chạy UID 999. |
+| T6  | ADR-0020 + tài liệu nhóm 1                                         | xong       | commit T6 | Rules check/format, typecheck, lint, arch:check, arch:docs:check, test:discovery và 340 gate đạt. OpenAPI không drift. | — | ADR-0020 ở trạng thái Proposed. |
 | C1  | CI full nhóm 1                                                     | chưa       |     |                                                 |               |                          |
 | T7  | notifications: điều kiện chung, `claimById`, M4                    | chưa       |     |                                                 |               |                          |
 | T8  | queue + relay + công tắc                                           | chưa       |     |                                                 |               |                          |
@@ -46,6 +46,7 @@ Trạng thái: `chưa` · `đang làm` · `xong` (chỉ sau khi đối chiếu t
 | T3 | R-09 (a)(c), Redis ở integration, in-band và nightly; CI thiếu URL báo lỗi | `redis-harness.integration-spec.ts` và tự rà workflow | `.github/workflows/ci.yml:233`, `.github/workflows/nightly.yml:31`, `redis-harness.ts:7` |
 | T4 | R-02 (a)–(f), (h), (i), chia sẻ bộ đếm, dự phòng, hồi phục, tắt êm, OpenAPI | `fallback-throttler.storage.spec.ts`, `redis-rate-limit.integration-spec.ts`, `redis-client-pause.integration-spec.ts` | `rate-limit.options.ts:25`, `fallback-throttler.storage.ts:28`, `scripts/dev/export-environment.ts:20` |
 | T5 | R-07, Redis local và production, proxy, thứ tự deploy và kiểm trạng thái tiến trình | `deployment-roles.gate-spec.ts`, `deploy-release.test.mjs`, Docker Compose | `docker-compose.prod.yml:44`, `deploy-release.sh:183`, `Caddyfile:45` |
+| T6 | R-10 (a) và (e) nhóm 1, ADR và quy ước vận hành | `pnpm rules:check`, `pnpm rules:format` | `docs/decisions/0020-redis-bullmq-outbox-relay-and-rate-limit.md:5`, `docs/rules/security-jobs.md:44` |
 
 ## Trọng tâm review (PLAN) → test
 
@@ -102,4 +103,4 @@ Trạng thái: `chưa` · `đang làm` · `xong` (chỉ sau khi đối chiếu t
 
 | Commit | Link run | quality | http | integration (1/2/3) | inband | e2e-smoke | Ghi chú |
 | ------ | -------- | ------- | ---- | ------------------- | ------ | --------- | ------- |
-| `6511f4fc` | [45971009063](https://github.com/SEP490-FALL2026/BE-dev/actions/runs/45971009063) | đang chạy | đang chạy | đang chạy | đang chạy | xanh | Xác minh T3, trước C1 |
+| `6511f4fc` | [45971009063](https://github.com/SEP490-FALL2026/BE-dev/actions/runs/45971009063) | đỏ, ESLint OOM | xanh | đang chạy / đang chạy / đỏ | xanh | xanh | Ca 403 đã tái hiện trên nền, xem [FIX-TEST-tech](FIX-TEST-tech.md). |

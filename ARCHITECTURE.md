@@ -136,7 +136,7 @@ job test xanh ([test guide](test/README.md)).
 
 - ADR: [docs/decisions](docs/decisions/) — 0001 monolith, 0005 ràng buộc DB, 0011 xác thực, 0013
   catalog/finance/licensing, 0015 requests, 0016 budgets, 0017 personnel, 0018 sweeper, 0019 tầng module và cửa công
-  khai.
+  khai, [0020 Redis, rate-limit và BullMQ](docs/decisions/0020-redis-bullmq-outbox-relay-and-rate-limit.md).
 - Quy ước theo chủ đề: [docs/rules](docs/rules/README.md). Tiến độ và trạng thái: [roadmap](docs/roadmap.md). Dev mới đọc
   [hướng dẫn dev mới](docs/guides/huong-dan-dev-moi.md) trước.
 - Ảnh chụp bản `ARCHITECTURE.md` trước 29/10/2026 (danh sách năng lực, bản đồ source cũ) nằm trong lịch sử git; nội dung
