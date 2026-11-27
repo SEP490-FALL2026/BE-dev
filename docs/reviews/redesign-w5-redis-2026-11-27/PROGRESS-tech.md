@@ -15,22 +15,22 @@ Tracker sống qua compact context. Người code đọc lại file này **đầ
 
 ## Gói
 
-| Gói | Mục                                                   | Trạng thái | sha | Lệnh kiểm + kết quả (unit, integration của gói) | FIX-TEST thêm | Ghi chú / chưa kiểm được |
-| --- | ----------------------------------------------------- | ---------- | --- | ----------------------------------------------- | ------------- | ------------------------ |
-| T1  | R-01 cấu hình, env, `no-redis-in-modules`             | chưa       |     |                                                 |               |                          |
-| T2  | R-01 client, R-08 (a)(b)                              | chưa       |     |                                                 |               |                          |
-| T3  | R-09 CI + harness                                     | chưa       |     |                                                 |               |                          |
-| T4  | R-02 rate-limit Redis                                 | chưa       |     |                                                 |               |                          |
-| T5  | R-07 compose, deploy, gate                            | chưa       |     |                                                 |               |                          |
-| T6  | ADR-0020 + tài liệu nhóm 1                            | chưa       |     |                                                 |               |                          |
-| C1  | CI full nhóm 1                                        | chưa       |     |                                                 |               |                          |
-| T7  | notifications: điều kiện chung, `claimById`, M4       | chưa       |     |                                                 |               |                          |
-| T8  | queue + relay + công tắc                              | chưa       |     |                                                 |               |                          |
-| T9  | consumer mail                                         | chưa       |     |                                                 |               |                          |
+| Gói | Mục                                                                | Trạng thái | sha | Lệnh kiểm + kết quả (unit, integration của gói) | FIX-TEST thêm | Ghi chú / chưa kiểm được |
+| --- | ------------------------------------------------------------------ | ---------- | --- | ----------------------------------------------- | ------------- | ------------------------ |
+| T1  | R-01 cấu hình, env, `no-redis-in-modules`                          | chưa       |     |                                                 |               |                          |
+| T2  | R-01 client, R-08 (a)(b)                                           | chưa       |     |                                                 |               |                          |
+| T3  | R-09 CI + harness                                                  | chưa       |     |                                                 |               |                          |
+| T4  | R-02 rate-limit Redis                                              | chưa       |     |                                                 |               |                          |
+| T5  | R-07 compose, deploy, gate                                         | chưa       |     |                                                 |               |                          |
+| T6  | ADR-0020 + tài liệu nhóm 1                                         | chưa       |     |                                                 |               |                          |
+| C1  | CI full nhóm 1                                                     | chưa       |     |                                                 |               |                          |
+| T7  | notifications: điều kiện chung, `claimById`, M4                    | chưa       |     |                                                 |               |                          |
+| T8  | queue + relay + công tắc                                           | chưa       |     |                                                 |               |                          |
+| T9  | consumer mail                                                      | chưa       |     |                                                 |               |                          |
 | T9b | R-11 job dọn đêm (Owner 27/11: C1–C4, 30 ngày, chạy khi khởi động) | chưa       |     |                                                 |               |                          |
-| T10 | Bull Board                                            | chưa       |     |                                                 |               |                          |
-| T11 | chốt, ca diệt đột biến                                | chưa       |     |                                                 |               |                          |
-| C2  | CI full toàn đợt                                      | chưa       |     |                                                 |               |                          |
+| T10 | Bull Board                                                         | chưa       |     |                                                 |               |                          |
+| T11 | chốt, ca diệt đột biến                                             | chưa       |     |                                                 |               |                          |
+| C2  | CI full toàn đợt                                                   | chưa       |     |                                                 |               |                          |
 
 Trạng thái: `chưa` · `đang làm` · `xong` (chỉ sau khi đối chiếu từng tiêu chí — LUẬT CỨNG 6) · `dừng hỏi`.
 
