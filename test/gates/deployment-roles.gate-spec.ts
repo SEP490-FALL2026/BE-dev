@@ -408,6 +408,7 @@ describe('the production image carries the production dependencies only', () => 
       'dotenv',
       'bullmq',
       'ioredis',
+      '@nest-lab/throttler-storage-redis',
       '@nestjs/bullmq',
     ];
 

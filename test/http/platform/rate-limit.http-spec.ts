@@ -4,7 +4,7 @@ import { App } from 'supertest/types';
 
 /**
  * R-07 (Owner, 14/10/2026): the global rate limit is kept per route and per client IP, held in the
- * memory of each process. These tests pin that contract so a change to a shared per-IP budget, or to
+ * memory of each process in the test environment. These tests pin that contract so a change to a shared per-IP budget, or to
  * how the client address is chosen, fails here instead of surfacing in production.
  *
  * ConfigModule validates process.env when AppModule is first imported, so every app is built from a

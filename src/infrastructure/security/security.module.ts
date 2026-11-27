@@ -2,12 +2,13 @@ import { DynamicModule, Logger, Module, Type } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
+import type { EnvironmentVariables } from '../config/env-schema';
 import { AccessDeclarationGuard } from './guards/access-declaration.guard';
 import { AuthenticationGuard } from './guards/authentication.guard';
 import { AuthorizationGuard } from './guards/authorization.guard';
 import { CredentialThrottlerGuard } from './guards/credential-throttler.guard';
 import { DeviceAuthenticationGuard } from './guards/device-authentication.guard';
-import { createRateLimitOptions } from './rate-limit.options';
+import { createRateLimitOptions, createRateLimitStorage } from './rate-limit.options';
 import { DEVICE_CREDENTIAL_VERIFIER, REJECT_EVERY_DEVICE_CREDENTIAL } from './tokens/device-credential-verifier.port';
 
 export interface SecurityModuleOptions {
@@ -29,7 +30,11 @@ export class SecurityModule {
     return {
       module: SecurityModule,
       imports: [
-        ThrottlerModule.forRootAsync({ inject: [ConfigService], useFactory: createRateLimitOptions }),
+        ThrottlerModule.forRootAsync({
+          inject: [ConfigService],
+          useFactory: (config: ConfigService<EnvironmentVariables, true>) =>
+            createRateLimitOptions(config, createRateLimitStorage(config, new Logger('RateLimit'))),
+        }),
         options.verifierModule,
         ...(options.deviceVerifierModule ? [options.deviceVerifierModule] : []),
       ],
