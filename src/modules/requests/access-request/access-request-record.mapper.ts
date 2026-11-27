@@ -1,7 +1,7 @@
 import type { Prisma } from '../../../generated/prisma/client';
 import { fromDateColumn, type BusinessDate } from '../../../core/business-date';
 import { toPricing } from './access-request-pricing.mapper';
-import type { NeedStepState, AccessRequestRecord, ReadableNeedWaitingReason } from './access-request.types';
+import type { NeedStepState, AccessRequestRecord, ReadableNeedWaitingReason, TicketRef } from './access-request.types';
 import { requestPolicyJson } from './access-request.json';
 import { currentMissingReasonOf, currentStateOf } from './access-request.policy';
 import { LIMIT_EXEMPTIONS, type LimitExemption } from './access-request.types';
@@ -42,6 +42,9 @@ export const SELECT_REQUEST = {
   offPlan: true,
   policy: true,
   submittedAt: true,
+  ticketId: true,
+  ticketPosition: true,
+  ticket: { select: { _count: { select: { items: true } } } },
   withdrawalRequestedAt: true,
   withdrawnByEmployeeId: true,
   withdrawalReason: true,
@@ -148,6 +151,13 @@ function currentNeedStepOf<S>(type: string, steps: readonly S[]): S | undefined 
   return type === 'GROUP_GRANT' ? steps[0] : steps[steps.length - 1];
 }
 
+/** Maps ticket columns and aggregate item count to a TicketRef, or null for standalone requests. */
+function ticketRefOf(row: RequestRow): TicketRef | null {
+  if (row.ticketId === null || row.ticketPosition === null || row.ticket === null) return null;
+
+  return { id: row.ticketId, position: row.ticketPosition, itemCount: row.ticket._count.items };
+}
+
 export function toRecord(row: RequestRow): AccessRequestRecord {
   const sent = sentColumns(row);
   const needSteps = row.steps.map((step) => ({
@@ -210,6 +220,7 @@ export function toRecord(row: RequestRow): AccessRequestRecord {
           }
         : requestPolicyJson.decode(row.policy),
     submittedAt: sent.submittedAt,
+    ticket: ticketRefOf(row),
     withdrawal:
       row.withdrawalRequestedAt !== null && row.withdrawnByEmployeeId !== null
         ? {

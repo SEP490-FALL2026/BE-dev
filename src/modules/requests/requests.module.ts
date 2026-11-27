@@ -3,6 +3,7 @@ import { PendingSpendListener } from './spend/pending-spend.listener';
 import { RequestsRoutingFacadeModule } from './requests-routing-facade.module';
 import { RequestsDashboardApi } from './public/requests-dashboard.api';
 import { RequestResubmissionService } from './request-intake/request-resubmission.service';
+import { RequestTicketRepo } from './request-ticket/request-ticket.repo';
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { AuditModule } from '../audit/audit.module';
@@ -237,6 +238,7 @@ import { PurchaseInvoiceSubmissionService } from './purchase-invoice/purchase-in
     // The grace of a transfer, the extension point this module opens for personnel (`QĐ-110q`, R-49).
     TransferGraceHoldContributions,
     RequestResubmissionService,
+    RequestTicketRepo,
     RequestSenderService,
     RequestDraftService,
     RequestDraftSubmitService,
@@ -461,6 +463,7 @@ import { PurchaseInvoiceSubmissionService } from './purchase-invoice/purchase-in
     RequestHistoryService,
     RequestPreviewService,
     RequestResubmissionService,
+    RequestTicketRepo,
     RequestTimingService,
     ReserveConfirmationService,
     ReturnRequestQueryService,

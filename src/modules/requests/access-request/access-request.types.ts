@@ -91,6 +91,12 @@ export interface RenewalRecord {
 
 export type AccessRequestKind = 'GRANT' | 'SERVICE_ACCOUNT' | 'RENEWAL' | 'GROUP_GRANT';
 
+export interface TicketRef {
+  id: string;
+  position: number;
+  itemCount: number;
+}
+
 export interface NewAccessRequest {
   /** A request for a service account also gets its row of detail, written in the same transaction by its own repository. */
   type?: AccessRequestKind;
@@ -123,6 +129,8 @@ export interface NewAccessRequest {
    * day it was saved. Absent for a request written new. The caller holds the lock of the draft (`RequestDraftRepo.lock`).
    */
   draftId?: string | null;
+  /** Ticket envelope and 1-based position when submitted as part of a multi-item ticket. */
+  ticket?: { id: string; position: number };
 }
 
 /** A need step as it is written: the first one with the request, the others after it (`addNeedStep`). */
@@ -222,6 +230,8 @@ export interface AccessRequestRecord {
   expectedEndDate: BusinessDate | null;
   policy: RequestPolicy;
   submittedAt: Date;
+  /** Ticket membership reference when submitted inside a ticket; null for standalone requests. */
+  ticket: TicketRef | null;
   /** Null unless the request was withdrawn or is waiting for the IT Admin to close the task of its grant. */
   withdrawal: WithdrawalRecord | null;
   /** Null unless the IT Admin cancelled the request because its beneficiary left. */

@@ -94,6 +94,7 @@ function baseRequest(over: Partial<AccessRequestRecord> = {}): AccessRequestReco
     expectedEndDate: null,
     policy: {} as never,
     submittedAt: NOW,
+    ticket: null,
     withdrawal: null,
     cancellation: null,
     serviceAccount: null,

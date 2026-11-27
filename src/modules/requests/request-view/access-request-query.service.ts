@@ -74,6 +74,7 @@ export interface AccessRequestView extends Omit<
   | 'budgetYear'
   | 'planLine'
   | 'offPlan'
+  | 'ticket'
 > {
   plan: { planId: string; planName: string; applicationId: string; applicationName: string } | null;
   /** What the Employee declared of software that is not in the catalog; null for any other request. */

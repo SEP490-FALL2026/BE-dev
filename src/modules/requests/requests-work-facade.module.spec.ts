@@ -288,6 +288,7 @@ describe('BudgetCheckService in worker graph (B-4)', () => {
           slaWorkingDays: 3,
         },
         submittedAt: new Date('2027-07-08T01:00:00.000Z'),
+        ticket: null,
         withdrawal: null,
         cancellation: null,
         serviceAccount: null,
