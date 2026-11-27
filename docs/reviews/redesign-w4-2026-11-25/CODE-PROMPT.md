@@ -133,10 +133,10 @@ git -C $R --no-pager ls-tree --name-only origin/dev docs/reviews/redesign-w4-202
 # (a) đợt 3 đã vào dev: phải in đủ 3 dòng
 git -C $R --no-pager ls-tree --name-only origin/dev prisma/migrations/20261204000500_w3_final3_request_monthly_price_check \
   src/modules/catalog/public/license-lot.api.ts src/modules/catalog/public/seat-ledger.api.ts
-# (b) migration cuối của dev: >= 20261204000500 và < 20261210000000
+# (b) migration cuối của dev: >= 20261204000700 và < 20261210000000
 git -C $R --no-pager ls-tree --name-only origin/dev prisma/migrations/ | tail -3
 # (c) phần code đợt 3 còn lệch dev (sau FIX-W3-FINAL-4): ghi vào DELTA nếu có
-git -C $R --no-pager diff --stat origin/dev origin/int/redesign-w3 -- src prisma
+git -C $R --no-pager diff --stat origin/dev origin/int/redesign-w3 -- src/modules/requests src/modules/budgets src/modules/catalog src/core prisma src/infrastructure/database   # phải rỗng (int không có Redis — không so cả src)
 # (d) DELTA mục 4: ba lệnh kiểm lại (diff từ 20ae45ee, grep khóa E5, grep @Optional)
 git -C $R config user.email                                # phải là email của Owner
 ```

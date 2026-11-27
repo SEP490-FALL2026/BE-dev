@@ -208,7 +208,7 @@ trigger BEFORE UPDATE OR DELETE ⟹ RAISE (chỉ ghi thêm)
 ### 6.2. Thứ tự khóa
 
 Bảng chuẩn ở `docs/rules/database-business.md` mục _Thứ tự khóa chuẩn_ — bản gộp sau đợt 3 (`:100-139`; tầng mới 5b, 6a, 6c, 6d, 7b, 9b; không còn tên
-`6b`; E1–E4 ở `:141-146` — DL-9). Đợt 4 chỉ dùng tầng 1, 2, 3a, 4, 10 và grant Người duyệt chi `FOR SHARE`; **không thêm tầng**:
+`6b`; E1–E4 ở `:143-146` — DL-9). Đợt 4 chỉ dùng tầng 1, 2, 3a, 4, 10 và grant Người duyệt chi `FOR SHARE`; **không thêm tầng**:
 
 | Luồng                                          | Đường khóa                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -323,7 +323,7 @@ openRequestId?, resetsOn?, contractEndDate?, maxMonths?, provisioningType? }]` (
   (trong số cơ sở, hoặc dùng dự phòng — Request một bước sang Người duyệt chi kèm cờ) mới trừ vào _còn lại_ cho mục sau (`QĐ-117k`(1)).
 - **Tiêu chí** (integration `request-ticket-head.integration-spec.ts`; số của `US-05-25` AC-9). **Sau đợt 3 (DL-7, DL-19):** _còn lại_ là sau khi trừ chi phí
   đang chạy không cam kết (`runningUncommitted`, `QĐ-116af`) — fixture `P-DES` không có seat `K2`/`K1` gán không Request và test khẳng định tiền điều kiện
-  `runningUncommittedMinor = 0` trước ca; số tiền mục = giá tháng của dòng × `termMonths` (ngày cố định `2026-06-01`, còn 7 tháng lịch tới 31/12 — W3-02; mọi `termMonths` ≤ 7 nên không
+  `runningUncommitted.amountMinor = 0` trước ca; số tiền mục = giá tháng của dòng × `termMonths` (ngày cố định `2026-06-01`, còn 7 tháng lịch tới 31/12 — W3-02; mọi `termMonths` ≤ 7 nên không
   sang năm sau), không ghi tay `amount_minor`. **Bảng giá fixture (I-2):** Miro Business dòng **500.000**/tháng, Notion Plus **300.000**/tháng, Slack Pro
   **250.000**/tháng; Miro `termMonths: 4` = 2.000.000 (`5` = 2.500.000), Notion `termMonths: 5` = 1.500.000, Slack `termMonths: 2` = 500.000:
 
@@ -651,13 +651,13 @@ dùng chung: `test/support/request-ticket-harness.ts` (A-T1; gói sau chỉ **im
 **Fixture sau đợt 3 (DL-7, DL-19 — bài học K-1, K-5, R-7 của FIX-W3-FINAL-3/-4):**
 
 - Gói `K2` (Figma, Miro, Notion…): thuê bao có **workspace** và **dòng** với `monthly_unit_price_minor`; **một dòng sống mỗi gói mỗi workspace** (W3-14,
-  `SubscriptionDuplicatePlanError`) — hai gói cùng ứng dụng là hai dòng; cần hai thuê bao cùng gói ⟹ workspace thứ hai (mẫu `secondWorkspaceOf` ở
-  `test/integration/requests/request-price-source.integration-spec.ts`; helper `test/support/w3-lines-world.ts`).
+  `SubscriptionDuplicatePlanError`) — hai gói cùng ứng dụng là hai dòng; cần hai thuê bao cùng gói ⟹ workspace thứ hai (dựng qua builder `declarePlan`/`declareSubscription` — `test/support/builders/catalog.builder.ts`, không gửi `responsibleItAdminEmployeeId` — và
+  `POST /workspaces`; **không** dùng mẫu `secondWorkspaceOf`/`w3-lines-world.ts` vì chúng sửa giá bằng SQL).
 - Gói `K4` dựng bằng `POST /license-lots` (+ nhập khóa); `POST /subscriptions` `PERPETUAL` ⟹ 422 `SUBSCRIPTION.PERPETUAL_IS_LICENSE_LOT`. Gói `K4`
   `DEVICE_KEY` cho ca §7.2 M chỉ cần gói (bị từ chối ở `assess`).
 - Số tiền: giá tháng của dòng × `termMonths` ghi rõ trong ca (bảng giá §7.3), **ngày cố định** `2026-06-01` (mẫu `20d87002`; `hireDate` của harness ≤
   ngày đó), tháng lịch W3-02 / `QĐ-120f`. Không sửa `unit_price_minor`/`amount_minor` bằng SQL (code đọc giá dòng và `monthly_price_minor` — R-7).
-- Ngân sách: test khẳng định tiền điều kiện `runningUncommittedMinor = 0` của `CC-DES` năm đang kiểm (route ngân sách) trước ca có số; không chép công thức.
+- Ngân sách: test khẳng định tiền điều kiện `runningUncommitted.amountMinor = 0` của `CC-DES` năm đang kiểm (route ngân sách) trước ca có số; không chép công thức.
 - SQL thô chỉ ở spec schema (`request-ticket-schema`, `request-reply-schema`); chèn `access_requests` `PRICED` `RECURRING` phải có `monthly_price_minor`
   (CHECK `access_requests_monthly_price_check`). Mọi ca nghiệp vụ đi **qua route/service thật**; ca đồng thời không tự viết `SELECT … FOR UPDATE` thay service.
 
@@ -818,21 +818,21 @@ khớp); các lệch còn lại là vị trí code, fixture, kỹ thuật — đ
 
 ### 16.4. Bản 3.1 — quyết định Owner 27/11 và review độc lập
 
-| Mã             | Áp ở                                                                                                                                                                     |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| OQ-W4-5 = A    | §7.2 bước 3 (chặn theo gói; đính chính trích dẫn `QĐ-116az`(1) + ngoại lệ Owner chấp nhận), ca O (năm + tháng ⟹ 201); OQ-W4-8 đóng                                       |
-| OQ-W4-6, 7 = A | §12, CODE-PROMPT, PLAN (worktree, orchestrator gộp `feat/redesign-w4*`, CI mỗi cổng)                                                                                     |
-| I-1            | §7.2 _Refactor_: `submitWithin` không gọi `assessParty`; A-T1 ca `K5` nội bộ không Cost Center ⟹ 201                                                                     |
-| I-2            | §7.3 bảng giá fixture + `termMonths` từng mục; §7.7 (a)(b), chuyển một bước; §11.2                                                                                       |
-| I-3            | PLAN B-CORE (fixture `spend-effects.service.spec.ts:66-98`, `requests-work-facade.module.spec.ts:257` thêm `ticket: null`), C-CONV (`step-reassignment.service.spec.ts`) |
-| I-4            | §11.1 dòng _nền_: `RETRYABLE`, `COMMITMENT_NOT_HOLDABLE` chỉ ở unit                                                                                                      |
-| I-5, I-6       | CODE-PROMPT §1 cổng 0 (`gh workflow run ci.yml --ref dev` làm run nền; kiểm SPEC 3.x + DELTA trên `dev`)                                                                 |
-| M-1            | PLAN wave B chia B1/B2                                                                                                                                                   |
-| M-2            | PLAN gói vá G-HTTP ở cổng A: tách toàn bộ 28 controller sang `requests-http.module.ts`                                                                                   |
-| M-3, M-4       | §7.2 bước 2, 4; §8.3; T-W4-17, T-W4-18                                                                                                                                   |
-| M-5            | §7.4 (+1 câu `refsOf` là chủ ý)                                                                                                                                          |
-| M-6            | DELTA mục 4 lệnh 1 thêm `src/modules/budgets`, `src/modules/catalog`, `src/core`                                                                                         |
-| M-7, M-8       | PLAN/CODE-PROMPT: `FIX-TEST-w4.md` chỉ orchestrator; orchestrator gộp trong worktree riêng `w4-gate`                                                                     |
-| M-9            | tên file mảnh registry thống nhất `api-collection-registry-{nested,events}-w4-<gói>.ts` (§7.4, PLAN 3.2)                                                                 |
-| M-10           | §6.2 câu E5 về khóa FK                                                                                                                                                   |
-| (thêm)         | §11.1: chạy đột biến xong phải `git restore`                                                                                                                             |
+| Mã             | Áp ở                                                                                                                                                                      |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OQ-W4-5 = A    | §7.2 bước 3 (chặn theo gói; đính chính trích dẫn `QĐ-116az`(1) + ngoại lệ Owner chấp nhận), ca O (năm + tháng ⟹ 201); OQ-W4-8 đóng                                        |
+| OQ-W4-6, 7 = A | §12, CODE-PROMPT, PLAN (worktree, orchestrator gộp `feat/redesign-w4*`, CI mỗi cổng)                                                                                      |
+| I-1            | §7.2 _Refactor_: `submitWithin` không gọi `assessParty`; A-T1 ca `K5` nội bộ không Cost Center ⟹ 201                                                                      |
+| I-2            | §7.3 bảng giá fixture + `termMonths` từng mục; §7.7 (a)(b), chuyển một bước; §11.2                                                                                        |
+| I-3            | PLAN B-CORE (fixture `spend-effects.service.spec.ts:66-108`, `requests-work-facade.module.spec.ts:257` thêm `ticket: null`), C-CONV (`step-reassignment.service.spec.ts`) |
+| I-4            | §11.1 dòng _nền_: `RETRYABLE`, `COMMITMENT_NOT_HOLDABLE` chỉ ở unit                                                                                                       |
+| I-5, I-6       | CODE-PROMPT §1 cổng 0 (`gh workflow run ci.yml --ref dev` làm run nền; kiểm SPEC 3.x + DELTA trên `dev`)                                                                  |
+| M-1            | PLAN wave B chia B1/B2                                                                                                                                                    |
+| M-2            | PLAN gói vá G-HTTP ở cổng A: tách toàn bộ 28 controller sang `requests-http.module.ts`                                                                                    |
+| M-3, M-4       | §7.2 bước 2, 4; §8.3; T-W4-17, T-W4-18                                                                                                                                    |
+| M-5            | §7.4 (+1 câu `refsOf` là chủ ý)                                                                                                                                           |
+| M-6            | DELTA mục 4 lệnh 1 thêm `src/modules/budgets`, `src/modules/catalog`, `src/core`                                                                                          |
+| M-7, M-8       | PLAN/CODE-PROMPT: `FIX-TEST-w4.md` chỉ orchestrator; orchestrator gộp trong worktree riêng `w4-gate`                                                                      |
+| M-9            | tên file mảnh registry thống nhất `api-collection-registry-{nested,events}-w4-<gói>.ts` (§7.4, PLAN 3.2)                                                                  |
+| M-10           | §6.2 câu E5 về khóa FK                                                                                                                                                    |
+| (thêm)         | §11.1: chạy đột biến xong phải `git restore`                                                                                                                              |

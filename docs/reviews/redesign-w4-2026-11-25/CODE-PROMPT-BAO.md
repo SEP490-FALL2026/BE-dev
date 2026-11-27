@@ -54,6 +54,11 @@ Tạo `PROGRESS-lane-b.md` (bảng gói → trạng thái → sha → test chín
 Mỗi commit: bộ kiểm nhanh PLAN mục 4 + `CI=true pnpm test -- <spec của file đã sửa>`. Đột biến SPEC §11.1 của gói: chạy tay, ghi `pkg/<gói>.md`, **bắt buộc**
 `git restore <file>` rồi chạy lại spec xanh trước khi commit. Registry/manifest: chỉ file mảnh `*-w4-<gói>.ts` + 1 dòng import/spread ở file gộp.
 
+**Luật riêng làn B (để gộp với làn N không vỡ):** (1) spec mới dựng `AccessRequestRecord` bằng `as unknown as AccessRequestRecord` (B-CORE làn N thêm trường
+`ticket` bắt buộc); (2) **không** thêm provider/controller vào `requests.module.ts` (G-HTTP làn N chuyển controller); (3) ca gửi lại/trình lại sau _Trả về
+của người_ trong test làn B gửi kèm ghi chú (B-REPLY/C-BATCH làn N sẽ bắt buộc ghi chú); (4) lý do `SpendItemOutcome.reason` chép **đúng** SPEC §8.3 (B-CORE
+làn N dùng cùng enum).
+
 ## 3. Dừng
 
 Theo CODE-PROMPT mục 5 (điều kiện 2–9, 11), thêm: cần sửa file của làn N hoặc của gói nối (C-SUBMIT, C-NEED, C-SPEND) ⟹ dừng phần đó, ghi _Bàn giao_ ở
