@@ -251,7 +251,7 @@ export class SubscriptionPeriodService {
     if (!organization) throw new Error('A renewal was recorded before installation');
 
     const status = subscriptionStatusOf(plan, 'TERM', linePricing.statusState(state));
-    const priced = status === 'ACTIVE' ? linePricing.activePriced : linePricing.priced;
+    const priced = linePricing.priced;
     const takesPrimary = status === 'ACTIVE' && previous.isPrimaryForPlan;
     if (takesPrimary) await this.pool.releasePrimary(tx, actor, organization.id, previous.id);
     if (oldLines.length > 0)
@@ -389,17 +389,15 @@ export class SubscriptionPeriodService {
       : null;
     const priced = await this.pricing.priceToday(tx, unitMoney);
     const minor = firstLineOf(kept)?.monthlyUnitPriceMinor ?? previous.monthlyUnitPriceMinor ?? 0n;
-    const activePriced = priced;
 
     return {
       priced,
-      activePriced,
       monthlyUnitPriceMinor: single.monthlyUnitPriceMinor,
       activeMonthlyUnitPriceMinor: single.monthlyUnitPriceMinor ?? minor,
       resolved,
       statusState: <T extends Record<string, unknown>>(s: T) => ({
         ...s,
-        ...activePriced,
+        ...priced,
       }),
     };
   }
@@ -424,7 +422,6 @@ export class SubscriptionPeriodService {
         : [];
     return {
       priced,
-      activePriced: priced,
       monthlyUnitPriceMinor,
       activeMonthlyUnitPriceMinor: monthlyUnitPriceMinor,
       resolved,
@@ -437,14 +434,16 @@ export class SubscriptionPeriodService {
     oldLineCount: number,
     billingCycle: BillingCycle,
   ) {
-    if (kept.length !== 1 || oldLineCount !== 1) return { unitMoney: null, monthlyUnitPriceMinor: null };
-    return resolveSubscriptionPrices({
+    if (kept.length !== 1 || oldLineCount !== 1) return { monthlyUnitPriceMinor: null };
+    const { monthlyUnitPriceMinor } = resolveSubscriptionPrices({
       kind: 'TERM',
       billingCycle,
       cycleChanged: false,
       sentMonthly: { amountMinor: kept[0].monthlyUnitPriceMinor, currency: 'VND' },
       sentUnit: undefined,
     });
+
+    return { monthlyUnitPriceMinor };
   }
 
   private async resolveInputLines(oldLines: readonly SubscriptionLineRecord[], input: NextPeriodInput) {
