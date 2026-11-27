@@ -57,4 +57,36 @@ describe('DeviceActivationRepo', () => {
       ]),
     );
   });
+
+  it('findById resolves subscriptionId from licenseKey.licenseLotId when key belongs to a license lot', async () => {
+    const findUnique = jest.fn().mockResolvedValue({
+      id: 'act-1',
+      organizationId: 'org-1',
+      deviceId: 'dev-1',
+      planId: 'plan-1',
+      licenseKeyId: 'key-lot',
+      origin: 'OPERATION',
+      movedFromActivationId: null,
+      activatedOn: new Date('2026-11-25T00:00:00Z'),
+      activatedAt: new Date('2026-11-25T01:00:00Z'),
+      activatedByAppUserId: 'user-1',
+      overActivationCap: false,
+      deactivatedOn: null,
+      deactivatedAt: null,
+      endCause: null,
+      licenseReleased: null,
+      closedByAppUserId: null,
+      licenseKey: {
+        subscriptionId: null,
+        licenseLotId: 'lot-1',
+        masked: 'XXXX-1111',
+        withdrawnAt: null,
+      },
+    });
+    const repo = new DeviceActivationRepo({ deviceActivation: { findUnique } } as unknown as PrismaService);
+
+    const record = await repo.findById('act-1');
+
+    expect(record?.subscriptionId).toBe('lot-1');
+  });
 });

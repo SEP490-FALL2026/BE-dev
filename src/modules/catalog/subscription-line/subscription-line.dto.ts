@@ -46,18 +46,9 @@ const seatChangeItemSchema = z.strictObject({
   id: z.uuid(),
   effectiveOn: z.string(),
   delta: z.number().int(),
-  reason: z.enum([
-    'INITIAL',
-    'RENEWAL',
-    'REQUEST_GRANT',
-    'REQUEST_REFUND',
-    'TOP_UP',
-    'TIER_UP',
-    'REDUCE',
-    'CORRECTION',
-  ]),
-  source: z.enum(['REQUEST_ITEM', 'VENDOR_RECORD', 'ADJUSTMENT']),
-  basis: z.enum(['ACTUAL', 'RECORDED', 'NONE']),
+  reason: z.enum(['INITIAL', 'TOP_UP', 'RENEWAL', 'REDUCE']),
+  source: z.enum(['GRANT', 'ADJUSTMENT', 'VENDOR_RECORD', 'MEMBER']),
+  basis: z.enum(['REQUEST_ITEM', 'NONE']),
   request: z.strictObject({ id: z.uuid(), code: z.string().nullable() }).nullable(),
   beneficiary: z
     .strictObject({

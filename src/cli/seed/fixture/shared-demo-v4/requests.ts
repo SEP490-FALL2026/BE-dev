@@ -76,6 +76,7 @@ export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIs
     r({
       key: 'R64',
       requester: 'NV-OFF1',
+      readAs: 'NV-ENGH',
       plan: 'grammarly-pro',
       termMonths: 3,
       target: 'COMPLETED',

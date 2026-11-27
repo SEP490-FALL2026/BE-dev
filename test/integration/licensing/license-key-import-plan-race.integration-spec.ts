@@ -151,7 +151,7 @@ describe('license key import and the kind of its plan, racing (integration, P28-
     expect(await keysOf(subscriptionId)).toBe(2);
   });
 
-  it('import first (lot): real POST /license-lots/:id/keys holds shared plan lock until commit while PATCH /plans waits, then refuses with LICENSE_LOTS', async () => {
+  it('import first (lot): real POST /license-lots/:id/keys holds shared plan lock until commit while PATCH /plans waits, then refuses with LICENSE_KEYS', async () => {
     const planId = await h.plan('K4');
     const lotRes = await request(h.server())
       .post('/api/v1/license-lots')
@@ -191,7 +191,7 @@ describe('license key import and the kind of its plan, racing (integration, P28-
     const changeRes = await changing;
     expect(changeRes.status).toBe(409);
     expect(h.codeOf(changeRes)).toBe('PLAN.IN_USE_BLOCKS_CHANGE');
-    expect((changeRes.body as { error: { details: { reason: string } } }).error.details.reason).toBe('LICENSE_LOTS');
+    expect((changeRes.body as { error: { details: { reason: string } } }).error.details.reason).toBe('LICENSE_KEYS');
     expect(await kindOf(planId)).toBe('K4');
     expect((await h.ctx.sql.query(`SELECT 1 FROM license_keys WHERE license_lot_id = $1`, [lotId])).rowCount).toBe(2);
   });

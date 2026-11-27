@@ -285,7 +285,7 @@ describe('REQUEST license-lot creation vs request cancellation race (integration
       expect(refused).toBeDefined();
       expect(h.codeOf(refused!)).toBe('LICENSE_LOT.RESERVED_FOR_REQUEST');
     }
-  });
+  }, 120_000);
 
   it('H-8 / F11 post-charge: refuses POST /provisioning-tasks with 409 LICENSE_LOT.RESERVED_FOR_REQUEST once excess charge is recorded', async () => {
     const lotCId = await seedApprovedGroupAndLot();

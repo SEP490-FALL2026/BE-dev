@@ -123600,21 +123600,9 @@
                     "id": { "type": "string", "format": "uuid" },
                     "effectiveOn": { "type": "string" },
                     "delta": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
-                    "reason": {
-                      "type": "string",
-                      "enum": [
-                        "INITIAL",
-                        "RENEWAL",
-                        "REQUEST_GRANT",
-                        "REQUEST_REFUND",
-                        "TOP_UP",
-                        "TIER_UP",
-                        "REDUCE",
-                        "CORRECTION"
-                      ]
-                    },
-                    "source": { "type": "string", "enum": ["REQUEST_ITEM", "VENDOR_RECORD", "ADJUSTMENT"] },
-                    "basis": { "type": "string", "enum": ["ACTUAL", "RECORDED", "NONE"] },
+                    "reason": { "type": "string", "enum": ["INITIAL", "TOP_UP", "RENEWAL", "REDUCE"] },
+                    "source": { "type": "string", "enum": ["GRANT", "ADJUSTMENT", "VENDOR_RECORD", "MEMBER"] },
+                    "basis": { "type": "string", "enum": ["REQUEST_ITEM", "NONE"] },
                     "request": {
                       "type": "object",
                       "properties": {

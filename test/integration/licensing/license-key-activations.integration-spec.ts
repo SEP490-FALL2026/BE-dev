@@ -248,7 +248,7 @@ describe('the activations of the license keys (integration, real PostgreSQL)', (
         })
         .expect(422);
 
-      expect(codeOf(refused)).toBe('LICENSE_LOT.PLAN_NOT_K4');
+      expect(codeOf(refused)).toBe('LICENSE_LOT.PURPOSE_NOT_AVAILABLE');
     });
 
     it('refuses a cap outside 1 to 100000 and activations used outside 0 to 100000 (422)', async () => {

@@ -42,6 +42,7 @@ const ACTIVATION_SELECT = {
   licenseKey: {
     select: {
       subscriptionId: true,
+      licenseLotId: true,
       masked: true,
       withdrawnAt: true,
     },
@@ -57,7 +58,7 @@ function toActivationRecord(row: ActivationRow): ActivationRecord {
     deviceId: row.deviceId,
     planId: row.planId,
     licenseKeyId: row.licenseKeyId,
-    subscriptionId: row.licenseKey?.subscriptionId ?? null,
+    subscriptionId: row.licenseKey?.licenseLotId ?? row.licenseKey?.subscriptionId ?? null,
     keyMasked: row.licenseKey?.masked ?? null,
     keyWithdrawn: row.licenseKey ? row.licenseKey.withdrawnAt !== null : false,
     origin: row.origin,

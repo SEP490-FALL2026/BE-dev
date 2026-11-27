@@ -65,14 +65,17 @@ export class SubscriptionResponsibleController {
   ) {
     try {
       const { subscription, changed } = await this.responsible.change(actor, params.id, body);
-      const view = withoutVendorAdminDetail(subscription);
-
-      return {
-        ...view,
-        createdAt: view.createdAt.toISOString(),
-        updatedAt: view.updatedAt.toISOString(),
+      const wire: Record<string, unknown> = {
+        ...withoutVendorAdminDetail(subscription),
+        lines: subscription.lines ?? [],
+        createdAt: subscription.createdAt.toISOString(),
+        updatedAt: subscription.updatedAt.toISOString(),
         changed,
       };
+      delete wire.lineCount;
+      delete wire.seatsToday;
+
+      return wire;
     } catch (error) {
       throw toSubscriptionApiException(error);
     }

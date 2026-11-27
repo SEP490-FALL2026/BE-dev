@@ -119,6 +119,7 @@ describe('device initial records & onboarding checklist step 6 (W2-13, integrati
   });
 
   it('W2-13 (a, b, e): records legacy initial device with past handover and INITIAL key activation without changing activationsUsed, rejects generated format, and completes step 6 after BM-06 signature', async () => {
+    await h.subscription(5);
     const { lotId, keyId } = await createK4KeyPlan(5, 3);
 
     // (b) Rejects generated format as legacy code (422 DEVICE.ASSET_CODE_INVALID)
