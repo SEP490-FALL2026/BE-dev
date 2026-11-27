@@ -28,8 +28,8 @@ from the `production-dependencies` stage (`pnpm install --prod --frozen-lockfile
 holds the production dependencies only: no `jest`, `eslint`, `ts-jest`, `@nestjs/cli`, `prettier` or `@types/*`. What the image
 runs stays in `dependencies`: `prisma` (the CLI behind `node node_modules/prisma/build/index.js migrate deploy`, which the
 `migrate` service of `docker-compose.prod.yml` runs in this same image; its `prisma.config.ts` needs `dotenv` and
-`prisma/config`), `@prisma/client`, `@prisma/adapter-pg`, `@node-rs/argon2`, and `bullmq` with `@nestjs/bullmq` (standby
-queue infrastructure kept by the Owner, OD-R5). Install scripts are not disabled in that stage: pnpm 11 runs only the build
+`prisma/config`), `@prisma/client`, `@prisma/adapter-pg`, `@node-rs/argon2`, `bullmq`, `ioredis` and the
+`@bull-board/api` and `@bull-board/express` dashboard packages. pnpm 11 runs only the build
 scripts `allowBuilds` in `pnpm-workspace.yaml` allows (`@prisma/engines`, which downloads the schema engine that
 `migrate deploy` needs, and `prisma`). `typescript` stays under `node_modules/.pnpm` only as a peer of `prisma` (not
 resolvable from the application). Measured on 30/10/2026 (`docker build --target runtime`): `node_modules` 909 MB to 427 MB
@@ -115,13 +115,17 @@ an argument or an environment variable. The consolidated
 [G0/G1 review](../reviews/g0-g1-remediation-2026-10-15/README.md) records the Linux PTY verification
 through the remediation revision; manual interactive PowerShell verification is still pending.
 The worker uses the same runtime image with command `node dist/worker.js` and has 40 seconds to stop. Set
-`BACKGROUND_JOBS_TRANSPORT=poll` to use the PostgreSQL outbox polling transport. Configure a reachable SMTP service
-separately.
+`BACKGROUND_JOBS_TRANSPORT=poll` and restart the worker to switch email delivery back to PostgreSQL polling.
+The worker in either mode needs a reachable SMTP service. API rate limiting and Bull Board have separate switches.
+Keep `QUEUE_BOARD_ENABLED=false` unless operators need the dashboard. To enable it, set `QUEUE_BOARD_USERNAME`
+and `QUEUE_BOARD_PASSWORD` and open `/ops/queues` through HTTPS. The production password must be at least
+20 characters and differ from the username.
 
 Before the first rollout that includes Redis, set `REDIS_PASSWORD` in the VPS `.env`. If an earlier deploy left an
 orphan named `slm-redis`, verify its container and volume names with `docker inspect slm-redis`. The Owner can stop and
 remove that exact container and remove its old volume by exact name after confirming it is disposable. The deploy script
-never deletes orphans. To reset rate-limit counters, scan only `<REDIS_KEY_PREFIX>:rl:*` and delete the matching keys.
+never deletes orphans. To reset rate-limit counters, scan only `<REDIS_KEY_PREFIX>:rl:*` in batches and delete those
+matching keys. The namespace `<REDIS_KEY_PREFIX>:bull:*` holds jobs and schedules.
 
 Request size: the API refuses a JSON or URL-encoded body over **100 KiB** with 413 `HTTP_PAYLOAD_TOO_LARGE` (one limit in
 code, [API contract](../rules/api-contract.md#errors)); the two import uploads take a multipart file of at most 2 MiB. A

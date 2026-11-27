@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { Logger, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { Worker, type Job } from 'bullmq';
@@ -23,6 +23,9 @@ import { keysUnder, redisTestSettings, withRedisPrefix } from '../../support/red
 
 const RECIPIENT = 'mail-fixture@example.test';
 const TOKEN = 'fixture-only-private-payload';
+
+@Module({})
+class DatabaseShutdownFixture {}
 
 interface OutboxState {
   status: string;
@@ -190,8 +193,14 @@ describe('email delivery through BullMQ, PostgreSQL and SMTP', () => {
     return rows[0];
   }
 
-  async function startConsumer(): Promise<void> {
+  async function startConsumer(onDatabaseDestroy = () => undefined): Promise<void> {
     consumerModule = await Test.createTestingModule({
+      imports: [
+        {
+          module: DatabaseShutdownFixture,
+          providers: [{ provide: 'database shutdown fixture', useValue: { onModuleDestroy: onDatabaseDestroy } }],
+        },
+      ],
       providers: [{ provide: EmailQueueConsumer, useValue: consumer }],
     }).compile();
     await consumerModule.init();
@@ -281,8 +290,9 @@ describe('email delivery through BullMQ, PostgreSQL and SMTP', () => {
     holdDelivery = hold;
     await relay.tick();
     const destroying = jest.spyOn(consumer, 'onModuleDestroy');
+    const databaseDestroyed = jest.fn<undefined, []>();
     try {
-      await startConsumer();
+      await startConsumer(databaseDestroyed);
       await waitUntil(async () => (await rowOf(first.id)).status === 'SENDING', 'active outbox lease');
       await hold.active.reached;
       const other = await Promise.all(Array.from({ length: 4 }, () => enqueue()));
@@ -292,9 +302,11 @@ describe('email delivery through BullMQ, PostgreSQL and SMTP', () => {
       void closing.then(closed, () => undefined);
       await waitUntil(() => Promise.resolve(destroying.mock.calls.length > 0), 'worker shutdown hook');
       expect(closed).not.toHaveBeenCalled();
+      expect(databaseDestroyed).not.toHaveBeenCalled();
       expect(await rowOf(first.id)).toMatchObject({ status: 'SENDING', attempts: 1 });
       hold.release.release();
       await closing;
+      expect(databaseDestroyed).toHaveBeenCalledTimes(1);
       consumerModule = undefined;
       expect(await rowOf(first.id)).toMatchObject({ status: 'SENT', attempts: 1 });
       for (const row of other) expect(await rowOf(row.id)).toMatchObject({ status: 'SENT', attempts: 1 });

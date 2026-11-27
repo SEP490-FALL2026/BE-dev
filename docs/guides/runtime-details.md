@@ -96,9 +96,10 @@ không làm mất dữ liệu (danh sách tài khoản trả 503). Băm/kiểm A
 tiết truy vấn candidates, tìm kiếm literal và thứ tự kiểm khi redeem ở
 [spec lát 1b](../workspace/items/us-01-account-invitation-activation/spec.md).
 
-Không đồ thị nào (API, worker, CLI khôi phục, CLI khởi tạo) mount `QueueInfrastructureModule` (Owner E2 = A, H6.4), và
-chỉ API mount `ObjectStorageModule`, qua `CatalogModule`, cho tệp của hợp đồng
-([ADR-0014](../decisions/0014-object-storage-mounted-for-contract-documents.md)); `module-graph.spec.ts` khóa cả hai.
+Worker `bullmq` mount `QueueInfrastructureModule` để chuyển ID outbox và hẹn job dọn đêm. API mount
+`ObjectStorageModule` qua `CatalogModule` cho tệp hợp đồng
+([ADR-0014](../decisions/0014-object-storage-mounted-for-contract-documents.md)). Gate `module-graph` kiểm tra
+chỗ gắn hai module này và Bull Board.
 Factory của module kho gọi validator riêng (`object-storage.config.ts`), nên production bắt buộc endpoint HTTPS kèm
 bucket và khóa truy cập. Worker và các lệnh không đọc các biến đó. `env-schema.ts` kiểm tra cấu hình Redis qua
 `src/infrastructure/redis/redis.config.ts`. WorkerModule cũng chạy `RequestWorkLoop`
@@ -116,13 +117,12 @@ giây cộng chu kỳ vòng; mỗi việc của lượt thử riêng nên việc
 `RequestsWorkFacadeModule` (không controller). Chạy một lượt bằng tay để kiểm: gọi
 `RequestStatusProjectorService.project(now)` từ test tích hợp (`test/support/status-harness.ts`),
 `StepSlaSweepService.sweep(now)` (`test/support/sla-harness.ts`, `sweepAt(now)`: `now` là tham số nên test dựng được
-ngày làm việc, cuối tuần và ngày nghỉ), hay khởi động worker. WorkerModule chạy `EmailDispatchLoop`
-(`src/worker/email-dispatch.job.ts`): vòng thăm dò PostgreSQL mỗi `OUTBOX_POLL_INTERVAL_MS` gửi thư trong EmailOutbox
-([ADR-0012](../decisions/0012-account-email-delivery.md), vẫn **Proposed**) — không cần Redis cho việc này. Vòng lặp là
-orchestration có chủ đích ở composition root vì nối hai module không được import nhau: `notifications` gửi thư qua hợp
-đồng công khai `EmailDeliveryService.dispatchDue` (tệp riêng `email-delivery.service.ts` từ ROOT-HARDEN.1, đăng ký ở
-`PUBLIC_CONTRACT_EXPORTS`), facade `IdentityAccessService.isActionLinkUsable` trả lời liên kết trong thư còn dùng được
-không. `EmailDispatcher`, repo, cipher và transport vẫn private (ROOT.1). Mọi lệnh (`src/cli/<lệnh>/`, bảng
+ngày làm việc, cuối tuần và ngày nghỉ), hay khởi động worker. `OutboxRelayLoop` đưa ID đã đến hạn lên BullMQ,
+`EmailQueueConsumer` lấy dòng qua `EmailDeliveryApi.deliverOne` và hỏi `IdentityAccessApi.isActionLinkUsable` trước khi
+gửi. Chế độ `poll` dùng `EmailDispatchLoop` gọi `EmailDeliveryApi.dispatchDue` mỗi `OUTBOX_POLL_INTERVAL_MS`.
+Cả hai dùng cùng lease PostgreSQL, giới hạn năm lần thử và kiểm tra liên kết. Job dọn đêm chạy lúc 00:00
+`Asia/Ho_Chi_Minh` và 60 giây sau khởi động, giữ khóa advisory và ghi số dòng đã xóa. Xem
+[ADR-0020](../decisions/0020-redis-bullmq-outbox-relay-and-rate-limit.md). Mọi lệnh (`src/cli/<lệnh>/`, bảng
 `src/cli/commands.ts`) dùng chung khung `src/cli/run-command.ts` để ghi lỗi, tắt
 log Nest và nhận `EnvironmentValidationError` bằng `instanceof`; gate cấu trúc quét cả root và infrastructure để chặn so
 khớp lỗi theo `error.name`.

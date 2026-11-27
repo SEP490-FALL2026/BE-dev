@@ -28,8 +28,8 @@ Tracker sống qua compact context. Người code đọc lại file này **đầ
 | T8  | queue + relay + công tắc                                           | xong       | `8c4d1baf` | Unit 12/12, integration timing PostgreSQL + Redis 3/3, typecheck, lint file sửa, arch:check, rules:check, discovery và 342 gate đạt. OpenAPI không drift. Audit sạch, một bản ioredis. | — | D-4, D-5. |
 | T9  | consumer mail                                                      | xong       | `10a87926` | Unit 18/18, integration Redis + PostgreSQL + SMTP 5/5, typecheck, lint file sửa, arch:check, rules:check và 342 gate đạt. OpenAPI không drift. | — | Đã kiểm mất Redis, job cũ, retry SMTP, shutdown, dedup stalled và dữ liệu Redis/log. |
 | T9b | R-11 job dọn đêm (Owner 27/11: C1–C4, 30 ngày, chạy khi khởi động) | xong       | `40df5dfd` | Unit runner/scheduler/poll, integration bảo trì 2/2, mail regression 5/5, 343 gate, typecheck, lint, architecture/capabilities. | — | Một dòng mô tả OpenAPI cho `invitation.delivery`. |
-| T10 | Bull Board                                                         | xong       | commit T10 | Unit 33/33 (gồm env), Redis integration 2/2 với `--detectOpenHandles`, Chrome, 81 gate tập trung, typecheck/lint, audit production sạch. | — | Một bản ioredis; CSP mặc định. |
-| T11 | chốt, ca diệt đột biến                                             | chưa       |     |                                                 |               |                          |
+| T10 | Bull Board                                                         | xong       | `3fbcf5dc` | Unit 33/33 (gồm env), Redis integration 2/2 với `--detectOpenHandles`, Chrome, 81 gate tập trung, typecheck/lint, audit production sạch. | — | Một bản ioredis; CSP mặc định. |
+| T11 | chốt, ca diệt đột biến                                             | xong       | commit T11 | Sáu đột biến làm test đỏ. Sau phục hồi: 53 unit, 27 integration, 3 timing, 343 gate, rules check/format, arch docs, discovery và kiểm OpenAPI. | — | `arch:graph` và `arch:routes` không có diff nội dung. |
 | C2  | CI full toàn đợt                                                   | chưa       |     |                                                 |               |                          |
 
 Trạng thái: `chưa` · `đang làm` · `xong` (chỉ sau khi đối chiếu từng tiêu chí — LUẬT CỨNG 6) · `dừng hỏi`.
@@ -54,15 +54,16 @@ Trạng thái: `chưa` · `đang làm` · `xong` (chỉ sau khi đối chiếu t
 | T9 | R-03 (f), R-04 (a)–(j), R-05 (d), R-08 (c), worker gửi mail và chỉ lưu mã | `email-queue-delivery.integration-spec.ts`, `email-queue.job.spec.ts` | `email-queue.job.ts:41`, `email-queue.job.ts:55` |
 | T9b | R-11 (a)–(j), lịch Việt Nam, phục hồi Redis, chạy lúc khởi động, giới hạn lô và giữ lời mời mới nhất | `nightly-maintenance.integration-spec.ts`, `nightly-maintenance.job.spec.ts`, `nightly-maintenance.runner.spec.ts`, `email-delivery.api.spec.ts`, `module-graph.gate-spec.ts` | `nightly-maintenance.job.ts:86`, `nightly-maintenance.runner.ts:43`, `session.repo.ts:187`, `action-token.repo.ts:24`, `notifications.repo.ts:36` |
 | T10 | R-06 (a)–(i), dashboard chỉ đọc ngoài OpenAPI, xác thực và CSP | `queue-board-auth.spec.ts`, `queue-board.mount.spec.ts`, `queue-board.integration-spec.ts`, `env-matrix.spec.ts`, Chrome headless | `queue-board.mount.ts:19`, `queue-board.mount.ts:44`, `queue-board-auth.ts:15`, `redis.config.ts:104` |
+| T11 | R-10 (a)–(e), gate đồ thị và dependency, tài liệu và kiểm không drift | `module-graph.gate-spec.ts`, `deployment-roles.gate-spec.ts`, `pnpm arch:docs:check`, `pnpm rules:check`, `pnpm rules:format` | `ARCHITECTURE.md:25`, `docs/rules/security-jobs.md:53`, `docs/guides/runtime-details.md:97`, `docs/guides/containers.md:117` |
 
 ## Trọng tâm review (PLAN) → test
 
 | #   | Đầu vào                                             | Test | Kết quả |
 | --- | --------------------------------------------------- | ---- | ------- |
-| 1   | Redis sai mật khẩu                                  |      |         |
-| 2   | Redis đầy (OOM)                                     |      |         |
-| 3   | Job lạ trong hàng                                   |      |         |
-| 4   | `poll` rồi `bullmq`, job cũ của dòng đã `SENT`      |      |         |
+| 1   | Redis sai mật khẩu                                  | `operator-error.spec.ts`, `redis-rate-limit.integration-spec.ts` | Xanh |
+| 2   | Redis đầy (OOM)                                     | `fallback-throttler.storage.spec.ts`, `outbox-relay.job.spec.ts` | Xanh, thử lỗi OOM từ adapter |
+| 3   | Job lạ trong hàng                                   | `email-queue.job.spec.ts`, `email-queue-delivery.integration-spec.ts` | Xanh |
+| 4   | `poll` rồi `bullmq`, job cũ của dòng đã `SENT`      | `email-queue-delivery.integration-spec.ts` | Xanh |
 | 5   | Mật khẩu Bull Board có `:`/không ASCII, base64 hỏng | `queue-board-auth.spec.ts`, `queue-board.integration-spec.ts` | Xanh |
 
 ## Ca diệt đột biến (T1, T11)
@@ -70,12 +71,12 @@ Trạng thái: `chưa` · `đang làm` · `xong` (chỉ sau khi đối chiếu t
 | Ca                                        | Test phải đỏ      | Đỏ thật? | Ghi chú |
 | ----------------------------------------- | ----------------- | -------- | ------- |
 | `import 'ioredis'` trong `src/modules/**` | `pnpm arch:check` | Có | Báo `no-redis-in-modules`. Xóa file thử, chạy lại xanh. |
-| bỏ `deduplication`                        | I-2 (c)           |          |         |
-| `dueIds` dùng điều kiện riêng thiếu lease | I-2 (d)           |          |         |
-| bỏ M4                                     | I-5 / I-3 (g)     |          |         |
-| ném lỗi gốc thay vì mã                    | I-3 (i), U-5      |          |         |
-| storage ném thay vì dự phòng              | I-1 (c), U-3      |          |         |
-| `close()` sau ngắt DB                     | I-3 (h)           |          |         |
+| bỏ `deduplication`                        | I-2 (c)           | Có | 1 ca relay đỏ. |
+| `dueIds` dùng điều kiện riêng thiếu lease | I-2 (d)           | Có | 1 ca relay đỏ. |
+| bỏ M4                                     | I-5 / I-3 (g)     | Có | 2 ca outbox đỏ (`poll` và theo ID). |
+| ném lỗi gốc thay vì mã                    | I-3 (i), U-5      | Có | 1 ca worker unit đỏ. |
+| storage ném thay vì dự phòng              | I-1 (c), U-3      | Có | 3 ca fallback unit đỏ. |
+| `close()` sau ngắt DB                     | I-3 (h)           | Có | 1 ca SMTP đang gửi đỏ khi điểm ngắt DB đến trước lúc thả SMTP. |
 
 ## Kiểm tay
 
@@ -105,11 +106,15 @@ Trạng thái: `chưa` · `đang làm` · `xong` (chỉ sau khi đối chiếu t
 
 | GP  | Khi nào | Làm gì | Commit |
 | --- | ------- | ------ | ------ |
+| GP-6 | Khi tích hợp đợt 3 | Rà `src/app/app.module.spec.ts` nếu đồ thị của đợt 3 có assertion về danh sách module tĩnh. T10 gắn `QueueBoardModule` vào API. | `3fbcf5dc` |
 
 ## Bàn giao (đợt 5 phần 2 / Owner)
 
 | Việc | Chữ ký / file đã có | Ai dùng |
 | ---- | ------------------- | ------- |
+| Vận hành | `BACKGROUND_JOBS_TRANSPORT=poll`, `RATE_LIMIT_STORE=memory`, Bull Board `/ops/queues` | Owner/đội vận hành, [containers](../../guides/containers.md) |
+| Trạng thái lời mời | `invitation.delivery` là `null` khi outbox của lời mời không còn, gồm mail kết thúc bị dọn sau 30 ngày. | FE, `openapi.json` |
+| Lưu giữ dữ liệu | C1–C3 giữ 30 ngày, giữ lời mời mới nhất; C4 giữ ít nhất một ngày và hết chặn. | Làn Docs cập nhật BRD §7.5. |
 
 ## CI GitHub
 

@@ -6,8 +6,8 @@ Mục đích: hai kênh báo tin — email qua outbox giao dịch (worker gửi 
 
 Tầng: T1 ([tiers.cjs](../../../scripts/arch/tiers.cjs)). Phụ thuộc: không module nghiệp vụ nào
 (`infrastructure/database`, `infrastructure/mail`). Được dùng bởi: budgets, data-import, identity-access, licensing,
-organization, personnel, requests ([module-graph](../../../docs/generated/module-graph.md)); worker
-`worker/email-dispatch.job.ts`.
+organization, personnel, requests ([module-graph](../../../docs/generated/module-graph.md)); worker dùng
+`worker/email-queue.job.ts` và `worker/outbox-relay.job.ts` ở chế độ BullMQ, `worker/email-dispatch.job.ts` ở chế độ poll.
 
 ## Public API (`public/`)
 
@@ -18,7 +18,8 @@ organization, personnel, requests ([module-graph](../../../docs/generated/module
   - `deliverHeldToHead(tx, input)` — giao mọi thông báo đang giữ cho trưởng phòng đầu tiên, một lần.
   - `cancelPendingForTokens(tx, hashes)`, `deliveryStates(hashes)` — hủy mail chưa gửi / đọc trạng thái gửi theo token.
 - `EmailDeliveryApi` ([public/email-delivery.api.ts](public/email-delivery.api.ts)): `dispatchDue(isUsable)` gửi
-  một lô đến hạn cho `poll`. Job dọn đêm dùng `purgeFinished(before, limit)` để xóa mail đã kết thúc sau 30 ngày.
+  một lô đến hạn cho `poll`. Relay gọi `dueIds(limit, now)` để lấy ID, consumer gọi `deliverOne(outboxId, isUsable)` để lấy
+  lease và gửi. Job dọn đêm dùng `purgeFinished(before, limit)` để xóa mail đã kết thúc sau 30 ngày.
   Khi mail lời mời đã được dọn, `invitation.delivery` có giá trị `null`.
 - `public/notifications.types.ts` — `EmailTemplate`, `IN_APP_NOTIFICATION_CODES` (bảng mã đóng; hai nhóm cuối là cảnh báo license
   của `a03-license-inbox-alerts` và mười mã `SUBSCRIPTION_*` của gia hạn thuê bao ở `a06-*`: `SUBSCRIPTION_RENEWAL_ALERT`,
