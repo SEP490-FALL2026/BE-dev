@@ -18,6 +18,6 @@ import { SubscriptionLineRepo } from './subscription-line/subscription-line.repo
     CatalogPlanPriceService,
     CatalogPricingApi,
   ],
-  exports: [SubscriptionRepo, SubscriptionPeriodRepo, PlanReferencePriceRepo, CatalogPricingApi],
+  exports: [SubscriptionRepo, SubscriptionPeriodRepo, PlanReferencePriceRepo, SubscriptionLineRepo, CatalogPricingApi],
 })
 export class CatalogPricingFacadeModule {}

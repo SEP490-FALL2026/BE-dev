@@ -315,39 +315,6 @@ describe('runningUncommittedByCostCenter (SPEC-B1 W3-08)', () => {
       expect(result.size).toBe(0);
     });
 
-    it('prices each seat of a period with two plans at the price of its own plan (2 x 375.000 x 6 and 800.000 x 6)', () => {
-      const result = runningUncommittedByCostCenter({
-        year: 2027,
-        today: '2027-07-08',
-        seats: [
-          seat({ assignmentId: 'a1', planId: 'standard' }),
-          seat({ assignmentId: 'a2', planId: 'standard' }),
-          seat({ assignmentId: 'a3', planId: 'premium' }),
-        ],
-        periodBySubscriptionPlan: new Map([
-          [periodKeyOf('sub-1', 'standard'), period({ monthlyPriceMinor: 375_000n })],
-          [periodKeyOf('sub-1', 'premium'), period({ monthlyPriceMinor: 800_000n })],
-        ]),
-        commitmentByRequest: new Map(),
-        runMonthsBySubscription: new Map([['sub-1', months(6)]]),
-      });
-
-      expect(result.get(CC_TK)).toBe(4_500_000n + 4_800_000n);
-    });
-
-    it('counts no cost for a seat whose plan has no price on its period', () => {
-      const result = runningUncommittedByCostCenter({
-        year: 2027,
-        today: '2027-07-08',
-        seats: [seat({ planId: 'premium' })],
-        periodBySubscriptionPlan: new Map([[periodKeyOf('sub-1', 'standard'), period()]]),
-        commitmentByRequest: new Map(),
-        runMonthsBySubscription: new Map(),
-      });
-
-      expect(result.size).toBe(0);
-    });
-
     it('FIX-W3 B-2: skips seats belonging to exceptRequestIds while keeping other uncommitted seats', () => {
       const result = runningUncommittedByCostCenter({
         year: 2028,

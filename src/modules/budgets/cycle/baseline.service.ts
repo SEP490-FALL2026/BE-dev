@@ -9,7 +9,7 @@ import {
   BudgetCycleNotFoundError,
   BudgetNotYourCostCenterError,
 } from '../budget/budget.errors';
-import { BaselineCatalogReads } from './baseline-catalog-reads.service';
+import { BaselineCatalogFacts } from './baseline-catalog-facts.service';
 import { BaselineFlags, type BaselineCarried } from './baseline-flags.service';
 import { BudgetFactsService } from '../budget/budget-facts.service';
 import { CommitmentRepo, heldKey } from '../budget/commitment.repo';
@@ -174,7 +174,7 @@ export class BaselineService {
     private readonly facts: BudgetFactsService,
     private readonly cycles: CycleRepo,
     private readonly organizationReads: OrganizationReadApi,
-    private readonly catalog: BaselineCatalogReads,
+    private readonly catalog: BaselineCatalogFacts,
     private readonly licensing: LicensingApi,
     private readonly commitments: CommitmentRepo,
     private readonly proposals: ProposalRepo,

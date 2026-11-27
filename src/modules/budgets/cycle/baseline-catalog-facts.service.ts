@@ -3,11 +3,11 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import type { BaselineSubscription } from '../../catalog/public/catalog.types';
 import { SubscriptionPeriodApi } from '../../catalog/public/subscription-period.api';
-import { servingMonthlyPriceMinor } from '../budget/serving-line-price.policy';
+import { servingMonthlyPriceMinor } from '../running-uncommitted/serving-line-price.policy';
 
 /** What the baseline reads of the catalog: the subscriptions in force, priced by their lines, and the `KPI-3` of the plans. */
 @Injectable()
-export class BaselineCatalogReads {
+export class BaselineCatalogFacts {
   constructor(
     private readonly catalog: CatalogApi,
     private readonly periods: SubscriptionPeriodApi,
