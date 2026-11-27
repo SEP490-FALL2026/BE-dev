@@ -256,7 +256,7 @@ export class SubscriptionRenewalsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The case is not waiting for its outcome (SUBSCRIPTION_RENEWAL.NOT_AWAITING_OUTCOME); more seats are held than the new period buys, or a cancelled subscription still has seats (SUBSCRIPTION_RENEWAL.EXCESS_NOT_REVOKED, details.seatsInUse, details.quantity); a seat to carry has an open task (SUBSCRIPTION_RENEWAL.SEATS_HAVE_OPEN_TASKS); the new period cannot be recorded as the continuation, for example the period was already continued, or its unit price is not in dong: a price is entered in dong only (SUBSCRIPTION_RENEWAL.PERIOD_REFUSED, details.reason ALREADY_RENEWED, PRICE_NOT_VND and the others). Nothing is written.',
+        'The case is not waiting for its outcome (SUBSCRIPTION_RENEWAL.NOT_AWAITING_OUTCOME); more seats are held than the new period buys, or a cancelled subscription still has seats (SUBSCRIPTION_RENEWAL.EXCESS_NOT_REVOKED, details.seatsInUse, details.quantity); a seat to carry has an open task (SUBSCRIPTION_RENEWAL.SEATS_HAVE_OPEN_TASKS); the new period cannot be recorded as the continuation, for example the period was already continued, or its unit price is not in dong: a price is entered in dong only (SUBSCRIPTION_RENEWAL.PERIOD_REFUSED, details.reason ALREADY_RENEWED, PRICE_NOT_VND and the others; details.planId names the plan when details.reason is APPLICATION_RETIRED). Nothing is written.',
       examples: [
         EXAMPLES.NOT_AWAITING_OUTCOME,
         EXAMPLES.EXCESS_NOT_REVOKED,

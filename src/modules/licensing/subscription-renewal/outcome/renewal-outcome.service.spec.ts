@@ -4,6 +4,7 @@ import type { ApiException } from '../../../../infrastructure/http/errors/api.ex
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { AuditApi } from '../../../audit/public/audit.api';
 import type { SubscriptionPeriodApi } from '../../../catalog/public/subscription-period.api';
+import { SubscriptionPeriodRefusedError } from '../../../catalog/public/subscription-period.errors';
 import type { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import type { AssignmentService } from '../../assignment/assignment.service';
 import type { SubscriptionRenewalSeatRepo } from '../subscription-renewal-seat.repo';
@@ -291,5 +292,41 @@ describe('RenewalOutcomeService', () => {
     );
 
     expect(closeExpiredLines).toHaveBeenCalledWith(tx, 'sub-1', '2027-06-30');
+  });
+
+  it('names the plan whose application is retired in the details of PERIOD_REFUSED, so the route answers which plan blocks the renewal', async () => {
+    const recordNextPeriod = jest
+      .fn()
+      .mockRejectedValue(new SubscriptionPeriodRefusedError('APPLICATION_RETIRED', 'plan-9'));
+    const service = new RenewalOutcomeService(
+      { lineTargetsOfRenewal: jest.fn().mockResolvedValue([]) } as unknown as SubscriptionRenewalRepo,
+      { notEndedBy: jest.fn().mockResolvedValue([]) } as unknown as SubscriptionRenewalSeatRepo,
+      {} as unknown as AssignmentService,
+      { recordNextPeriod } as unknown as SubscriptionPeriodApi,
+      {} as unknown as RenewalPartiesService,
+      {} as unknown as OrganizationReadApi,
+      {} as unknown as AuditApi,
+      {} as unknown as TransactionRunner,
+    );
+
+    const caught = await service
+      .recordIn(
+        {} as never,
+        actor,
+        {
+          record: { id: 'ren-1', subscriptionId: 'sub-1', state: 'DECIDED', decision: { choice: 'RENEW' } } as never,
+          decision: { choice: 'RENEW' } as never,
+          period: { subscriptionId: 'sub-1', purchasedQuantity: 12 } as never,
+        },
+        { outcome: 'AS_DECIDED', nextPeriod: { startDate: '2027-07-01', purchasedQuantity: 12 } as never },
+        { today: '2026-12-01', now: new Date('2026-12-01T00:00:00Z') },
+      )
+      .catch((error: unknown) => error);
+
+    expect(caught).toBeInstanceOf(RenewalError);
+    expect(caught).toMatchObject({
+      problem: 'PERIOD_REFUSED',
+      details: { reason: 'APPLICATION_RETIRED', planId: 'plan-9' },
+    });
   });
 });

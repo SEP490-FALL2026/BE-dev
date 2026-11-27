@@ -360,8 +360,12 @@ export class RenewalOutcomeService {
         unitPricePath: 'nextPeriod.unitPrice',
       });
     } catch (error) {
-      if (error instanceof SubscriptionPeriodRefusedError)
-        throw new RenewalError('PERIOD_REFUSED', { reason: error.reason });
+      if (error instanceof SubscriptionPeriodRefusedError) {
+        throw new RenewalError('PERIOD_REFUSED', {
+          reason: error.reason,
+          ...(error.planId === undefined ? {} : { planId: error.planId }),
+        });
+      }
       throw error;
     }
     if (next.status !== 'ACTIVE' && carry.length > 0) throw new RenewalError('PERIOD_REFUSED', { reason: 'DRAFT' });

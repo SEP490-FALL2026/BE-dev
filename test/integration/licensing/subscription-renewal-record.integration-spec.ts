@@ -266,6 +266,32 @@ describe('the one-write renewal at the point of adjustment (integration, real Po
     });
   });
 
+  it('refuses the new period of a subscription whose application was retired, naming the plan, and writes nothing', async () => {
+    const unit = await h.unit(2);
+    const { subscriptionId } = await h.termWithSeats(unit, 20, { quantity: 10, ...year() });
+    const { rows: plan } = await h.ctx.sql.query<{ plan_id: string; application_id: string }>(
+      `SELECT s.plan_id, p.application_id FROM subscriptions s JOIN plans p ON p.id = s.plan_id WHERE s.id = $1`,
+      [subscriptionId],
+    );
+    await h.ctx.sql.query(`UPDATE applications SET catalog_status = 'RETIRED', retired_at = now() WHERE id = $1`, [
+      plan[0].application_id,
+    ]);
+    const before = await h.count('subscriptions');
+
+    const refused = await record({
+      subscriptionId,
+      choice: 'REDUCE',
+      proposedQuantity: 2,
+      outcome: 'AS_DECIDED',
+      nextPeriod: nextYear(2),
+    });
+
+    expect(refused.status).toBe(409);
+    expect(h.codeOf(refused)).toBe('SUBSCRIPTION_RENEWAL.PERIOD_REFUSED');
+    expect(detailsOf(refused)).toEqual({ reason: 'APPLICATION_RETIRED', planId: plan[0].plan_id });
+    expect(await h.count('subscriptions')).toBe(before);
+  });
+
   it('starts the new period on the renewal day: a reduction in the middle of a year, or a gap after it, is refused and writes nothing (A1C-04)', async () => {
     const unit = await h.unit(2);
     const { subscriptionId, seats } = await h.termWithSeats(unit, 20, { quantity: 10, ...year() });
