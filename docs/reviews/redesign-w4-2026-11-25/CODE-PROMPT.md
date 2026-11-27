@@ -1,5 +1,10 @@
 # Prompt dán sẵn cho Neon — Đợt 4 thiết kế lại (phiếu nhiều mục, orchestrator + subagent song song, bản 3.1)
 
+> **Bản 3.2 (27/11) — chia hai làn:** Owner chốt Bảo làm **làn B** (A-T1, A-POL2, B-SUBMIT-R, B-NEED-R, B-SPEND-R — prompt riêng
+> [CODE-PROMPT-BAO.md](CODE-PROMPT-BAO.md)); Neon (orchestrator) làm **làn N** (A-DB, A-POL1, G-HTTP, B-CORE, B-REPLY, C-WITHDRAW, C-BATCH, C-CONV, C-VIEW,
+> C-LISTS) rồi, sau khi điều phối gộp hai làn, **gói nối** C-SUBMIT, C-NEED, C-SPEND, D-MOBILE, D-SEED, D-DOCS. Nhánh, cổng, điểm chạm harness:
+> [SPLIT-2-LANES.md](SPLIT-2-LANES.md) — **thắng** mục 1–2 dưới đây khi khác. Orchestrator **không** giao gói của làn B; cổng A bỏ điều kiện C0 (thuộc làn B).
+>
 > **Bản 3.1 (27/11):** Owner chốt OQ-W4-5 = A, OQ-W4-6 = A, OQ-W4-7 = A; OQ-W4-8 đóng. Áp review độc lập (I-1…I-6, M-1…M-10 — SPEC §16.4): cổng 0 kiểm SPEC
 > 3.x trên `dev` và chạy run CI nền tay; gói vá G-HTTP ở cổng A; wave B chia B1/B2; orchestrator gộp trong worktree `w4-gate`; đột biến xong phải `git restore`.
 >

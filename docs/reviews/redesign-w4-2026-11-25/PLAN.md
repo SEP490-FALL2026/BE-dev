@@ -1,5 +1,7 @@
 # PLAN — Đợt 4 thiết kế lại: phiếu nhiều mục (27/11/2026, bản 3.1 — chạy song song)
 
+> **Bản 3.2 (27/11):** chia hai làn Neon ‖ Bảo, không đợi nhau tới lúc gộp — [SPLIT-2-LANES.md](SPLIT-2-LANES.md) thay mục 1–2 (ai làm, nhánh, cổng).
+>
 > **Bản 3.1 (27/11):** Owner chốt OQ-W4-5 = A (chặn trùng trong phiếu theo gói; năm/tháng `L-1` không chặn; OQ-W4-8 đóng),
 > OQ-W4-6 = A (ngoại lệ song song riêng đợt 4: worktree, orchestrator gộp vào `feat/redesign-w4*`), OQ-W4-7 = A (CI tay mỗi cổng). Áp review độc lập:
 > I-1 (`submitWithin` không gọi `assessParty`), I-2 (giá/`termMonths` số nguyên), I-3 (fixture `ticket: null`), I-4, I-5, I-6 (cổng 0), M-1 (wave B chia
