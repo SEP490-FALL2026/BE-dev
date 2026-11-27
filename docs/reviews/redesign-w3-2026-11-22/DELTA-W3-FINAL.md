@@ -44,6 +44,13 @@ Ghi nhận thêm (không đổi luật): khi gia hạn, `plan_id` kỳ mới gi�
 - Lỗi theo CHECK/trigger có tên (sổ seat `BELOW_OCCUPANCY`, dòng thuê bao, lô khóa, kích hoạt thiết bị, phiên bản ngân sách) nay ra đúng 409/422 đã
   khai thay vì 500 (D-1 — adapter Prisma 7 bỏ tên constraint; sửa ở `pg-pool.ts`).
 - `ActivationRecord.subscriptionId` mang id **lô** (đã ghi ở DTO/OpenAPI).
+- Đổi mã lỗi của `POST /subscriptions/{id}/lines` (422, chỉ đổi mã, status giữ nguyên; FE đổi chỗ so khớp `error.code`):
+
+  | Mã cũ                       | Mã mới                                        | Lý do                                                                                                  |
+  | --------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+  | `WORKSPACE_VENDOR_MISMATCH` | `SUBSCRIPTION_LINE.WORKSPACE_VENDOR_MISMATCH` | thiếu `DOMAIN.`                                                                                        |
+  | `PLAN.NOT_FOUND` (422)      | `SUBSCRIPTION_LINE.PLAN_NOT_FOUND`            | `PLAN.NOT_FOUND` chỉ đi với 404 ở route plan (một mã một status)                                       |
+  | `APPLICATION.RETIRED` (lỗi) | `SUBSCRIPTION_LINE.APPLICATION_RETIRED`       | `APPLICATION.RETIRED` là key thành công của gỡ ứng dụng; route khác dùng `<ROUTE>.APPLICATION_RETIRED` |
 
 ## 4. Nợ sang đợt 8
 
