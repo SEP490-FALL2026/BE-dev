@@ -290,14 +290,11 @@ describe('license key import and the kind of its plan, racing (integration, P28-
 
     expect((await retiring).status).toBe(200);
     const createRes = await creating;
-    expect([201, 422]).toContain(createRes.status);
+    // The retirement queued first on the lock of the application, so the lot is judged against a retired application.
+    expect(createRes.status).toBe(422);
+    expect(h.codeOf(createRes)).toBe('LICENSE_LOT.APPLICATION_RETIRED');
     const lotCount = (await h.ctx.sql.query(`SELECT 1 FROM license_lots WHERE plan_id = $1`, [planId])).rowCount;
-    if (createRes.status === 422) {
-      expect(h.codeOf(createRes)).toBe('LICENSE_LOT.APPLICATION_RETIRED');
-      expect(lotCount).toBe(0);
-    } else {
-      expect(lotCount).toBe(1);
-    }
+    expect(lotCount).toBe(0);
 
     const followUp = await request(h.server())
       .post('/api/v1/license-lots')

@@ -15,6 +15,8 @@ const handoverResultSchema = z.strictObject({
   toItAdminEmployeeId: z.uuid(),
   subscriptions: z.number().int().nonnegative(),
   applications: z.number().int().nonnegative(),
+  workspaces: z.number().int().nonnegative(),
+  licenseLots: z.number().int().nonnegative(),
   handedOverAt: z.string(),
 });
 

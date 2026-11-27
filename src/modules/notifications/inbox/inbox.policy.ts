@@ -247,8 +247,16 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   SUBSCRIPTION_PRICE_REVIEW: ['subscriptionId', 'purchaseInvoiceId'],
   // What an IT Admin who leaves still answers for, once the day has come and the handover is not done (`QĐ-110j`, `R-26`).
   IT_ADMIN_HANDOVER_PENDING: ['sourceKind', 'sourceId', 'employeeId', 'dueOn'],
-  // The same, told to the IT Admin who took it all: from whom, and how many of each (`QĐ-110j`, SPEC P5).
-  IT_ADMIN_HANDOVER_RECEIVED: ['sourceKind', 'sourceId', 'fromEmployeeId', 'subscriptions', 'applications'],
+  // The same, told to the IT Admin who took it all: from whom, and how many of each: subscriptions, applications, workspaces and license lots.
+  IT_ADMIN_HANDOVER_RECEIVED: [
+    'sourceKind',
+    'sourceId',
+    'fromEmployeeId',
+    'subscriptions',
+    'applications',
+    'workspaces',
+    'licenseLots',
+  ],
   // A departure cancelled after the last working day: how many revocation tasks in progress the IT Admin closes by hand (`QĐ-110c`).
   DEPARTURE_REVOCATION_IT_CLOSE: ['caseId', 'employeeId', 'taskCount'],
   // A new version of a policy: which policy, which version, and whether the reader is asked to acknowledge it (`QĐ-111bi`).

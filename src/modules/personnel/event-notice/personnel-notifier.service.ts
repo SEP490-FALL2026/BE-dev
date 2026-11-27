@@ -430,6 +430,8 @@ export class PersonnelNotifier {
       toEmployeeId: string;
       subscriptions: number;
       applications: number;
+      workspaces: number;
+      licenseLots: number;
     },
   ): Promise<void> {
     await this.tell(tx, input.organizationId, input.toEmployeeId, 'IT_ADMIN_HANDOVER_RECEIVED', {
@@ -440,6 +442,8 @@ export class PersonnelNotifier {
         fromEmployeeId: input.fromEmployeeId,
         subscriptions: input.subscriptions,
         applications: input.applications,
+        workspaces: input.workspaces,
+        licenseLots: input.licenseLots,
       },
       eventKey: `IT_ADMIN_HANDOVER_RECEIVED:${input.source.kind}:${input.source.id}:${randomUUID()}`,
     });

@@ -66,6 +66,17 @@ async function seedPendingK2GrantItem(
   employeeId: string,
 ): Promise<{ requestId: string; taskId: string }> {
   const requestId = h.gate.grantable(employeeId, planId);
+  // The ledger row of a seat bought for a request names it, so the request exists as a row; the gate of the test answers for its state.
+  await h.ctx.sql.query(
+    `INSERT INTO access_requests
+       (id, organization_id, type, branch, state, plan_id, department_id, cost_center_id, requester_employee_id,
+        business_reason, submitted_at, policy, created_by_app_user_id, budget_year, amount_months, amount_minor,
+        amount_currency, term_months, unit_price_minor, monthly_price_minor, price_kind, billing_cycle, pricing_status)
+     VALUES ($1, $2, 'GRANT', 'PAID_IN_CATALOG', 'EXECUTING', $3, $4, (SELECT id FROM cost_centers WHERE department_id = $4 LIMIT 1), $5, 'seat purchase concurrency',
+             now(), '{"version":1,"branch":"PAID_IN_CATALOG","chain":["NEED"],"slaWorkingDays":3}'::jsonb, $6,
+             2026, 6, 3000000, 'VND', 6, 500000, 500000, 'RECURRING', 'MONTHLY', 'PRICED')`,
+    [requestId, h.seed.organizationId, planId, h.seed.departmentId, employeeId, h.it1.appUserId],
+  );
   const assignmentId = randomUUID();
   const taskId = randomUUID();
   const { rows } = await h.ctx.sql.query<{ organization_id: string; app_user_id: string }>(
@@ -97,7 +108,7 @@ async function seedPendingK2GrantItem(
 /**
  * `W3-18` (real PostgreSQL):
  * 20x barrier concurrency with 2 purchases targeting the same `subscription_line` (`period FOR UPDATE` -> `line FOR UPDATE`)
- * never produces PostgreSQL deadlock (`40P01`).
+ * never produces PostgreSQL deadlock (`40P01`), answers 201 to both, adds 2 seats to the ledger of the line and records exactly 2 purchases.
  */
 describe('Seat purchase concurrency (integration, real PostgreSQL, W3-18)', () => {
   const people: string[] = [];
@@ -153,6 +164,15 @@ describe('Seat purchase concurrency (integration, real PostgreSQL, W3-18)', () =
       const itemA = await seedPendingK2GrantItem(planId, empA);
       const itemB = await seedPendingK2GrantItem(planId, empB);
 
+      const ledgerOf = async () =>
+        (
+          await h.ctx.sql.query<{ seats: number; purchases: number }>(
+            `SELECT COALESCE((SELECT sum(delta) FROM seat_changes WHERE subscription_line_id = $1), 0)::int AS seats,
+                    (SELECT count(*) FROM seat_purchases WHERE subscription_line_id = $1)::int AS purchases`,
+            [lineId],
+          )
+        ).rows[0];
+      const before = await ledgerOf();
       const barrier = new Barrier(2);
       const postPurchase = async (item: { requestId: string; beneficiaryEmployeeId: string; taskId: string }) => {
         await barrier.wait();
@@ -167,10 +187,17 @@ describe('Seat purchase concurrency (integration, real PostgreSQL, W3-18)', () =
         postPurchase({ requestId: itemB.requestId, beneficiaryEmployeeId: empB, taskId: itemB.taskId }),
       ]);
 
-      expect(resA.status).toBe('fulfilled');
       if (resA.status === 'rejected') expect(isDeadlockError(resA.reason)).toBe(false);
-      expect(resB.status).toBe('fulfilled');
       if (resB.status === 'rejected') expect(isDeadlockError(resB.reason)).toBe(false);
+      expect(resA.status).toBe('fulfilled');
+      expect(resB.status).toBe('fulfilled');
+      if (resA.status === 'fulfilled' && resB.status === 'fulfilled') {
+        // Two purchases of one seat each for two different people on one line both go through: neither is turned away, none ends in a 5xx.
+        expect([resA.value.status, resB.value.status]).toEqual([201, 201]);
+      }
+      const after = await ledgerOf();
+      expect(after.seats - before.seats).toBe(2);
+      expect(after.purchases - before.purchases).toBe(2);
     }
   });
 });

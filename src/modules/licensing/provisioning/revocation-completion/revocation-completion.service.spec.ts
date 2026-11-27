@@ -41,6 +41,17 @@ describe('RevocationCompletionService (delegates acting IT Admin check via Provi
   it('Ca 6: records MEMBER REDUCE -1 effective on next payment date (2026-12-05) when completing K2 MEMBERS revocation on 2026-11-10', async () => {
     const tx = {} as never;
     const recordMember = jest.fn().mockResolvedValue({ id: 'chg-reduce' });
+    const order: string[] = [];
+    const lockPeriodsAndLines = jest.fn().mockImplementation(() => {
+      order.push('lines');
+
+      return Promise.resolve([]);
+    });
+    const lockAssignment = jest.fn().mockImplementation(() => {
+      order.push('assignment');
+
+      return Promise.resolve({ id: 'asg-1', subscriptionId: 'sub-slack', effectiveFrom: '2026-11-01' });
+    });
     const seatLedger = {
       findLineWithPeriodByPlan: jest.fn().mockResolvedValue({
         line: { id: 'line-slack', ledgerOpenedOn: '2026-11-01', closedOn: null },
@@ -53,6 +64,7 @@ describe('RevocationCompletionService (delegates acting IT Admin check via Provi
           endDate: null,
         },
       }),
+      lockPeriodsAndLines,
       recordMember,
     } as unknown as SeatLedgerApi;
     const aftermath = new RevocationAftermath(
@@ -81,11 +93,7 @@ describe('RevocationCompletionService (delegates acting IT Admin check via Provi
       } as never,
       { views: jest.fn().mockResolvedValue([{ id: 'task-1' }]) } as never,
       {
-        lock: jest.fn().mockResolvedValue({
-          id: 'asg-1',
-          subscriptionId: 'sub-slack',
-          effectiveFrom: '2026-11-01',
-        }),
+        lock: lockAssignment,
         end: jest.fn(),
       } as never,
       { businessToday: jest.fn().mockResolvedValue('2026-11-10') } as never,
@@ -99,12 +107,10 @@ describe('RevocationCompletionService (delegates acting IT Admin check via Provi
 
     await service.complete(ACTOR, 'task-1', { completion: 'ACCOUNT_REMOVED', evidence: 'done' });
 
-    expect(recordMember).toHaveBeenCalledWith(
-      tx,
-      expect.objectContaining({ id: 'line-slack' }),
-      -1,
-      '2026-12-05',
-      expect.objectContaining({ recordedByEmployeeId: ACTOR.employeeId, alreadyLocked: true }),
-    );
+    expect(lockPeriodsAndLines).toHaveBeenCalledWith(tx, ['sub-slack'], ['line-slack']);
+    expect(order).toEqual(['lines', 'assignment']);
+    expect(recordMember).toHaveBeenCalledWith(tx, expect.objectContaining({ id: 'line-slack' }), -1, '2026-12-05', {
+      recordedByEmployeeId: ACTOR.employeeId,
+    });
   });
 });
