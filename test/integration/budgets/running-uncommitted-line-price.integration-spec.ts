@@ -10,6 +10,7 @@ interface BaselineWire {
     estimatedAnnualCost: { amount: string };
     software: {
       subscriptionId: string;
+      planId: string;
       monthsRunning: number;
       monthlyUnitPrice: { amount: string } | null;
       estimatedAnnualCost: { amount: string } | null;
@@ -28,6 +29,7 @@ describe('price of a seat of a period with lines in the running uncommitted cost
   let standardLineId: string;
   let premiumLineId: string;
   let premiumPlanId: string;
+  let standardPlanId: string;
   const today = () => h.today();
   const costOfYear = async (): Promise<bigint> => {
     const facts = h.ctx.app.get(RunningUncommittedFactsService, { strict: false });
@@ -60,7 +62,7 @@ describe('price of a seat of a period with lines in the running uncommitted cost
     await h.withApprover();
     unit = await h.departmentWithHead('P-LP1');
     subscriptionId = await h.subscription(10, 'K2');
-    const standardPlanId = (
+    standardPlanId = (
       await h.ctx.sql.query<{ plan_id: string }>(`SELECT plan_id FROM subscriptions WHERE id = $1`, [subscriptionId])
     ).rows[0].plan_id;
     // The column of the period stays at 1.000.000: only the lines say what a seat costs.
@@ -129,19 +131,29 @@ describe('price of a seat of a period with lines in the running uncommitted cost
     const priceOf = async () =>
       (await baselineOf()).departments
         .find((row) => row.departmentId === unit.department.id)
-        ?.software.find((row) => row.subscriptionId === subscriptionId)?.monthlyUnitPrice?.amount;
+        ?.software.find((row) => row.subscriptionId === subscriptionId && row.planId === standardPlanId)
+        ?.monthlyUnitPrice?.amount;
 
     expect(await priceOf()).toBe('500000');
     await patchLinePrice(standardLineId, '450000');
     expect(await priceOf()).toBe('450000');
   });
 
-  it('charges the year of a period with two plans the line of each plan: one seat at 450.000 and one at 850.000, twelve months', async () => {
+  it('lists a row for each plan of a period with two plans, each at the line of its plan, twelve months: 450.000 x 12 and 850.000 x 12', async () => {
     const department = (await baselineOf()).departments.find((row) => row.departmentId === unit.department.id);
-    const entry = department?.software.find((row) => row.subscriptionId === subscriptionId);
+    const row = (planId: string) =>
+      department?.software.find((entry) => entry.subscriptionId === subscriptionId && entry.planId === planId);
 
-    expect(entry?.monthsRunning).toBe(12);
-    expect(entry?.estimatedAnnualCost?.amount).toBe('15600000');
+    expect(row(standardPlanId)).toMatchObject({
+      monthsRunning: 12,
+      monthlyUnitPrice: { amount: '450000' },
+      estimatedAnnualCost: { amount: '5400000' },
+    });
+    expect(row(premiumPlanId)).toMatchObject({
+      monthsRunning: 12,
+      monthlyUnitPrice: { amount: '850000' },
+      estimatedAnnualCost: { amount: '10200000' },
+    });
     expect(department?.estimatedAnnualCost.amount).toBe('15600000');
   });
 });

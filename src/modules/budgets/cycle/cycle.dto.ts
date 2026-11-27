@@ -70,20 +70,25 @@ export const baselineQuerySchema = z.strictObject({
 
 const softwareView = z.strictObject({
   subscriptionId: z.uuid(),
+  planId: z.uuid().meta({
+    description:
+      'The plan of the row: a period with several plans has a row for each plan the people of the department hold.',
+  }),
   application: z.string(),
   plan: z.string(),
   seatsPurchased: z.number().int().nullable().meta({
-    description: 'The seats the subscription bought in all (the whole shared pool for K2/K4); null when it has none.',
+    description:
+      'The seats the line serving the plan has today (the whole shared pool of that plan for K2/K4), or the seats of a period that has no line; null when it has none.',
   }),
   seatsAssigned: z.number().int().meta({
     description:
-      'The seats the people of the department hold, counted the way the warehouse counts them: a seat that starts later is included.',
+      'The seats of the plan the people of the department hold, counted the way the warehouse counts them: a seat that starts later is included.',
   }),
   monthlyUnitPrice: moneyView.nullable(),
   monthsRunning: z.number().int().min(0).max(12),
   estimatedAnnualCost: moneyView.nullable().meta({
     description:
-      'Seats assigned to the department × monthly price × months running; the idle seats are in sharedPoolUnallocated. Null when the price is not known.',
+      'Seats of the plan assigned to the department × monthly price of the line of the plan × months running; the idle seats are in sharedPoolUnallocated. Null when the price is not known.',
   }),
   suggestRenewal: z.boolean().meta({
     description: 'The term ends within the year, or ends before it and still runs today: a Renew line is suggested.',
@@ -126,7 +131,7 @@ const baselineDepartmentView = z.strictObject({
   softwareTotal: z.number().int(),
   software: z.array(softwareView).max(50).meta({
     description:
-      'The active subscriptions the people of the department hold seats of, by id: at most 50 are listed (the bound of the baseline); softwareTotal says how many there are.',
+      'The active subscriptions the people of the department hold seats of, a row for each plan of a subscription, by subscription id: at most 50 are listed (the bound of the baseline); softwareTotal says how many rows there are.',
   }),
 });
 const poolSoftwareView = z.strictObject({

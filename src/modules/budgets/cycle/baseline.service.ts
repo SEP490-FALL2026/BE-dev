@@ -39,6 +39,9 @@ type Reading = {
   seatPlans: ReadonlyMap<string, ReadonlyMap<string, number>>;
   /** The monthly price of a seat of a plan on a period (the line that serves the plan); null when it has none. */
   priceOf: (subscriptionId: string, planId: string) => bigint | null;
+  /** The seats the line serving the plan has today (the seats bought of a period with no line); null when it has no number of seats. */
+  seatsOf: (subscriptionId: string, planId: string) => number | null;
+  planNameOf: (planId: string) => string;
   /** The subscriptions the company has decided to end: they are not renewed (`Q-162`). */
   ending: ReadonlySet<string>;
   /** `KPI-3` in percent by plan, for the plans that have one. */
@@ -47,18 +50,41 @@ type Reading = {
   format: (minor: bigint) => { amount: string; currency: string };
 };
 
-/** What the seats of the department of one subscription cost, each seat at the line of its own plan. */
-function costByPlanOf(subscription: BaselineSubscription, reading: Reading, terminated: boolean) {
-  const { year, today, seatPlans, priceOf } = reading;
-
-  return subscriptionCostByPlan(
+/** The row of one plan of a subscription the department holds seats of: its seats, the price of its line and what its year costs. */
+function planRowOf(
+  subscription: BaselineSubscription,
+  planId: string,
+  held: number,
+  reading: Reading,
+): { wire: BaselineWire['departments'][number]['software'][number]; cost: bigint | null } {
+  const { year, today, priceOf, seatsOf, planNameOf, ending, kpi3ByPlan, format } = reading;
+  const terminated = ending.has(subscription.subscriptionId);
+  const monthly = priceOf(subscription.subscriptionId, planId);
+  const { months, costMinor } = subscriptionCostByPlan(
     year,
     today,
-    seatPlans.get(subscription.subscriptionId) ?? new Map<string, number>(),
-    (planId) => priceOf(subscription.subscriptionId, planId),
+    new Map([[planId, held]]),
+    () => monthly,
     subscription,
     terminated,
   );
+
+  return {
+    cost: costMinor,
+    wire: {
+      subscriptionId: subscription.subscriptionId,
+      planId,
+      application: subscription.applicationName,
+      plan: planNameOf(planId),
+      seatsPurchased: seatsOf(subscription.subscriptionId, planId),
+      seatsAssigned: held,
+      monthlyUnitPrice: monthly === null ? null : format(monthly),
+      monthsRunning: months,
+      estimatedAnnualCost: costMinor === null ? null : format(costMinor),
+      suggestRenewal: shouldSuggestRenewal(year, today, subscription, terminated),
+      kpi3: kpi3ByPlan.get(planId) ?? null,
+    },
+  };
 }
 
 /**
@@ -77,33 +103,22 @@ export function departmentOf(
     carriedOverShortfall: 0n,
   },
 ): BaselineWire['departments'][number] {
-  const { year, today, seats, ending, kpi3ByPlan, spent, format } = reading;
+  const { seats, seatPlans, spent, format } = reading;
   const software: BaselineWire['departments'][number]['software'] = [];
   let total = 0n;
   let assigned = 0;
   let unknown = false;
+  let rows = 0;
   for (const subscription of subscriptions) {
-    const held = seats.get(subscription.subscriptionId) ?? 0;
-    const terminated = ending.has(subscription.subscriptionId);
-    const monthly = subscription.monthlyPriceMinor;
-    const { months, costMinor: cost } = costByPlanOf(subscription, reading, terminated);
-    total += cost ?? 0n;
-    unknown ||= cost === null;
     // The seats of a period that a later one follows are the later one's too (the same people): they are counted once.
-    if (!subscription.hasSuccessor) assigned += held;
-    if (software.length >= SOFTWARE_LISTED_MAX) continue;
-    software.push({
-      subscriptionId: subscription.subscriptionId,
-      application: subscription.applicationName,
-      plan: subscription.planName,
-      seatsPurchased: subscription.purchasedQuantity,
-      seatsAssigned: held,
-      monthlyUnitPrice: monthly === null ? null : format(monthly),
-      monthsRunning: months,
-      estimatedAnnualCost: cost === null ? null : format(cost),
-      suggestRenewal: shouldSuggestRenewal(year, today, subscription, terminated),
-      kpi3: kpi3ByPlan.get(subscription.planId) ?? null,
-    });
+    if (!subscription.hasSuccessor) assigned += seats.get(subscription.subscriptionId) ?? 0;
+    for (const [planId, held] of seatPlans.get(subscription.subscriptionId) ?? []) {
+      const row = planRowOf(subscription, planId, held, reading);
+      total += row.cost ?? 0n;
+      unknown ||= row.cost === null;
+      rows += 1;
+      if (software.length < SOFTWARE_LISTED_MAX) software.push(row.wire);
+    }
   }
 
   return {
@@ -119,7 +134,7 @@ export function departmentOf(
     estimatedAnnualCost: format(total),
     hasUnknownCost: unknown,
     seatsAssigned: assigned,
-    softwareTotal: subscriptions.length,
+    softwareTotal: rows,
     software,
   };
 }
@@ -251,6 +266,7 @@ export class BaselineService {
     const { allocation, ending } = await this.seatsOf(subscriptions, today);
     const { kpi3ByPlan, planNameOf } = await this.planFacts(subscriptions, pricing.planIdsOf, allocation);
     const spentOf = await this.spentByDepartment(history, today);
+    const common = { year, today, priceOf, seatsOf: pricing.seatsOf, planNameOf, ending, format };
 
     const costCenterIds = [...costCenters.values()];
     // Locked is a state of the cycle (`QĐ-111z`): a draft whose deadline is behind us is not locked, and nobody missed a deadline yet.
@@ -263,7 +279,7 @@ export class BaselineService {
         brief,
         costCenters.get(brief.id) ?? null,
         subscriptions.filter((subscription) => (seats.get(subscription.subscriptionId) ?? 0) > 0),
-        { year, today, seats, seatPlans, priceOf, ending, kpi3ByPlan, spent: spentOf(brief.id), format },
+        { ...common, seats, seatPlans, kpi3ByPlan, spent: spentOf(brief.id) },
         carriedOf(costCenters.get(brief.id) ?? ''),
       );
     });
@@ -278,15 +294,9 @@ export class BaselineService {
       sharedPoolUnallocated:
         departmentId === undefined
           ? sharedPoolLineOf(subscriptions, {
-              year,
-              today,
+              ...common,
               heldByPlan: allocation.heldByPlan,
-              seatsOf: pricing.seatsOf,
               planIdsOf: pricing.planIdsOf,
-              priceOf,
-              planNameOf,
-              ending,
-              format,
             })
           : null,
     };

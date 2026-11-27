@@ -143386,20 +143386,25 @@
                         "type": "object",
                         "properties": {
                           "subscriptionId": { "type": "string", "format": "uuid" },
+                          "planId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "description": "The plan of the row: a period with several plans has a row for each plan the people of the department hold."
+                          },
                           "application": { "type": "string" },
                           "plan": { "type": "string" },
                           "seatsPurchased": {
                             "type": "integer",
                             "minimum": -9007199254740991,
                             "maximum": 9007199254740991,
-                            "description": "The seats the subscription bought in all (the whole shared pool for K2/K4); null when it has none.",
+                            "description": "The seats the line serving the plan has today (the whole shared pool of that plan for K2/K4), or the seats of a period that has no line; null when it has none.",
                             "nullable": true
                           },
                           "seatsAssigned": {
                             "type": "integer",
                             "minimum": -9007199254740991,
                             "maximum": 9007199254740991,
-                            "description": "The seats the people of the department hold, counted the way the warehouse counts them: a seat that starts later is included."
+                            "description": "The seats of the plan the people of the department hold, counted the way the warehouse counts them: a seat that starts later is included."
                           },
                           "monthlyUnitPrice": {
                             "type": "object",
@@ -143414,7 +143419,7 @@
                             "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
                             "required": ["amount", "currency"],
                             "additionalProperties": false,
-                            "description": "Seats assigned to the department × monthly price × months running; the idle seats are in sharedPoolUnallocated. Null when the price is not known.",
+                            "description": "Seats of the plan assigned to the department × monthly price of the line of the plan × months running; the idle seats are in sharedPoolUnallocated. Null when the price is not known.",
                             "nullable": true
                           },
                           "suggestRenewal": {
@@ -143430,6 +143435,7 @@
                         },
                         "required": [
                           "subscriptionId",
+                          "planId",
                           "application",
                           "plan",
                           "seatsPurchased",
@@ -143442,7 +143448,7 @@
                         ],
                         "additionalProperties": false
                       },
-                      "description": "The active subscriptions the people of the department hold seats of, by id: at most 50 are listed (the bound of the baseline); softwareTotal says how many there are."
+                      "description": "The active subscriptions the people of the department hold seats of, a row for each plan of a subscription, by subscription id: at most 50 are listed (the bound of the baseline); softwareTotal says how many rows there are."
                     }
                   },
                   "required": [

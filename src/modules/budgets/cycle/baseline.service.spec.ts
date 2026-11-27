@@ -35,6 +35,9 @@ const reading = (
   ),
   priceOf: (subscriptionId: string) =>
     subscriptions.find((one) => one.subscriptionId === subscriptionId)?.monthlyPriceMinor ?? null,
+  seatsOf: (subscriptionId: string) =>
+    subscriptions.find((one) => one.subscriptionId === subscriptionId)?.purchasedQuantity ?? null,
+  planNameOf: (planId: string) => `Plan ${planId}`,
   ending,
   kpi3ByPlan,
   spent: 0n,
@@ -112,7 +115,14 @@ describe('one department of the baseline', () => {
     });
 
     expect(department.estimatedAnnualCost).toEqual(format(15_600_000n));
-    expect(department.software[0]).toMatchObject({ seatsAssigned: 2, monthlyUnitPrice: format(500_000n) });
+    // One row for each plan of the period, each at the line of its own plan (the decision of the Owner on 27/11).
+    expect(department.softwareTotal).toBe(2);
+    expect(
+      department.software.map((row) => [row.planId, row.seatsAssigned, row.monthlyUnitPrice, row.estimatedAnnualCost]),
+    ).toEqual([
+      ['standard', 1, format(500_000n), format(6_000_000n)],
+      ['premium', 1, format(800_000n), format(9_600_000n)],
+    ]);
   });
 
   it('AF-08 KPI-3: tells the KPI-3 of the plan when usage was assessed, null otherwise', () => {

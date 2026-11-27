@@ -120,4 +120,26 @@ describe('the baseline of a period with two plans: a row for each plan, the idle
     expect(pool?.seatsIdle).toBe(10);
     expect(pool?.estimatedAnnualCost.amount).toBe('70800000');
   });
+
+  it('lists a row for each plan the department holds: its seats, its line price and its year, 3 x 500.000 x 12 and 2 x 800.000 x 12', async () => {
+    const department = (await baselineOf()).departments.find((row) => row.departmentId === unit.department.id);
+    const rows = (department?.software ?? [])
+      .filter((row) => row.subscriptionId === subscriptionId)
+      .sort((a, b) => Number(a.monthlyUnitPrice?.amount) - Number(b.monthlyUnitPrice?.amount));
+
+    expect(
+      rows.map((row) => [
+        row.planId,
+        row.seatsPurchased,
+        row.seatsAssigned,
+        row.monthlyUnitPrice?.amount,
+        row.estimatedAnnualCost?.amount,
+      ]),
+    ).toEqual([
+      [standardPlanId, 10, 3, '500000', '18000000'],
+      [premiumPlanId, 5, 2, '800000', '19200000'],
+    ]);
+    expect(rows.map((row) => row.plan)).toEqual([expect.any(String), 'Premium idle']);
+    expect(department?.estimatedAnnualCost.amount).toBe('37200000');
+  });
 });
