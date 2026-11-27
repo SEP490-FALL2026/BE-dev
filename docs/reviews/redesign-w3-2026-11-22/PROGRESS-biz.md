@@ -344,6 +344,10 @@ SELECT l."id" AS "license_lot_id", s."id" AS "subscription_id", s."unit_price_cu
  WHERE s."unit_price_currency" IS NOT NULL AND s."unit_price_currency" <> 'VND';
 ```
 
+Roll forward của migration này (không sửa file migration đã có): các lô sinh ở `20261203000200` đã **chép** giá từ thuê bao nguồn lúc đó, nên sửa
+giá của thuê bao sau đó **không** sửa giá của lô. Câu SELECT trên trả dòng nào thì xử lý **cả hai**: sửa `unit_price_*` của thuê bao nguồn
+sang VND **và** sửa giá của lô tương ứng (`license_lots`, theo `license_lot_id` ở kết quả), rồi mới triển khai lại.
+
 ### Kết quả Manual CI `45958467303` (`int/redesign-w3` @ `20d87002`)
 
 - `select`: **PASS** | `quality`: **PASS** | `http-contract`: **PASS** | `e2e-smoke`: **PASS** | `integration-inband` (`13/13` `_serial` gồm `seed-check-runtime`): **PASS** | `Deploy to VPS`: **skipped**
