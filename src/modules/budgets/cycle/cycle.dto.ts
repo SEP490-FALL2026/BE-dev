@@ -74,7 +74,7 @@ const softwareView = z.strictObject({
     description:
       'The plan of the row: a period with several plans has a row for each plan the people of the department hold.',
   }),
-  application: z.string(),
+  application: z.string().meta({ description: 'The application of the plan of the row.' }),
   plan: z.string(),
   seatsPurchased: z.number().int().nullable().meta({
     description:
@@ -128,7 +128,10 @@ const baselineDepartmentView = z.strictObject({
     description: 'A subscription its people hold has no price the baseline can use: its cost is left out of the total.',
   }),
   seatsAssigned: z.number().int(),
-  softwareTotal: z.number().int(),
+  softwareTotal: z.number().int().meta({
+    description:
+      'How many rows there are in all: a row for each (subscription, plan) the people of the department hold.',
+  }),
   software: z.array(softwareView).max(50).meta({
     description:
       'The active subscriptions the people of the department hold seats of, a row for each plan of a subscription, by subscription id: at most 50 are listed (the bound of the baseline); softwareTotal says how many rows there are.',
@@ -137,9 +140,12 @@ const baselineDepartmentView = z.strictObject({
 const poolSoftwareView = z.strictObject({
   subscriptionId: z.uuid(),
   planId: z.uuid().meta({ description: 'The plan of the row: a period with several plans has a row for each plan.' }),
-  application: z.string(),
+  application: z.string().meta({ description: 'The application of the plan of the row.' }),
   plan: z.string(),
-  seatsPurchased: z.number().int().meta({ description: 'The seats the line serving the plan has today.' }),
+  seatsPurchased: z.number().int().meta({
+    description:
+      'The seats the line serving the plan has today; the seats bought of the period when the period has no line.',
+  }),
   seatsAssigned: z
     .number()
     .int()
@@ -160,10 +166,12 @@ const sharedPoolLineView = z.strictObject({
   estimatedAnnualCost: moneyView,
   hasUnknownCost: z.boolean(),
   seatsIdle: z.number().int(),
-  softwareTotal: z.number().int(),
+  softwareTotal: z.number().int().meta({
+    description: 'How many rows there are in all: a row for each (subscription, plan) with idle seats.',
+  }),
   software: z.array(poolSoftwareView).max(50).meta({
     description:
-      'The K2/K4 subscriptions with idle seats, by id: at most 50 are listed; softwareTotal says how many there are.',
+      'One row for each (subscription, plan) of a K2/K4 period with idle seats, by subscription id: at most 50 are listed; softwareTotal says how many rows there are.',
   }),
 });
 /** What runs today, department by department, and what it is estimated to cost over the year (`FR-5.15`, `R-I03`). */

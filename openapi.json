@@ -143378,7 +143378,12 @@
                       "description": "A subscription its people hold has no price the baseline can use: its cost is left out of the total."
                     },
                     "seatsAssigned": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
-                    "softwareTotal": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                    "softwareTotal": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "How many rows there are in all: a row for each (subscription, plan) the people of the department hold."
+                    },
                     "software": {
                       "maxItems": 50,
                       "type": "array",
@@ -143391,7 +143396,7 @@
                             "format": "uuid",
                             "description": "The plan of the row: a period with several plans has a row for each plan the people of the department hold."
                           },
-                          "application": { "type": "string" },
+                          "application": { "type": "string", "description": "The application of the plan of the row." },
                           "plan": { "type": "string" },
                           "seatsPurchased": {
                             "type": "integer",
@@ -143483,7 +143488,12 @@
                   },
                   "hasUnknownCost": { "type": "boolean" },
                   "seatsIdle": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
-                  "softwareTotal": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                  "softwareTotal": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991,
+                    "description": "How many rows there are in all: a row for each (subscription, plan) with idle seats."
+                  },
                   "software": {
                     "maxItems": 50,
                     "type": "array",
@@ -143496,13 +143506,13 @@
                           "format": "uuid",
                           "description": "The plan of the row: a period with several plans has a row for each plan."
                         },
-                        "application": { "type": "string" },
+                        "application": { "type": "string", "description": "The application of the plan of the row." },
                         "plan": { "type": "string" },
                         "seatsPurchased": {
                           "type": "integer",
                           "minimum": -9007199254740991,
                           "maximum": 9007199254740991,
-                          "description": "The seats the line serving the plan has today."
+                          "description": "The seats the line serving the plan has today; the seats bought of the period when the period has no line."
                         },
                         "seatsAssigned": {
                           "type": "integer",
@@ -143547,7 +143557,7 @@
                       ],
                       "additionalProperties": false
                     },
-                    "description": "The K2/K4 subscriptions with idle seats, by id: at most 50 are listed; softwareTotal says how many there are."
+                    "description": "One row for each (subscription, plan) of a K2/K4 period with idle seats, by subscription id: at most 50 are listed; softwareTotal says how many rows there are."
                   }
                 },
                 "required": ["line", "estimatedAnnualCost", "hasUnknownCost", "seatsIdle", "softwareTotal", "software"],

@@ -5,6 +5,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { LicensingApi } from '../../licensing/public/licensing.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import {
+  BaselinePlanMissingError,
   BudgetBaselineVersionNotAllowedError,
   BudgetCycleNotFoundError,
   BudgetNotYourCostCenterError,
@@ -41,7 +42,8 @@ type Reading = {
   priceOf: (subscriptionId: string, planId: string) => bigint | null;
   /** The seats the line serving the plan has today (the seats bought of a period with no line); null when it has no number of seats. */
   seatsOf: (subscriptionId: string, planId: string) => number | null;
-  planNameOf: (planId: string) => string;
+  /** The name of a plan and of its application: a period with several plans may hold plans of several applications. */
+  planFactsOf: (planId: string) => { planName: string; applicationName: string };
   /** The subscriptions the company has decided to end: they are not renewed (`Q-162`). */
   ending: ReadonlySet<string>;
   /** `KPI-3` in percent by plan, for the plans that have one. */
@@ -57,7 +59,7 @@ function planRowOf(
   held: number,
   reading: Reading,
 ): { wire: BaselineWire['departments'][number]['software'][number]; cost: bigint | null } {
-  const { year, today, priceOf, seatsOf, planNameOf, ending, kpi3ByPlan, format } = reading;
+  const { year, today, priceOf, seatsOf, planFactsOf, ending, kpi3ByPlan, format } = reading;
   const terminated = ending.has(subscription.subscriptionId);
   const monthly = priceOf(subscription.subscriptionId, planId);
   const { months, costMinor } = subscriptionCostByPlan(
@@ -74,8 +76,8 @@ function planRowOf(
     wire: {
       subscriptionId: subscription.subscriptionId,
       planId,
-      application: subscription.applicationName,
-      plan: planNameOf(planId),
+      application: planFactsOf(planId).applicationName,
+      plan: planFactsOf(planId).planName,
       seatsPurchased: seatsOf(subscription.subscriptionId, planId),
       seatsAssigned: held,
       monthlyUnitPrice: monthly === null ? null : format(monthly),
@@ -149,7 +151,8 @@ interface PoolReading extends Pick<Reading, 'year' | 'today' | 'ending' | 'forma
   seatsOf: (subscriptionId: string, planId: string) => number | null;
   /** The plans a period serves. */
   planIdsOf: (subscriptionId: string) => readonly string[];
-  planNameOf: (planId: string) => string;
+  /** The name of a plan and of its application: a period with several plans may hold plans of several applications. */
+  planFactsOf: (planId: string) => { planName: string; applicationName: string };
 }
 
 /**
@@ -192,7 +195,7 @@ function poolRowOf(
   planId: string,
   reading: PoolReading,
 ): { wire: PoolLine['software'][number]; cost: bigint | null } | null {
-  const { year, today, heldByPlan, seatsOf, priceOf, planNameOf, ending, format } = reading;
+  const { year, today, heldByPlan, seatsOf, priceOf, planFactsOf, ending, format } = reading;
   const purchased = seatsOf(subscription.subscriptionId, planId);
   const holding = heldByPlan.get(subscription.subscriptionId)?.get(planId) ?? 0;
   const idle = poolIdleSeats(subscription.provisioningType, purchased, holding);
@@ -212,8 +215,8 @@ function poolRowOf(
     wire: {
       subscriptionId: subscription.subscriptionId,
       planId,
-      application: subscription.applicationName,
-      plan: planNameOf(planId),
+      application: planFactsOf(planId).applicationName,
+      plan: planFactsOf(planId).planName,
       seatsPurchased: purchased ?? 0,
       seatsAssigned: holding,
       seatsIdle: idle,
@@ -264,9 +267,9 @@ export class BaselineService {
     ]);
     const { subscriptions, priceOf } = pricing;
     const { allocation, ending } = await this.seatsOf(subscriptions, today);
-    const { kpi3ByPlan, planNameOf } = await this.planFacts(subscriptions, pricing.planIdsOf, allocation);
+    const { kpi3ByPlan, planFactsOf } = await this.planFacts(subscriptions, pricing.planIdsOf, allocation);
     const spentOf = await this.spentByDepartment(history, today);
-    const common = { year, today, priceOf, seatsOf: pricing.seatsOf, planNameOf, ending, format };
+    const common = { year, today, priceOf, seatsOf: pricing.seatsOf, planFactsOf, ending, format };
 
     const costCenterIds = [...costCenters.values()];
     // Locked is a state of the cycle (`QĐ-111z`): a draft whose deadline is behind us is not locked, and nobody missed a deadline yet.
@@ -307,7 +310,10 @@ export class BaselineService {
     subscriptions: readonly BaselineSubscription[],
     planIdsOf: (subscriptionId: string) => readonly string[],
     allocation: SeatAllocation,
-  ): Promise<{ kpi3ByPlan: Map<string, number>; planNameOf: (planId: string) => string }> {
+  ): Promise<{
+    kpi3ByPlan: Map<string, number>;
+    planFactsOf: (planId: string) => { planName: string; applicationName: string };
+  }> {
     const planIds = [
       ...new Set([
         ...subscriptions.flatMap((one) => planIdsOf(one.subscriptionId)),
@@ -315,15 +321,15 @@ export class BaselineService {
       ]),
     ];
     const kpi3ByPlan = await this.catalog.kpi3Of(planIds);
-    const names = await this.catalog.planNames(planIds);
+    const facts = await this.catalog.planFacts(planIds);
 
     return {
       kpi3ByPlan,
-      planNameOf: (planId) => {
-        const name = names.get(planId);
-        if (name === undefined) throw new Error(`The baseline reads a plan that does not exist: ${planId}`);
+      planFactsOf: (planId) => {
+        const plan = facts.get(planId);
+        if (plan === undefined) throw new BaselinePlanMissingError(planId);
 
-        return name;
+        return plan;
       },
     };
   }

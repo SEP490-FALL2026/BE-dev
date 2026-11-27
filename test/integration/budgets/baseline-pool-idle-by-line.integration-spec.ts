@@ -13,6 +13,7 @@ interface BaselineWire {
     software: {
       subscriptionId: string;
       planId: string;
+      application: string;
       plan: string;
       seatsPurchased: number | null;
       seatsAssigned: number;
@@ -27,6 +28,7 @@ interface BaselineWire {
     software: {
       subscriptionId: string;
       planId: string;
+      application: string;
       plan: string;
       seatsPurchased: number;
       seatsAssigned: number;
@@ -83,10 +85,19 @@ describe('the baseline of a period with two plans: a row for each plan, the idle
       `UPDATE subscription_lines SET monthly_unit_price_minor = 500000 WHERE subscription_id = $1`,
       [subscriptionId],
     );
+    // The second plan belongs to another application of the same vendor (a period binds the vendor, not the application).
     premiumPlanId = (
       await h.ctx.sql.query<{ id: string }>(
-        `INSERT INTO plans (id, organization_id, application_id, name, normalized_name, provisioning_type, pricing_model, control_level, key_binding)
-         SELECT gen_random_uuid(), organization_id, application_id, 'Premium idle', 'premium idle', provisioning_type,
+        `WITH app AS (
+           INSERT INTO applications (id, organization_id, kind, vendor_id, functional_group_id, name, normalized_name,
+             responsible_it_admin_employee_id)
+           SELECT gen_random_uuid(), a.organization_id, a.kind, a.vendor_id, a.functional_group_id, 'Premium app idle',
+                  'premium app idle', a.responsible_it_admin_employee_id
+             FROM plans p JOIN applications a ON a.id = p.application_id WHERE p.id = $1
+           RETURNING id
+         )
+         INSERT INTO plans (id, organization_id, application_id, name, normalized_name, provisioning_type, pricing_model, control_level, key_binding)
+         SELECT gen_random_uuid(), organization_id, (SELECT id FROM app), 'Premium idle', 'premium idle', provisioning_type,
                 pricing_model, control_level, key_binding
            FROM plans WHERE id = $1
          RETURNING id`,
@@ -119,6 +130,7 @@ describe('the baseline of a period with two plans: a row for each plan, the idle
 
     expect(pool?.seatsIdle).toBe(10);
     expect(pool?.estimatedAnnualCost.amount).toBe('70800000');
+    expect(pool?.software.find((row) => row.planId === premiumPlanId)?.application).toBe('Premium app idle');
   });
 
   it('lists a row for each plan the department holds: its seats, its line price and its year, 3 x 500.000 x 12 and 2 x 800.000 x 12', async () => {
@@ -140,6 +152,9 @@ describe('the baseline of a period with two plans: a row for each plan, the idle
       [premiumPlanId, 5, 2, '800000', '19200000'],
     ]);
     expect(rows.map((row) => row.plan)).toEqual([expect.any(String), 'Premium idle']);
+    // Each row names the application of its own plan, not the one of the plan of the period.
+    expect(rows[1].application).toBe('Premium app idle');
+    expect(rows[0].application).not.toBe('Premium app idle');
     expect(department?.estimatedAnnualCost.amount).toBe('37200000');
   });
 });

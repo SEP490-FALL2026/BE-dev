@@ -37,7 +37,7 @@ const reading = (
     subscriptions.find((one) => one.subscriptionId === subscriptionId)?.monthlyPriceMinor ?? null,
   seatsOf: (subscriptionId: string) =>
     subscriptions.find((one) => one.subscriptionId === subscriptionId)?.purchasedQuantity ?? null,
-  planNameOf: (planId: string) => `Plan ${planId}`,
+  planFactsOf: (planId: string) => ({ planName: `Plan ${planId}`, applicationName: `App of ${planId}` }),
   ending,
   kpi3ByPlan,
   spent: 0n,
@@ -125,6 +125,56 @@ describe('one department of the baseline', () => {
     ]);
   });
 
+  it('names each row by the plan and the application of its own plan: a period of two applications of one vendor shows both', () => {
+    const period = subscription(1, { planId: 'jira', applicationName: 'Jira' });
+    const names = new Map([
+      ['jira', { planName: 'Jira Standard', applicationName: 'Jira' }],
+      ['confluence', { planName: 'Confluence Premium', applicationName: 'Confluence' }],
+    ]);
+
+    const department = departmentOf({ id: 'dep', code: 'D', name: 'Dep' }, 'cc', [period], {
+      ...reading([period], new Map([[period.subscriptionId, 2]])),
+      seatPlans: new Map([
+        [
+          period.subscriptionId,
+          new Map([
+            ['jira', 1],
+            ['confluence', 1],
+          ]),
+        ],
+      ]),
+      planFactsOf: (planId: string) => names.get(planId) as { planName: string; applicationName: string },
+    });
+
+    expect(department.software.map((row) => [row.application, row.plan])).toEqual([
+      ['Jira', 'Jira Standard'],
+      ['Confluence', 'Confluence Premium'],
+    ]);
+  });
+
+  it('lists the first 50 rows when a department holds two plans of many subscriptions, and counts every row in softwareTotal', () => {
+    const subscriptions = Array.from({ length: 26 }, (_, index) => subscription(index));
+    const seatPlans = new Map(
+      subscriptions.map((one) => [
+        one.subscriptionId,
+        new Map([
+          ['standard', 1],
+          ['premium', 1],
+        ]),
+      ]),
+    );
+
+    const department = departmentOf({ id: 'dep', code: 'D', name: 'Dep' }, 'cc', subscriptions, {
+      ...reading(subscriptions, new Map(subscriptions.map((one) => [one.subscriptionId, 2]))),
+      seatPlans,
+    });
+
+    // 26 subscriptions x 2 plans = 52 rows: 50 are listed, the total counts all 52, and the year of every row is in the cost.
+    expect(department.software).toHaveLength(SOFTWARE_LISTED_MAX);
+    expect(department.softwareTotal).toBe(52);
+    expect(department.estimatedAnnualCost).toEqual(format(BigInt(52 * 100 * 12)));
+  });
+
   it('AF-08 KPI-3: tells the KPI-3 of the plan when usage was assessed, null otherwise', () => {
     const used = subscription(1, { planId: 'slack' });
     const unknown = subscription(2, { planId: 'figma' });
@@ -163,7 +213,7 @@ describe('BR-MF4-01 QĐ-103k: the line Unallocated - shared pool of the baseline
         subscriptions.filter((one) => one.subscriptionId === subscriptionId).map((one) => one.planId),
       priceOf: (subscriptionId) =>
         subscriptions.find((one) => one.subscriptionId === subscriptionId)?.monthlyPriceMinor ?? null,
-      planNameOf: (planId) => `Plan ${planId}`,
+      planFactsOf: (planId) => ({ planName: `Plan ${planId}`, applicationName: `App of ${planId}` }),
       ending: new Set(),
       format,
     });
@@ -210,7 +260,7 @@ describe('BR-MF4-01 QĐ-103k: the line Unallocated - shared pool of the baseline
       seatsOf: (_subscriptionId, planId) => seats.get(planId) ?? null,
       planIdsOf: () => ['standard', 'premium'],
       priceOf: (_subscriptionId, planId) => prices.get(planId) ?? null,
-      planNameOf: (planId) => planId,
+      planFactsOf: (planId) => ({ planName: planId, applicationName: planId === 'premium' ? 'Confluence' : 'Jira' }),
       ending: new Set(),
       format,
     });
@@ -218,6 +268,8 @@ describe('BR-MF4-01 QĐ-103k: the line Unallocated - shared pool of the baseline
     // 7 idle Standard at 500.000 + 3 idle Premium at 800.000 = 5.900.000 a month, twelve months.
     expect(pool.estimatedAnnualCost).toEqual(format(70_800_000n));
     expect(pool.seatsIdle).toBe(10);
+    // The second plan is of another application of the same vendor: its row names that application, not the one of the period.
+    expect(pool.software.map((row) => row.application)).toEqual(['Jira', 'Confluence']);
     expect(pool.software.map((row) => [row.planId, row.seatsIdle, row.monthlyUnitPrice])).toEqual([
       ['standard', 7, format(500_000n)],
       ['premium', 3, format(800_000n)],

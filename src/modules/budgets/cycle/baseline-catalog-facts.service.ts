@@ -92,11 +92,19 @@ export class BaselineCatalogFacts {
     };
   }
 
-  /** The name of each of these plans, by id. */
-  async planNames(planIds: readonly string[], tx?: DbTx): Promise<Map<string, string>> {
+  /** The name of each of these plans and of the application each belongs to, by plan id. */
+  async planFacts(
+    planIds: readonly string[],
+    tx?: DbTx,
+  ): Promise<Map<string, { planName: string; applicationName: string }>> {
     const summaries = await this.catalog.getPlanSummaries(planIds, tx);
 
-    return new Map(summaries.map((summary) => [summary.planId, summary.planName]));
+    return new Map(
+      summaries.map((summary) => [
+        summary.planId,
+        { planName: summary.planName, applicationName: summary.applicationName },
+      ]),
+    );
   }
 
   /** `KPI-3` in percent by plan, for the plans that have one. */
