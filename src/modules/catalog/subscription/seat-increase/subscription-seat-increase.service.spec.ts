@@ -33,7 +33,7 @@ const baseInput = (overrides: Partial<SeatIncrease> = {}): SeatIncrease => ({
   ...overrides,
 });
 
-function harness(options: { usableIds?: string[]; superAdminId?: string | null }) {
+function harness(options: { usableIds?: string[]; superAdminId?: string | null; financeId?: string | null }) {
   const tx = { tag: 'tx' } as unknown as DbTx;
   const notifyInApp = jest.fn<Promise<boolean>, [DbTx, NoticeCall]>().mockResolvedValue(true);
   const identity = {
@@ -41,6 +41,9 @@ function harness(options: { usableIds?: string[]; superAdminId?: string | null }
     findUsableSuperAdminEmployeeId: jest
       .fn()
       .mockResolvedValue(options.superAdminId === undefined ? 'emp-sa' : options.superAdminId),
+    findUsableFinanceEmployeeId: jest
+      .fn()
+      .mockResolvedValue(options.financeId === undefined ? 'emp-fin' : options.financeId),
   };
 
   const service = new SubscriptionSeatIncreaseService({ notifyInApp } as never, identity as never);
@@ -103,5 +106,31 @@ describe('SubscriptionSeatIncreaseService', () => {
     const draft = harness({ usableIds: ['emp-it1'] });
     expect(await draft.service.told(draft.tx, baseInput({ status: 'DRAFT' }))).toBe(0);
     expect(draft.notifyInApp).not.toHaveBeenCalled();
+  });
+
+  it('W3-03: toldReduction notifies R1 + Finance with SUBSCRIPTION_SEATS_REDUCED and ISO timestamp eventKey', async () => {
+    const { tx, service, notifyInApp } = harness({ usableIds: ['emp-khoa'], financeId: 'emp-fin' });
+    const updatedAt = new Date('2026-11-25T10:00:00.000Z');
+
+    const count = await service.toldReduction(tx, {
+      organizationId: 'org-1',
+      subscriptionId: 'sub-1',
+      planProvisioningType: 'K2',
+      status: 'ACTIVE',
+      responsibleItAdminEmployeeId: 'emp-khoa',
+      from: 12,
+      to: 11,
+      updatedAt,
+      actor: actorOf('emp-nam'),
+    });
+
+    expect(count).toBe(2);
+    expect(notifyInApp.mock.calls.map((c) => c[1].recipientEmployeeId)).toEqual(['emp-khoa', 'emp-fin']);
+    expect(notifyInApp.mock.calls[0][1]).toMatchObject({
+      code: 'SUBSCRIPTION_SEATS_REDUCED',
+      subject: { type: 'SUBSCRIPTION', id: 'sub-1' },
+      params: { subscriptionId: 'sub-1', fromQuantity: 12, toQuantity: 11, changedByEmployeeId: 'emp-nam' },
+      eventKey: 'SUBSCRIPTION_SEATS_REDUCED:sub-1:2026-11-25T10:00:00.000Z',
+    });
   });
 });

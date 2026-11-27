@@ -124,11 +124,11 @@ describe('the spend of the people of a request for a group, decided one by one o
       expect(stored.rows[0].next_year_amount_minor).toBe(String(2 * 12 * M));
     });
 
-    describe('RQ-2: each person is held for their own months, a person cut at the end of a contract included (R-38, QĐ-111j)', () => {
+    describe('RQ-2: each person is held for their own months, a person cut at the end of a contract included (R-38, W3-02 calendar months)', () => {
       /**
-       * The day is fixed: the business day is 10 November of the year. Two staff and an intern ask for 6 months of a plan of 1.000.000 a month:
-       * the staff months begin 10/11, 10/12 and then four of the year after (6.000.000 in all: 2.000.000 and 4.000.000), the intern's contract ends
-       * 05/12, so only the month of 10/11 begins (1.000.000, nothing of the year after).
+       * The day is fixed: the business day is 10 November of the year. Two staff and an intern ask for 6 months of a K2 plan of 1.000.000 a month
+       * (end 09/05 of the next year -> W3-02 calendar months: Nov+Dec = 2 in year 1, Jan..May = 5 in year 2): the staff hold 2.000.000 and keep
+       * 5.000.000 each; the intern's contract ends 05/12, covering calendar months Nov and Dec (2.000.000 this year, nothing of the year after).
        */
       const cutGroup = async (contractEnd = `${h.year}-12-05`) => {
         const u = await unit();
@@ -178,13 +178,13 @@ describe('the spend of the people of a request for a group, decided one by one o
         ).rows[0];
       afterEach(() => jest.restoreAllMocks());
 
-      it('prices the whole group for each person own end: 2.000.000 + 2.000.000 + 1.000.000', async () => {
+      it('prices the whole group for each person own calendar months: 2.000.000 + 2.000.000 + 2.000.000', async () => {
         const { priced } = await cutGroup();
 
-        expect(priced).toBe('5000000');
+        expect(priced).toBe('6000000');
       });
 
-      it('approving the two staff and refusing the intern holds exactly what the two cost: 4.000.000, not a third of the group taken away', async () => {
+      it('approving the two staff and refusing the intern holds exactly what the two cost: 4.000.000 now and 2 × 5.000.000 = 10.000.000 next year', async () => {
         const { id, e1, e2, e3 } = await cutGroup();
 
         await h
@@ -208,17 +208,16 @@ describe('the spend of the people of a request for a group, decided one by one o
           [
             [h.year, '2000000', true],
             [h.year, '2000000', true],
-            [h.year + 1, '4000000', false],
-            [h.year + 1, '4000000', false],
+            [h.year + 1, '5000000', false],
+            [h.year + 1, '5000000', false],
           ].sort(),
         );
         expect(rows.some((row) => row.employee_id === e3.employeeId)).toBe(false);
-        expect(await kept(id)).toEqual({ amount_minor: '4000000', next_year_amount_minor: '8000000' });
+        expect(await kept(id)).toEqual({ amount_minor: '4000000', next_year_amount_minor: '10000000' });
       });
 
-      it('a contract that ends in January cuts only the year after: the intern holds 2.000.000 now and keeps 1.000.000 of the next year, the staff 4.000.000 each (T-R38)', async () => {
-        // The intern months that begin by 31/01 are 10/11, 10/12 and 10/01: two this year and one the next. Counting the intern like the staff
-        // (no cut) would keep 4.000.000 of the year after instead of 1.000.000.
+      it('a contract that ends in January cuts only the year after: the intern holds 2.000.000 now and keeps 1.000.000 of the next year, the staff 5.000.000 each (T-R38)', async () => {
+        // The intern ends 31/01: Nov and Dec this year (2M) and Jan next year (1M). Staff keep Jan..May (5M each).
         const { id, e1, e2, e3 } = await cutGroup(`${h.year + 1}-01-31`);
 
         await h
@@ -232,14 +231,14 @@ describe('the spend of the people of a request for a group, decided one by one o
         expect(
           Object.fromEntries(rows.filter((row) => !row.held).map((row) => [row.employee_id, row.amount_minor])),
         ).toEqual({
-          [e1.employeeId]: '4000000',
-          [e2.employeeId]: '4000000',
+          [e1.employeeId]: '5000000',
+          [e2.employeeId]: '5000000',
           [e3.employeeId]: '1000000',
         });
-        expect(await kept(id)).toEqual({ amount_minor: '6000000', next_year_amount_minor: '9000000' });
+        expect(await kept(id)).toEqual({ amount_minor: '6000000', next_year_amount_minor: '11000000' });
       });
 
-      it('approving all three holds 5.000.000: 2.000.000 for each of the staff and 1.000.000 for the intern, who keeps nothing of the year after', async () => {
+      it('approving all three holds 6.000.000: 2.000.000 each for Nov+Dec, and the intern keeps nothing of the year after', async () => {
         const { id, e1, e2, e3 } = await cutGroup();
 
         await h
@@ -247,18 +246,18 @@ describe('the spend of the people of a request for a group, decided one by one o
           .expect(200);
 
         expect((await h.commitments(id)).map((commitment) => [commitment.year, commitment.amount_minor])).toEqual([
-          [h.year, '5000000'],
+          [h.year, '6000000'],
         ]);
         const held = (await rowsOf(id)).filter((row) => row.held);
         expect(Object.fromEntries(held.map((row) => [row.employee_id, row.amount_minor]))).toEqual({
           [e1.employeeId]: '2000000',
           [e2.employeeId]: '2000000',
-          [e3.employeeId]: '1000000',
+          [e3.employeeId]: '2000000',
         });
         expect((await rowsOf(id)).filter((row) => !row.held).map((row) => row.employee_id)).not.toContain(
           e3.employeeId,
         );
-        expect(await kept(id)).toEqual({ amount_minor: '5000000', next_year_amount_minor: '8000000' });
+        expect(await kept(id)).toEqual({ amount_minor: '6000000', next_year_amount_minor: '10000000' });
       });
     });
 

@@ -40,15 +40,18 @@ export interface OpenServiceMonths {
 
 export interface NewPurchaseInvoice {
   organizationId: string;
-  linkKind: 'REQUEST' | 'SUBSCRIPTION';
+  linkKind: 'REQUEST' | 'SUBSCRIPTION' | 'LICENSE_LOT';
   requestId: string | null;
   provisioningTaskId: string | null;
   subscriptionId: string | null;
+  seatPurchaseId?: string | null;
+  subscriptionLineIds?: readonly string[];
+  licenseLotId?: string | null;
   vendorId: string;
   number: string;
   issuedOn: BusinessDate;
   serviceMonth: BusinessDate;
-  label: 'NEW_PURCHASE' | 'PERIOD' | 'RENEWAL';
+  label: 'NEW_PURCHASE' | 'PERIOD' | 'RENEWAL' | 'SEAT_PURCHASE';
   periodIndex: number | null;
   periodCount: number | null;
   quantity: number;
@@ -73,7 +76,7 @@ export interface NewPurchaseInvoice {
 
 export interface PurchaseInvoiceFilter {
   state?: 'SUBMITTED' | 'CONFIRMED' | 'RETURNED';
-  label?: 'NEW_PURCHASE' | 'PERIOD' | 'RENEWAL';
+  label?: 'NEW_PURCHASE' | 'PERIOD' | 'RENEWAL' | 'SEAT_PURCHASE';
   vendorId?: string;
   subscriptionId?: string;
   requestId?: string;
@@ -134,9 +137,28 @@ export class PurchaseInvoiceRepo {
     );
   }
 
-  /** How many submissions of the request or subscription were not returned, and the month the earliest of them pays for. */
+  /** Active non-withdrawn/non-cancelled beneficiary count (`m`) for `requestId` (`GROUP_GRANT` active lines or beneficiaries). */
+  async activeBeneficiaryCount(requestId: string, tx?: DbTx): Promise<number> {
+    const req = await (tx ?? this.prisma).accessRequest.findUnique({
+      where: { id: requestId },
+      select: {
+        type: true,
+        state: true,
+        lines: { select: { state: true } },
+        _count: { select: { beneficiaries: true } },
+      },
+    });
+    if (!req) return 0;
+    if (req.type === 'GROUP_GRANT') {
+      return req.lines.filter((line) => line.state !== 'WITHDRAWN' && line.state !== 'CANCELLED').length;
+    }
+
+    return req.state === 'WITHDRAWN' || req.state === 'CANCELLED' ? 0 : Math.max(1, req._count.beneficiaries);
+  }
+
+  /** How many submissions of the request, subscription, or lot were not returned, and the month the earliest of them pays for. */
   async earlierOf(
-    link: { requestId: string } | { subscriptionId: string },
+    link: { requestId: string } | { subscriptionId: string } | { licenseLotId: string },
     tx?: DbTx,
   ): Promise<{ count: number; earliestServiceMonth: BusinessDate | null }> {
     const aggregate = await (tx ?? this.prisma).purchaseInvoice.aggregate({
@@ -169,6 +191,45 @@ export class PurchaseInvoiceRepo {
     return rows[0]?.found === true;
   }
 
+  /** Whether a non-returned purchase invoice already links to `seatPurchaseId`. */
+  async seatPurchaseHasOpenInvoice(seatPurchaseId: string, tx?: DbTx): Promise<boolean> {
+    const found = await (tx ?? this.prisma).purchaseInvoice.findFirst({
+      where: { seatPurchaseId, state: { not: 'RETURNED' } },
+      select: { id: true },
+    });
+
+    return found !== null;
+  }
+
+  /** Returns which lines are already covered by non-returned period `purchase_invoices` for `(subscriptionId, serviceMonth)`. */
+  async invoicedLinesForMonth(
+    subscriptionId: string,
+    serviceMonth: BusinessDate,
+    tx?: DbTx,
+  ): Promise<{ wholePeriodInvoiced: boolean; lineIds: Set<string> }> {
+    const rows = await (tx ?? this.prisma).purchaseInvoice.findMany({
+      where: {
+        linkKind: 'SUBSCRIPTION',
+        subscriptionId,
+        seatPurchaseId: null,
+        serviceMonth: toDateColumn(serviceMonth),
+        state: { not: 'RETURNED' },
+      },
+      select: { subscriptionLineIds: true },
+    });
+    const lineIds = new Set<string>();
+    let wholePeriodInvoiced = false;
+    for (const row of rows) {
+      if (row.subscriptionLineIds.length === 0) {
+        wholePeriodInvoiced = true;
+      } else {
+        for (const id of row.subscriptionLineIds) lineIds.add(id);
+      }
+    }
+
+    return { wholePeriodInvoiced, lineIds };
+  }
+
   async insert(tx: DbTx, input: NewPurchaseInvoice): Promise<PurchaseInvoiceRow> {
     return tx.purchaseInvoice.create({
       data: {
@@ -177,6 +238,9 @@ export class PurchaseInvoiceRepo {
         requestId: input.requestId,
         provisioningTaskId: input.provisioningTaskId,
         subscriptionId: input.subscriptionId,
+        seatPurchaseId: input.seatPurchaseId ?? null,
+        subscriptionLineIds: input.subscriptionLineIds ? [...input.subscriptionLineIds] : [],
+        licenseLotId: input.licenseLotId ?? null,
         vendorId: input.vendorId,
         number: input.number,
         issuedOn: toDateColumn(input.issuedOn),

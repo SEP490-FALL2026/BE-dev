@@ -110,7 +110,6 @@ describe('the vendor admins gate and the renewal of a period (integration, real 
       commitmentTermMonths: 1,
       startDate: '2026-04-05',
       purchasedQuantity: 3,
-      responsibleItAdminEmployeeId: h.it1.employeeId,
     };
 
     const declared = await request(h.server()).post('/api/v1/subscriptions').set(h.as(h.it1)).send(body).expect(422);

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../../generated/prisma/client';
-import { fromDateColumn, toDateColumn } from '../../../core/business-date';
+import { fromDateColumn } from '../../../core/business-date';
 import type { PlanRevocationInfo, PlanSummary, PlanSummaryWithLogo, WorkspaceDuty } from '../public/catalog.types';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
@@ -14,14 +14,16 @@ import type {
   PlanRecord,
   PlanSummaryRecord,
   ProvisioningType,
+  ReferenceCommitmentMonths,
   ReferencePrice,
   WorkspaceProfileRecord,
 } from './plan.types';
 import { applicationPlanName } from './plan.policy';
+import { mapWorkspaceDutyRow, type WorkspaceDutyRow } from './plan.mapper';
 
 const WITH_APPLICATION = { application: { select: { name: true, kind: true, logoUrl: true } } } as const;
 type PlanRow = Prisma.PlanGetPayload<{ include: typeof WITH_APPLICATION }>;
-type ProfileRow = Prisma.PlanWorkspaceProfileGetPayload<{ include: { members: true } }>;
+type WorkspaceRow = Prisma.WorkspaceGetPayload<{ include: { admins: true } }>;
 
 /** The reference price of a plan row (`QĐ-113a`): both columns or none (a CHECK of the table). */
 const referencePriceOf = (row: {
@@ -54,32 +56,43 @@ const toPlan = (row: PlanRow): PlanRecord => ({
   sharingPolicy: row.sharingPolicy,
   hasAdminConsole: row.hasAdminConsole,
   referencePrice: referencePriceOf(row),
+  referenceCommitmentMonths: row.referenceCommitmentMonths as ReferenceCommitmentMonths | null,
   createdAt: row.createdAt,
   updatedAt: row.updatedAt,
 });
 
-const toProfile = (row: ProfileRow): WorkspaceProfileRecord => ({
-  planId: row.planId,
-  primaryOwnerEmployeeId: row.primaryOwnerEmployeeId,
-  members: row.members.map((member) => ({ employeeId: member.employeeId, role: member.role })),
-  ownerLimit: row.ownerLimit,
-  adminLimit: row.adminLimit,
-  ownerTransferProcedure: row.ownerTransferProcedure,
-  emergencyAccount:
-    row.emergencyIdentity === null
-      ? null
-      : {
-          identity: row.emergencyIdentity,
-          occupiesSeat: row.emergencyOccupiesSeat as boolean,
-          holderEmployeeId: row.emergencyHolderEmployeeId as string,
-          lastReviewedOn: fromDateColumn(row.emergencyLastReviewedOn as Date),
-        },
-  ownerAccountEmail: row.ownerAccountEmail,
-  adminNote: row.adminNote,
-  updatedAt: row.updatedAt,
-});
+/**
+ * The profile of a plan as the workspace of its vendor says it: the workspace is the source, the old profile of the plan is old data. A workspace
+ * nobody is named in (no primary owner and no owner among the administrators) is no profile yet.
+ */
+const toProfile = (planId: string, row: WorkspaceRow): WorkspaceProfileRecord | null => {
+  const members = row.admins.map((member) => ({ employeeId: member.employeeId, role: member.role }));
+  const owner = row.primaryOwnerEmployeeId ?? members.find((member) => member.role === 'OWNER')?.employeeId ?? null;
+  if (owner === null) return null;
 
-/** The one writer of `plans`, `plan_workspace_profiles` and `plan_workspace_admins`: the plan aggregate (US-04-02). */
+  return {
+    planId,
+    primaryOwnerEmployeeId: owner,
+    members,
+    ownerLimit: row.ownerLimit,
+    adminLimit: row.adminLimit,
+    ownerTransferProcedure: row.ownerTransferProcedure,
+    emergencyAccount:
+      row.emergencyIdentity === null
+        ? null
+        : {
+            identity: row.emergencyIdentity,
+            occupiesSeat: row.emergencyOccupiesSeat as boolean,
+            holderEmployeeId: row.emergencyHolderEmployeeId as string,
+            lastReviewedOn: fromDateColumn(row.emergencyLastReviewedOn as Date),
+          },
+    ownerAccountEmail: row.ownerAccountEmail,
+    adminNote: row.adminNote,
+    updatedAt: row.updatedAt,
+  };
+};
+
+/** The one writer of `plans`: the plan aggregate (US-04-02). It reads the profile of a plan from the workspace of its vendor. */
 @Injectable()
 export class PlanRepo {
   constructor(private readonly prisma: PrismaService) {}
@@ -101,6 +114,7 @@ export class PlanRepo {
         hasAdminConsole: input.hasAdminConsole,
         referencePriceMinor: input.referencePrice?.amountMinor ?? null,
         referencePriceCurrency: input.referencePrice?.currency ?? null,
+        referenceCommitmentMonths: input.referenceCommitmentMonths,
       },
       include: WITH_APPLICATION,
     });
@@ -170,6 +184,9 @@ export class PlanRepo {
         ...(changes.sharingPolicy !== undefined ? { sharingPolicy: changes.sharingPolicy } : {}),
         ...(changes.hasAdminConsole !== undefined ? { hasAdminConsole: changes.hasAdminConsole } : {}),
         ...referencePriceColumns(changes.referencePrice),
+        ...(changes.referenceCommitmentMonths !== undefined
+          ? { referenceCommitmentMonths: changes.referenceCommitmentMonths }
+          : {}),
       },
       include: WITH_APPLICATION,
     });
@@ -195,6 +212,8 @@ export class PlanRepo {
           pricingModel: row.pricingModel,
           sharingPolicy: row.sharingPolicy,
           hasAdminConsole: row.hasAdminConsole,
+          referencePriceMinor: row.referencePriceMinor,
+          referenceCommitmentMonths: row.referenceCommitmentMonths as ReferenceCommitmentMonths | null,
           applicationId: row.applicationId,
           applicationName: row.application.name,
           applicationKind: row.application.kind,
@@ -209,7 +228,7 @@ export class PlanRepo {
     const rows = await (tx ?? this.prisma).plan.findMany({
       where: { id: { in: [...ids] } },
       include: {
-        application: { select: { name: true, kind: true, catalogStatus: true } },
+        application: { select: { name: true, kind: true, catalogStatus: true, vendorId: true } },
       },
     });
 
@@ -221,10 +240,13 @@ export class PlanRepo {
       pricingModel: row.pricingModel,
       sharingPolicy: row.sharingPolicy,
       hasAdminConsole: row.hasAdminConsole,
+      referencePriceMinor: row.referencePriceMinor,
+      referenceCommitmentMonths: row.referenceCommitmentMonths as ReferenceCommitmentMonths | null,
       applicationId: row.applicationId,
       applicationName: row.application.name,
       applicationKind: row.application.kind,
       applicationStatus: row.application.catalogStatus,
+      applicationVendorId: row.application.vendorId,
     }));
   }
 
@@ -346,6 +368,25 @@ export class PlanRepo {
   }
 
   /**
+   * Locks the application `FOR SHARE` first, then the plan `FOR SHARE` (`applications` before `plans`, matching
+   * `ApplicationRetirementService` so retirement and lot creation serialize without deadlocking); returns null when absent.
+   */
+  async lockSharedWithApplicationLookup(tx: DbTx, id: string): Promise<PlanLookup | null> {
+    const lockedApp = await tx.$queryRaw<{ id: string }[]>`
+      SELECT a.id
+        FROM applications a
+        JOIN plans p ON p.application_id = a.id
+       WHERE p.id = ${id}::uuid
+       FOR SHARE OF a
+    `;
+    if (lockedApp.length === 0) return null;
+    const locked = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM plans WHERE id = ${id}::uuid FOR SHARE`;
+    if (locked.length === 0) return null;
+
+    return this.findLookup(id, tx);
+  }
+
+  /**
    * The same, locked `FOR UPDATE` for the rest of the transaction: two writers that decide something across the subscriptions of a
    * plan (which one prices it) take turns, and a reader that holds the plan `FOR SHARE` waits for them.
    */
@@ -392,6 +433,7 @@ export class PlanRepo {
             hasAdminConsole: true,
             referencePriceMinor: true,
             referencePriceCurrency: true,
+            referenceCommitmentMonths: true,
             createdAt: true,
             updatedAt: true,
             application: { select: { name: true, kind: true, logoUrl: true } },
@@ -402,13 +444,16 @@ export class PlanRepo {
         });
 
         return {
-          items: rows.map(({ application, referencePriceMinor, referencePriceCurrency, ...row }) => ({
-            ...row,
-            referencePrice: referencePriceOf({ referencePriceMinor, referencePriceCurrency }),
-            applicationName: application.name,
-            applicationLogoUrl: application.logoUrl,
-            applicationKind: application.kind,
-          })),
+          items: rows.map(
+            ({ application, referencePriceMinor, referencePriceCurrency, referenceCommitmentMonths, ...row }) => ({
+              ...row,
+              referencePrice: referencePriceOf({ referencePriceMinor, referencePriceCurrency }),
+              referenceCommitmentMonths: referenceCommitmentMonths as ReferenceCommitmentMonths | null,
+              applicationName: application.name,
+              applicationLogoUrl: application.logoUrl,
+              applicationKind: application.kind,
+            }),
+          ),
           total: await tx.plan.count({ where }),
         };
       },
@@ -427,12 +472,7 @@ export class PlanRepo {
   }
 
   async findProfile(planId: string, tx?: DbTx): Promise<WorkspaceProfileRecord | null> {
-    const row = await (tx ?? this.prisma).planWorkspaceProfile.findUnique({
-      where: { planId },
-      include: { members: true },
-    });
-
-    return row ? toProfile(row) : null;
+    return (await this.findProfilesOf([planId], tx)).get(planId) ?? null;
   }
 
   /**
@@ -452,80 +492,103 @@ export class PlanRepo {
     return rows.map((row) => row.id);
   }
 
+  /**
+   * The workspace each of these plans reads its profile from (B2-R5): the only workspace of the vendor of its application; with several, the one that
+   * holds a live subscription of the plan, else the one made first. A plan of no vendor, or of a vendor with no workspace, is absent.
+   */
+  private async workspacesOfPlans(planIds: readonly string[], tx?: DbTx): Promise<Map<string, WorkspaceRow>> {
+    const db = tx ?? this.prisma;
+    const plans = await db.plan.findMany({
+      where: { id: { in: [...planIds] } },
+      select: { id: true, application: { select: { vendorId: true } } },
+    });
+    const vendorIds = [
+      ...new Set(plans.flatMap((plan) => (plan.application.vendorId ? [plan.application.vendorId] : []))),
+    ];
+    if (vendorIds.length === 0) return new Map();
+    const workspaces = await db.workspace.findMany({
+      where: { vendorId: { in: vendorIds } },
+      include: { admins: true },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+    const several = plans.filter(
+      (plan) => workspaces.filter((workspace) => workspace.vendorId === plan.application.vendorId).length > 1,
+    );
+    const live =
+      several.length === 0
+        ? []
+        : await db.subscription.findMany({
+            where: {
+              planId: { in: several.map((plan) => plan.id) },
+              workspaceId: { not: null },
+              status: { in: ['DRAFT', 'ACTIVE'] },
+              renewedBy: null,
+            },
+            select: { planId: true, workspaceId: true },
+            orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+          });
+    const chosen = new Map<string, WorkspaceRow>();
+    for (const plan of plans) {
+      const ofVendor = workspaces.filter((workspace) => workspace.vendorId === plan.application.vendorId);
+      const held = live.find((row) => row.planId === plan.id)?.workspaceId;
+      const workspace = ofVendor.length > 1 ? (ofVendor.find((row) => row.id === held) ?? ofVendor[0]) : ofVendor[0];
+      if (workspace) chosen.set(plan.id, workspace);
+    }
+
+    return chosen;
+  }
+
   /** The profiles of these plans in one read, by plan; a plan with none is absent. */
   async findProfilesOf(planIds: readonly string[], tx?: DbTx): Promise<Map<string, WorkspaceProfileRecord>> {
     if (planIds.length === 0) return new Map();
-    const rows = await (tx ?? this.prisma).planWorkspaceProfile.findMany({
-      where: { planId: { in: [...planIds] } },
-      include: { members: true },
-    });
+    const profiles = new Map<string, WorkspaceProfileRecord>();
+    for (const [planId, workspace] of await this.workspacesOfPlans(planIds, tx)) {
+      const profile = toProfile(planId, workspace);
+      if (profile) profiles.set(planId, profile);
+    }
 
-    return new Map(rows.map((row) => [row.planId, toProfile(row)]));
+    return profiles;
   }
 
-  /** The workspaces these people own or administer, one row for each person and plan, the primary owner first (one read, `US-03-04` AC-28). */
+  /**
+   * The workspaces these people own or administer, one row for each person and workspace, the primary owner first (one read, `US-03-04` AC-28). A
+   * row names the plan the workspace is known by: the first plan (by name) with a live subscription in it, else the first plan of the vendor the company
+   * administers at the vendor; a workspace with no such plan is left out. One constant SQL query regardless of how many workspaces match.
+   */
   async findWorkspaceDuties(employeeIds: readonly string[], tx?: DbTx): Promise<WorkspaceDuty[]> {
     if (employeeIds.length === 0) return [];
     const ids = [...employeeIds];
-    const profiles = await (tx ?? this.prisma).planWorkspaceProfile.findMany({
-      where: { OR: [{ primaryOwnerEmployeeId: { in: ids } }, { members: { some: { employeeId: { in: ids } } } }] },
-      select: {
-        planId: true,
-        primaryOwnerEmployeeId: true,
-        emergencyIdentity: true,
-        members: { where: { employeeId: { in: ids } }, select: { employeeId: true, role: true } },
-        plan: { select: { name: true, application: { select: { name: true } } } },
-      },
-      orderBy: { planId: 'asc' },
-    });
+    const rows = await (tx ?? this.prisma).$queryRaw<WorkspaceDutyRow[]>`
+      WITH matched_ws AS (
+        SELECT w.id, w.name, w.vendor_id, w.primary_owner_employee_id,
+               w.responsible_it_admin_employee_id, (w.emergency_identity IS NOT NULL) AS emergency_account_declared
+          FROM workspaces w
+         WHERE w.primary_owner_employee_id = ANY(${ids}::uuid[])
+            OR EXISTS (SELECT 1 FROM workspace_admins wa WHERE wa.workspace_id = w.id AND wa.employee_id = ANY(${ids}::uuid[]))
+      ),
+      ws_admins AS (
+        SELECT wa.workspace_id,
+               COALESCE(jsonb_agg(jsonb_build_object('employeeId', wa.employee_id::text, 'role', wa.role::text) ORDER BY wa.employee_id), '[]'::jsonb) AS members
+          FROM workspace_admins wa JOIN matched_ws mw ON mw.id = wa.workspace_id GROUP BY wa.workspace_id
+      ),
+      picked_plan AS (
+        SELECT DISTINCT ON (mw.id) mw.id AS workspace_id, p.id AS plan_id, p.name AS plan_name, a.name AS application_name
+          FROM matched_ws mw JOIN applications a ON a.vendor_id = mw.vendor_id JOIN plans p ON p.application_id = a.id
+         WHERE p.provisioning_type = 'K2' OR (p.provisioning_type = 'K4' AND p.has_admin_console = true)
+         ORDER BY mw.id,
+                  EXISTS (SELECT 1 FROM subscriptions s WHERE s.workspace_id = mw.id AND s.plan_id = p.id
+                             AND s.status IN ('DRAFT', 'ACTIVE') AND s.closed_at IS NULL AND NOT EXISTS (SELECT 1 FROM subscriptions r WHERE r.renewed_from_id = s.id)) DESC,
+                  p.name ASC, p.id ASC
+      )
+      SELECT mw.id::text AS workspace_id, mw.name AS workspace_name, mw.vendor_id::text AS vendor_id,
+             mw.primary_owner_employee_id::text AS primary_owner_employee_id, mw.responsible_it_admin_employee_id::text AS responsible_it_admin_employee_id,
+             mw.emergency_account_declared, COALESCE(wa.members, '[]'::jsonb) AS members,
+             pp.plan_id::text AS plan_id, pp.plan_name, pp.application_name
+        FROM matched_ws mw JOIN picked_plan pp ON pp.workspace_id = mw.id LEFT JOIN ws_admins wa ON wa.workspace_id = mw.id
+       ORDER BY mw.id ASC
+    `;
 
-    return profiles.flatMap((profile) => {
-      const named = {
-        planId: profile.planId,
-        planName: profile.plan.name,
-        applicationName: profile.plan.application.name,
-        emergencyAccountDeclared: profile.emergencyIdentity !== null,
-      };
-      const owner = ids.includes(profile.primaryOwnerEmployeeId) ? profile.primaryOwnerEmployeeId : null;
-      const members = profile.members.filter((member) => member.employeeId !== owner);
-
-      return [
-        ...(owner ? [{ ...named, employeeId: owner, role: 'PRIMARY_OWNER' as const }] : []),
-        ...members.map((member) => ({ ...named, employeeId: member.employeeId, role: member.role })),
-      ];
-    });
-  }
-
-  /** Writes the whole profile of the plan: the profile row, then its members replaced by the given list. */
-  async replaceProfile(tx: DbTx, profile: Omit<WorkspaceProfileRecord, 'updatedAt'>): Promise<WorkspaceProfileRecord> {
-    const data = {
-      primaryOwnerEmployeeId: profile.primaryOwnerEmployeeId,
-      ownerLimit: profile.ownerLimit,
-      adminLimit: profile.adminLimit,
-      ownerTransferProcedure: profile.ownerTransferProcedure,
-      emergencyIdentity: profile.emergencyAccount?.identity ?? null,
-      emergencyOccupiesSeat: profile.emergencyAccount?.occupiesSeat ?? null,
-      emergencyHolderEmployeeId: profile.emergencyAccount?.holderEmployeeId ?? null,
-      emergencyLastReviewedOn: profile.emergencyAccount ? toDateColumn(profile.emergencyAccount.lastReviewedOn) : null,
-      ownerAccountEmail: profile.ownerAccountEmail,
-      adminNote: profile.adminNote,
-    };
-    await tx.planWorkspaceProfile.upsert({
-      where: { planId: profile.planId },
-      create: { planId: profile.planId, ...data },
-      update: data,
-    });
-    await tx.planWorkspaceAdmin.deleteMany({ where: { planId: profile.planId } });
-    await tx.planWorkspaceAdmin.createMany({
-      data: profile.members.map((member) => ({
-        planId: profile.planId,
-        employeeId: member.employeeId,
-        role: member.role,
-      })),
-    });
-    const stored = await this.findProfile(profile.planId, tx);
-
-    return stored as WorkspaceProfileRecord;
+    return rows.flatMap((row) => mapWorkspaceDutyRow(row, ids));
   }
 
   /** The name of each of these plans as a sentence names it ("application – plan"), by id, in one read; an id that does not exist is absent. */

@@ -1,11 +1,18 @@
 import type { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import type { AuditApi } from '../../audit/public/audit.api';
+import type { BudgetsApi } from '../../budgets/public/budgets.api';
+import type { LicenseLotApi } from '../../catalog/public/license-lot.api';
 import type { LicensingApi } from '../../licensing/public/licensing.api';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { AccessRequestRepo } from '../access-request/access-request.repo';
+import type { AccessRequestRecord } from '../access-request/access-request.types';
+import type { RequestOutcomeService } from '../outcome/request-outcome.service';
 import type { SpendStatusService } from '../spend/spend-status.service';
 import type { GroupLineWithdrawer } from './group-line-withdrawer.service';
-import type { GroupWithdrawalAftermath } from './group-withdrawal-aftermath.service';
+import type { GroupResolutionService } from './group-resolution.service';
+import { GroupWithdrawalAftermath } from './group-withdrawal-aftermath.service';
+import type { LineAmountRepo } from './line-amount.repo';
 import {
   checkLineWithdrawal,
   needStepOfGroup,
@@ -276,5 +283,59 @@ describe('GroupWithdrawalService tx forwarding', () => {
     await service.withdrawAll(actor, 'req-1', { reason: 'No longer needed' });
 
     expect(organizationReads.getHeadedDepartment).toHaveBeenCalledWith('emp-head', undefined, tx);
+  });
+});
+
+describe('GroupWithdrawalAftermath (F-18 lock tier 6a before reading invoiceActualMinor)', () => {
+  it('locks the lot via LicenseLotApi.lockLot BEFORE branching on invoiceActualMinor', async () => {
+    const order: string[] = [];
+    const tx = { kind: 'tx' } as unknown as DbTx;
+    const actor = { appUserId: 'u-1', employeeId: 'emp-head', roles: ['MANAGER'] } as unknown as AuthenticatedPrincipal;
+    const findLotOfRequest = jest.fn().mockImplementation(() => {
+      order.push('findLotOfRequest');
+      return Promise.resolve({ id: 'lot-1', invoiceActualMinor: null });
+    });
+    const lockLot = jest.fn().mockImplementation(() => {
+      order.push('lockLot');
+      return Promise.resolve({ id: 'lot-1', invoiceActualMinor: 36_000_000n });
+    });
+    const recordLotWithdrawalAfterInvoice = jest.fn().mockImplementation(() => {
+      order.push('recordLotWithdrawalAfterInvoice');
+      return Promise.resolve();
+    });
+    const releaseForRequest = jest.fn();
+    const markReleased = jest.fn();
+
+    const aftermath = new GroupWithdrawalAftermath(
+      { of: jest.fn(), markReleased } as unknown as LineAmountRepo,
+      { recordLotWithdrawalAfterInvoice, releaseForRequest } as unknown as BudgetsApi,
+      { record: jest.fn() } as unknown as AuditApi,
+      { ended: jest.fn() } as unknown as RequestOutcomeService,
+      { resolve: jest.fn() } as unknown as GroupResolutionService,
+      { findLotOfRequest, lockLot } as unknown as LicenseLotApi,
+      {
+        getOrganization: jest.fn().mockResolvedValue({ timeZone: 'Asia/Ho_Chi_Minh' }),
+      } as unknown as OrganizationReadApi,
+    );
+
+    await aftermath.after(
+      tx,
+      actor,
+      {
+        id: 'req-1',
+        organizationId: 'org-1',
+        type: 'GROUP_GRANT',
+        planId: 'plan-1',
+        departmentId: 'dept-1',
+        costCenterId: 'cc-1',
+      } as unknown as AccessRequestRecord,
+      [{ line: { employeeId: 'emp-2' } as never, done: { kind: 'ENDED', released: true } }],
+      { reason: 'Withdrawn', release: 'PARTICIPANT_WITHDRAWN', now: new Date('2027-04-15T00:00:00Z') },
+    );
+
+    expect(lockLot).toHaveBeenCalledWith(tx, 'lot-1');
+    expect(order).toEqual(['findLotOfRequest', 'lockLot', 'recordLotWithdrawalAfterInvoice']);
+    expect(releaseForRequest).not.toHaveBeenCalled();
+    expect(markReleased).toHaveBeenCalledWith(tx, 'req-1', 'emp-2', expect.any(Date));
   });
 });

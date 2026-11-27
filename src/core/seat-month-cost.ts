@@ -1,4 +1,5 @@
-import type { BusinessDate } from './business-date';
+import { addDays, monthBoundsOf, type BusinessDate } from './business-date';
+import { addMonths, firstGridOffsetFrom } from './fiscal-year';
 
 /**
  * The cost a seat has in the days of a month (`BR-MF1-08`, `M-06`, `M-10`): the commitment of a K1 or K2 right is a price a month, and when
@@ -16,6 +17,14 @@ const parts = (day: BusinessDate): { year: number; month: number; day: number } 
 
 const divideHalfUp = (numerator: bigint, denominator: bigint): bigint =>
   (2n * numerator + denominator) / (2n * denominator);
+
+/** `numerator ÷ denominator` rounded half away from zero; `denominator` is positive. */
+export function roundHalfAway(numerator: bigint, denominator: bigint): bigint {
+  const magnitude = numerator < 0n ? -numerator : numerator;
+  const rounded = (2n * magnitude + denominator) / (2n * denominator);
+
+  return numerator < 0n ? -rounded : rounded;
+}
 
 /** What the days of the month of `day` before it cost: the price a month times the days before `day` over the days of the month. Day 1 costs nothing. */
 export function monthCostBefore(monthlyMinor: bigint, day: BusinessDate): bigint {
@@ -69,4 +78,99 @@ export function seatHeldRange(input: {
   if (input.validUntil !== null && input.validUntil <= from) return null;
 
   return { from, until: input.validUntil };
+}
+
+const DAY_MS = 86_400_000;
+
+export type BillingCycleKind = 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER';
+
+function calendarDaysBetween(from: BusinessDate, to: BusinessDate): number {
+  if (to <= from) return 0;
+
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS);
+}
+
+function gcdBigInt(a: bigint, b: bigint): bigint {
+  let x = a < 0n ? -a : a;
+  let y = b < 0n ? -b : b;
+  while (y !== 0n) {
+    const t = x % y;
+    x = y;
+    y = t;
+  }
+
+  return x === 0n ? 1n : x;
+}
+
+function addFraction(a: { num: bigint; den: bigint }, b: { num: bigint; den: bigint }): { num: bigint; den: bigint } {
+  const num = a.num * b.den + b.num * a.den;
+  const den = a.den * b.den;
+  const divisor = gcdBigInt(num, den);
+
+  return { num: num / divisor, den: den / divisor };
+}
+
+/**
+ * Exact rational sum of `coveredDays_m / daysInMonth_m` over every calendar month intersecting `[from, toInclusive]`,
+ * allowing callers to round once after multiplying by monthly price and seat count.
+ */
+export function coverFraction(from: BusinessDate, toInclusive: BusinessDate): { num: bigint; den: bigint } {
+  if (from > toInclusive) return { num: 0n, den: 1n };
+  const endExclusive = addDays(toInclusive, 1);
+  let total = { num: 0n, den: 1n };
+  let cursor = from;
+
+  while (cursor < endExclusive) {
+    const { start, nextStart } = monthBoundsOf(cursor);
+    const segEnd = endExclusive < nextStart ? endExclusive : nextStart;
+    const daysInMonth = calendarDaysBetween(start, nextStart);
+    const coveredDays = calendarDaysBetween(cursor, segEnd);
+    const piece =
+      coveredDays === daysInMonth ? { num: 1n, den: 1n } : { num: BigInt(coveredDays), den: BigInt(daysInMonth) };
+    total = addFraction(total, piece);
+    cursor = segEnd;
+  }
+
+  return total;
+}
+
+/**
+ * First renewal or billing payment boundary `R` strictly after `fromDate`:
+ * - `ANNUAL`: `renewalDate ?? (endDate + 1)`
+ * - `MONTHLY` / `QUARTERLY`: first grid date strictly after `fromDate` anchored at `renewalDate ?? endDate`.
+ */
+export function nextBillingBoundary(input: {
+  billingCycle: BillingCycleKind | null;
+  renewalDate: BusinessDate | null;
+  endDate: BusinessDate | null;
+  fromDate: BusinessDate;
+}): BusinessDate | null {
+  if (input.billingCycle === 'ANNUAL') {
+    return input.renewalDate ?? (input.endDate !== null ? addDays(input.endDate, 1) : null);
+  }
+  if (input.billingCycle === 'MONTHLY' || input.billingCycle === 'QUARTERLY') {
+    const anchor = input.renewalDate ?? input.endDate;
+    if (anchor === null) return null;
+    const stepMonths = input.billingCycle === 'MONTHLY' ? 1 : 3;
+    const offset = firstGridOffsetFrom(anchor, stepMonths, addDays(input.fromDate, 1));
+
+    return addMonths(anchor, offset * stepMonths);
+  }
+
+  return null;
+}
+
+/**
+ * Computes `roundHalfAway(monthlyMinor * seats * coverFraction(from, untilExclusive - 1))` with a single rounding step.
+ */
+export function proratedSeatAmount(input: {
+  monthlyMinor: bigint;
+  seats: number;
+  from: BusinessDate;
+  untilExclusive: BusinessDate;
+}): bigint {
+  if (input.seats <= 0 || input.from >= input.untilExclusive) return 0n;
+  const frac = coverFraction(input.from, addDays(input.untilExclusive, -1));
+
+  return roundHalfAway(input.monthlyMinor * BigInt(input.seats) * frac.num, frac.den);
 }

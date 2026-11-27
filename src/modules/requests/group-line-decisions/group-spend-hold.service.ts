@@ -2,7 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { fiscalYearOf } from '../../../core/fiscal-year';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { CatalogApi } from '../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { AccessRequestNotPriceableError } from '../access-request/access-request.errors';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { pricedPeople } from '../access-request/group-request.types';
@@ -25,6 +27,7 @@ export class GroupSpendHold {
     private readonly effects: SpendEffectsService,
     private readonly organizationReads: OrganizationReadApi,
     private readonly termEnds: RequestTermEndsService,
+    private readonly catalog: CatalogApi,
   ) {}
 
   async hold(
@@ -123,14 +126,29 @@ export class GroupSpendHold {
       request.termMonths !== null && request.expectedEndDate === null
         ? await this.termEnds.endsOfPeople(tx, request.termMonths, ids, today)
         : ids.map((id) => request.lines.find((line) => line.employeeId === id)?.expectedEndDate ?? null);
+    const monthlyPriceMinor = this.savedMonthlyPriceOf(pricing);
+    if (monthlyPriceMinor === undefined) throw new AccessRequestNotPriceableError();
+    const planPrice = await this.planPricingFacts(tx, request);
     const lines = lineAmountsOf({
+      provisioningType: planPrice?.provisioningType,
       unitPrice: pricing.unitPrice,
+      monthlyPriceMinor,
       billingCycle: pricing.billingCycle,
       checkDate: today,
       ends,
     });
 
     return lines === null ? null : { year: fiscalYearOf(today), lines };
+  }
+
+  private savedMonthlyPriceOf(pricing: AccessRequestRecord['pricing']): bigint | undefined {
+    return pricing.monthlyPriceMinor ?? undefined;
+  }
+
+  private planPricingFacts(tx: DbTx, request: AccessRequestRecord) {
+    if (request.branch !== 'PAID_IN_CATALOG' || request.planId === null) return Promise.resolve(null);
+
+    return this.catalog.getPlanPrice(request.planId, tx);
   }
 }
 

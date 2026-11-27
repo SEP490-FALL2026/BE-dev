@@ -41,6 +41,7 @@ export class ProvisioningDecisionService {
   /** Puts the failed task back in the queue of its channel. Throws ProvisioningTaskNotFoundError, ProvisioningTaskStateError. */
   async retry(actor: AuthenticatedPrincipal, id: string): Promise<TaskView> {
     const task = await this.frame.work(actor, id, {
+      beforeLock: null,
       check: (locked) => assertDecidable(locked.status),
       write: async ({ tx, task: locked }) => {
         await this.refuseWhileWithdrawing(tx, locked);
@@ -63,6 +64,7 @@ export class ProvisioningDecisionService {
    */
   async handOff(actor: AuthenticatedPrincipal, id: string): Promise<TaskView> {
     const task = await this.frame.work(actor, id, {
+      beforeLock: null,
       check: (locked) => {
         assertDecidable(locked.status);
         assertHandOffAllowed(locked.channel);
@@ -89,6 +91,7 @@ export class ProvisioningDecisionService {
   async closeFailed(actor: AuthenticatedPrincipal, id: string, input: { reason: string }): Promise<TaskView> {
     const reason = cleanFailureReason(input.reason);
     const task = await this.frame.work(actor, id, {
+      beforeLock: null,
       check: (locked) => assertDecidable(locked.status),
       write: async ({ tx, task: locked, organizationId, now }) => {
         await this.refuseWhileWithdrawing(tx, locked);
@@ -145,6 +148,7 @@ export class ProvisioningDecisionService {
    */
   async cancel(actor: AuthenticatedPrincipal, id: string): Promise<TaskView> {
     const task = await this.frame.work(actor, id, {
+      beforeLock: null,
       check: (locked) => assertCancellable(locked.status, locked.kind),
       write: async ({ tx, task: locked, organizationId, now }) => {
         if (locked.kind === 'REVOKE') return this.cancelRevocation(tx, actor, locked, now);

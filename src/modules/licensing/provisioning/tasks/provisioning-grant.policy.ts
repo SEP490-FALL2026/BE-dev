@@ -1,3 +1,5 @@
+import type { BusinessDate } from '../../../../core/business-date';
+
 /** What a grant task records as bought with it (`provisioning_tasks.purchase_*`). */
 export interface GrantPurchase {
   kind: 'POOL_TOP_UP' | 'KEY_PURCHASE' | 'K1_SUBSCRIPTION';
@@ -90,3 +92,27 @@ export const grantWarnings = (
   inCharge: { itAdminEmployeeId: string | null } | null,
 ): 'DEPARTMENT_WITHOUT_IT_ADMIN'[] =>
   inCharge && inCharge.itAdminEmployeeId === null ? ['DEPARTMENT_WITHOUT_IT_ADMIN'] : [];
+
+/**
+ * Effective date for a `MEMBER` `TOP_UP +1` grant (`B2-R14`): if the line already has a future `MEMBER`
+ * `REDUCE -1` (`effectiveOn > today`) not yet paired with a `MEMBER` `TOP_UP +1` on the same date, compensates the
+ * earliest such `REDUCE` using its `effectiveOn`; otherwise takes effect on `today`.
+ */
+export function memberGrantEffectiveOn(
+  today: BusinessDate,
+  futureMemberChanges: readonly { effectiveOn: BusinessDate; reason: string }[],
+): BusinessDate {
+  const netByDay = new Map<BusinessDate, number>();
+  for (const row of futureMemberChanges) {
+    if (row.effectiveOn <= today) continue;
+    const prev = netByDay.get(row.effectiveOn) ?? 0;
+    if (row.reason === 'REDUCE') netByDay.set(row.effectiveOn, prev + 1);
+    else if (row.reason === 'TOP_UP') netByDay.set(row.effectiveOn, prev - 1);
+  }
+  const uncompensated = [...netByDay.entries()]
+    .filter(([, unreturned]) => unreturned > 0)
+    .map(([day]) => day)
+    .sort();
+
+  return uncompensated[0] ?? today;
+}

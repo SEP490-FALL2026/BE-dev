@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/business-date';
+import { addDays, fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/business-date';
 import { seatHeldRange } from '../../../core/seat-month-cost';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { SeatOfMonth } from '../public/licensing-seat-month.types';
+import type { SeatInForce, SeatOfMonth, UnrequestedK1SeatInForce } from '../public/licensing-seat-month.types';
 import { AssignmentChainRepo } from './assignment-chain.repo';
 
 /**
@@ -45,6 +45,49 @@ export class AssignmentSeatMonthRepo {
     tx?: DbTx,
     subscriptionId?: string,
   ): Promise<SeatOfMonth[]> {
+    const held = await this.loadHeldSeats(planIds, start, nextStart, tx, subscriptionId);
+
+    return held.map(({ row, heldRange, requestId }) => ({
+      assignmentId: row.id,
+      subscriptionId: row.subscriptionId,
+      planId: row.planId,
+      employeeId: row.employeeId,
+      kind: row.kind,
+      owningDepartmentId: row.owningDepartmentId,
+      heldFrom: heldRange.from,
+      heldUntil: heldRange.until,
+      requestId,
+    }));
+  }
+
+  /**
+   * The seats of these plans that are in force on `day` (`heldFrom <= day && (heldUntil === null || day < heldUntil)`),
+   * with source, holder, owning department, and resolved chain request id.
+   */
+  async seatsInForceOfPlans(planIds: readonly string[], day: BusinessDate, tx?: DbTx): Promise<SeatInForce[]> {
+    const held = await this.loadHeldSeats(planIds, day, addDays(day, 1), tx);
+
+    return held.map(({ row, heldRange, requestId }) => ({
+      assignmentId: row.id,
+      subscriptionId: row.subscriptionId,
+      planId: row.planId,
+      requestId,
+      source: row.source,
+      kind: row.kind,
+      employeeId: row.employeeId,
+      owningDepartmentId: row.owningDepartmentId,
+      heldFrom: heldRange.from,
+      heldUntil: heldRange.until,
+    }));
+  }
+
+  private async loadHeldSeats(
+    planIds: readonly string[],
+    start: BusinessDate,
+    nextStart: BusinessDate,
+    tx?: DbTx,
+    subscriptionId?: string,
+  ) {
     if (planIds.length === 0) return [];
     const db = tx ?? this.prisma;
     const rows = await db.licenseAssignment.findMany({
@@ -82,15 +125,90 @@ export class AssignmentSeatMonthRepo {
 
       return [
         {
+          row: { ...row, subscriptionId: row.subscriptionId },
+          heldRange: held,
+          requestId: requestOf.get(row.id) ?? null,
+        },
+      ];
+    });
+  }
+
+  /** Plan ids of active standalone (subscriptionless) assignments on `day`. */
+  async standalonePlanIdsOn(day: BusinessDate, tx?: DbTx): Promise<string[]> {
+    const nextDay = addDays(day, 1);
+    const rows = await (tx ?? this.prisma).licenseAssignment.findMany({
+      where: {
+        subscriptionId: null,
+        failedAt: null,
+        cancelledAt: null,
+        validFrom: { lt: toDateColumn(nextDay) },
+        OR: [{ validUntil: null }, { validUntil: { gt: toDateColumn(day) } }],
+      },
+      select: { planId: true },
+      distinct: ['planId'],
+    });
+
+    return rows.map((row) => row.planId);
+  }
+
+  /** Active standalone K1 seats on `day` that have no Request in their chain (`K-A2`). */
+  async unrequestedK1SeatsInForceOfPlans(
+    planIds: readonly string[],
+    day: BusinessDate,
+    tx?: DbTx,
+  ): Promise<Omit<UnrequestedK1SeatInForce, 'referenceMonthlyPriceMinor'>[]> {
+    if (planIds.length === 0) return [];
+    const db = tx ?? this.prisma;
+    const nextDay = addDays(day, 1);
+    const rows = await db.licenseAssignment.findMany({
+      where: {
+        subscriptionId: null,
+        planId: { in: [...planIds] },
+        failedAt: null,
+        cancelledAt: null,
+        validFrom: { lt: toDateColumn(nextDay) },
+        OR: [{ validUntil: null }, { validUntil: { gt: toDateColumn(day) } }],
+      },
+      select: {
+        id: true,
+        planId: true,
+        employeeId: true,
+        kind: true,
+        source: true,
+        owningDepartmentId: true,
+        validFrom: true,
+        grantedOn: true,
+        validUntil: true,
+        billingAnchorOn: true,
+      },
+      orderBy: [{ planId: 'asc' }, { id: 'asc' }],
+    });
+    const requestOf = await this.chains.grantsOfChains(
+      db,
+      rows.map((row) => row.id),
+    );
+
+    return rows.flatMap((row) => {
+      if (requestOf.has(row.id)) return [];
+      const held = seatHeldRange({
+        validFrom: fromDateColumn(row.validFrom),
+        grantedOn: row.grantedOn ? fromDateColumn(row.grantedOn) : null,
+        validUntil: row.validUntil ? fromDateColumn(row.validUntil) : null,
+        needsGrant: row.source === 'REQUEST',
+      });
+      if (!held || held.from > day || (held.until !== null && day >= held.until)) return [];
+
+      return [
+        {
           assignmentId: row.id,
-          subscriptionId: row.subscriptionId,
           planId: row.planId,
-          employeeId: row.employeeId,
+          source: row.source,
           kind: row.kind,
+          employeeId: row.employeeId,
           owningDepartmentId: row.owningDepartmentId,
           heldFrom: held.from,
           heldUntil: held.until,
-          requestId: requestOf.get(row.id) ?? null,
+          billingAnchorOn: row.billingAnchorOn ? fromDateColumn(row.billingAnchorOn) : null,
         },
       ];
     });

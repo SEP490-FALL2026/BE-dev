@@ -621,10 +621,18 @@ describe('requests (integration, PostgreSQL constraints)', () => {
       amount_minor: 4000,
       amount_currency: 'USD',
       unit_price_minor: 2000,
+      monthly_price_minor: 2000,
       billing_cycle: 'MONTHLY',
       budget_year: 2026,
       price_kind: 'RECURRING',
     };
+
+    it('B-5: refuses null monthly_price_minor for non-DRAFT PRICED RECURRING request, while allowing DRAFT', async () => {
+      expect((await insertRequest({ ...recurring, monthly_price_minor: null })).state).toBe(CHECK);
+      expect(
+        (await insertRequest({ ...recurring, state: 'DRAFT', submitted_at: null, monthly_price_minor: null })).state,
+      ).toBeNull();
+    });
 
     it('BR-MF1-06a: takes a request with no term in months, and the months of the year the amount covers (0 to 12)', async () => {
       expect((await insertRequest({ ...recurring, term_months: null, amount_months: 2 })).state).toBeNull();

@@ -50,6 +50,10 @@ const ROUTES: Array<[string, Call]> = [
     (s) => request(s).post(`/api/v1/subscription-renewals/${ID}/outcome`).send({ outcome: 'UNCONFIRMED' }),
   ],
   ['GET /subscription-deadline-events', (s) => request(s).get('/api/v1/subscription-deadline-events')],
+  [
+    'GET /subscriptions/{id}/renewals/missed-adjustment-kpi',
+    (s) => request(s).get(`/api/v1/subscriptions/${SUB}/renewals/missed-adjustment-kpi?months=2027-07-01`),
+  ],
 ];
 
 /** What the route of the seats needed answers (`SBF-20` §5): the point, the count of the seats, the target and whether a cancellation is allowed. */
@@ -72,6 +76,9 @@ const ADJUSTMENT = {
   responsibleItAdminEmployeeId: null,
   callerIsResponsible: false,
   recordedRenewalId: null,
+  lines: [],
+  minimumSeatsTotal: null,
+  shortfall: 0,
 };
 
 /** What a stand-in service throws for each test; the HTTP mapping is what is proven here. */
@@ -81,6 +88,7 @@ const throwing = async () => {
   return Promise.reject(new Error('the stand-in was reached without an answer'));
 };
 const adjustmentOf = jest.fn<Promise<unknown>, [unknown, string]>();
+const missedAdjustmentKpiOf = jest.fn<Promise<unknown>, [unknown, string, string[]]>();
 /** The reader of one case by id: the route of the seats needed must never reach it (R2-5). */
 const caseGet = jest.fn(throwing);
 const EMPTY_PAGE = { items: [], pagination: { page: 1, pageSize: 20, totalItems: 0, totalPages: 0 } };
@@ -105,6 +113,7 @@ describe('subscription renewal routes (e2e, no database)', () => {
             seatRanking: throwing,
             deadlineEvents: emptyPage,
             detailOf: throwing,
+            missedAdjustmentKpiOf,
           },
         },
         { token: RenewalRecordService, useValue: { record: throwing } },
@@ -609,6 +618,89 @@ describe('subscription renewal routes (e2e, no database)', () => {
       const response = await call(app.getHttpServer()).set('Authorization', as(roles)).expect(422);
 
       expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
+    });
+  });
+
+  describe('F-16: missed-adjustment KPI-4 endpoint (GET /subscriptions/:id/renewals/missed-adjustment-kpi)', () => {
+    const LINE_ID = '9a2f4b10-1234-4abc-8def-1234567890ab';
+    const PLAN_ID = '8b3c5d21-2345-4bcd-9efa-2345678901bc';
+    const URL = `/api/v1/subscriptions/${SUB}/renewals/missed-adjustment-kpi?months=2027-07-01,2027-08-01`;
+
+    it.each([['IT_ADMIN'], ['FINANCE']])('%s reads KPI-4 summary and per-line breakdown with 200', async (role) => {
+      missedAdjustmentKpiOf.mockResolvedValueOnce({
+        subscriptionId: SUB,
+        totalSeatMonths: 2,
+        totalAmountMinor: 1_000_000n,
+        lines: [
+          {
+            subscriptionLineId: LINE_ID,
+            planId: PLAN_ID,
+            missedSeats: 1,
+            seatMonths: 2,
+            amountMinor: 1_000_000n,
+            months: [
+              { month: '2027-07-01', missedIdleSeatDays: 31, daysInMonth: 31, seatMonths: 1, amountMinor: 500_000n },
+              { month: '2027-08-01', missedIdleSeatDays: 31, daysInMonth: 31, seatMonths: 1, amountMinor: 500_000n },
+            ],
+          },
+        ],
+      });
+
+      const response = await request(app.getHttpServer())
+        .get(URL)
+        .set('Authorization', as([role]))
+        .expect(200);
+
+      expect(bodyOf(response)).toMatchObject({
+        message: 'SUBSCRIPTION_RENEWAL.KPI4_RETRIEVED',
+        data: {
+          kpi: {
+            subscriptionId: SUB,
+            totalSeatMonths: 2,
+            totalAmount: { amount: '1000000', currency: 'VND' },
+            linesById: {
+              [LINE_ID]: {
+                planId: PLAN_ID,
+                missedSeats: 1,
+                seatMonths: 2,
+                amount: { amount: '1000000', currency: 'VND' },
+                monthsByMonth: {
+                  '2027-07-01': {
+                    missedIdleSeatDays: 31,
+                    daysInMonth: 31,
+                    seatMonths: 1,
+                    amount: { amount: '500000', currency: 'VND' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+      expect(missedAdjustmentKpiOf).toHaveBeenCalledWith(expect.objectContaining({ roles: [role] }), SUB, [
+        '2027-07-01',
+        '2027-08-01',
+      ]);
+    });
+
+    it('rejects invalid months query with 422 VALIDATION_ERROR', async () => {
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/subscriptions/${SUB}/renewals/missed-adjustment-kpi?months=2027-07-15`)
+        .set('Authorization', as(['IT_ADMIN']))
+        .expect(422);
+
+      expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('G-16: returns 404 SUBSCRIPTION_RENEWAL.NOT_FOUND when subscription does not exist', async () => {
+      missedAdjustmentKpiOf.mockRejectedValueOnce(new RenewalError('NOT_FOUND'));
+
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/subscriptions/${SUB}/renewals/missed-adjustment-kpi?months=2027-07-01`)
+        .set('Authorization', as(['FINANCE']))
+        .expect(404);
+
+      expect(bodyOf(response).error.code).toBe('SUBSCRIPTION_RENEWAL.NOT_FOUND');
     });
   });
 });

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { SeatLedgerApi } from '../../catalog/public/seat-ledger.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { RenewalUsageContributions } from '../public/licensing.extension-points';
 import type { RenewalSeatUsage } from '../public/licensing-renewal.types';
@@ -26,11 +27,29 @@ export class RenewalRankingService {
     private readonly seats: SubscriptionRenewalSeatRepo,
     private readonly organizationReads: OrganizationReadApi,
     private readonly usage: RenewalUsageContributions,
+    private readonly seatLedger: SeatLedgerApi,
   ) {}
 
-  async seatsOf(subscriptionId: string, today: BusinessDate, tx?: DbTx): Promise<RankedSeats> {
+  businessToday(now?: Date): Promise<BusinessDate> {
+    return this.organizationReads.businessToday(now);
+  }
+
+  getEmployees(ids: readonly string[], tx?: DbTx) {
+    return this.organizationReads.getEmployees([...ids], tx);
+  }
+
+  async seatsOf(
+    subscriptionId: string,
+    today: BusinessDate,
+    tx?: DbTx,
+    subscriptionLineId?: string,
+  ): Promise<RankedSeats> {
     const all = await this.seats.notEndedBy(subscriptionId, today, tx);
-    const held = all.filter((seat) => heldOn(seat, today));
+    const targetPlanId = subscriptionLineId
+      ? (await this.seatLedger.linesOfIds([subscriptionLineId], tx))[0]?.planId
+      : undefined;
+    const scoped = targetPlanId ? all.filter((seat) => seat.planId === targetPlanId) : all;
+    const held = scoped.filter((seat) => heldOn(seat, today));
     const people = await this.organizationReads.getEmployees([...new Set(held.map((seat) => seat.employeeId))], tx);
     const left = new Set(people.filter((person) => person.status !== 'ACTIVE').map((person) => person.id));
     const [reader] = this.usage.all();

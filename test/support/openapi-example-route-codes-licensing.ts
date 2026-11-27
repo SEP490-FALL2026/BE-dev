@@ -1,5 +1,6 @@
 import type { RouteErrorStatus } from './openapi-example-manifest';
 import { ROUTE_ERROR_CODES_WAVE2 } from './openapi-example-route-codes-wave2';
+import { ROUTE_ERROR_CODES_WAVE3_TECH } from './openapi-example-route-codes-wave3-tech';
 
 /**
  * Part of ROUTE_ERROR_CODES (licensing and notifications added by G5/G6), traced on BE `0da8f56`
@@ -9,6 +10,7 @@ export const ROUTE_ERROR_CODES_LICENSING: Readonly<
   Record<string, Partial<Record<RouteErrorStatus, readonly string[]>>>
 > = {
   ...ROUTE_ERROR_CODES_WAVE2,
+  ...ROUTE_ERROR_CODES_WAVE3_TECH,
   assignmentExpiryReminderList: {
     '403': ['ASSIGNMENT_EXPIRY.SCOPE_FORBIDDEN'],
   },
@@ -199,6 +201,7 @@ export const ROUTE_ERROR_CODES_LICENSING: Readonly<
     '409': [
       'EMPLOYEE.NOT_STARTED',
       'LICENSE_ASSIGNMENT.SEAT_CAPACITY',
+      'LICENSE_LOT.RESERVED_FOR_REQUEST',
       'PROVISIONING.BENEFICIARY_DEPARTED',
       'PROVISIONING.BENEFICIARY_NOT_STARTED',
       'PROVISIONING.CONTRACT_ENDED',
@@ -262,6 +265,10 @@ export const ROUTE_ERROR_CODES_LICENSING: Readonly<
   subscriptionRenewalList: {
     '403': ['SUBSCRIPTION_RENEWAL.READ_FORBIDDEN'],
   },
+  subscriptionRenewalMissedAdjustmentKpiGet: {
+    '403': ['SUBSCRIPTION_RENEWAL.READ_FORBIDDEN'],
+    '404': ['SUBSCRIPTION_RENEWAL.NOT_FOUND'],
+  },
   subscriptionRenewalPropose: {
     '403': ['SUBSCRIPTION_RENEWAL.NOT_RESPONSIBLE'],
     '404': ['SUBSCRIPTION_RENEWAL.NOT_FOUND'],
@@ -279,9 +286,12 @@ export const ROUTE_ERROR_CODES_LICENSING: Readonly<
     '422': [
       'MONEY_OUT_OF_RANGE',
       'MONEY_SCALE_EXCEEDED',
+      'SUBSCRIPTION_RENEWAL.LINES_REQUIRED',
+      'SUBSCRIPTION_RENEWAL.LINE_QUANTITY_NOT_TARGET',
       'SUBSCRIPTION_RENEWAL.NEXT_PERIOD_REQUIRED',
       'SUBSCRIPTION_RENEWAL.OUTCOME_MISMATCH',
       'SUBSCRIPTION_RENEWAL.QUANTITY_INVALID',
+      'SUBSCRIPTION_RENEWAL.REDUCTION_AFTER_DEADLINE',
       'SUBSCRIPTION_RENEWAL.VENDOR_MINIMUM_EVIDENCE_REQUIRED',
     ],
   },
@@ -294,7 +304,13 @@ export const ROUTE_ERROR_CODES_LICENSING: Readonly<
       'SUBSCRIPTION_RENEWAL.PERIOD_REFUSED',
       'SUBSCRIPTION_RENEWAL.SEATS_HAVE_OPEN_TASKS',
     ],
-    '422': ['MONEY_OUT_OF_RANGE', 'MONEY_SCALE_EXCEEDED', 'SUBSCRIPTION_RENEWAL.OUTCOME_MISMATCH'],
+    '422': [
+      'MONEY_OUT_OF_RANGE',
+      'MONEY_SCALE_EXCEEDED',
+      'SUBSCRIPTION_RENEWAL.LINES_REQUIRED',
+      'SUBSCRIPTION_RENEWAL.OUTCOME_MISMATCH',
+      'SUBSCRIPTION_RENEWAL.QUANTITY_INVALID',
+    ],
   },
   subscriptionRenewalSeatRanking: {
     '403': ['SUBSCRIPTION_RENEWAL.READ_FORBIDDEN'],

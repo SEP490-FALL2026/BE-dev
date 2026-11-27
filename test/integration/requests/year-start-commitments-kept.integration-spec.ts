@@ -59,14 +59,20 @@ describe('the commitment of 01/01 is what the approval kept (T-RQ2 for 01/01, T-
       made.department.id,
       first,
     ]);
+    await h.setItAdminInCharge(made.department, { employeeId: h.it1.employeeId, account: h.it1 });
 
     return made;
   };
-  const setPrice = (subscriptionId: string, monthly: number) =>
-    h.ctx.sql.query(`UPDATE subscriptions SET unit_price_minor = $2, price_reporting_minor = $2 WHERE id = $1`, [
+  const setPrice = async (subscriptionId: string, monthly: number) => {
+    await h.ctx.sql.query(
+      `UPDATE subscriptions SET unit_price_minor = $2, monthly_unit_price_minor = $2, price_reporting_minor = $2 WHERE id = $1`,
+      [subscriptionId, monthly],
+    );
+    await h.ctx.sql.query(`UPDATE subscription_lines SET monthly_unit_price_minor = $2 WHERE subscription_id = $1`, [
       subscriptionId,
       monthly,
     ]);
+  };
   /** A plan of that kind at that price a month, and the subscription that sets the price. */
   const planAt = async (kind: 'K1' | 'K2', monthly: number) => {
     const subscription = await h.subscription(100, kind);
@@ -171,8 +177,8 @@ describe('the commitment of 01/01 is what the approval kept (T-RQ2 for 01/01, T-
     ]);
   });
 
-  // A request for a group is for a plan of a shared pool (`K2`): the numbers of T-XY1 are the same, the months of use are 9 from 15/11.
-  it('T-XY1: a group of three at 600.000 for 9 months from 15/11 keeps 3 × 4.200.000 = 12.600.000, and every person approved and not yet granted holds it on 01/01', async () => {
+  // A request for a group is for a plan of a shared pool (`K2`, W3-02 calendar months): 9 months from 15/11 ends 14/08, so next year holds 8 calendar months (Jan..Aug).
+  it('T-XY1: a group of three at 600.000 for 9 months from 15/11 keeps 3 × 4.800.000 = 14.400.000 (W3-02), and every person approved and not yet granted holds it on 01/01', async () => {
     const u = await unit();
     const { subscription, plan } = await planAt('K2', 600_000);
     const group = await people(u, 3);
@@ -181,16 +187,16 @@ describe('the commitment of 01/01 is what the approval kept (T-RQ2 for 01/01, T-
       `SELECT amount_minor::text FROM access_request_line_amounts WHERE request_id = $1 AND budget_year = $2 AND NOT held`,
       [id, h.next],
     );
-    expect(lines.rows.map((row) => row.amount_minor)).toEqual(['4200000', '4200000', '4200000']);
-    expect((await kept(id)).next_year_amount_minor).toBe('12600000');
+    expect(lines.rows.map((row) => row.amount_minor)).toEqual(['4800000', '4800000', '4800000']);
+    expect((await kept(id)).next_year_amount_minor).toBe('14400000');
 
     await setPrice(subscription, 650_000);
     await passOn();
 
-    expect((await rows(id)).map((row) => row.amount_minor)).toEqual(['12600000']);
+    expect((await rows(id)).map((row) => row.amount_minor)).toEqual(['14400000']);
   });
 
-  it('T-XY1: the same group, granted, one person leaves (their seat is closed before 31/12): 01/01 holds 2 × 4.200.000 = 8.400.000', async () => {
+  it('T-XY1: the same group, granted, one person leaves (their seat is closed before 31/12): 01/01 holds 2 × 4.800.000 = 9.600.000', async () => {
     const u = await unit();
     const { subscription, plan } = await planAt('K2', 600_000);
     const group = await people(u, 3);
@@ -206,7 +212,7 @@ describe('the commitment of 01/01 is what the approval kept (T-RQ2 for 01/01, T-
 
     await passOn();
 
-    expect((await rows(id)).map((row) => row.amount_minor)).toEqual(['8400000']);
+    expect((await rows(id)).map((row) => row.amount_minor)).toEqual(['9600000']);
   });
 
   it('B1A-04: one person of the group has their seat closed in March, before the term the approval counted: 01/01 holds their months to the day it closes at the price of the approval (3 × 600.000), not at the price of 01/01 (650.000)', async () => {
@@ -225,8 +231,8 @@ describe('the commitment of 01/01 is what the approval kept (T-RQ2 for 01/01, T-
 
     await passOn();
 
-    // 2 × 4.200.000 kept, and January to March at 600.000 for the one who closes; never 3 × 650.000.
-    expect((await rows(id)).map((row) => row.amount_minor)).toEqual([String(2n * 4_200_000n + 3n * 600_000n)]);
+    // 2 × 4.800.000 kept (W3-02 8 calendar months), and January to March at 600.000 for the one who closes; never 3 × 650.000.
+    expect((await rows(id)).map((row) => row.amount_minor)).toEqual([String(2n * 4_800_000n + 3n * 600_000n)]);
   });
 
   it('B1A-01: a request approved in dollars by an older release is not counted by the number it kept (14.000 cents are not 14.000 dong): the months at the price of 01/01, and the audit trail says so', async () => {
@@ -271,8 +277,8 @@ describe('the commitment of 01/01 is what the approval kept (T-RQ2 for 01/01, T-
 
     await passOn();
 
-    // Two people keep 4.200.000 each; the third is counted by the 9 months of use from 01/01 at 650.000, nothing of the 14.000 cents.
-    expect((await rows(id)).map((row) => row.amount_minor)).toEqual([String(2 * 4_200_000 + 9 * 650_000)]);
+    // Two people keep 4.800.000 each (W3-02 8 calendar months); the third is counted by the 9 months of use from 01/01 at 650.000, nothing of the 14.000 cents.
+    expect((await rows(id)).map((row) => row.amount_minor)).toEqual([String(2 * 4_800_000 + 9 * 650_000)]);
     const events = await h.ctx.sql.query<{
       after: { employeeId: string; currency: string; savedMinor: string; year: number };
     }>(

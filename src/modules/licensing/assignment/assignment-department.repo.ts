@@ -3,7 +3,7 @@ import { toDateColumn, type BusinessDate } from '../../../core/business-date';
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { AssignmentRecord } from '../public/licensing.types';
-import { toRecord } from './assignment.repo';
+import { toRecord } from './assignment-record.mapper';
 
 /**
  * What is read of the assignments by department: a read that no write goes through (the writer of `license_assignments` is

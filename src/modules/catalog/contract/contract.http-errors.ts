@@ -12,6 +12,7 @@ import {
   ContractReasonRequiredError,
   ContractSubscriptionAlreadyLinkedError,
   ContractSubscriptionKindNotAllowedError,
+  ContractSubscriptionNotK2Error,
   ContractSubscriptionNotFoundError,
   ContractSubscriptionNotLinkedError,
   ContractSubscriptionVendorMismatchError,
@@ -68,6 +69,9 @@ export function toContractApiException(error: unknown): unknown {
   }
   if (error instanceof ContractSubscriptionNotLinkedError) {
     return refuse(HttpStatus.NOT_FOUND, 'CONTRACT.SUBSCRIPTION_NOT_LINKED', error.message);
+  }
+  if (error instanceof ContractSubscriptionNotK2Error) {
+    return refuse(UNPROCESSABLE, 'CONTRACT.SUBSCRIPTION_NOT_K2', error.message);
   }
   if (error instanceof ContractSubscriptionKindNotAllowedError) {
     return refuse(UNPROCESSABLE, 'CONTRACT.SUBSCRIPTION_KIND_NOT_ALLOWED', error.message, {
@@ -134,6 +138,7 @@ export const CONTRACT_ERROR_EXAMPLES = {
   SUBSCRIPTION_NOT_FOUND: example(new ContractSubscriptionNotFoundError()),
   SUBSCRIPTION_NOT_LINKED: example(new ContractSubscriptionNotLinkedError()),
   SUBSCRIPTION_KIND_NOT_ALLOWED: example(new ContractSubscriptionKindNotAllowedError('K1')),
+  SUBSCRIPTION_NOT_K2: example(new ContractSubscriptionNotK2Error()),
   INCOMPLETE: example(new ContractIncompleteError()),
   SUBSCRIPTION_VENDOR_MISMATCH: example(new ContractSubscriptionVendorMismatchError()),
   SUBSCRIPTION_ALREADY_LINKED: example(new ContractSubscriptionAlreadyLinkedError('<contract-id>')),

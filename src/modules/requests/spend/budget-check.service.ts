@@ -17,12 +17,16 @@ import { BudgetCheckRepo, type CheckRecord, type CheckTrigger } from './budget-c
 
 /** The same amount for the same year and months, and the same part of the year after: nothing to write. */
 const isSameAmount = (before: PricingRecord, after: PricingRecord): boolean =>
-  before.status === 'PRICED' &&
-  before.amount?.amountMinor === after.amount?.amountMinor &&
-  before.budgetYear === after.budgetYear &&
-  before.amountMonths === after.amountMonths &&
-  before.nextYearAmount?.amountMinor === after.nextYearAmount?.amountMinor &&
-  before.kind === after.kind;
+  [
+    before.status === 'PRICED',
+    before.amount?.amountMinor === after.amount?.amountMinor,
+    before.unitPrice?.amountMinor === after.unitPrice?.amountMinor,
+    before.monthlyPriceMinor === after.monthlyPriceMinor,
+    before.budgetYear === after.budgetYear,
+    before.amountMonths === after.amountMonths,
+    before.nextYearAmount?.amountMinor === after.nextYearAmount?.amountMinor,
+    before.kind === after.kind,
+  ].every(Boolean);
 
 /** Why a request cannot be checked at all: it is not a case for the check, but for whoever gives it its price in dong. */
 export type NotCheckable = 'PRICE_MISSING';
@@ -258,6 +262,7 @@ export class BudgetCheckService {
           reserveMinor: found.reserveMinor,
           heldMinor: found.heldMinor,
           spentMinor: found.spentMinor,
+          runningUncommittedMinor: found.runningUncommittedMinor,
         }
       : null;
   }

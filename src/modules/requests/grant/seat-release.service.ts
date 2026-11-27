@@ -3,20 +3,26 @@ import type { BusinessDate } from '../../../core/business-date';
 import { fiscalYearOf } from '../../../core/fiscal-year';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { BudgetsApi } from '../../budgets/public/budgets.api';
-import type { CommitmentReleaseReason, SeatCommitment } from '../../budgets/public/budgets.types';
+import type {
+  CommitmentReleaseInput,
+  CommitmentReleaseReason,
+  SeatCommitment,
+} from '../../budgets/public/budgets.types';
 import { LicensingApi } from '../../licensing/public/licensing.api';
 import type { GrantOutcomeFacts, ProvisioningKind, RevocationTaskFacts } from '../../licensing/public/licensing.types';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { TransferReleaseInput, TransferReleaseResult } from '../public/requests.types';
 import {
   givenAtTransfer,
-  lateGrantShare,
+  k1RevocationOutcome,
+  k1TransferReleaseBreakdown,
+  lateGrantBreakdown,
   releasesBeforeGrant,
-  revocationEndsOn,
-  revocationShare,
+  revocationBreakdown,
   transferReleaseEndsOn,
   transferReleaseReference,
   type SeatCoverage,
+  type SeatReleaseBreakdown,
 } from './seat-release.policy';
 import { SeatReleaseRepo } from './seat-release.repo';
 
@@ -50,7 +56,8 @@ export class SeatReleaseService {
   async afterRevocation(tx: DbTx, task: RevocationTaskFacts, now: Date): Promise<void> {
     const completed = task.completed;
     if (task.status !== 'COMPLETED' || completed === undefined) return;
-    const endsOn = revocationEndsOn(completed);
+    const outcome = k1RevocationOutcome(completed);
+    const endsOn = outcome.endsOn;
     if (endsOn === null) return;
     const coverages = await this.repo.coverageOf(tx, {
       requestIds: completed.grantRequestId === null ? [] : [completed.grantRequestId],
@@ -61,13 +68,19 @@ export class SeatReleaseService {
         endDate: completed.grantedEndDate,
       },
     });
+    const k1PaidThrough =
+      completed.provisioningType === 'K1' && completed.personalCommitmentMonths === 12 ? outcome.paidThroughOn : null;
     await this.give(tx, coverages, now, {
       reason: 'REVOKED',
       reference: `revocationTask:${task.id}`,
-      shareOf: (commitment, coverage, currentYear) =>
-        givenAtTransfer(commitment, completed.chainAssignmentIds)
-          ? 0n
-          : revocationShare({ commitment, coverage, endsOn, currentYear }),
+      breakdownOf: (commitment, coverage, currentYear) => {
+        if (givenAtTransfer(commitment, completed.chainAssignmentIds)) return { amountMinor: 0n, months: [] };
+        if (k1PaidThrough !== null && commitment.year <= fiscalYearOf(k1PaidThrough)) {
+          return { amountMinor: 0n, months: [] };
+        }
+
+        return revocationBreakdown({ commitment, coverage, endsOn, currentYear });
+      },
     });
   }
 
@@ -87,6 +100,7 @@ export class SeatReleaseService {
     );
     for (const chain of chains) {
       const kind = priced.find((right) => right.assignmentId === chain.assignmentId)?.provisioningType;
+      if (kind === 'K1' && chain.personalCommitmentMonths === 12) continue;
       const endsOn = kind === undefined ? null : transferReleaseEndsOn(kind, input.effectiveOn);
       if (endsOn === null) continue;
       const coverages = await this.repo.coverageOf(tx, {
@@ -97,7 +111,8 @@ export class SeatReleaseService {
       const released = await this.give(tx, coverages, now, {
         reason: 'TRANSFER_EFFECTIVE',
         reference: transferReleaseReference(input.transferId, chain.assignmentId),
-        shareOf: (commitment, coverage, currentYear) => revocationShare({ commitment, coverage, endsOn, currentYear }),
+        breakdownOf: (commitment, coverage, currentYear) =>
+          revocationBreakdown({ commitment, coverage, endsOn, currentYear }),
       });
       for (const [requestId, amountMinor] of released)
         byRequest.set(requestId, (byRequest.get(requestId) ?? 0n) + amountMinor);
@@ -115,7 +130,13 @@ export class SeatReleaseService {
    */
   async afterRightReplaced(
     tx: DbTx,
-    input: { assignmentId: string; provisioningType: ProvisioningKind; endedOn: BusinessDate; now: Date },
+    input: {
+      assignmentId: string;
+      provisioningType: ProvisioningKind;
+      endedOn: BusinessDate;
+      now: Date;
+      newRequestId?: string;
+    },
   ): Promise<void> {
     const endsOn = transferReleaseEndsOn(input.provisioningType, input.endedOn);
     if (endsOn === null) return;
@@ -126,14 +147,85 @@ export class SeatReleaseService {
       assignmentIds: chain.chainAssignmentIds,
       grant: { requestId: chain.grantRequestId, startDate: chain.grantedStartDate, endDate: chain.grantedEndDate },
     });
+    if (
+      input.provisioningType === 'K1' &&
+      chain.personalCommitmentMonths === 12 &&
+      chain.billingAnchorOn &&
+      input.newRequestId
+    ) {
+      const transferred = await this.transferK1AnnualIfInvoiced(tx, chain, coverages, input);
+      if (transferred) return;
+    }
     await this.give(tx, coverages, input.now, {
       reason: 'TRANSFER_EFFECTIVE',
       reference: transferReleaseReference(REGRANT_REFERENCE, input.assignmentId),
-      shareOf: (commitment, coverage, currentYear) =>
-        givenAtTransfer(commitment, chain.chainAssignmentIds)
-          ? 0n
-          : revocationShare({ commitment, coverage, endsOn, currentYear }),
+      breakdownOf: (commitment, coverage, currentYear) => {
+        if (givenAtTransfer(commitment, chain.chainAssignmentIds)) return { amountMinor: 0n, months: [] };
+        if (input.provisioningType === 'K1' && chain.personalCommitmentMonths === 12 && chain.billingAnchorOn) {
+          return k1TransferReleaseBreakdown({
+            commitment,
+            billingAnchorOn: chain.billingAnchorOn,
+            endedOn: input.endedOn,
+            currentYear,
+          });
+        }
+
+        return revocationBreakdown({ commitment, coverage, endsOn, currentYear });
+      },
     });
+  }
+
+  private async transferK1AnnualIfInvoiced(
+    tx: DbTx,
+    chain: Awaited<ReturnType<LicensingApi['listRightChainsOf']>>[number],
+    coverages: ReadonlyMap<string, SeatCoverage>,
+    input: { assignmentId: string; endedOn: BusinessDate; now: Date; newRequestId?: string },
+  ): Promise<boolean> {
+    if (!input.newRequestId || !chain.billingAnchorOn) return false;
+    const oldRequestIds = [...new Set([...coverages.keys(), ...(chain.grantRequestId ? [chain.grantRequestId] : [])])];
+    if (oldRequestIds.length === 0) return false;
+
+    const confirmedMap = await this.repo.confirmedInvoiceIdsByRequests(tx, oldRequestIds);
+    const invoiceIds = oldRequestIds.flatMap((id) => confirmedMap.get(id) ?? []);
+    if (invoiceIds.length === 0) return false;
+
+    const ccPair = await this.resolveTransferCostCenters(
+      tx,
+      chain.grantRequestId ?? oldRequestIds[0],
+      input.newRequestId,
+    );
+    if (!ccPair) return false;
+
+    await this.budgets.transferK1AnnualAllocations(tx, {
+      lockSubjectKey:
+        chain.k1RootAssignmentId ?? chain.chainAssignmentIds[chain.chainAssignmentIds.length - 1] ?? input.assignmentId,
+      invoiceIds,
+      billingAnchorOn: chain.billingAnchorOn,
+      endedOn: input.endedOn,
+      oldCostCenterId: ccPair.oldCostCenterId,
+      newCostCenterId: ccPair.newCostCenterId,
+      oldRequestIds,
+      newRequestId: input.newRequestId,
+      reference: transferReleaseReference(REGRANT_REFERENCE, input.assignmentId),
+      now: input.now,
+    });
+
+    return true;
+  }
+
+  private async resolveTransferCostCenters(
+    tx: DbTx,
+    oldRequestId: string,
+    newRequestId: string,
+  ): Promise<{ oldCostCenterId: string; newCostCenterId: string } | null> {
+    const ccMap = await this.repo.requestCostCenters(tx, [oldRequestId, newRequestId]);
+    const oldCc = ccMap.get(oldRequestId) ?? null;
+    const newCc = ccMap.get(newRequestId) ?? null;
+    if (!oldCc || !newCc || oldCc === newCc) {
+      return null;
+    }
+
+    return { oldCostCenterId: oldCc, newCostCenterId: newCc };
   }
 
   /** The grant of `requestId` was completed: a K2 right granted after its commitment began gives back the days before it. */
@@ -148,7 +240,8 @@ export class SeatReleaseService {
     await this.give(tx, coverages, now, {
       reason: 'LATE_GRANT',
       reference: `grantAssignment:${facts.assignmentId}`,
-      shareOf: (commitment, coverage, currentYear) => lateGrantShare({ commitment, coverage, grantedOn, currentYear }),
+      breakdownOf: (commitment, coverage, currentYear) =>
+        lateGrantBreakdown({ commitment, coverage, grantedOn, currentYear }),
     });
   }
 
@@ -183,7 +276,7 @@ export class SeatReleaseService {
     by: {
       reason: Extract<CommitmentReleaseReason, 'REVOKED' | 'LATE_GRANT' | 'TRANSFER_EFFECTIVE'>;
       reference: string;
-      shareOf: (commitment: SeatCommitment, coverage: SeatCoverage, currentYear: number) => bigint;
+      breakdownOf: (commitment: SeatCommitment, coverage: SeatCoverage, currentYear: number) => SeatReleaseBreakdown;
     },
   ): Promise<Map<string, bigint>> {
     const given = new Map<string, bigint>();
@@ -191,16 +284,17 @@ export class SeatReleaseService {
     // The years before the year of today are closed: their commitments are left as they are.
     const currentYear = fiscalYearOf(await this.organizationReads.businessToday(now, tx));
     const commitments = await this.budgets.lockSeatCommitments(tx, [...coverages.keys()], currentYear);
-    const amounts = new Map<string, { year: number; amountMinor: bigint }[]>();
+    const amounts = new Map<string, NonNullable<CommitmentReleaseInput['amounts']>[number][]>();
     for (const commitment of commitments) {
       const coverage = coverages.get(commitment.requestId);
       if (coverage === undefined) continue;
-      const amountMinor = by.shareOf(commitment, coverage, currentYear);
-      if (amountMinor <= 0n) continue;
-      amounts.set(commitment.requestId, [
-        ...(amounts.get(commitment.requestId) ?? []),
-        { year: commitment.year, amountMinor },
-      ]);
+      const breakdown = by.breakdownOf(commitment, coverage, currentYear);
+      if (breakdown.amountMinor <= 0n) continue;
+      const entry =
+        breakdown.months.length > 0
+          ? { year: commitment.year, amountMinor: breakdown.amountMinor, months: breakdown.months }
+          : { year: commitment.year, amountMinor: breakdown.amountMinor };
+      amounts.set(commitment.requestId, [...(amounts.get(commitment.requestId) ?? []), entry]);
     }
     for (const [requestId, items] of amounts) {
       const released = await this.budgets.releaseForRequest(tx, {

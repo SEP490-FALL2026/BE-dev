@@ -232,13 +232,14 @@ const withdraw: Handler = async (ctx, scenario, request) => {
   });
 };
 
-function planTypeOf(ctx: DemoRunContext, scenario: DemoRequestScenario): string | null {
-  for (const application of ctx.fixture.applications) {
-    const plan = application.plans.find((candidate) => candidate.key === scenario.plan);
-    if (plan) return plan.provisioningType;
-  }
+function planEntryOf(ctx: DemoRunContext, planKey: string | undefined) {
+  return ctx.fixture.applications
+    .flatMap((application) => application.plans)
+    .find((candidate) => candidate.key === planKey);
+}
 
-  return null;
+function planTypeOf(ctx: DemoRunContext, scenario: DemoRequestScenario): string | null {
+  return planEntryOf(ctx, scenario.plan)?.provisioningType ?? null;
 }
 
 /** IT Admin opens the grant task: from the pool, with a purchase when the pool is out (K2) or the store has no key (K4). */
@@ -288,20 +289,79 @@ export async function grantTaskStatus(
   return latest?.status ?? null;
 }
 
-/** The free key of the K4 subscription the scenario's plan has, for the IT Admin to hand over. */
-async function freeKeyId(
+async function existingStoreKeyId(
+  ctx: DemoRunContext,
+  email: string,
+  planKey: string | undefined,
+): Promise<string | undefined> {
+  for (const lot of ctx.fixture.lots.filter((candidate) => candidate.plan === planKey)) {
+    const lotId = ctx.ids.lots.get(lot.key);
+    if (!lotId) continue;
+    const keys = await listAll<{ id: string }>(ctx, email, `/license-keys?licenseLotId=${lotId}&status=IN_STORE`);
+    if (keys[0]) return keys[0].id;
+  }
+
+  return undefined;
+}
+
+async function ensureRequestLotId(
   ctx: DemoRunContext,
   email: string,
   scenario: DemoRequestScenario,
-): Promise<string | undefined> {
-  if (scenario.grant !== 'KEY') return undefined;
-  const subscription = ctx.fixture.subscriptions.find((candidate) => candidate.plan === scenario.plan);
-  const subscriptionId = ctx.ids.subscriptions.get(subscription?.key ?? '');
-  const keys = await listAll<{ id: string; status: string }>(
+  request: RequestWire,
+  plan: NonNullable<ReturnType<typeof planEntryOf>>,
+): Promise<string> {
+  const cacheKey = `request:${scenario.key}`;
+  const cached = ctx.ids.lots.get(cacheKey);
+  if (cached) return cached;
+  const planId = ctx.ids.plans.get(plan.key);
+  if (!planId) throw new Error(`The fixture has no plan id for ${plan.key}`);
+  const lots = await listAll<{ id: string; purpose: string; requestId: string | null }>(
     ctx,
     email,
-    `/license-keys?subscriptionId=${subscriptionId}&status=IN_STORE`,
+    `/license-lots?planId=${planId}`,
   );
+  const found = lots.find((row) => row.purpose === 'REQUEST' && row.requestId === request.id);
+  const lotId =
+    found?.id ??
+    (
+      await ctx.api.call<{ id: string }>(email, 'POST', '/license-lots', {
+        planId,
+        purchasedOn: ctx.today,
+        licenseCount: grantedBeneficiaries(scenario).length,
+        unitPrice: { amount: plan.referencePrice ?? '3000000', currency: 'VND' },
+        purpose: 'REQUEST',
+        requestId: request.id,
+      })
+    ).id;
+  ctx.ids.lots.set(cacheKey, lotId);
+
+  return lotId;
+}
+
+/**
+ * Resolves the license key id to complete a K4 grant task: takes an existing `IN_STORE` key when `grant === 'KEY'`,
+ * or creates a `REQUEST` lot (`POST /license-lots`) and imports a key (`POST /license-lots/{id}/keys`) when `grant === 'PURCHASE'`.
+ */
+async function k4LicenseKeyId(
+  ctx: DemoRunContext,
+  email: string,
+  scenario: DemoRequestScenario,
+  request: RequestWire,
+): Promise<string | undefined> {
+  if (scenario.grant === 'KEY') return existingStoreKeyId(ctx, email, scenario.plan);
+  const plan = planEntryOf(ctx, scenario.plan);
+  const isAccountK4 =
+    plan?.provisioningType === 'K4' && plan.keyBinding !== 'DEVICE_KEY' && plan.keyBinding !== 'DEVICE_BUNDLED';
+  if (scenario.grant !== 'PURCHASE' || !isAccountK4) return undefined;
+  const lotId = await ensureRequestLotId(ctx, email, scenario, request, plan);
+  let keys = await listAll<{ id: string }>(ctx, email, `/license-keys?licenseLotId=${lotId}&status=IN_STORE`);
+  if (!keys[0]) {
+    await ctx.api.call(email, 'POST', `/license-lots/${lotId}/keys`, {
+      keys: [`REQ-${scenario.key.toUpperCase()}-7Q2K-X9M4-0001`],
+    });
+    keys = await listAll<{ id: string }>(ctx, email, `/license-keys?licenseLotId=${lotId}&status=IN_STORE`);
+  }
 
   return keys[0]?.id;
 }
@@ -337,7 +397,7 @@ async function completeTask(ctx: DemoRunContext, scenario: DemoRequestScenario, 
   if (open.length === 0) throw new Error(`The grant task of ${scenario.key} is neither queued nor in progress`);
   for (const task of open) {
     if (task.status === 'QUEUED') await ctx.api.call(email, 'POST', `/provisioning-tasks/${task.id}/claim`);
-    const licenseKeyId = await freeKeyId(ctx, email, scenario);
+    const licenseKeyId = await k4LicenseKeyId(ctx, email, scenario, request);
     await ctx.api.call(email, 'POST', `/provisioning-tasks/${task.id}/complete`, {
       evidence: `${tag(ctx, scenario.key)} Đã cấp quyền cho người dùng.`,
       ...(licenseKeyId ? { licenseKeyId } : {}),

@@ -21,6 +21,7 @@ const BUDGET = {
   committed: money('20'),
   spent: money('10'),
   pendingSpend: money('30'),
+  runningUncommitted: money('0'),
   remainingBase: money('40'),
   remainingWithReserve: money('60'),
   overBudget: false,

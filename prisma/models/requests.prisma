@@ -202,6 +202,7 @@ model AccessRequest {
   amountMinor           BigInt?                    @map("amount_minor")
   amountCurrency        String?                    @map("amount_currency") @db.Char(3)
   unitPriceMinor        BigInt?                    @map("unit_price_minor")
+  monthlyPriceMinor     BigInt?                    @map("monthly_price_minor")
   billingCycle          BillingCycle?              @map("billing_cycle")
   // The payments, one for each billing period: [{ dueOn, amountMinor, budgetYear }]. Never shown as a list.
   paymentSchedule       Json?                      @map("payment_schedule")
@@ -268,6 +269,7 @@ model AccessRequest {
   serviceAccount       AccessRequestServiceAccount?
   renewal              AccessRequestRenewal?
   purchaseInvoices     PurchaseInvoice[]
+  seatChanges          SeatChange[]      @relation("SeatChangeOfRequest")
   returnsFromHere      ReturnRequest[]              @relation("ReturnRequestOrigin")
   replacesAssignment   LicenseAssignment?           @relation("RequestReplacesAssignment", fields: [replacesAssignmentId], references: [id], onDelete: Restrict)
 
@@ -1180,6 +1182,7 @@ model YearStartCommitmentRun {
 enum PurchaseInvoiceLinkKind {
   REQUEST
   SUBSCRIPTION
+  LICENSE_LOT
 }
 
 // What the invoice is called when it is read (QĐ-111w, R-50): the first invoice of a request, a later period of it, or the renewal of a subscription.
@@ -1187,6 +1190,7 @@ enum PurchaseInvoiceLabel {
   NEW_PURCHASE
   PERIOD
   RENEWAL
+  SEAT_PURCHASE
 }
 
 enum PurchaseInvoiceState {
@@ -1244,12 +1248,19 @@ model PurchaseInvoice {
   expectedQuantity                  Int?    @map("expected_quantity")
   expectedUnitPriceOriginalMinor    BigInt? @map("expected_unit_price_original_minor")
   expectedUnitPriceOriginalCurrency String? @map("expected_unit_price_original_currency") @db.Char(3)
+  // The purchase of seats the invoice pays for (one open invoice per purchase), and the lines of the period when the vendor splits the invoice.
+  seatPurchaseId      String?  @map("seat_purchase_id") @db.Uuid
+  subscriptionLineIds String[] @map("subscription_line_ids") @db.Uuid
+  // The lot the invoice pays for (link kind LICENSE_LOT); one open invoice per lot.
+  licenseLotId        String?  @map("license_lot_id") @db.Uuid
 
   request         AccessRequest?            @relation(fields: [requestId], references: [id], onDelete: Restrict)
   resubmissionOf  PurchaseInvoice?          @relation("PurchaseInvoiceResubmission", fields: [resubmissionOfId], references: [id], onDelete: Restrict)
   resubmission    PurchaseInvoice?          @relation("PurchaseInvoiceResubmission")
   documents       PurchaseInvoiceDocument[]
   discrepancyCase InvoiceDiscrepancyCase?
+  seatPurchase    SeatPurchase?             @relation(fields: [seatPurchaseId], references: [id], onDelete: Restrict)
+  licenseLot      LicenseLot?               @relation(fields: [licenseLotId], references: [id], onDelete: Restrict)
 
   // The partial unique index of the open number, the checks and the trigger are SQL in the migration (ADR-0005).
   @@index([requestId, serviceMonth], map: "purchase_invoices_request_service_month_idx")
@@ -1278,6 +1289,7 @@ enum InvoiceDiscrepancyState {
 enum InvoiceDiscrepancyOutcome {
   EXPLAINED
   OUT_OF_PROCESS_SUSPECTED
+  EXCHANGE_RATE_LINE_PRICE_UPDATED
 }
 
 // The case Finance works from a purchase invoice whose count of seats or price of one (in the currency the invoice states) differs from what was

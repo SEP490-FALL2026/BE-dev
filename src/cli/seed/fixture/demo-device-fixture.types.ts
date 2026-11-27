@@ -14,7 +14,7 @@ export interface DemoDevice {
   serialNumber: string;
   /** The plan keys bundled with the machine (the operating system that came with it). */
   bundled: string[];
-  /** The subscription whose key the machine already used when it was entered (an `INITIAL` activation): the plan is bought per machine. */
+  /** The lot whose key the machine already used when it was entered (an `INITIAL` activation): the plan is bought per machine. */
   initialKeyOf?: string;
   signature: boolean;
   acknowledge: boolean;
@@ -33,7 +33,7 @@ export interface DemoNewDevice {
   bundled: string[];
   /** Who it is handed to when it is entered; none: it waits in the stock. */
   holder?: string;
-  /** The subscriptions of the plans bought per machine whose key the machine runs (an `OPERATION` activation). */
+  /** The lot of the plan bought per machine whose key the machine runs (an `OPERATION` activation). */
   keyOf?: string;
   condition?: 'BROKEN' | 'IN_REPAIR';
 }

@@ -39,18 +39,19 @@ describe('QĐ-113a the price of a seat for savings is the price of a subscriptio
     expect(getPlanPrice).not.toHaveBeenCalled();
   });
 
-  it('is the price of the subscription when one prices the plan', async () => {
+  it('is the price of the subscription when one prices the plan, reading monthlyPriceMinor directly', async () => {
     const context = await contextWith({
       getSubscriptionPlanPrice: jest.fn().mockResolvedValue({
         ...REFERENCE,
         unitPrice: { amountMinor: 3_000_000n, currency: 'VND' },
+        monthlyPriceMinor: 1_000_000n,
         billingCycle: 'QUARTERLY',
         source: 'SUBSCRIPTION',
       }),
     });
 
     expect(await context.price('plan')).toEqual({
-      amountMinor: 3_000_000n,
+      monthlyPriceMinor: 1_000_000n,
       currency: 'VND',
       billingCycle: 'QUARTERLY',
     });

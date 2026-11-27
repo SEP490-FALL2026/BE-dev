@@ -22,6 +22,7 @@ describe('BR-MF4-01 baseline holder-department basis HTTP contract (QĐ-103k)', 
       software: [
         {
           subscriptionId: '00000000-0000-4000-8000-000000000001',
+          planId: '00000000-0000-4000-8000-000000000002',
           application: 'Figma',
           plan: 'Organization',
           seatsPurchased: 10,

@@ -60,4 +60,16 @@ describe('ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE details', () => {
     expect(mapped.status).toBe(HttpStatus.CONFLICT);
     expect(mapped.body.code).toBe('EMPLOYEE.NOT_STARTED');
   });
+
+  it('maps W3-17 K1 annual term errors with exact codes and contractEndDate details', () => {
+    const fixed = answerOf(new AccessRequestTermRefusedError('K1_ANNUAL_TERM_FIXED', null, 'K1'));
+    expect(fixed.status).toBe(HttpStatus.UNPROCESSABLE_ENTITY);
+    expect(fixed.body.code).toBe('ACCESS_REQUEST.K1_ANNUAL_TERM_FIXED');
+    expect(fixed.body).not.toHaveProperty('details');
+
+    const tooShort = answerOf(new AccessRequestTermRefusedError('K1_ANNUAL_CONTRACT_TOO_SHORT', '2027-03-31', 'K1'));
+    expect(tooShort.status).toBe(HttpStatus.UNPROCESSABLE_ENTITY);
+    expect(tooShort.body.code).toBe('ACCESS_REQUEST.K1_ANNUAL_CONTRACT_TOO_SHORT');
+    expect(tooShort.body.details).toEqual({ contractEndDate: '2027-03-31' });
+  });
 });

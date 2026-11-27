@@ -25,7 +25,7 @@ export class SubscriptionSeatsController {
   @ApiSuccessResponse(SeatUsageResponseDto, {
     message: 'SUBSCRIPTION_SEAT_USAGE.FETCHED',
     description:
-      'The seats bought, those taken today in the organization calendar (the assignments occupying and, for a lot of keys on machines, the open activations on machines) and the seats free; purchased and free are null while the subscription has no quantity.',
+      'The seats bought (for K2 subscriptions, the sum of seats today across lines serving today), those taken today in the organization calendar (the assignments occupying and, for a lot of keys on machines, the open activations on machines) and the seats free; purchased and free are null while the subscription has no quantity.',
   })
   @ApiErrorResponses(
     UNAUTHENTICATED_RESPONSE,

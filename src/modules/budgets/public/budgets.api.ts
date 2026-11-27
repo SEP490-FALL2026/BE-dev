@@ -4,16 +4,26 @@ import { BudgetFactsRepo } from '../budget/budget-facts.repo';
 import { CommitmentService } from '../commitment/commitment.service';
 import { OutOfProcessSpendRecorderService } from '../invoice/out-of-process-spend-recorder.service';
 import { PurchaseInvoiceRecorderService } from '../invoice/purchase-invoice-recorder.service';
+import { InvoiceAllocationTransferService } from '../invoice/invoice-allocation-transfer.service';
+import { K1YearStartApplicationService } from '../invoice/k1-year-start-application.service';
+import { RunningUncommittedFactsService } from '../running-uncommitted/running-uncommitted-facts.service';
+import { LicenseLotCostService } from '../shared-pool-line/license-lot-cost.service';
 import type {
   CommittedAmount,
   CommitmentHoldInput,
   CommitmentReleaseInput,
+  ExcessLicenseGrantInput,
+  ExcessLicenseGrantRecorded,
   HeldAmount,
   HeldCommitment,
+  K1TransferAllocationInput,
+  K1YearStartApplyInput,
+  LotWithdrawalAfterInvoiceInput,
   OutOfProcessSpendInput,
   OutOfProcessSpendRecorded,
   PurchaseInvoiceRecorded,
   PurchaseInvoiceRecordInput,
+  RecordedPurchaseInvoiceInfo,
   ReleasedCommitment,
   RequestCommitment,
   SeatCommitment,
@@ -35,11 +45,22 @@ export class BudgetsApi {
     private readonly commitments: CommitmentService,
     private readonly purchaseInvoices: PurchaseInvoiceRecorderService,
     private readonly outOfProcessSpends: OutOfProcessSpendRecorderService,
+    private readonly runningUncommitted: RunningUncommittedFactsService,
+    private readonly k1YearStart: K1YearStartApplicationService,
+    private readonly k1Transfer: InvoiceAllocationTransferService,
+    private readonly lotCosts: LicenseLotCostService,
   ) {}
 
   /** The current budget of each of the years; a year without one is absent from the map, which is not a budget of nothing. */
-  yearFacts(costCenterId: string, years: readonly number[], tx?: DbTx): Promise<Map<number, YearBudgetFacts>> {
-    return this.facts.yearFacts(costCenterId, years, tx);
+  async yearFacts(costCenterId: string, years: readonly number[], tx?: DbTx): Promise<Map<number, YearBudgetFacts>> {
+    const facts = await this.facts.yearFacts(costCenterId, years, tx);
+    if (facts.size === 0) return facts;
+    const running = await this.runningUncommitted.ofCostCenterYears(costCenterId, [...facts.keys()], tx);
+    for (const [year, entry] of facts) {
+      facts.set(year, { ...entry, runningUncommittedMinor: running.get(year) ?? 0n });
+    }
+
+    return facts;
   }
 
   /**
@@ -133,5 +154,48 @@ export class BudgetsApi {
     input: OutOfProcessSpendInput,
   ): Promise<OutOfProcessSpendRecorded> {
     return this.outOfProcessSpends.record(tx, actor, input);
+  }
+
+  /**
+   * Marks the pool variance of `purchaseInvoiceId` as resolved once its discrepancy case closes, keeping `invoices` append-only.
+   * Returns true when a `pool_variance_in_review` invoice was resolved, false otherwise.
+   */
+  markPoolVarianceResolved(tx: DbTx, purchaseInvoiceId: string, resolvedAt?: Date): Promise<boolean> {
+    return this.purchaseInvoices.markPoolVarianceResolved(tx, purchaseInvoiceId, resolvedAt);
+  }
+
+  /** Reads the recorded subscription id and pool variance figures (with current in-review status) of `purchaseInvoiceId`. */
+  purchaseInvoiceInfo(purchaseInvoiceId: string, tx?: DbTx): Promise<RecordedPurchaseInvoiceInfo | null> {
+    return this.purchaseInvoices.purchaseInvoiceInfo(purchaseInvoiceId, tx);
+  }
+
+  /** Acquires Tier 0 K1 allocation advisory locks (`k1-allocation:<key>:<year>`) ascending before commitment reads. */
+  lockK1AllocationYears(tx: DbTx, subjectKeys: readonly string[], years: readonly number[]): Promise<void> {
+    return this.k1YearStart.lockK1AllocationYears(tx, subjectKeys, years);
+  }
+
+  /** Applies existing K1 annual `invoice_allocations` to newly created 01/01 year-start commitments in the same tx. */
+  applyK1YearStartAllocations(tx: DbTx, input: K1YearStartApplyInput): Promise<void> {
+    return this.k1YearStart.applyYearStart(tx, input);
+  }
+
+  /** Transfers remaining K1 annual allocation months on replacement (`F8`) with `TRANSFER_OUT`/`TRANSFER_IN` and `D-16` guard. */
+  transferK1AnnualAllocations(tx: DbTx, input: K1TransferAllocationInput): Promise<{ transferredMinor: bigint }> {
+    return this.k1Transfer.transfer(tx, input);
+  }
+
+  /** Number of excess license charges already recorded on each lot id (used for F11 reservation checks). */
+  chargedExcessCountsOfLots(lotIds: readonly string[], tx?: DbTx): Promise<Map<string, number>> {
+    return this.lotCosts.chargedExcessCountsOfLots(lotIds, tx);
+  }
+
+  /** Records excess-license charge or own-request hold (`F10`) when a K4 key from a lot is granted. */
+  recordExcessLotLicenseGrant(tx: DbTx, input: ExcessLicenseGrantInput): Promise<ExcessLicenseGrantRecorded> {
+    return this.lotCosts.recordExcessLicenseGrant(tx, input);
+  }
+
+  /** Compensates a confirmed `REQUEST` lot invoice on group member withdrawal (`F13c`, `D-16`). */
+  recordLotWithdrawalAfterInvoice(tx: DbTx, input: LotWithdrawalAfterInvoiceInput): Promise<void> {
+    return this.purchaseInvoices.recordLotWithdrawalAfterInvoice(tx, input);
   }
 }

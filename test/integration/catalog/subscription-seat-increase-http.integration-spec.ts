@@ -1,10 +1,21 @@
 import request from 'supertest';
 import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
-import { principal } from '../../support/ai-assist-fakes';
+import type { AuthenticatedPrincipal } from '../../../src/infrastructure/security/tokens/access-token-verifier.port';
 import { CatalogApi } from '../../../src/modules/catalog/public/catalog.api';
+import { SubscriptionChangeGuard } from '../../../src/modules/catalog/subscription/subscription-change-guard.service';
+import { SeatLedgerApi } from '../../../src/modules/catalog/public/seat-ledger.api';
 import type { ApiAccount } from '../../support/api-accounts';
 import { buildActivatedAccount } from '../../support/builders/account.builder';
 import { SeatHarness } from '../../support/seat-baseline-harness';
+
+const principalOf = (account: ApiAccount): AuthenticatedPrincipal => ({
+  subject: account.appUserId,
+  appUserId: account.appUserId,
+  sessionId: 'test-session',
+  employeeId: account.employeeId,
+  roles: ['IT_ADMIN'],
+  directRoles: ['IT_ADMIN'],
+});
 
 const h = new SeatHarness();
 
@@ -30,6 +41,41 @@ describe('the notice of a rise of the seats bought of a subscription (X-IT.7)', 
       )
     ).rows;
 
+  /**
+   * Tells a rise of the seats of the subscription from `from` to `to` the way a change of the seats does, in its own transaction: the seats of a subscription are
+   * no longer edited by `PATCH` (409 SEAT_COUNT_VIA_LEDGER, W3-27), so the rule of who is told is reached through the service that holds it (the recipients,
+   * and which subscriptions are owed a notice), until that code leaves with the old route.
+   */
+  const tellRise = async (
+    subscriptionId: string,
+    from: number | null,
+    to: number | null,
+    raisedBy: ApiAccount = h.it1,
+  ) => {
+    const row = (
+      await h.ctx.sql.query<{ status: string; provisioning_type: string; responsible: string | null }>(
+        `SELECT s.status::text, p.provisioning_type::text, s.responsible_it_admin_employee_id AS responsible
+           FROM subscriptions s JOIN plans p ON p.id = s.plan_id WHERE s.id = $1`,
+        [subscriptionId],
+      )
+    ).rows[0];
+    const guard = h.ctx.app.get(SubscriptionChangeGuard, { strict: false });
+
+    return h.ctx.app.get(TransactionRunner, { strict: false }).run((tx) =>
+      guard.tellSeatIncrease(tx, {
+        organizationId: h.seed.organizationId,
+        subscriptionId,
+        planProvisioningType: row.provisioning_type as 'K1' | 'K2' | 'K4',
+        status: row.status as 'ACTIVE' | 'DRAFT',
+        responsibleItAdminEmployeeId: row.responsible,
+        from,
+        to,
+        requestId: null,
+        actor: principalOf(raisedBy),
+      }),
+    );
+  };
+
   const answerFor = (subscriptionId: string, holder: ApiAccount | null) =>
     h.ctx.sql.query(`UPDATE subscriptions SET responsible_it_admin_employee_id = $2 WHERE id = $1`, [
       subscriptionId,
@@ -50,7 +96,7 @@ describe('the notice of a rise of the seats bought of a subscription (X-IT.7)', 
     const subscriptionId = await h.subscription(10, 'K2');
     await answerFor(subscriptionId, it2);
 
-    await h.changeSeats(subscriptionId, { purchasedQuantity: 14 });
+    await tellRise(subscriptionId, 10, 14);
 
     const notices = await noticesOf(subscriptionId);
     expect(notices).toHaveLength(1);
@@ -67,7 +113,7 @@ describe('the notice of a rise of the seats bought of a subscription (X-IT.7)', 
   it('tells nobody when the IT Admin who answers for the pool raised it themselves', async () => {
     const subscriptionId = await h.subscription(10, 'K2');
 
-    await h.changeSeats(subscriptionId, { purchasedQuantity: 12 });
+    await tellRise(subscriptionId, 10, 12);
 
     expect(await noticesOf(subscriptionId)).toEqual([]);
   });
@@ -76,8 +122,8 @@ describe('the notice of a rise of the seats bought of a subscription (X-IT.7)', 
     const subscriptionId = await h.subscription(10, 'K2');
     await answerFor(subscriptionId, it2);
 
-    await h.changeSeats(subscriptionId, { purchasedQuantity: 8 });
-    await h.changeSeats(subscriptionId, { purchasedQuantity: 8 });
+    await tellRise(subscriptionId, 10, 8);
+    await tellRise(subscriptionId, 8, 8);
     await patch(h.it1, subscriptionId, { autoRenew: true }).expect(200);
 
     expect(await noticesOf(subscriptionId)).toEqual([]);
@@ -87,7 +133,7 @@ describe('the notice of a rise of the seats bought of a subscription (X-IT.7)', 
     const subscriptionId = await h.subscription(3, 'K4');
     await answerFor(subscriptionId, it3);
 
-    await h.changeSeats(subscriptionId, { purchasedQuantity: 5 });
+    await tellRise(subscriptionId, 3, 5);
 
     const notices = await noticesOf(subscriptionId);
     expect(notices.map((notice) => notice.recipient_employee_id)).toEqual([it3.employeeId]);
@@ -98,7 +144,7 @@ describe('the notice of a rise of the seats bought of a subscription (X-IT.7)', 
     const subscriptionId = await h.draftSubscription('K2');
     await answerFor(subscriptionId, it2);
 
-    await h.changeSeats(subscriptionId, { purchasedQuantity: 25 });
+    await tellRise(subscriptionId, 10, 25);
 
     expect(await noticesOf(subscriptionId)).toEqual([]);
   });
@@ -107,21 +153,21 @@ describe('the notice of a rise of the seats bought of a subscription (X-IT.7)', 
     const subscriptionId = await h.subscription(5, 'K1');
     await answerFor(subscriptionId, it2);
 
-    await h.changeSeats(subscriptionId, { purchasedQuantity: 9 });
+    await tellRise(subscriptionId, 5, 9);
 
     expect(await noticesOf(subscriptionId)).toEqual([]);
   });
 
-  it('tells every other IT Admin who works when nobody answers for the pool', async () => {
+  it('tells the Super Admin when nobody usable answers for the pool (QĐ-118f)', async () => {
     const subscriptionId = await h.subscription(10, 'K2');
-    // The one who answers has no account that can act now: the notice goes to the common queue of the IT Admins who work, but the one who raised it.
+    // The one who answers has no account that can act now: the notice goes to the Super Admin, who stands in for them (SPEC §8.1, R1).
     await h.ctx.sql.query(`UPDATE app_users SET status = 'LOCKED' WHERE employee_id = $1`, [it2.employeeId]);
     await answerFor(subscriptionId, it2);
 
-    await h.changeSeats(subscriptionId, { purchasedQuantity: 11 });
+    await tellRise(subscriptionId, 10, 11);
 
     const told = (await noticesOf(subscriptionId)).map((notice) => notice.recipient_employee_id);
-    expect(told).toEqual([it3.employeeId]);
+    expect(told).toEqual([h.seed.superAdmin.employeeId]);
     await h.ctx.sql.query(`UPDATE app_users SET status = 'ACTIVE' WHERE employee_id = $1`, [it2.employeeId]);
   });
 
@@ -145,52 +191,74 @@ describe('the notice of a rise of the seats bought of a subscription (X-IT.7)', 
       const seen = await read(id);
 
       const first = await patch(id, {
-        purchasedQuantity: 6,
+        autoRenew: true,
         expectedUpdatedAt: seen,
-        quantityChangeReason: 'More seats',
       }).expect(200);
       const second = await patch(id, {
-        purchasedQuantity: 5,
+        autoRenew: false,
         expectedUpdatedAt: seen,
-        quantityChangeReason: 'More seats',
       }).expect(409);
 
       expect(h.codeOf(second)).toBe('SUBSCRIPTION.STALE');
       expect(h.detailsOf(second)).toMatchObject({ currentUpdatedAt: h.dataOf<{ updatedAt: string }>(first).updatedAt });
-      expect(await quantityOf(id)).toBe(6);
+      const row = await h.ctx.sql.query<{ auto_renew: boolean }>(`SELECT auto_renew FROM subscriptions WHERE id = $1`, [
+        id,
+      ]);
+      expect(row.rows[0].auto_renew).toBe(true);
     });
 
-    it('refuses a change of the seats sent with no version of a read: 422 SUBSCRIPTION.VERSION_REQUIRED, nothing written', async () => {
+    it('refuses a change of the seats sent on PATCH per W3-27: 409 SUBSCRIPTION.SEAT_COUNT_VIA_LEDGER, nothing written', async () => {
       const id = await h.subscription(4, 'K2');
 
-      const refused = await patch(id, { purchasedQuantity: 6, quantityChangeReason: 'More seats' }).expect(422);
+      const refused = await patch(id, { purchasedQuantity: 6, quantityChangeReason: 'More seats' }).expect(409);
 
-      expect(h.codeOf(refused)).toBe('SUBSCRIPTION.VERSION_REQUIRED');
+      expect(h.codeOf(refused)).toBe('SUBSCRIPTION.SEAT_COUNT_VIA_LEDGER');
       expect(await quantityOf(id)).toBe(4);
     });
 
-    it.each(['K2', 'K1'] as const)(
-      'a seat bought for a %s grant between the read and the PATCH makes the PATCH stale',
-      async (type) => {
-        const id = await h.subscription(4, type);
-        const seen = await read(id);
+    it('G-14 (3ba8b572): a seat bought on a K2 line between the read and the edit makes the line update stale: 409 SUBSCRIPTION_LINE.STALE', async () => {
+      const id = await h.subscription(4, 'K2');
+      await h.ctx.sql.query(`UPDATE subscriptions SET responsible_it_admin_employee_id = $2 WHERE id = $1`, [
+        id,
+        h.it1.employeeId,
+      ]);
+      const lineRow = (
+        await h.ctx.sql.query<{ id: string; updated_at: Date }>(
+          `SELECT id, updated_at FROM subscription_lines WHERE subscription_id = $1`,
+          [id],
+        )
+      ).rows[0];
+      expect(lineRow).toBeDefined();
+      const seen = lineRow.updated_at.toISOString();
 
-        // What a grant does in its own transaction: lock the target, then buy the seat (the K1 grant takes its own seat the same way).
-        const catalog = h.ctx.app.get(CatalogApi, { strict: false });
-        await h.ctx.app.get(TransactionRunner).run(async (tx) => {
-          await catalog.lockSeatTarget(tx, { subscriptionId: id });
-          await catalog.addPoolSeat(tx, principal(h.it1.employeeId), id, null);
+      const runner = h.ctx.app.get(TransactionRunner, { strict: false });
+      const catalog = h.ctx.app.get(CatalogApi, { strict: false });
+      const seatLedger = h.ctx.app.get(SeatLedgerApi, { strict: false });
+      await runner.run(async (tx) => {
+        const target = await catalog.lockSeatTarget(tx, { subscriptionId: id });
+        if (!target?.subscriptionLineId) throw new Error('Expected active K2 subscription line');
+        return seatLedger.recordVendor(tx, target.subscriptionLineId, {
+          delta: 1,
+          effectiveOn: '2026-01-05',
+          note: 'Seat bought in flight',
+          actor: principalOf(h.it1),
+          alreadyLocked: true,
+          today: '2026-01-05',
         });
-        expect(await quantityOf(id)).toBe(5);
+      });
 
-        const refused = await patch(id, {
-          purchasedQuantity: 9,
+      const stale = await request(h.server())
+        .post(`/api/v1/subscription-lines/${lineRow.id}/seat-corrections`)
+        .set(h.as(h.it1))
+        .send({
+          delta: 1,
+          effectiveOn: '2026-01-05',
+          note: 'Correction from stale read',
           expectedUpdatedAt: seen,
-          quantityChangeReason: 'More seats',
-        }).expect(409);
-        expect(h.codeOf(refused)).toBe('SUBSCRIPTION.STALE');
-        expect(await quantityOf(id)).toBe(5);
-      },
-    );
+        })
+        .expect(409);
+
+      expect(h.codeOf(stale)).toBe('SUBSCRIPTION_LINE.STALE');
+    });
   });
 });

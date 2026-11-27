@@ -72,41 +72,90 @@ export class ProvisioningGrantCompletion {
     });
     if (checklist) await this.checklists.record(tx, task.id, checklist);
     await this.repo.markCompleted(tx, task.id, actor.appUserId, checklist?.evidence ?? input.evidence, now);
-    if (input.licenseKeyId !== undefined) {
-      await this.keys.assign(tx, actor, {
-        organizationId,
-        licenseKeyId: input.licenseKeyId,
-        assignmentId: task.assignmentId,
-        subscriptionId: task.assignment.subscriptionId,
+
+    const completedOn = await this.organizationReads.businessToday(now, tx);
+    const keyMeta = await this.assignKeyForGrant(tx, actor, {
+      task,
+      organizationId,
+      provisioningType,
+      completedOn,
+      licenseKeyId: input.licenseKeyId,
+    });
+    if (provisioningType === 'K4' && task.purchase === null && keyMeta?.licenseLotId) {
+      await this.sharedPool.assertK4LotGrantable(tx, {
+        planId: task.assignment.planId,
+        lotId: keyMeta.licenseLotId,
+        requestId: task.requestId,
+        afterKeyAssigned: true,
       });
     }
-    const completedOn = await this.organizationReads.businessToday(now, tx);
     const granted = await this.assignments.recordGranted(tx, task.assignmentId, completedOn);
-    if (task.requestId === null) return;
+    await this.notifyGrantedOutcome(tx, { task, provisioningType, completedOn, granted, keyMeta });
+    if (keyMeta && !keyMeta.costBorne) await this.keys.markCostBorne(tx, keyMeta.licenseKeyId);
+  }
 
-    const pooled = provisioningType === 'K2' || provisioningType === 'K4';
+  private async notifyGrantedOutcome(
+    tx: DbTx,
+    params: {
+      task: ProvisioningTaskRecord;
+      provisioningType: 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
+      completedOn: string;
+      granted: { effectiveFrom: string; expectedEndDate: string | null };
+      keyMeta: { licenseKeyId: string; licenseLotId: string | null; costBorne: boolean } | null;
+    },
+  ): Promise<void> {
+    const { task, provisioningType, completedOn, granted, keyMeta } = params;
+    if (task.requestId === null) return;
     // From the pool means taken from a free seat or key: a K2 or K4 grant with nothing bought for it (`BR-MF1-09c`).
-    const fromPool = pooled && task.purchase === null;
+    const fromPool = (provisioningType === 'K2' || provisioningType === 'K4') && task.purchase === null;
     await this.gate.get().reportOutcome(tx, task.requestId, 'COMPLETED', task.assignment.employeeId, {
+      taskId: task.id,
       fromPool,
       provisioningType,
       grantedOn: completedOn,
       assignmentId: task.assignmentId,
       effectiveFrom: granted.effectiveFrom,
       expectedEndDate: granted.expectedEndDate,
+      ...(keyMeta
+        ? {
+            licenseLotId: keyMeta.licenseLotId,
+            licenseKeyId: keyMeta.licenseKeyId,
+            keyCostBorneBeforeGrant: keyMeta.costBorne,
+          }
+        : {}),
     });
-    if (!fromPool) return;
-    await this.sharedPool.recordAvoided(tx, {
-      organizationId,
-      completedOn,
-      task: {
-        id: task.id,
-        assignmentId: task.assignmentId,
-        requestId: task.requestId,
-        planId: task.assignment.planId,
-        subscriptionId: task.assignment.subscriptionId,
-        provisioningType,
-      },
+  }
+
+  private async assignKeyForGrant(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    params: {
+      task: ProvisioningTaskRecord;
+      organizationId: string;
+      provisioningType: 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
+      completedOn: string;
+      licenseKeyId: string | undefined;
+    },
+  ): Promise<{ licenseKeyId: string; licenseLotId: string | null; costBorne: boolean } | null> {
+    if (params.licenseKeyId === undefined) return null;
+    const chosenLotId =
+      params.task.assignment.subscriptionId ??
+      (params.provisioningType === 'K4'
+        ? await this.sharedPool.chooseLine(tx, {
+            planId: params.task.assignment.planId,
+            provisioningType: 'K4',
+            today: params.completedOn,
+            requestId: params.task.requestId,
+            excludeTaskId: params.task.id,
+          })
+        : null);
+
+    return this.keys.assign(tx, actor, {
+      organizationId: params.organizationId,
+      licenseKeyId: params.licenseKeyId,
+      assignmentId: params.task.assignmentId,
+      subscriptionId: params.task.assignment.subscriptionId,
+      licenseLotId: chosenLotId,
     });
   }
 }

@@ -117,6 +117,7 @@ export class GroupSubmissionFactsService {
     // The kind of plan decides the time of use of the request; the sender's own employment is not what a group is judged by.
     const termRefusal = checkTermMonths({
       kind: target.provisioningType,
+      referenceCommitmentMonths: target.referenceCommitmentMonths,
       termMonths: input.termMonths,
       fixedTermPerson: false,
     });
@@ -177,6 +178,7 @@ export class GroupSubmissionFactsService {
           termRefusal === null
             ? checkTermMonths({
                 kind: target.provisioningType,
+                referenceCommitmentMonths: target.referenceCommitmentMonths,
                 termMonths: input.termMonths,
                 fixedTermPerson: (person?.employmentType ?? 'STAFF') !== 'STAFF',
                 contractEndDate: person?.contractEndDate ?? null,
@@ -204,6 +206,7 @@ export class GroupSubmissionFactsService {
         ? await this.assessment.priceFor(tx, {
             planId: input.planId,
             free: false,
+            provisioningType: target.provisioningType,
             beneficiaries: lines.length,
             checkDate: today,
             endDate: null,

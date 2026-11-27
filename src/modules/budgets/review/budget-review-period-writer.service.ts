@@ -49,7 +49,7 @@ export class BudgetReviewPeriodWriterService {
         if (await this.repo.findByMonth(input.organizationId, input.year, input.month, tx)) {
           throw new BudgetReviewExistsError(input.year, input.month);
         }
-        const lines = await this.figures.linesOf(tx, input.year, input.month, input.currency);
+        const lines = await this.figures.linesOf(tx, input.year, input.month, input.currency, input.today);
         // A quarter asks the heads of the Cost Centers it needs explained the day it opens, not only when the due day comes (US-12-21 AC-4); a department with no head that day is not
         // asked and not waited for (AC-12).
         const heads =
@@ -100,6 +100,11 @@ export class BudgetReviewPeriodWriterService {
         sharedPoolUnallocatedMinor: input.pool.unallocatedMinor,
         sharedPoolReserveMinor: input.pool.reserveMinor,
         annualCeilingMinor: input.pool.annualCeilingMinor,
+        sharedPoolIdleMinor: input.pool.idleCostMinor ?? 0n,
+        sharedPoolVarianceMinor: input.pool.invoiceVarianceMinor ?? 0n,
+        sharedPoolVarianceInReviewMinor: input.pool.invoiceVarianceInReviewMinor ?? 0n,
+        sharedPoolDeviceLotMinor: input.pool.deviceLotPurchasesMinor ?? 0n,
+        sharedPoolReplacementMinor: input.pool.replacementKeysMinor ?? 0n,
         explanationsDueOn: input.explanationsDueOn,
       },
       lines,

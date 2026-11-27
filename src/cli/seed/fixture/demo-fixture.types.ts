@@ -91,6 +91,8 @@ export interface DemoPlan {
    * Written by `withReferencePrices` from the subscription of the plan, or by hand for a plan with no subscription; K5 has none.
    */
   referencePrice?: string;
+  /** Default commitment term of a K1 plan (`1` monthly, `12` annual). */
+  referenceCommitmentMonths?: 1 | 12;
 }
 
 export interface DemoApplication {
@@ -105,18 +107,42 @@ export interface DemoApplication {
   plans: DemoPlan[];
 }
 
-/** The one subscription of a (application, plan): the stock the shared pool draws seats from (`QĐ-103d`). It belongs to no department. */
+export interface DemoSubscriptionLine {
+  plan: string;
+  /** Monthly unit price in VND (`monthlyUnitPrice` on `POST /subscriptions`). */
+  monthlyUnitPrice: { amount: string; currency: 'VND' };
+  /** Seats bought on top of baseline rows mapped to this line. */
+  freeAfterBaseline?: number;
+  /** Explicit seat count when no baseline rows map to this line. */
+  quantity?: number;
+  /** Minimum seats required on this line (tier/minimum contract). */
+  minimumSeats?: number;
+}
+
+/** The one subscription of a (application, plan) or workspace multi-line group (`QĐ-103d`). It belongs to no department. */
 export interface DemoSubscription {
   key: string;
-  plan: string;
-  kind: 'TERM' | 'PERPETUAL';
-  /** The price of one seat for one billing period, in dong (`QĐ-111an`: a price is written in the currency of the company only). */
-  unitPrice: { amount: string; currency: 'VND' };
+  /** Single plan key (omitted when `lines` declares one or more lines). */
+  plan?: string;
+  /** Multi-line declaration on `POST /subscriptions`. */
+  lines?: DemoSubscriptionLine[];
+  /** A period of the shared pool. A purchase made once (K4) is a lot (`DemoLot`), never a subscription. */
+  kind: 'TERM';
+  /** The price of one seat for one billing period, in dong (`QĐ-111an`). Omitted when `lines` specifies per-line monthly prices. */
+  unitPrice?: { amount: string; currency: 'VND' };
   /** The price the vendor quotes, when it is not in dong: kept beside `unitPrice` (FX-1), never used to work anything out. */
   originalPrice?: { amount: string; currency: string };
   billingCycle: 'MONTHLY' | 'ANNUAL';
   /** The commitment of the period: 1 month for a monthly plan, 12 for an annual one. */
   termMonths: 1 | 12;
+  /** Seat counting mode of a K2 period (`FIXED` default, or `MEMBERS` for monthly pay-as-you-go). */
+  seatCounting?: 'FIXED' | 'MEMBERS';
+  /** Whether vendor invoices after the period (`L-2`). */
+  invoicedLater?: boolean;
+  /** Total vendor minimum across lines on a multi-line subscription (`L-6`). */
+  minimumSeatsTotal?: number;
+  /** Vendor minimum seats on a single-line subscription (writes `vendorMinimumSeats` & `line.minimumSeats`). */
+  minimumSeats?: number;
   /**
    * The payment day of a monthly subscription, or the renewal day of an annual one, this many days from today (negative: already past); none: a
    * monthly one runs the calendar year with no payment day, and an annual one has the year of its start.
@@ -135,6 +161,20 @@ export interface DemoSubscription {
   freeAfterBaseline: number;
   /** Seats bought when no baseline file gives the number (K1, K4, K5). */
   quantity?: number;
+}
+
+/** A lot of licenses of a K4 plan: a purchase made once, on a day in the past, with the price of one license. A plan has one lot or more (a second purchase at another price). */
+export interface DemoLot {
+  key: string;
+  plan: string;
+  licenseCount: number;
+  unitPrice: { amount: string; currency: 'VND' };
+  /** Why it was bought: a key given to an account is replaced (`REPLACEMENT`), a key that goes on a machine is kept in stock (`STOCK`). */
+  purpose: 'REPLACEMENT' | 'STOCK';
+  /** Days before today the licenses were bought. */
+  purchasedDaysAgo: number;
+  /** The IT Admin who makes the lot and answers for it (a person code). */
+  responsible: string;
 }
 
 /**
@@ -330,8 +370,8 @@ export interface DemoReturn {
 }
 
 export interface DemoKeys {
-  /** The K4 subscription the keys are imported into. */
-  subscription: string;
+  /** The lot of licenses the keys are imported into (by the key of the lot). */
+  lot: string;
   /** How many keys the store holds; their values are written by the seed, never shared. */
   count: number;
   /** The cap of activations of each key (default: the install limit in the terms of the plan, else one). */
@@ -432,6 +472,8 @@ export interface DemoFixture {
   approvalRoles: { SPENDING_APPROVER: string };
   applications: DemoApplication[];
   subscriptions: DemoSubscription[];
+  /** The lots of licenses of the K4 plans, bought through `POST /license-lots`. */
+  lots: DemoLot[];
   seats: DemoSeat[];
   /** The terms IT recorded for some plans; the others have none yet (the warning of a review due). */
   planTerms: DemoPlanTerms[];

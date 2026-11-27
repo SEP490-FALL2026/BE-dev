@@ -30,11 +30,18 @@ import {
   type ReleasePlan,
 } from '../budget/commitment-release.policy';
 import { budgetAuditEvent, BudgetFactsService } from '../budget/budget-facts.service';
-import { CommitmentRepo } from '../budget/commitment.repo';
-import { InvoiceRepo } from '../budget/invoice.repo';
+import { CommitmentRepo, type LockedCommitmentOfRequest } from '../budget/commitment.repo';
 import { ThresholdAlertService } from '../threshold/threshold-alert.service';
 import type { CommittedAmount, HeldAmount, RequestCommitment } from '../public/budgets.types';
 import type { CommitmentWire, ReleaseWire } from './commitment.dto';
+import {
+  monthRowsOf,
+  spreadBySeatMonthly,
+  spreadRelease,
+  spreadRemainder,
+  type MonthlySliceState,
+} from './month/commitment-month.policy';
+import { CommitmentMonthService } from './month/commitment-month.service';
 
 /**
  * What a request holds against the budget (`US-06-04`, `US-06-07`, `BR-MF1-07d`): one commitment, for the current fiscal year, made when the
@@ -52,7 +59,7 @@ export class CommitmentService {
     private readonly audit: AuditApi,
     private readonly releaseGuard: CommitmentReleaseGuardHook,
     private readonly requestFacts: CommitmentRequestFactsHook,
-    private readonly invoices: InvoiceRepo,
+    private readonly commitmentMonths: CommitmentMonthService,
     private readonly thresholds: ThresholdAlertService,
   ) {}
 
@@ -80,25 +87,69 @@ export class CommitmentService {
     for (const item of plan.items) {
       const row = rows.find((candidate) => candidate.id === item.id);
       if (!row || already.has(item.id)) continue;
-      done.push(
-        await this.give(tx, null, row, item, {
-          reason: input.reason,
-          reasonText: reference,
-          now: input.now,
-          requestId: input.requestId,
-        }),
-      );
+      const namedAmount = input.amounts?.find((a) => a.year === item.year);
+      const released = await this.releaseItemWithSlices(tx, row, item, namedAmount, {
+        reason: input.reason,
+        reasonText: reference,
+        now: input.now,
+        requestId: input.requestId,
+      });
+      if (released !== null) done.push(released);
     }
 
     return done;
+  }
+
+  private async releaseItemWithSlices(
+    tx: DbTx,
+    row: LockedCommitmentOfRequest,
+    item: PlannedRelease,
+    namedAmount: NonNullable<CommitmentReleaseInput['amounts']>[number] | undefined,
+    event: { reason: CommitmentReleaseReason | 'REMAINDER'; reasonText: string | null; now: Date; requestId: string },
+  ): Promise<ReleasedCommitment | null> {
+    const slices = await this.commitmentMonths.lockOfCommitment(tx, row.id);
+    if (slices.length === 0) return this.give(tx, null, row, item, event);
+
+    const spread = this.pickSpread(slices, item.takeMinor, row.seatMonthlyMinor, namedAmount);
+    if (spread.totalTakenMinor <= 0n) return null;
+    for (const alloc of spread.allocations) {
+      await this.commitmentMonths.addReleased(tx, row.id, alloc.month, alloc.takeMinor);
+    }
+    const adjusted: PlannedRelease = {
+      ...item,
+      takeMinor: spread.totalTakenMinor,
+      leftMinor: heldOf(row) - spread.totalTakenMinor,
+    };
+    return this.give(tx, null, row, adjusted, event);
+  }
+
+  private pickSpread(
+    slices: readonly MonthlySliceState[],
+    takeMinor: bigint,
+    seatMonthlyMinor: bigint | null,
+    namedAmount: NonNullable<CommitmentReleaseInput['amounts']>[number] | undefined,
+  ) {
+    if (namedAmount?.months && namedAmount.months.length > 0) {
+      return spreadRelease(slices, namedAmount.months);
+    }
+    if (namedAmount === undefined) {
+      return spreadRemainder(slices, takeMinor);
+    }
+    return spreadBySeatMonthly(slices, takeMinor, seatMonthlyMinor);
   }
 
   /**
    * The commitments still held of these requests for the years from `fromYear`, locked until the transaction ends: what the release by day
    * of one seat is worked out on (`RV-07`, `M-10`) before it is given back with `release`.
    */
-  lockSeatCommitments(tx: DbTx, requestIds: readonly string[], fromYear: number): Promise<SeatCommitment[]> {
-    return this.commitments.lockSeatCommitmentsOf(tx, requestIds, fromYear);
+  async lockSeatCommitments(tx: DbTx, requestIds: readonly string[], fromYear: number): Promise<SeatCommitment[]> {
+    const rows = await this.commitments.lockSeatCommitmentsWithIds(tx, requestIds, fromYear);
+    const result: SeatCommitment[] = [];
+    for (const { id, ...commitment } of rows) {
+      const slices = await this.commitmentMonths.lockOfCommitment(tx, id);
+      result.push(slices.length > 0 ? { ...commitment, months: slices.map((s) => s.month) } : commitment);
+    }
+    return result;
   }
 
   /**
@@ -115,7 +166,16 @@ export class CommitmentService {
       if (!(await this.releaseGuard.get().canReleaseRemainder(row.requestId))) {
         throw new BudgetCommitmentRefusedError('REQUEST_OPEN');
       }
-      await this.give(tx, actor, row, plan.items[0], {
+      let item = plan.items[0];
+      const slices = await this.commitmentMonths.lockOfCommitment(tx, row.id);
+      if (slices.length > 0) {
+        const spread = spreadRemainder(slices, item.takeMinor);
+        for (const alloc of spread.allocations) {
+          await this.commitmentMonths.addReleased(tx, row.id, alloc.month, alloc.takeMinor);
+        }
+        item = { ...item, takeMinor: spread.totalTakenMinor, leftMinor: heldOf(row) - spread.totalTakenMinor };
+      }
+      await this.give(tx, actor, row, item, {
         reason: 'REMAINDER',
         reasonText: reason.trim(),
         now: new Date(),
@@ -223,6 +283,14 @@ export class CommitmentService {
     const held = await this.commitments.hold(tx, input);
     await this.thresholds.settle(tx, watch, input.now);
     for (const commitment of held) {
+      const slices = monthRowsOf({
+        commitmentId: commitment.id,
+        year: commitment.year,
+        amountMinor: commitment.amountMinor,
+        seatMonthlyMinor: input.seatMonthlyMinor,
+        months: input.months ?? [],
+      });
+      if (slices.length > 0) await this.commitmentMonths.insertMany(tx, slices);
       await this.audit.record(
         tx,
         budgetAuditEvent(actor, input.organizationId, 'BUDGET_COMMITMENT.CREATED', 'BUDGET_COMMITMENT', commitment.id, {
@@ -285,6 +353,14 @@ export class CommitmentService {
         result.refused.push({ requestId: item.requestId, reason: 'CURRENCY_MISMATCH' });
         continue;
       }
+      const slices = monthRowsOf({
+        commitmentId: held.id,
+        year: input.year,
+        amountMinor: item.amountMinor,
+        seatMonthlyMinor: item.seatMonthlyMinor,
+        months: item.months ?? [],
+      });
+      if (slices.length > 0) await this.commitmentMonths.insertMany(tx, slices);
       result.created.push({
         requestId: item.requestId,
         commitmentId: held.id,
@@ -392,7 +468,7 @@ export class CommitmentService {
     });
     const centers = await this.facts.costCenters(rows.map((row) => row.costCenterId));
     // What the invoices of the whole page cost and whether one is flagged, in one read.
-    const invoiced = await this.invoices.figuresOf(rows.map((row) => row.id));
+    const invoiced = await this.commitments.invoiceFiguresOf(rows.map((row) => row.id));
     // The requests of the whole page in one read, never one for each commitment.
     const requests =
       rows.length === 0

@@ -1,0 +1,520 @@
+import request from 'supertest';
+import { addDays } from '../../../src/core/business-date';
+import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
+import { AccountStatusService } from '../../../src/modules/identity-access/accounts/app-users/account-status.service';
+import { RoleGrantService } from '../../../src/modules/identity-access/accounts/role-grant.service';
+import { SubscriptionRenewalSweepService } from '../../../src/modules/licensing/subscription-renewal/subscription-renewal-sweep.service';
+import { OrganizationReadApi } from '../../../src/modules/organization/public/organization-read.api';
+import { ItHandoverMilestoneService } from '../../../src/modules/personnel/it-handover/it-handover-milestone.service';
+import type { ApiAccount } from '../../support/api-accounts';
+import { buildActivatedAccount, principalOf } from '../../support/builders/account.builder';
+import { declareApplication, declarePlan } from '../../support/builders/catalog.builder';
+import { SeatHarness } from '../../support/seat-baseline-harness';
+
+const h = new SeatHarness();
+const NO = { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false };
+
+interface WorkspaceWire {
+  id: string;
+  flags: string[];
+  admins: Array<{ employeeId: string; role: string; flags: string[] }>;
+}
+
+/**
+ * W3-12 (`QĐ-114ae`, `QĐ-110k`, `QĐ-110u`, `QĐ-117e`, Owner Q-D): >= 2 working admin gate on workspace, flags on workspace/subscription,
+ * dashboard count, and exactly one `WORKSPACE_ADMIN_NOT_WORKING` notification per `(workspace, admin)` across offboarding and sweep.
+ */
+describe('workspace >= 2 working admin gate and WORKSPACE_ADMIN_NOT_WORKING alerts (integration, real PostgreSQL)', () => {
+  let khoa: ApiAccount;
+  let nam: ApiAccount;
+  let appId: string;
+  let vendorId: string;
+
+  const postWorkspace = (name: string) =>
+    request(h.server()).post('/api/v1/workspaces').set(h.as(khoa)).send({ vendorId, name });
+
+  const setAdmins = (wsId: string, expectedUpdatedAt: string, admins: Array<{ employeeId: string; role: string }>) =>
+    request(h.server()).put(`/api/v1/workspaces/${wsId}/admins`).set(h.as(khoa)).send({
+      admins,
+      primaryOwnerEmployeeId: admins[0].employeeId,
+      expectedUpdatedAt,
+    });
+
+  const makeK2Plan = async (): Promise<string> => {
+    const planId = await declarePlan(h.ctx, khoa.accessToken, {
+      applicationId: appId,
+      name: h.unique('K2 Plan'),
+      provisioningType: 'K2',
+      pricingModel: 'PER_SEAT',
+      controlLevel: 'FULL',
+    });
+
+    return planId;
+  };
+
+  const makeK4Plan = async (hasAdminConsole: boolean): Promise<string> =>
+    declarePlan(h.ctx, khoa.accessToken, {
+      applicationId: appId,
+      name: h.unique(`K4 Plan ${hasAdminConsole ? 'Console' : 'NoConsole'}`),
+      provisioningType: 'K4',
+      keyBinding: 'ACCOUNT',
+      controlLevel: 'FULL',
+      hasAdminConsole,
+    });
+
+  const declareTerm = (planId: string, workspaceId: string, extra: Record<string, unknown> = {}) =>
+    request(h.server())
+      .post('/api/v1/subscriptions')
+      .set(h.as(khoa))
+      .send({
+        planId,
+        workspaceId,
+        kind: 'TERM',
+        purchasedQuantity: 10,
+        unitPrice: { amount: '1000000', currency: 'VND' },
+        billingCycle: 'MONTHLY',
+        commitmentTermMonths: 1,
+        startDate: '2026-01-05',
+        ...extra,
+      });
+
+  const setAccountStatus = async (account: ApiAccount, status: 'ACTIVE' | 'LOCKED') => {
+    if (status === 'LOCKED') {
+      const adminPrincipal = await principalOf(h.ctx, h.admin);
+      await h.ctx.app.get(AccountStatusService, { strict: false }).lock(adminPrincipal, account.appUserId, 'Test lock');
+    } else {
+      await h.ctx.sql.query(`UPDATE app_users SET status = 'ACTIVE', updated_at = now() WHERE id = $1`, [
+        account.appUserId,
+      ]);
+    }
+  };
+
+  const noticesFor = async (workspaceId: string, employeeId: string) =>
+    (
+      await h.ctx.sql.query<{ recipient_employee_id: string; event_key: string; params: Record<string, unknown> }>(
+        `SELECT recipient_employee_id, event_key, params
+           FROM in_app_notifications
+          WHERE code = 'WORKSPACE_ADMIN_NOT_WORKING'
+            AND event_key = $1
+          ORDER BY created_at, id`,
+        [`WORKSPACE_ADMIN_NOT_WORKING:${workspaceId}:${employeeId}`],
+      )
+    ).rows;
+
+  beforeAll(async () => {
+    await h.start();
+    khoa = h.it1;
+    nam = await buildActivatedAccount(h.ctx, h.seed, { code: 'E-NAM', email: 'nam@acme.vn', role: 'IT_ADMIN' });
+    appId = await declareApplication(h.ctx, khoa.accessToken, {
+      name: h.unique('Anthropic'),
+      kind: 'SAAS',
+      vendorName: h.unique('Anthropic Vendor'),
+      dataSensitivity: 'LOW',
+      communication: NO,
+    });
+    vendorId = (
+      await h.ctx.sql.query<{ vendor_id: string }>(`SELECT vendor_id FROM applications WHERE id = $1`, [appId])
+    ).rows[0].vendor_id;
+  }, 240000);
+
+  afterAll(async () => {
+    await h.stop();
+  });
+
+  describe('8 acceptance scenarios of W3-12', () => {
+    it('3. Nam locked, baseline open -> 201 with vendorAdminsBelowMinimum flag', async () => {
+      const wsRes = await postWorkspace(h.unique('WS-Gate')).expect(201);
+      const ws = h.dataOf<{ id: string; updatedAt: string }>(wsRes);
+      await setAdmins(ws.id, ws.updatedAt, [
+        { employeeId: khoa.employeeId, role: 'OWNER' },
+        { employeeId: nam.employeeId, role: 'ADMIN' },
+      ]).expect(200);
+      const planId = await makeK2Plan();
+      await setAccountStatus(nam, 'LOCKED');
+
+      try {
+        const res = await declareTerm(planId, ws.id).expect(201);
+        expect(h.dataOf<{ vendorAdminsBelowMinimum: boolean }>(res).vendorAdminsBelowMinimum).toBe(true);
+      } finally {
+        await setAccountStatus(nam, 'ACTIVE');
+      }
+    });
+
+    it('K4.3. K4 hasAdminConsole=true, Nam locked, baseline open -> 201', async () => {
+      const ws = h.dataOf<{ id: string; updatedAt: string }>(await postWorkspace(h.unique('WS-K4-Open')).expect(201));
+      await setAdmins(ws.id, ws.updatedAt, [
+        { employeeId: khoa.employeeId, role: 'OWNER' },
+        { employeeId: nam.employeeId, role: 'ADMIN' },
+      ]).expect(200);
+      const planId = await makeK4Plan(true);
+      await setAccountStatus(nam, 'LOCKED');
+
+      try {
+        await request(h.server())
+          .post('/api/v1/license-lots')
+          .set(h.as(khoa))
+          .send({
+            planId,
+            workspaceId: ws.id,
+            purchasedOn: '2026-11-25',
+            licenseCount: 3,
+            unitPrice: { amount: '12000000', currency: 'VND' },
+            purpose: 'REPLACEMENT',
+          })
+          .expect(201);
+      } finally {
+        await setAccountStatus(nam, 'ACTIVE');
+      }
+    });
+
+    it('4. renewal outcome recorded while Nam is locked succeeds and flags vendorAdminsBelowMinimum on the new period', async () => {
+      await h.closeBaseline().expect(200);
+      const ws = h.dataOf<{ id: string; updatedAt: string }>(await postWorkspace(h.unique('WS-Renew')).expect(201));
+      await setAdmins(ws.id, ws.updatedAt, [
+        { employeeId: khoa.employeeId, role: 'OWNER' },
+        { employeeId: nam.employeeId, role: 'ADMIN' },
+      ]).expect(200);
+      const planId = await makeK2Plan();
+      const today = await h.ctx.app.get(OrganizationReadApi, { strict: false }).businessToday();
+      const firstId = h.dataOf<{ id: string }>(
+        await declareTerm(planId, ws.id, {
+          purchasedQuantity: 1,
+          startDate: addDays(today, -28),
+          renewalDate: addDays(today, 2),
+        }).expect(201),
+      ).id;
+      await h.ctx.sql.query(
+        `INSERT INTO license_assignments (
+           id, organization_id, kind, source, plan_id, subscription_id, employee_id,
+           account_identifier, normalized_account_identifier, valid_from, valid_from_basis,
+           granted_on, created_by_app_user_id
+         ) VALUES (
+           gen_random_uuid(), $1, 'PERSONAL'::"AssignmentKind", 'REQUEST'::"AssignmentSource",
+           $2, $3, $4, 'khoa@acme.vn', 'khoa@acme.vn', $5::date, 'ACTUAL'::"AssignmentDateBasis",
+           $5::date, $6
+         )`,
+        [h.seed.organizationId, planId, firstId, khoa.employeeId, addDays(today, -28), khoa.appUserId],
+      );
+
+      await setAccountStatus(nam, 'LOCKED');
+      try {
+        const renewalRes = await request(h.server())
+          .post('/api/v1/subscription-renewals')
+          .set(h.as(khoa))
+          .send({
+            subscriptionId: firstId,
+            choice: 'RENEW',
+            proposedQuantity: 1,
+            outcome: 'AS_DECIDED',
+            nextPeriod: {
+              purchasedQuantity: 1,
+              unitPrice: { amount: '1000000', currency: 'VND' },
+              billingCycle: 'MONTHLY',
+              startDate: addDays(today, 2),
+              renewalDate: addDays(today, 32),
+              autoRenew: true,
+              allowsMidTermReduction: false,
+            },
+          })
+          .expect(201);
+        const nextId = h.dataOf<{ renewal: { outcomeDetail: { nextSubscriptionId: string } } }>(renewalRes).renewal
+          .outcomeDetail.nextSubscriptionId;
+        const nextView = h.dataOf<{ vendorAdminsBelowMinimum: boolean }>(
+          await request(h.server()).get(`/api/v1/subscriptions/${nextId}`).set(h.as(khoa)).expect(200),
+        );
+        expect(nextView.vendorAdminsBelowMinimum).toBe(true);
+      } finally {
+        await setAccountStatus(nam, 'ACTIVE');
+      }
+    });
+
+    it.each([
+      {
+        label: '1. workspace has Khoa & Nam working (baseline closed) -> 201',
+        lockNam: false,
+        expectedStatus: 201,
+        expectedBelowFlag: false,
+      },
+      {
+        label: '2. Nam locked, baseline closed -> 422 SUBSCRIPTION.VENDOR_ADMINS_REQUIRED',
+        lockNam: true,
+        expectedStatus: 422,
+        expectedCode: 'SUBSCRIPTION.VENDOR_ADMINS_REQUIRED',
+      },
+    ])('$label', async ({ lockNam, expectedStatus, expectedCode, expectedBelowFlag }) => {
+      await h.ctx.sql.query(
+        `UPDATE seat_baseline_states
+            SET closed_at = now(), closed_by_app_user_id = $2
+          WHERE organization_id = $1 AND closed_at IS NULL`,
+        [h.seed.organizationId, khoa.appUserId],
+      );
+      const wsRes = await postWorkspace(h.unique('WS-Gate')).expect(201);
+      const ws = h.dataOf<{ id: string; updatedAt: string }>(wsRes);
+      await setAdmins(ws.id, ws.updatedAt, [
+        { employeeId: khoa.employeeId, role: 'OWNER' },
+        { employeeId: nam.employeeId, role: 'ADMIN' },
+      ]).expect(200);
+      const planId = await makeK2Plan();
+      if (lockNam) await setAccountStatus(nam, 'LOCKED');
+
+      try {
+        const res = await declareTerm(planId, ws.id).expect(expectedStatus);
+        if (expectedCode) {
+          expect(h.codeOf(res)).toBe(expectedCode);
+        } else {
+          expect(h.dataOf<{ vendorAdminsBelowMinimum: boolean }>(res).vendorAdminsBelowMinimum).toBe(expectedBelowFlag);
+        }
+      } finally {
+        if (lockNam) await setAccountStatus(nam, 'ACTIVE');
+      }
+    });
+
+    it('5 & 6. workspaceGet flags ADMINS_BELOW_MINIMUM & ADMIN_NOT_WORKING; 3 sweep runs send exactly 1 notice to Khoa and update dashboard', async () => {
+      const ws = h.dataOf<{ id: string; updatedAt: string }>(await postWorkspace(h.unique('WS-Sweep')).expect(201));
+      await setAdmins(ws.id, ws.updatedAt, [
+        { employeeId: khoa.employeeId, role: 'OWNER' },
+        { employeeId: nam.employeeId, role: 'ADMIN' },
+      ]).expect(200);
+      const planId = await makeK2Plan();
+      await declareTerm(planId, ws.id).expect(201);
+
+      await setAccountStatus(nam, 'LOCKED');
+      try {
+        const wsView = h.dataOf<WorkspaceWire>(
+          await request(h.server()).get(`/api/v1/workspaces/${ws.id}`).set(h.as(khoa)).expect(200),
+        );
+        expect(wsView.flags).toContain('ADMINS_BELOW_MINIMUM');
+        expect(wsView.admins.find((a) => a.employeeId === nam.employeeId)?.flags).toEqual(['ADMIN_NOT_WORKING']);
+
+        const dash = h.dataOf<{
+          sections: {
+            workspacesBelowVendorAdminMinimum: { state: string; count: number };
+            plansBelowVendorAdminMinimum: { state: string; count: number };
+          };
+        }>(await request(h.server()).get('/api/v1/dashboards/it-admin').set(h.as(khoa)).expect(200));
+        expect(dash.sections.workspacesBelowVendorAdminMinimum.state).toBe('COUNTED');
+        expect(dash.sections.workspacesBelowVendorAdminMinimum.count).toBeGreaterThanOrEqual(1);
+        expect(dash.sections.plansBelowVendorAdminMinimum).toBeDefined();
+
+        const sweeper = h.ctx.app.get(SubscriptionRenewalSweepService, { strict: false });
+        await sweeper.sweep();
+        await sweeper.sweep();
+        await sweeper.sweep();
+
+        const rows = await noticesFor(ws.id, nam.employeeId);
+        expect(rows).toHaveLength(1);
+        expect(rows[0].recipient_employee_id).toBe(khoa.employeeId);
+        expect(rows[0].params).toMatchObject({ workspaceId: ws.id, employeeId: nam.employeeId, workingAdminCount: 1 });
+      } finally {
+        await setAccountStatus(nam, 'ACTIVE');
+      }
+    });
+
+    it('7. Khoa (responsible) changing role from IT_ADMIN to FINANCE notifies Super Admin once', async () => {
+      const ws = h.dataOf<{ id: string; updatedAt: string }>(
+        await postWorkspace(h.unique('WS-RoleChange')).expect(201),
+      );
+      await setAdmins(ws.id, ws.updatedAt, [
+        { employeeId: khoa.employeeId, role: 'OWNER' },
+        { employeeId: nam.employeeId, role: 'ADMIN' },
+      ]).expect(200);
+      const runner = h.ctx.app.get(TransactionRunner, { strict: false });
+      const grants = h.ctx.app.get(RoleGrantService, { strict: false });
+      const currentFinance = (
+        await h.ctx.sql.query<{ app_user_id: string }>(
+          `SELECT app_user_id FROM role_grants WHERE organization_id = $1 AND role = 'FINANCE' AND revoked_at IS NULL`,
+          [h.seed.organizationId],
+        )
+      ).rows[0]?.app_user_id;
+
+      await runner.run(async (tx) => {
+        if (currentFinance) {
+          await grants.revokeRole(tx, {
+            appUserId: currentFinance,
+            role: 'FINANCE',
+            revokedBy: h.seed.superAdmin.employeeId,
+            now: new Date(),
+          });
+        }
+        await grants.revokeRole(tx, {
+          appUserId: khoa.appUserId,
+          role: 'IT_ADMIN',
+          revokedBy: h.seed.superAdmin.employeeId,
+          now: new Date(),
+        });
+        await grants.grantRole(tx, {
+          organizationId: h.seed.organizationId,
+          appUserId: khoa.appUserId,
+          role: 'FINANCE',
+          grantedBy: h.seed.superAdmin.employeeId,
+          grantedAt: new Date(),
+        });
+      });
+
+      try {
+        await h.ctx.app.get(SubscriptionRenewalSweepService, { strict: false }).sweep();
+        const rows = await noticesFor(ws.id, khoa.employeeId);
+        expect(rows).toHaveLength(1);
+        expect(rows[0].recipient_employee_id).toBe(h.seed.superAdmin.employeeId);
+      } finally {
+        await runner.run(async (tx) => {
+          await grants.revokeRole(tx, {
+            appUserId: khoa.appUserId,
+            role: 'FINANCE',
+            revokedBy: h.seed.superAdmin.employeeId,
+            now: new Date(),
+          });
+          if (currentFinance) {
+            await grants.grantRole(tx, {
+              organizationId: h.seed.organizationId,
+              appUserId: currentFinance,
+              role: 'FINANCE',
+              grantedBy: h.seed.superAdmin.employeeId,
+              grantedAt: new Date(),
+            });
+          }
+          await grants.grantRole(tx, {
+            organizationId: h.seed.organizationId,
+            appUserId: khoa.appUserId,
+            role: 'IT_ADMIN',
+            grantedBy: h.seed.superAdmin.employeeId,
+            grantedAt: new Date(),
+          });
+        });
+      }
+    });
+
+    it('8. Nam offboarding milestone then hourly sweep emits ONE notification (same eventKey), not two', async () => {
+      const ws = h.dataOf<{ id: string; updatedAt: string }>(await postWorkspace(h.unique('WS-Offboard')).expect(201));
+      await setAdmins(ws.id, ws.updatedAt, [
+        { employeeId: khoa.employeeId, role: 'OWNER' },
+        { employeeId: nam.employeeId, role: 'ADMIN' },
+      ]).expect(200);
+      const runner = h.ctx.app.get(TransactionRunner, { strict: false });
+      const handover = h.ctx.app.get(ItHandoverMilestoneService, { strict: false });
+
+      await setAccountStatus(nam, 'LOCKED');
+      try {
+        await runner.run((tx) =>
+          handover.reached(tx, {
+            organizationId: h.seed.organizationId,
+            source: { kind: 'OFFBOARDING_CASE', id: '00000000-0000-4000-8000-000000000008' },
+            employeeId: nam.employeeId,
+            dueOn: '2026-11-25',
+          }),
+        );
+        await h.ctx.app.get(SubscriptionRenewalSweepService, { strict: false }).sweep();
+
+        const rows = await noticesFor(ws.id, nam.employeeId);
+        expect(rows).toHaveLength(1);
+        expect(rows[0].recipient_employee_id).toBe(khoa.employeeId);
+      } finally {
+        await setAccountStatus(nam, 'ACTIVE');
+      }
+    });
+  });
+
+  describe('W3-12 & W3-24: K4 license lot creation workspace >= 2 working admin gate', () => {
+    it.each([
+      {
+        label: '1. K4 hasAdminConsole=true, Khoa & Nam working, baseline closed -> 201',
+        hasAdminConsole: true,
+        lockNam: false,
+        expectedStatus: 201,
+      },
+      {
+        label: '2. K4 hasAdminConsole=true, Nam locked, baseline closed -> 422 LICENSE_LOT.VENDOR_ADMINS_REQUIRED',
+        hasAdminConsole: true,
+        lockNam: true,
+        expectedStatus: 422,
+        expectedCode: 'LICENSE_LOT.VENDOR_ADMINS_REQUIRED',
+      },
+      {
+        label: '4. K4 hasAdminConsole=false, Nam locked, baseline closed -> 201',
+        hasAdminConsole: false,
+        lockNam: true,
+        expectedStatus: 201,
+      },
+    ])('$label', async ({ hasAdminConsole, lockNam, expectedStatus, expectedCode }) => {
+      await h.ctx.sql.query(
+        `UPDATE seat_baseline_states
+            SET closed_at = now(), closed_by_app_user_id = $2
+          WHERE organization_id = $1 AND closed_at IS NULL`,
+        [h.seed.organizationId, khoa.appUserId],
+      );
+      const ws = h.dataOf<{ id: string; updatedAt: string }>(await postWorkspace(h.unique('WS-LotGate')).expect(201));
+      await setAdmins(ws.id, ws.updatedAt, [
+        { employeeId: khoa.employeeId, role: 'OWNER' },
+        { employeeId: nam.employeeId, role: 'ADMIN' },
+      ]).expect(200);
+      const planId = await makeK4Plan(hasAdminConsole);
+      if (lockNam) await setAccountStatus(nam, 'LOCKED');
+
+      try {
+        const res = await request(h.server())
+          .post('/api/v1/license-lots')
+          .set(h.as(khoa))
+          .send({
+            planId,
+            workspaceId: ws.id,
+            purchasedOn: '2026-11-25',
+            licenseCount: 3,
+            unitPrice: { amount: '12000000', currency: 'VND' },
+            purpose: 'REPLACEMENT',
+          })
+          .expect(expectedStatus);
+        if (expectedCode) expect(h.codeOf(res)).toBe(expectedCode);
+      } finally {
+        if (lockNam) await setAccountStatus(nam, 'ACTIVE');
+      }
+    });
+  });
+
+  describe('X-IT-R3: PUT /workspaces/:id/admins and PATCH /workspaces/:id reject departure-blocked IT Admin', () => {
+    it('refuses an IT Admin whose departure already blocks access, and allows a future block', async () => {
+      const leaving = await buildActivatedAccount(h.ctx, h.seed, {
+        code: 'E-WS-BLK',
+        email: 'ws-blk@acme.vn',
+        role: 'IT_ADMIN',
+      });
+      const future = await buildActivatedAccount(h.ctx, h.seed, {
+        code: 'E-WS-FUT',
+        email: 'ws-fut@acme.vn',
+        role: 'IT_ADMIN',
+      });
+      await h.ctx.sql.query(
+        `INSERT INTO employee_access_blocks (employee_id, organization_id, blocked_from, cause)
+         VALUES ($1, $3, '2000-01-01'::date, 'DEPARTURE_LAST_DAY'),
+                ($2, $3, '2999-12-31'::date, 'DEPARTURE_LAST_DAY')`,
+        [leaving.employeeId, future.employeeId, h.seed.organizationId],
+      );
+      const ws = h.dataOf<{ id: string; updatedAt: string }>(await postWorkspace(h.unique('WS-Block')).expect(201));
+
+      const asAdmin = await setAdmins(ws.id, ws.updatedAt, [
+        { employeeId: khoa.employeeId, role: 'OWNER' },
+        { employeeId: leaving.employeeId, role: 'ADMIN' },
+      ]).expect(422);
+      expect(h.codeOf(asAdmin)).toBe('WORKSPACE.ADMIN_NOT_IT_ADMIN');
+
+      const asHolder = await request(h.server())
+        .patch(`/api/v1/workspaces/${ws.id}`)
+        .set(h.as(khoa))
+        .send({
+          expectedUpdatedAt: ws.updatedAt,
+          emergencyAccount: {
+            identity: 'emergency@acme.vn',
+            occupiesSeat: false,
+            holderEmployeeId: leaving.employeeId,
+            lastReviewedOn: '2026-11-25',
+          },
+        })
+        .expect(422);
+      expect(h.codeOf(asHolder)).toBe('WORKSPACE.ADMIN_NOT_IT_ADMIN');
+
+      await setAdmins(ws.id, ws.updatedAt, [
+        { employeeId: khoa.employeeId, role: 'OWNER' },
+        { employeeId: future.employeeId, role: 'ADMIN' },
+      ]).expect(200);
+    });
+  });
+});

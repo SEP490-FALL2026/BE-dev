@@ -4,6 +4,14 @@ import { PrismaService } from '../../../../infrastructure/database/prisma.servic
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import type { AssignmentFacts } from '../../public/licensing-renewal.types';
 
+const toCommitmentMonths = (months: number | null): 1 | 12 | null => (months === 1 || months === 12 ? months : null);
+
+const grantStateOf = (status: string | undefined): AssignmentFacts['grant'] => {
+  if (status === undefined) return 'NONE';
+
+  return status === 'COMPLETED' ? 'COMPLETED' : 'NOT_COMPLETED';
+};
+
 /**
  * What the return and the renewal of a seat read of an assignment together with its tasks and its chain: a read of two tables
  * that no write goes through (the writers are `AssignmentRepo` and `ProvisioningTaskRepo`). A fixed number of statements.
@@ -26,6 +34,8 @@ export class AssignmentFactsRepo {
         validFrom: true,
         validUntil: true,
         expectedEndDate: true,
+        personalCommitmentMonths: true,
+        billingAnchorOn: true,
         failedAt: true,
         cancelledAt: true,
         provisioningTasks: { select: { kind: true, status: true, requestId: true }, orderBy: { createdAt: 'asc' } },
@@ -51,9 +61,11 @@ export class AssignmentFactsRepo {
       effectiveFrom: fromDateColumn(row.validFrom),
       validUntil: row.validUntil ? fromDateColumn(row.validUntil) : null,
       expectedEndDate: row.expectedEndDate ? fromDateColumn(row.expectedEndDate) : null,
+      personalCommitmentMonths: toCommitmentMonths(row.personalCommitmentMonths),
+      billingAnchorOn: row.billingAnchorOn ? fromDateColumn(row.billingAnchorOn) : null,
       open: row.validUntil === null && row.failedAt === null && row.cancelledAt === null,
       chainStartsOn: await this.chainStart(assignmentId, db),
-      grant: grant === undefined ? 'NONE' : grant.status === 'COMPLETED' ? 'COMPLETED' : 'NOT_COMPLETED',
+      grant: grantStateOf(grant?.status),
       grantRequestId: grant?.requestId ?? null,
       revocationLive: row.provisioningTasks.some(
         (task) => task.kind === 'REVOKE' && task.status !== 'CLOSED_FAILED' && task.status !== 'CANCELLED',

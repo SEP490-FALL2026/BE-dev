@@ -1,9 +1,17 @@
 import { Injectable } from '@nestjs/common';
-import { toDateColumn, type BusinessDate } from '../../../core/business-date';
+import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/business-date';
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { PoolSubscription, RuleSubscription, StockPlanFilter, StockPlanPage } from '../public/catalog.types';
+import type {
+  PoolSubscription,
+  RuleSubscription,
+  StockPlan,
+  StockPlanFilter,
+  StockPlanPage,
+} from '../public/catalog.types';
+import { isLineServingOn } from '../subscription-line/subscription-line.policy';
+import { SubscriptionLineSeatsService } from '../subscription-line/subscription-line-seats.service';
 import { orderBySourcePreference, withoutPeriodsAhead } from './pool/subscription-pool.policy';
 import { withPriceSource } from './subscription-priced.repo';
 
@@ -19,9 +27,101 @@ export const notTakenOverOn = (today: BusinessDate): Prisma.SubscriptionWhereInp
 });
 
 /** Reads which subscriptions grant seats on a day, the way the shared pool reads it: what the rules of wasted seats judge. */
+
+const GRANTABLE_LINE_SELECT = {
+  id: true,
+  planId: true,
+  ledgerOpenedOn: true,
+  closedOn: true,
+  createdAt: true,
+  subscription: {
+    select: {
+      id: true,
+      status: true,
+      startDate: true,
+      endDate: true,
+      purchasedQuantity: true,
+      isPrimaryForPlan: true,
+    },
+  },
+} as const;
+
+/** The plan row of a stock page as the stock plan it is: a K2 plan over the subscriptions of its pool, a K4 plan over its lots (the id of the lot as the purchase). */
+function stockPlanOf(
+  row: {
+    id: string;
+    name: string;
+    provisioningType: string;
+    keyBinding: StockPlan['keyBinding'];
+    application: { id: string; name: string; logoUrl: string | null };
+    subscriptions: {
+      id: string;
+      purchasedQuantity: number | null;
+      renewedFromId: string | null;
+      startDate: Date | null;
+    }[];
+    licenseLots: { id: string; licenseCount: number }[];
+  },
+  today: BusinessDate,
+): StockPlan {
+  return {
+    planId: row.id,
+    planName: row.name,
+    // The filter keeps K2 and K4 plans only.
+    provisioningType: row.provisioningType as 'K2' | 'K4',
+    keyBinding: row.keyBinding,
+    applicationId: row.application.id,
+    applicationName: row.application.name,
+    applicationLogoUrl: row.application.logoUrl,
+    subscriptions:
+      row.provisioningType === 'K4'
+        ? row.licenseLots.map((lot) => ({ subscriptionId: lot.id, purchasedQuantity: lot.licenseCount }))
+        : withoutPeriodsAhead(row.subscriptions, today).map((subscription) => ({
+            subscriptionId: subscription.id,
+            purchasedQuantity: subscription.purchasedQuantity,
+          })),
+  };
+}
+
+interface GrantableLineRow {
+  id: string;
+  planId: string;
+  ledgerOpenedOn: Date | null;
+  closedOn: Date | null;
+  createdAt: Date;
+  subscription: {
+    id: string;
+    status: 'ACTIVE' | 'DRAFT';
+    startDate: Date | null;
+    endDate: Date | null;
+    purchasedQuantity: number | null;
+    isPrimaryForPlan: boolean;
+  };
+}
+
+function filterServingLines(lineRows: readonly GrantableLineRow[], today: BusinessDate): GrantableLineRow[] {
+  return lineRows.filter((row) =>
+    isLineServingOn(
+      {
+        ledgerOpenedOn: row.ledgerOpenedOn ? fromDateColumn(row.ledgerOpenedOn) : null,
+        closedOn: row.closedOn ? fromDateColumn(row.closedOn) : null,
+      },
+      today,
+      {
+        status: row.subscription.status,
+        startDate: row.subscription.startDate ? fromDateColumn(row.subscription.startDate) : null,
+        endDate: row.subscription.endDate ? fromDateColumn(row.subscription.endDate) : null,
+      },
+    ),
+  );
+}
+
 @Injectable()
 export class SubscriptionGrantingRepo {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ledger: SubscriptionLineSeatsService,
+  ) {}
 
   /** The subscriptions of one plan a seat can be taken from on `today`, in the order a grant takes them (see `findGrantableOfPlans`). */
   async findGrantableOfPlan(planId: string, today: BusinessDate, tx?: DbTx) {
@@ -29,11 +129,9 @@ export class SubscriptionGrantingRepo {
   }
 
   /**
-   * The same for many plans in one read, by plan (a plan with none is absent). A draft is left out (its seats cannot be granted), and so is
-   * a subscription whose period already ended or that a later period has taken over (active and started: `notTakenOverOn`); a period
-   * recorded ahead of its start is left out while the one it continues is in (`withoutPeriodsAhead`: one pool, its seats counted once).
-   * Per plan the primary subscription comes first, then the one that
-   * would price the plan: the order a grant with no subscription named takes them.
+   * The same for many plans in one read, by plan (a plan with none is absent). For K2 lines, reads serving lines on `today`
+   * (including a `RENEWED` line through `closedOn`) and derives seat counts from `seat_changes` when `ledgerOpenedOn <= today`;
+   * falls back to legacy `subscriptions` rows for periods without lines (K1, K4, and pre-line test periods).
    */
   async findGrantableOfPlans(
     planIds: readonly string[],
@@ -42,10 +140,16 @@ export class SubscriptionGrantingRepo {
   ): Promise<Map<string, PoolSubscription[]>> {
     const grantable = new Map<string, PoolSubscription[]>();
     if (planIds.length === 0) return grantable;
+
+    const linedSubIds = await this.collectGrantableLines(planIds, today, grantable, tx);
+
     const rows = await (tx ?? this.prisma).subscription.findMany({
       where: {
         planId: { in: [...planIds] },
         status: 'ACTIVE',
+        closedAt: null,
+        plan: { provisioningType: { not: 'K1' } },
+        lines: { none: {} },
         AND: [notTakenOverOn(today), { OR: [{ endDate: null }, { endDate: { gte: toDateColumn(today) } }] }],
       },
       select: {
@@ -62,21 +166,68 @@ export class SubscriptionGrantingRepo {
     });
     type Source = ReturnType<typeof withPriceSource<(typeof rows)[number]>>;
     const byPlan = new Map<string, Source[]>();
-    for (const row of withoutPeriodsAhead(rows, today)) {
+    for (const row of withoutPeriodsAhead(rows, today, linedSubIds)) {
       byPlan.set(row.planId, [...(byPlan.get(row.planId) ?? []), withPriceSource(row)]);
     }
     for (const [planId, sources] of byPlan) {
-      grantable.set(
-        planId,
-        orderBySourcePreference(sources).map((row) => ({
-          subscriptionId: row.id,
-          purchasedQuantity: row.purchasedQuantity,
-          isPrimaryForPlan: row.isPrimaryForPlan,
-        })),
-      );
+      const legacy = orderBySourcePreference(sources).map((row) => ({
+        subscriptionId: row.id,
+        purchasedQuantity: row.purchasedQuantity,
+        isPrimaryForPlan: row.isPrimaryForPlan,
+      }));
+      grantable.set(planId, [...(grantable.get(planId) ?? []), ...legacy]);
     }
 
     return grantable;
+  }
+
+  private async collectGrantableLines(
+    planIds: readonly string[],
+    today: BusinessDate,
+    grantable: Map<string, PoolSubscription[]>,
+    tx?: DbTx,
+  ): Promise<ReadonlySet<string>> {
+    const day = toDateColumn(today);
+    const lineRows = await (tx ?? this.prisma).subscriptionLine.findMany({
+      where: {
+        planId: { in: [...planIds] },
+        OR: [{ closedOn: null }, { closedOn: { gte: day } }],
+        subscription: {
+          status: 'ACTIVE',
+          closedAt: null,
+          kind: 'TERM',
+          AND: [
+            notTakenOverOn(today),
+            { OR: [{ startDate: null }, { startDate: { lte: day } }] },
+            { OR: [{ endDate: null }, { endDate: { gte: day } }] },
+          ],
+        },
+      },
+      select: GRANTABLE_LINE_SELECT,
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+
+    const serving = filterServingLines(lineRows, today);
+    const openedIds = serving
+      .filter((row) => row.ledgerOpenedOn !== null && fromDateColumn(row.ledgerOpenedOn) <= today)
+      .map((row) => row.id);
+    const ledgerSeats = await this.ledger.seatsOnOfLines(openedIds, today, tx);
+
+    const subIds = new Set<string>();
+    for (const row of serving) {
+      subIds.add(row.subscription.id);
+      const opened = row.ledgerOpenedOn !== null && fromDateColumn(row.ledgerOpenedOn) <= today;
+      const entry: PoolSubscription = {
+        subscriptionId: row.subscription.id,
+        subscriptionLineId: row.id,
+        lineCreatedAt: row.createdAt,
+        purchasedQuantity: opened ? (ledgerSeats.get(row.id) ?? 0) : row.subscription.purchasedQuantity,
+        isPrimaryForPlan: row.subscription.isPrimaryForPlan,
+      };
+      grantable.set(row.planId, [...(grantable.get(row.planId) ?? []), entry]);
+    }
+
+    return subIds;
   }
 
   /** Which of these subscriptions a later period continues (`renewed_from_id`): they are no longer the period that runs. One statement. */
@@ -91,15 +242,16 @@ export class SubscriptionGrantingRepo {
   }
 
   /**
-   * One page of the plans that give out seats (K2), keys (K4) or personal accounts (K1), each with the subscriptions a seat can be taken
-   * from on `today`: the shared pool of the plan as a grant reads it (active, not taken over by a later period, not ended, a next period
-   * recorded ahead of its start counted with the one it continues, `withoutPeriodsAhead`). A plan with no
-   * such subscription is not listed, and with an IT Admin named only the subscriptions that person answers for count, so the plans of
-   * the others do not appear. By application, plan then id, and the total for the same filter, from one snapshot.
+   * One page of the plans that give out seats (K2) or keys (K4), each with what a grant can take from on `today`: for a K2 plan the shared pool
+   * of the plan as a grant reads it (active, not taken over by a later period, not ended, a next period recorded ahead of its start counted with
+   * the one it continues, `withoutPeriodsAhead`); for a K4 plan its lots, each as an entry of the id of the lot with the licenses it bought. A plan
+   * of personal accounts (K1) has no subscription and is not listed. A plan with nothing to take from is not listed, and with an IT Admin named
+   * only what that person answers for counts, so the plans of the others do not appear. By application, plan then id, and the total for the same filter, from one snapshot.
    */
   async pageStockPlans(filter: StockPlanFilter): Promise<StockPlanPage> {
     const grantable: Prisma.SubscriptionWhereInput = {
       status: 'ACTIVE',
+      closedAt: null,
       ...(filter.responsibleItAdminEmployeeId
         ? { responsibleItAdminEmployeeId: filter.responsibleItAdminEmployeeId }
         : {}),
@@ -108,10 +260,15 @@ export class SubscriptionGrantingRepo {
         { OR: [{ endDate: null }, { endDate: { gte: toDateColumn(filter.today) } }] },
       ],
     };
+    const lots: Prisma.LicenseLotWhereInput = filter.responsibleItAdminEmployeeId
+      ? { responsibleItAdminEmployeeId: filter.responsibleItAdminEmployeeId }
+      : {};
     const where: Prisma.PlanWhereInput = {
-      provisioningType: { in: ['K1', 'K2', 'K4'] },
       ...(filter.planId ? { id: filter.planId } : {}),
-      subscriptions: { some: grantable },
+      OR: [
+        { provisioningType: 'K2', subscriptions: { some: grantable } },
+        { provisioningType: 'K4', licenseLots: { some: lots } },
+      ],
     };
 
     return this.prisma.$transaction(
@@ -129,6 +286,7 @@ export class SubscriptionGrantingRepo {
               select: { id: true, purchasedQuantity: true, renewedFromId: true, startDate: true },
               orderBy: { id: 'asc' },
             },
+            licenseLots: { where: lots, select: { id: true, licenseCount: true }, orderBy: { id: 'asc' } },
           },
           orderBy: [{ application: { normalizedName: 'asc' } }, { normalizedName: 'asc' }, { id: 'asc' }],
           skip: filter.skip,
@@ -136,20 +294,7 @@ export class SubscriptionGrantingRepo {
         });
 
         return {
-          items: rows.map((row) => ({
-            planId: row.id,
-            planName: row.name,
-            // The filter keeps K1, K2 and K4 plans only.
-            provisioningType: row.provisioningType as 'K1' | 'K2' | 'K4',
-            keyBinding: row.keyBinding,
-            applicationId: row.application.id,
-            applicationName: row.application.name,
-            applicationLogoUrl: row.application.logoUrl,
-            subscriptions: withoutPeriodsAhead(row.subscriptions, filter.today).map((subscription) => ({
-              subscriptionId: subscription.id,
-              purchasedQuantity: subscription.purchasedQuantity,
-            })),
-          })),
+          items: rows.map((row) => stockPlanOf(row, filter.today)),
           total: await tx.plan.count({ where }),
         };
       },

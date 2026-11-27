@@ -155,7 +155,7 @@ export const REQUESTS_EXTRA: DemoRequestScenario[] = [
     key: 'R41',
     requester: 'NV-DEV5',
     plan: 'claude-pro',
-    termMonths: 3,
+    termMonths: 12,
     target: 'REJECTED',
     rejectAt: 'SPEND',
     reason: 'Hỏi đáp, rà soát mã và tóm tắt tài liệu dài khi phân tích lỗi.',

@@ -1,8 +1,12 @@
 import {
+  calendarMonthsIn,
   checkTerm,
   checkTermMonths,
   effectiveEndOf,
   endAfterGrant,
+  k1NextBillingOn,
+  k1PaidThroughOn,
+  k1RemainingBillingStart,
   lastMonthBeginsOn,
   monthsBeginningIn,
   renewalEndOf,
@@ -339,5 +343,146 @@ describe('the months that begin in a year (R-39, QĐ-111j: a month belongs to th
   it('a cut term stops at the end: 10/11/2026 to 31/01/2027 is 2 months in 2026 and 1 in 2027', () => {
     expect(monthsBeginningIn({ start: '2026-11-10', end: '2027-01-31', year: 2026 })).toBe(2);
     expect(monthsBeginningIn({ start: '2026-11-10', end: '2027-01-31', year: 2027 })).toBe(1);
+  });
+});
+
+describe('W3-02: calendarMonthsIn (calendar months of a year with at least one held day)', () => {
+  it.each([
+    ['31/01 -> 15/03 in 2027 spans Jan, Feb, Mar', '2027-01-31', '2027-03-15', 2027, 3],
+    ['01/03 -> 31/03 in 2027 is 1 calendar month', '2027-03-01', '2027-03-31', 2027, 1],
+    ['21/11 with no end in 2026 runs to Dec (2 months)', '2026-11-21', null, 2026, 2],
+    ['21/11 with no end in 2027 covers all 12 months', '2026-11-21', null, 2027, 12],
+    ['cross-year 21/11/2026 -> 15/03/2027 in 2026', '2026-11-21', '2027-03-15', 2026, 2],
+    ['cross-year 21/11/2026 -> 15/03/2027 in 2027', '2026-11-21', '2027-03-15', 2027, 3],
+    ['year before start returns 0', '2026-11-21', null, 2025, 0],
+    ['year after lastHeldOn returns 0', '2026-11-21', '2027-03-15', 2028, 0],
+    ['lastHeldOn before start returns 0', '2026-10-15', '2026-10-01', 2026, 0],
+  ])('%s', (_label, start, lastHeldOn, year, expected) => {
+    expect(calendarMonthsIn({ start, lastHeldOn, year })).toBe(expected);
+  });
+});
+
+describe('W3-17: K1 annual term fixed 12m, contract end boundary, and rolling cycle helpers', () => {
+  it.each([
+    ['K1 annual permanent 12m -> allowed', 12, 12, false, null, '2026-11-05', undefined, null],
+    ['K1 annual exact boundary 04/11/2027 -> allowed', 12, 12, true, '2027-11-04', '2026-11-05', undefined, null],
+    [
+      'K1 annual 1 day short 03/11/2027 -> K1_ANNUAL_CONTRACT_TOO_SHORT',
+      12,
+      12,
+      true,
+      '2027-11-03',
+      '2026-11-05',
+      undefined,
+      'K1_ANNUAL_CONTRACT_TOO_SHORT',
+    ],
+    [
+      'K1 annual contract 31/03/2027 -> K1_ANNUAL_CONTRACT_TOO_SHORT',
+      12,
+      12,
+      true,
+      '2027-03-31',
+      '2026-11-05',
+      undefined,
+      'K1_ANNUAL_CONTRACT_TOO_SHORT',
+    ],
+    [
+      'K1 annual contract ended before start -> TERM_CONTRACT_ENDED',
+      12,
+      12,
+      true,
+      '2026-10-31',
+      '2026-11-05',
+      undefined,
+      'TERM_CONTRACT_ENDED',
+    ],
+    [
+      'K1 annual with 6 months -> K1_ANNUAL_TERM_FIXED',
+      12,
+      6,
+      false,
+      null,
+      '2026-11-05',
+      undefined,
+      'K1_ANNUAL_TERM_FIXED',
+    ],
+    [
+      'K1 annual with 9 months -> K1_ANNUAL_TERM_FIXED',
+      12,
+      9,
+      false,
+      null,
+      '2026-11-05',
+      undefined,
+      'K1_ANNUAL_TERM_FIXED',
+    ],
+    [
+      'K1 annual with long-term null -> K1_ANNUAL_TERM_FIXED',
+      12,
+      null,
+      false,
+      null,
+      '2026-11-05',
+      undefined,
+      'K1_ANNUAL_TERM_FIXED',
+    ],
+    [
+      'K1 annual transfer replacement on 20/03/2027 ending 04/11/2027 -> allowed when contract ends 04/11/2027',
+      12,
+      12,
+      true,
+      '2027-11-04',
+      '2027-03-20',
+      '2027-11-04',
+      null,
+    ],
+    ['K1 monthly stays capped at 9 months (9 allowed)', 1, 9, false, null, '2026-11-05', undefined, null],
+    [
+      'K1 monthly stays capped at 9 months (12 refused)',
+      1,
+      12,
+      false,
+      null,
+      '2026-11-05',
+      undefined,
+      'TERM_MONTHS_OUT_OF_RANGE',
+    ],
+  ] as const)(
+    '%s',
+    (
+      _label,
+      referenceCommitmentMonths,
+      termMonths,
+      fixedTermPerson,
+      contractEndDate,
+      termStart,
+      requiredEndDate,
+      expected,
+    ) => {
+      expect(
+        checkTermMonths({
+          kind: 'K1',
+          referenceCommitmentMonths,
+          termMonths,
+          fixedTermPerson,
+          contractEndKnown: contractEndDate !== null,
+          contractEndDate,
+          termStart,
+          requiredEndDate,
+        }),
+      ).toBe(expected);
+    },
+  );
+
+  it('computes K1 paidThroughOn, nextBillingOn, and remainingBillingStart accurately', () => {
+    expect(k1PaidThroughOn('2026-11-05', '2027-03-20', 12)).toBe('2027-11-04');
+    expect(k1PaidThroughOn('2026-11-05', '2027-11-04', 12)).toBe('2027-11-04');
+    expect(k1PaidThroughOn('2026-11-05', '2027-11-05', 12)).toBe('2028-11-04');
+
+    expect(k1NextBillingOn('2026-11-05', '2027-03-20')).toBe('2027-04-05');
+    expect(k1NextBillingOn('2026-11-05', '2027-04-05')).toBe('2027-04-05');
+
+    expect(k1RemainingBillingStart('2026-11-05', '2027-03-20')).toBe('2027-04-05');
+    expect(k1RemainingBillingStart('2026-11-05', '2027-03-05')).toBe('2027-04-05');
   });
 });

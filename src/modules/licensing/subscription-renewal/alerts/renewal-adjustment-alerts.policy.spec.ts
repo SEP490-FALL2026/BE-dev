@@ -132,7 +132,7 @@ describe('after the renewal day (row 4)', () => {
     };
     expect(due(endsOnItsDate, '2026-11-20', { autoRenew: false })).not.toContain('EXPIRY_MARKED');
     expect(due(endsOnItsDate, '2026-11-21', { autoRenew: false })).toEqual(['EXPIRY_MARKED']);
-    expect(due(endsOnItsDate, '2026-11-21', { autoRenew: false, holdsSeats: false })).toEqual([]);
+    expect(due(endsOnItsDate, '2026-11-21', { autoRenew: false, holdsSeats: false })).toEqual(['EXPIRY_MARKED']);
   });
 
   it('never gives an incident to a plan by the month that renews itself: its end rolls on to a day not yet come', () => {

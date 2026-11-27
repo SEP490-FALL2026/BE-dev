@@ -19,11 +19,13 @@ const ROW = {
   committed: money('20'),
   spent: money('10'),
   pendingSpend: money('0'),
+  runningUncommitted: money('0'),
   remainingBase: null,
   remainingWithReserve: null,
   remaining: null,
   overBudget: false,
   overCommitted: false,
+  noPriceRightCount: 0,
   priorPeriodAdjustment: money('10'),
 };
 

@@ -13,6 +13,11 @@ const STATUS: Record<PurchaseInvoiceRefusal, HttpStatus> = {
   LINK_NOT_FOUND: HttpStatus.NOT_FOUND,
   NOT_FOUND: HttpStatus.NOT_FOUND,
   REQUEST_NOT_PURCHASABLE: HttpStatus.CONFLICT,
+  SEAT_PURCHASE_REQUIRED: HttpStatus.UNPROCESSABLE_ENTITY,
+  SEAT_PURCHASE_INVOICED: HttpStatus.CONFLICT,
+  LOT_ALREADY_INVOICED: HttpStatus.CONFLICT,
+  LINE_ALREADY_INVOICED: HttpStatus.UNPROCESSABLE_ENTITY,
+  INVALID_LINE_SELECTION: HttpStatus.UNPROCESSABLE_ENTITY,
   NO_VENDOR: HttpStatus.UNPROCESSABLE_ENTITY,
   NUMBER_TAKEN: HttpStatus.CONFLICT,
   DOCUMENT_INVALID: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -30,10 +35,16 @@ const STATUS: Record<PurchaseInvoiceRefusal, HttpStatus> = {
 export function toPurchaseInvoiceApiException(error: unknown): unknown {
   if (error instanceof ApiException) return error;
   if (error instanceof PurchaseInvoiceRefusedError) {
+    const details = {
+      ...(error.problem ? { reason: error.problem } : {}),
+      ...(error.seatPurchaseIds ? { seatPurchaseIds: error.seatPurchaseIds } : {}),
+      ...(error.lineIds ? { lineIds: error.lineIds } : {}),
+    };
+
     return new ApiException(STATUS[error.reason], {
       code: `PURCHASE_INVOICE.${error.reason}`,
       message: error.message,
-      ...(error.problem ? { details: { reason: error.problem } } : {}),
+      ...(Object.keys(details).length > 0 ? { details } : {}),
     });
   }
 
@@ -47,6 +58,15 @@ export const PURCHASE_INVOICE_ERROR_EXAMPLES = {
   LINK_NOT_FOUND: example(new PurchaseInvoiceRefusedError('LINK_NOT_FOUND')),
   NOT_FOUND: example(new PurchaseInvoiceRefusedError('NOT_FOUND')),
   REQUEST_NOT_PURCHASABLE: example(new PurchaseInvoiceRefusedError('REQUEST_NOT_PURCHASABLE', 'STATE')),
+  SEAT_PURCHASE_REQUIRED: example(
+    new PurchaseInvoiceRefusedError('SEAT_PURCHASE_REQUIRED', undefined, { seatPurchaseIds: ['<seat-purchase-id>'] }),
+  ),
+  SEAT_PURCHASE_INVOICED: example(new PurchaseInvoiceRefusedError('SEAT_PURCHASE_INVOICED')),
+  LOT_ALREADY_INVOICED: example(new PurchaseInvoiceRefusedError('LOT_ALREADY_INVOICED')),
+  LINE_ALREADY_INVOICED: example(
+    new PurchaseInvoiceRefusedError('LINE_ALREADY_INVOICED', undefined, { lineIds: ['<subscription-line-id>'] }),
+  ),
+  INVALID_LINE_SELECTION: example(new PurchaseInvoiceRefusedError('INVALID_LINE_SELECTION')),
   NO_VENDOR: example(new PurchaseInvoiceRefusedError('NO_VENDOR')),
   NUMBER_TAKEN: example(new PurchaseInvoiceRefusedError('NUMBER_TAKEN')),
   DOCUMENT_INVALID: example(new PurchaseInvoiceRefusedError('DOCUMENT_INVALID', 'NOT_FOUND')),

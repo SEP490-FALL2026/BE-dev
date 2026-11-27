@@ -3,16 +3,20 @@ import type { BusinessDate } from '../../../core/business-date';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AssignmentService } from '../assignment/assignment.service';
-import { SubscriptionRenewalRepo } from '../subscription-renewal/subscription-renewal.repo';
+import {
+  RenewalSavingsService,
+  type RecordRealisedSavingInput,
+  type RecordRealisedSavingResult,
+} from '../subscription-renewal/savings/renewal-savings.service';
 import { ProvisioningFailureService, type FailureRecorded } from '../provisioning/provisioning-failure.service';
 import {
   ProvisioningCancellationService,
   type GrantCancelInput,
 } from '../provisioning/grant-cancellation/provisioning-cancellation.service';
-import { ProvisioningTaskFrame } from '../provisioning/provisioning-task-frame.service';
 import { RevocationViewService } from '../provisioning/revocation-view.service';
 import { RevocationWithdrawalService } from '../provisioning/revocation-withdrawal/revocation-withdrawal.service';
 import { RevocationService } from '../provisioning/revocation.service';
+import { SharedPoolService } from '../shared-pool/shared-pool.service';
 import type {
   AssignmentRecord,
   GrantCancellation,
@@ -43,11 +47,11 @@ export class LicensingApi {
     private readonly assignments: AssignmentService,
     private readonly provisioningFailures: ProvisioningFailureService,
     private readonly cancellations: ProvisioningCancellationService,
-    private readonly frame: ProvisioningTaskFrame,
     private readonly revocations: RevocationService,
     private readonly withdrawals: RevocationWithdrawalService,
     private readonly revocationView: RevocationViewService,
-    private readonly renewals: SubscriptionRenewalRepo,
+    private readonly sharedPool: SharedPoolService,
+    private readonly renewalSavings: RenewalSavingsService,
   ) {}
 
   /**
@@ -131,7 +135,7 @@ export class LicensingApi {
 
   /** Which of these subscriptions the company has decided to end (the live renewal case was decided `CANCEL`), in one statement. */
   getSubscriptionIdsToEnd(subscriptionIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
-    return this.renewals.endingAmong(subscriptionIds, tx);
+    return this.renewalSavings.endingAmong(subscriptionIds, tx);
   }
 
   /** How many seats each of these subscriptions holds as of `onDate`, the way the warehouse counts them (a service account and a future start included), in one statement. */
@@ -225,7 +229,7 @@ export class LicensingApi {
    * so the audit event records it and the Super Admin is notified once for the task (`SoD-5`).
    */
   selfExecutionMode(actor: AuthenticatedPrincipal, beneficiaryEmployeeId: string): Promise<SelfExecutionMode> {
-    return this.frame.selfExecutionMode(actor, beneficiaryEmployeeId);
+    return this.revocations.selfExecutionMode(actor, beneficiaryEmployeeId);
   }
 
   /**
@@ -286,5 +290,25 @@ export class LicensingApi {
    */
   listTransferIdsWithFailedRevocation(transferIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
     return this.revocationView.transferIdsWithFailedRevocation(transferIds, tx);
+  }
+
+  /**
+   * Records the avoided cost for a grant task completed from the shared pool (`B1-R8`, idempotent per task).
+   */
+  recordAvoidedCost(
+    tx: DbTx,
+    taskId: string,
+    amount: { amountMinor: bigint; currency: string },
+    completedOn: BusinessDate,
+  ): Promise<void> {
+    return this.sharedPool.recordAvoidedCost(tx, taskId, amount, completedOn);
+  }
+
+  /**
+   * Records one-time realised renewal savings when Finance confirms the first invoice of the renewed period
+   * (or closes its discrepancy case, `Q-G`).
+   */
+  recordRealisedSaving(tx: DbTx, input: RecordRealisedSavingInput): Promise<RecordRealisedSavingResult> {
+    return this.renewalSavings.recordRealisedSaving(tx, input);
   }
 }

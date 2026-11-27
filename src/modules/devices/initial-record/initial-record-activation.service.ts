@@ -86,6 +86,10 @@ export class InitialRecordActivationService {
     return keyActivationIds;
   }
 
+  /**
+   * Orders the keys by the purchase they belong to, which is their lot (tier 6a): the order every writer of a lot takes its locks in, so two machines
+   * opened at once never wait for each other in a circle. A key entered before lots is ordered by its subscription, which has the id of its lot.
+   */
   private async sortKeyIdsBySubscription(tx: DbTx, licenseKeyIds: readonly string[]): Promise<string[]> {
     if (licenseKeyIds.length <= 1) return [...licenseKeyIds];
     const subscriptionByKeyId = await this.deviceActivations.keySubscriptionIds(licenseKeyIds, tx);

@@ -136,7 +136,7 @@ export class UsageRulesContextService {
     if (!priced || priced.kind !== 'RECURRING') return null;
 
     return {
-      amountMinor: priced.unitPrice.amountMinor,
+      monthlyPriceMinor: priced.monthlyPriceMinor,
       currency: priced.unitPrice.currency,
       billingCycle: priced.billingCycle,
     };

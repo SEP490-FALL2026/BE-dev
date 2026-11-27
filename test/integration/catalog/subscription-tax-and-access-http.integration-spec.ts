@@ -85,7 +85,9 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
         label: 'ESTIMATE_NO_PROFILE',
         group: 'T2',
         taxAmount: '120000',
-        estimatedCost: '840000',
+        // The price is kept as a monthly price (SPEC-B1 W3-02): 800.000 over 12 months is 66.667 a month (rounded half up), the year is 66.667 x 12 = 800.004,
+        // and the 40.000 of tax that is not deductible is added: 840.004.
+        estimatedCost: '840004',
       });
       const missing = dataOf<{ items: Array<{ id: string }> }>(
         await request(server())
@@ -199,12 +201,13 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
       const created = await subscription(planId);
 
       expect(codeOf(await get(randomUUID()).expect(404))).toBe('SUBSCRIPTION.NOT_FOUND');
-      // The seats are sent with the version of a read, as they always are now; a subscription that is not there answers 404 whatever the version.
+      // The seats of a subscription are changed on its lines and counted from their ledger, so a write of `purchasedQuantity` is refused whatever the id; any other change of a subscription that is not there answers 404.
+      expect(codeOf(await patch(randomUUID(), { autoRenew: true }).expect(404))).toBe('SUBSCRIPTION.NOT_FOUND');
       expect(
         codeOf(
-          await patch(randomUUID(), { purchasedQuantity: 1, expectedUpdatedAt: new Date().toISOString() }).expect(404),
+          await patch(randomUUID(), { purchasedQuantity: 1, expectedUpdatedAt: new Date().toISOString() }).expect(409),
         ),
-      ).toBe('SUBSCRIPTION.NOT_FOUND');
+      ).toBe('SUBSCRIPTION.SEAT_COUNT_VIA_LEDGER');
       expect(codeOf(await complete(randomUUID()).expect(404))).toBe('SUBSCRIPTION.NOT_FOUND');
       expect(codeOf(await patch(created.id, {}).expect(422))).toBe('SUBSCRIPTION.UPDATE_EMPTY');
       for (const body of [
@@ -223,7 +226,8 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
       const { planId, applicationId } = await plan();
       const other = await plan();
       const first = await subscription(planId);
-      const second = await subscription(planId, { purchasedQuantity: 3 });
+      // One live subscription of a plan per workspace (W3-14): the second one of the plan is a draft stored as an earlier release left it, with no workspace.
+      const second = { id: await h.wholeDraft(planId, { day: '2026-03-16' }) };
       await subscription(other.planId);
 
       const byApplication = dataOf<{ items: SubscriptionWire[]; pagination: { totalItems: number } }>(

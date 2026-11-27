@@ -185,7 +185,7 @@ describe('the outcome of a renewal and the chain of periods (integration, real P
     ).toHaveLength(1);
   });
 
-  it('refuses the new period while the seat to take back is still held, then records it with the savings it shows (US-11-03 AC-3, AC-5, AC-12, US-11-05 AC-9)', async () => {
+  it('refuses the new period while the seat to take back is still held, then records it with no saving yet, which is written when Finance confirms the first invoice of the new period (US-11-03 AC-3, AC-5, AC-12, US-11-05 AC-9)', async () => {
     const unit = await h.unit(3);
     const term = await ownYear(unit, 10);
     // The seat of the first person is being taken back: the system does not count it, and the new period must not carry it.
@@ -213,7 +213,8 @@ describe('the outcome of a renewal and the chain of periods (integration, real P
 
     expect(renewal.outcomeDetail).toMatchObject({
       kind: 'AS_DECIDED',
-      realisedSavings: { amount: '8000000', currency: 'VND' },
+      // The IT Admin records no saving: it is written once, when Finance confirms the first invoice of the new period.
+      realisedSavings: null,
     });
     const carried = (await seatsOf([renewal.outcomeDetail?.nextSubscriptionId as string])).map(
       (row) => row.predecessor_id,

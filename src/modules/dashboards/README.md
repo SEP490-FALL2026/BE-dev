@@ -31,7 +31,7 @@ dùng bởi: không module nào; chỉ `app/app.module.ts` mount `DashboardsModu
   trạng thái `COUNTED`/`AT_SOURCE`/`NOT_AVAILABLE` và lý do thiếu nguồn), `dashboard-section.dto.ts` (schema chung bốn trường),
   `dashboard-section.errors.ts` (`DashboardRefusedError`), `dashboard-section.http-errors.ts` (403 như guard, 503).
 - `progress/` — tiến độ nghỉ việc/điều chuyển dùng chung hai trang IT Admin và Super Admin (SPEC P21, `QĐ-110` G2): `departures`, `transfers` (gồm `revocationFailed`),
-  `seatsReturned`, `plansBelowVendorAdminMinimum` + `calendar` (10 ngày làm việc tới); `dashboard-progress.policy.ts` (ánh xạ thuần),
+  `seatsReturned`, `plansBelowVendorAdminMinimum`, `workspacesBelowVendorAdminMinimum` (số workspace đang dùng trên toàn công ty có ít hơn 2 admin còn làm việc là IT Admin, đọc qua `CatalogResponsibilityApi.countWorkspacesBelowMinimum`) + `calendar` (10 ngày làm việc tới); `dashboard-progress.policy.ts` (ánh xạ thuần),
   `dashboard-progress.service.ts` (đọc qua facade personnel/licensing/catalog), `dashboard-progress.dto.ts`. Mọi số `COUNTED`; chỉ
   `upcoming` và `revocationOverdue` nêu danh sách (`offboardingCaseList`), còn lại `sourceOperationId = null` vì không danh sách nào trả đúng số đó.
 - `revocation-sla/` — `GET /reports/revocation-sla` (SUPER_ADMIN toàn công ty; IT_ADMIN chỉ phòng phụ trách; SPEC P22, R5 E3/E7): trung vị ngày làm việc,

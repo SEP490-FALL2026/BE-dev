@@ -1,7 +1,6 @@
 import { fromDateColumn } from '../../../core/business-date';
 import { DONG, formatAmount } from '../../../core/money/money';
 import type { InvoiceDiscrepancyRow } from '../invoice-discrepancy/invoice-discrepancy.repo';
-import type { InvoiceDiscrepancyOutcome } from '../invoice-discrepancy/invoice-discrepancy.types';
 import type { InvoiceDiscrepancyDetailWire, InvoiceDiscrepancySummaryWire } from './invoice-discrepancy.dto';
 
 /** The digits after the point of each currency the cases of a page state a price in, by code; the dong has none. */
@@ -59,24 +58,22 @@ export function toSummary(row: InvoiceDiscrepancyRow, units: MinorUnitsOf): Invo
 }
 
 export function toDetail(row: InvoiceDiscrepancyRow, units: MinorUnitsOf): InvoiceDiscrepancyDetailWire {
-  const closed =
-    row.state === 'CLOSED' &&
-    row.outcome !== null &&
-    row.reason !== null &&
-    row.differenceMinor !== null &&
-    row.closedByEmployeeId !== null &&
-    row.closedAt !== null;
-
   return {
     ...toSummary(row, units),
-    closure: closed
-      ? {
-          outcome: row.outcome as InvoiceDiscrepancyOutcome,
-          reason: row.reason as string,
-          differenceAmount: dong(row.differenceMinor as bigint),
-          closedBy: { employeeId: row.closedByEmployeeId as string },
-          closedAt: (row.closedAt as Date).toISOString(),
-        }
-      : null,
+    closure:
+      row.state === 'CLOSED' &&
+      row.outcome !== null &&
+      row.reason !== null &&
+      row.differenceMinor !== null &&
+      row.closedByEmployeeId !== null &&
+      row.closedAt !== null
+        ? {
+            outcome: row.outcome,
+            reason: row.reason,
+            differenceAmount: dong(row.differenceMinor),
+            closedBy: { employeeId: row.closedByEmployeeId },
+            closedAt: row.closedAt.toISOString(),
+          }
+        : null,
   };
 }

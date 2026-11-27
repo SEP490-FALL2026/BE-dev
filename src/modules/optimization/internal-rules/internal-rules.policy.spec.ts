@@ -38,8 +38,55 @@ describe('G1 (gate 1)', () => {
     expect(g1ActionOf('K2')).toBe('REGRANT_OR_REDUCE');
   });
 
-  it('TẠM CHỌN: a K4 pool is not supported yet, so no G1 is made for it', () => {
-    expect(decideG1(vacancy({ provisioningType: 'K4' }), null)).toEqual({ skip: null, step: { kind: 'NONE' } });
+  it('W3-26 (K-A10): allows K4 ACCOUNT lots (pricingModel PER_SEAT or null) with countsTowardVacantCost=false, excludes DEVICE_KEY/DEVICE_BUNDLED', () => {
+    expect(
+      decideG1(
+        vacancy({
+          provisioningType: 'K4',
+          keyBinding: 'ACCOUNT',
+          pricingModel: null,
+          free: 2,
+          subjectKind: 'LICENSE_LOT',
+        }),
+        null,
+      ),
+    ).toEqual({
+      skip: null,
+      step: { kind: 'CREATE', freeSeats: 2, countsTowardVacantCost: false, action: 'REGRANT_BEFORE_PURCHASE' },
+    });
+    expect(
+      decideG1(
+        vacancy({
+          provisioningType: 'K4',
+          keyBinding: 'ACCOUNT',
+          pricingModel: 'PER_SEAT',
+          free: 2,
+          subjectKind: 'LICENSE_LOT',
+        }),
+        null,
+      ).step,
+    ).toEqual({ kind: 'CREATE', freeSeats: 2, countsTowardVacantCost: false, action: 'REGRANT_BEFORE_PURCHASE' });
+    expect(
+      decideG1(vacancy({ provisioningType: 'K4', keyBinding: 'ACCOUNT', pricingModel: 'FLAT_RATE', free: 2 }), null)
+        .skip?.gate,
+    ).toBe('PER_SEAT');
+    expect(
+      decideG1(
+        vacancy({
+          provisioningType: 'K4',
+          keyBinding: 'DEVICE_KEY',
+          pricingModel: null,
+          free: 5,
+          subjectKind: 'LICENSE_LOT',
+        }),
+        null,
+      ),
+    ).toEqual({ skip: null, step: { kind: 'NONE' } });
+    expect(
+      decideG1(vacancy({ provisioningType: 'K4', keyBinding: 'DEVICE_BUNDLED', pricingModel: null, free: 5 }), {
+        freeSeats: 5,
+      }).step,
+    ).toEqual({ kind: 'CLOSE', reason: 'OUT_OF_SCOPE' });
   });
 
   it('US-10-01 AC-7: leaves a plan that is not PER_SEAT out with the gate and closes a G1 it had', () => {
@@ -170,5 +217,25 @@ describe('G2 (gates 1 and 8)', () => {
       terminatingUntil: '2026-11-30',
       supersedes: null,
     });
+  });
+
+  it('W3-26: accepts K4 ACCOUNT (PER_SEAT or null) for G2 and excludes K4 DEVICE_KEY/DEVICE_BUNDLED and non-PER_SEAT legacy plans', () => {
+    expect(decideG2(seat({ provisioningType: 'K4', keyBinding: 'ACCOUNT', pricingModel: null }), null)).toEqual({
+      skip: null,
+      step: { kind: 'CREATE', state: 'OPEN', revocationTaskId: null, terminatingUntil: null, supersedes: null },
+    });
+    expect(decideG2(seat({ provisioningType: 'K4', keyBinding: 'DEVICE_KEY', pricingModel: null }), null)).toEqual({
+      skip: null,
+      step: { kind: 'NONE' },
+    });
+    expect(
+      decideG2(seat({ provisioningType: 'K4', keyBinding: 'DEVICE_BUNDLED', pricingModel: 'PER_SEAT' }), null),
+    ).toEqual({
+      skip: null,
+      step: { kind: 'NONE' },
+    });
+    expect(
+      decideG2(seat({ provisioningType: 'K4', keyBinding: 'ACCOUNT', pricingModel: 'FLAT_RATE' }), null).skip?.gate,
+    ).toBe('PER_SEAT');
   });
 });

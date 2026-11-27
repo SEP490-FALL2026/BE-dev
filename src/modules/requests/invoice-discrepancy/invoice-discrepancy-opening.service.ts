@@ -28,10 +28,11 @@ export class InvoiceDiscrepancyOpeningService {
       now: Date;
     },
   ): Promise<string> {
+    const mismatches = [...new Set(input.mismatches)];
     const { id } = await this.cases.insert(tx, {
       organizationId: input.organizationId,
       purchaseInvoiceId: input.purchaseInvoiceId,
-      mismatches: input.mismatches,
+      mismatches,
       openedAt: input.now,
     });
     await this.audit.record(tx, {
@@ -43,7 +44,7 @@ export class InvoiceDiscrepancyOpeningService {
       resourceType: 'INVOICE_DISCREPANCY',
       resourceId: id,
       before: null,
-      after: { purchaseInvoiceId: input.purchaseInvoiceId, mismatches: [...input.mismatches] },
+      after: { purchaseInvoiceId: input.purchaseInvoiceId, mismatches },
       correlationId: actor.sessionId,
     });
 

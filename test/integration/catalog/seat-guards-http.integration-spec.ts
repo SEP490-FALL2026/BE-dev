@@ -299,7 +299,6 @@ describe('the guards of the seats of a subscription over HTTP (integration, real
             unitPrice: { amount: '1000000', currency: 'VND' },
             billingCycle: 'MONTHLY',
             commitmentTermMonths: 1,
-            responsibleItAdminEmployeeId: h.it1.employeeId,
             startDate: '2026-01-05',
           })
           .expect(201),

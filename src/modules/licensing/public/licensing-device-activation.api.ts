@@ -51,7 +51,10 @@ export class LicensingDeviceActivationApi {
     return this.queries.find(activationId, tx);
   }
 
-  /** Resolves `subscriptionId` keyed by `licenseKeyId` without locking; missing keys are omitted. */
+  /**
+   * Resolves the purchase of each key, keyed by `licenseKeyId`, without locking; missing keys are omitted. The purchase of a key is its lot (a lot born
+   * from a perpetual purchase has the id of that subscription); the name `subscriptionId` of the wave-2 signature is kept.
+   */
   keySubscriptionIds(licenseKeyIds: readonly string[], tx?: DbTx): Promise<Map<string, string>> {
     return this.queries.keySubscriptionIds(licenseKeyIds, tx);
   }

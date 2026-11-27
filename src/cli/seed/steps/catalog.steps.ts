@@ -1,9 +1,28 @@
 import { addMonths, dayOffset } from '../demo-dates';
 import { as, listAll, summarize, yearOf } from '../demo-step-kit';
 import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
-import type { DemoApplication, DemoPlan, DemoSubscription } from '../fixture/demo-fixture.types';
+import type { DemoApplication, DemoPlan, DemoSubscription, DemoSubscriptionLine } from '../fixture/demo-fixture.types';
 
 type Result = { status: StepOutcome['status']; label: string };
+
+/** Whether a fixture subscription covers `planKey` (either single-line `plan` or inside `lines[]`). */
+export function subscriptionHasPlan(subscription: DemoSubscription, planKey: string): boolean {
+  return subscription.plan === planKey || Boolean(subscription.lines?.some((line) => line.plan === planKey));
+}
+
+/** Primary plan key of a fixture subscription (its single plan, or its first line). */
+export function subscriptionPrimaryPlan(subscription: DemoSubscription): string {
+  return subscription.plan ?? subscription.lines?.[0]?.plan ?? '';
+}
+
+/** Monthly unit price in dong for `planKey` on `subscription` (`lines[]` first, else `unitPrice` divided by 12 half-away for annual). */
+export function subscriptionMonthlyPriceOf(subscription: DemoSubscription, planKey?: string): number {
+  const line = planKey ? subscription.lines?.find((candidate) => candidate.plan === planKey) : subscription.lines?.[0];
+  if (line) return Number(line.monthlyUnitPrice.amount);
+  const amount = Number(subscription.unitPrice?.amount ?? 0);
+
+  return subscription.billingCycle === 'ANNUAL' ? Math.floor((amount + 6) / 12) : amount;
+}
 
 interface ApplicationRow {
   id: string;
@@ -61,7 +80,7 @@ async function oneApplication(
     functionalGroupId,
     ...(application.vendorName ? { vendorName: application.vendorName } : {}),
     dataSensitivity: application.dataSensitivity,
-    plan: firstPlanBody(first),
+    plan: firstPlanBody(first, commitmentMonthsForPlan(ctx, first)),
   });
   ctx.ids.applications.set(application.key, created.id);
   if (created.vendor) ctx.ids.vendors.set(application.key, created.vendor.id);
@@ -69,15 +88,31 @@ async function oneApplication(
   return { status: 'done', label };
 }
 
+function commitmentMonthsForPlan(ctx: DemoRunContext, plan: DemoPlan): 1 | 12 | undefined {
+  if (plan.referenceCommitmentMonths !== undefined) return plan.referenceCommitmentMonths;
+  if (plan.provisioningType === 'K1') return 1;
+  if (plan.provisioningType === 'K2') {
+    return ctx.fixture.subscriptions.find((subscription) => subscriptionHasPlan(subscription, plan.key))?.termMonths;
+  }
+
+  return undefined;
+}
+
 /** The plan of the one command: the body of a plan without its application, which the command is making. */
-function firstPlanBody(plan: DemoPlan): Record<string, unknown> {
-  const body = planBody('', plan);
+function firstPlanBody(plan: DemoPlan, referenceCommitmentMonths?: 1 | 12): Record<string, unknown> {
+  const body = planBody('', plan, referenceCommitmentMonths);
   delete body.applicationId;
 
   return body;
 }
 
-export function planBody(applicationId: string, plan: DemoPlan): Record<string, unknown> {
+export function planBody(
+  applicationId: string,
+  plan: DemoPlan,
+  referenceCommitmentMonths?: 1 | 12,
+): Record<string, unknown> {
+  const commitment = referenceCommitmentMonths ?? (plan.provisioningType === 'K1' ? 1 : undefined);
+
   return {
     applicationId,
     name: plan.name,
@@ -90,6 +125,7 @@ export function planBody(applicationId: string, plan: DemoPlan): Record<string, 
     ...(plan.keyBinding ? { keyBinding: plan.keyBinding } : {}),
     // QĐ-113a: the price before tax in dong of a paid plan, the one a request falls back to when no subscription of the plan has a price.
     ...(plan.referencePrice ? { referencePrice: { amount: plan.referencePrice, currency: 'VND' } } : {}),
+    ...(commitment !== undefined ? { referenceCommitmentMonths: commitment } : {}),
   };
 }
 
@@ -128,7 +164,12 @@ async function plans(ctx: DemoRunContext): Promise<StepOutcome> {
         );
       } else if (ctx.mode === 'plan') results.push({ status: 'planned', label: plan.name });
       else {
-        const created = await ctx.api.call<{ id: string }>(admin, 'POST', '/plans', planBody(applicationId, plan));
+        const created = await ctx.api.call<{ id: string }>(
+          admin,
+          'POST',
+          '/plans',
+          planBody(applicationId, plan, commitmentMonthsForPlan(ctx, plan)),
+        );
         ctx.ids.plans.set(plan.key, created.id);
         results.push({ status: 'done', label: plan.name });
       }
@@ -161,7 +202,10 @@ export function workspaceProfileBody(
   ownerAccountEmail?: string;
 } | null {
   if (!needsVendorAdmins(plan)) return null;
-  const owner = ctx.fixture.subscriptions.find((subscription) => subscription.plan === plan.key)?.responsible;
+  // A K4 plan is held in lots, not in a subscription: the IT Admin who made its first lot answers for it.
+  const owner =
+    ctx.fixture.subscriptions.find((subscription) => subscriptionHasPlan(subscription, plan.key))?.responsible ??
+    ctx.fixture.lots.find((lot) => lot.plan === plan.key)?.responsible;
   const other =
     plan.vendorAdmin ??
     ctx.fixture.people.find((person) => person.account === 'IT_ADMIN' && person.code !== owner)?.code;
@@ -218,8 +262,26 @@ export function baselineSeatsOf(ctx: DemoRunContext, subscriptionKey: string): n
   return ctx.fixture.seats.filter((seat) => seat.subscription === subscriptionKey).length;
 }
 
-/** What is bought: the baseline seats and the free ones, or the number the fixture names for a plan with no baseline file. */
+function lineQuantityOf(
+  ctx: DemoRunContext,
+  subscriptionKey: string,
+  line: DemoSubscriptionLine,
+  index: number,
+): number {
+  if (line.quantity !== undefined) return line.quantity;
+
+  return (index === 0 ? baselineSeatsOf(ctx, subscriptionKey) : 0) + (line.freeAfterBaseline ?? 0);
+}
+
+/** What is bought: the baseline seats and the free ones, the sum of `lines[]`, or the number the fixture names for a plan with no baseline file. */
 export function purchasedQuantityOf(ctx: DemoRunContext, subscription: DemoSubscription): number {
+  if (subscription.lines) {
+    return subscription.lines.reduce(
+      (total, line, index) => total + lineQuantityOf(ctx, subscription.key, line, index),
+      0,
+    );
+  }
+
   return subscription.quantity ?? baselineSeatsOf(ctx, subscription.key) + subscription.freeAfterBaseline;
 }
 
@@ -261,23 +323,20 @@ function annualDates(ctx: DatedContext, subscription: DemoSubscription): Dates {
 
 /** The day a subscription starts: the first day the seats of the pool exist, so no seat of it is granted before. */
 export function subscriptionStartDate(ctx: DatedContext, subscription: DemoSubscription): string {
-  if (subscription.kind === 'PERPETUAL' || subscription.withoutDates) return dayOffset(ctx.today, -200);
+  if (subscription.withoutDates) return dayOffset(ctx.today, -200);
 
   return (subscription.billingCycle === 'ANNUAL' ? annualDates(ctx, subscription) : monthlyDates(ctx, subscription))
     .startDate;
 }
 
-/** The terms of a subscription (everything but which plan and for whom), as the API takes them on creation and on update of a draft. */
-export function subscriptionTerms(ctx: DemoRunContext, subscription: DemoSubscription): Record<string, unknown> {
+function subscriptionSharedTerms(ctx: DemoRunContext, subscription: DemoSubscription): Record<string, unknown> {
   const base = {
-    purchasedQuantity: purchasedQuantityOf(ctx, subscription),
-    unitPrice: subscription.unitPrice,
-    // The quote of the vendor when it is not in dong, kept beside the price (FX-1); the price itself is always in dong.
     ...(subscription.originalPrice ? { originalPrice: subscription.originalPrice } : {}),
-    responsibleItAdminEmployeeId: ctx.ids.employees.get(subscription.responsible),
+    ...(subscription.seatCounting ? { seatCounting: subscription.seatCounting } : {}),
+    ...(subscription.invoicedLater !== undefined ? { invoicedLater: subscription.invoicedLater } : {}),
+    ...(subscription.minimumSeatsTotal !== undefined ? { minimumSeatsTotal: subscription.minimumSeatsTotal } : {}),
+    ...(subscription.minimumSeats !== undefined ? { vendorMinimumSeats: subscription.minimumSeats } : {}),
   };
-  // A key is bought once, on a day in the past (the purchase date is the start date); it has no term and no end.
-  if (subscription.kind === 'PERPETUAL') return { ...base, startDate: dayOffset(ctx.today, -200) };
   const cycle = { billingCycle: subscription.billingCycle, commitmentTermMonths: subscription.termMonths };
   // A plan with no date to alert from: no end, no renewal, no notice (the warning `NO_ALERT_ANCHOR`, the refusal `CONTRACT_DATA_INCOMPLETE`).
   if (subscription.withoutDates) {
@@ -302,23 +361,63 @@ export function subscriptionTerms(ctx: DemoRunContext, subscription: DemoSubscri
   };
 }
 
+/** Terms accepted by `PATCH /subscriptions/:id` on an unfinished draft (never sends `purchasedQuantity` or `lines[]`). */
+export function subscriptionPatchTerms(ctx: DemoRunContext, subscription: DemoSubscription): Record<string, unknown> {
+  return {
+    ...(!subscription.lines && subscription.unitPrice ? termOrPerpetualPriceFields(subscription) : {}),
+    ...subscriptionSharedTerms(ctx, subscription),
+  };
+}
+
+/** The terms of a subscription (everything but top-level `planId` and `kind`), as `POST /subscriptions` takes them. */
+export function subscriptionTerms(ctx: DemoRunContext, subscription: DemoSubscription): Record<string, unknown> {
+  if (subscription.lines) {
+    return {
+      lines: subscription.lines.map((line, index) => ({
+        planId: ctx.ids.plans.get(line.plan) ?? '',
+        monthlyUnitPrice: line.monthlyUnitPrice,
+        quantity: lineQuantityOf(ctx, subscription.key, line, index),
+        ...(line.minimumSeats !== undefined ? { minimumSeats: line.minimumSeats } : {}),
+      })),
+      ...subscriptionSharedTerms(ctx, subscription),
+    };
+  }
+
+  return {
+    purchasedQuantity: purchasedQuantityOf(ctx, subscription),
+    ...termOrPerpetualPriceFields(subscription),
+    ...subscriptionSharedTerms(ctx, subscription),
+  };
+}
+
 export function subscriptionBody(
   ctx: DemoRunContext,
   subscription: DemoSubscription,
   planId: string,
 ): Record<string, unknown> {
   return {
-    planId,
+    ...(subscription.lines ? {} : { planId }),
     kind: subscription.kind,
     ...subscriptionTerms(ctx, subscription),
   };
 }
 
+function termOrPerpetualPriceFields(subscription: DemoSubscription): Record<string, unknown> {
+  const cycleMonths = subscription.billingCycle === 'ANNUAL' ? 12n : 1n;
+  const rawUnit = BigInt(subscription.unitPrice?.amount ?? '0');
+  const monthlyMinor = (rawUnit * 2n + cycleMonths) / (2n * cycleMonths);
+
+  return {
+    monthlyUnitPrice: { amount: String(monthlyMinor), currency: 'VND' },
+    ...(monthlyMinor * cycleMonths === rawUnit && subscription.unitPrice ? { unitPrice: subscription.unitPrice } : {}),
+  };
+}
+
 async function subscriptions(ctx: DemoRunContext): Promise<StepOutcome> {
-  const admin = await as(ctx, catalogAdmin(ctx));
   const results: Result[] = [];
   for (const subscription of ctx.fixture.subscriptions) {
-    results.push(await oneSubscription(ctx, admin, subscription));
+    // The IT Admin who declares a subscription is the one who answers for it: the dataset declares each with the person it names.
+    results.push(await oneSubscription(ctx, await as(ctx, subscription.responsible), subscription));
   }
 
   return summarize(results);
@@ -330,7 +429,7 @@ async function subscriptions(ctx: DemoRunContext): Promise<StepOutcome> {
  */
 async function oneSubscription(ctx: DemoRunContext, admin: string, subscription: DemoSubscription): Promise<Result> {
   const label = subscription.key;
-  const planId = ctx.ids.plans.get(subscription.plan) ?? '';
+  const planId = ctx.ids.plans.get(subscriptionPrimaryPlan(subscription)) ?? '';
   const rows = await listAll<SubscriptionRow>(ctx, admin, `/subscriptions?planId=${planId}`);
   let found = rows[0];
   if (!found && ctx.mode === 'plan') return { status: 'planned', label };
@@ -347,13 +446,79 @@ async function oneSubscription(ctx: DemoRunContext, admin: string, subscription:
   if (ctx.mode === 'plan') return { status: 'planned', label: `${label} (hoàn tất bản nháp)` };
   // A draft an earlier run left is brought to the fixture's terms before it is completed.
   await ctx.api.call(admin, 'PATCH', `/subscriptions/${found.id}`, {
-    ...subscriptionTerms(ctx, subscription),
+    ...subscriptionPatchTerms(ctx, subscription),
     expectedUpdatedAt: found.updatedAt,
   });
   await ctx.api.call(admin, 'POST', `/subscriptions/${found.id}/completions`);
 
   return { status: 'done', label };
 }
+
+interface SeatChangeRow {
+  reason: string;
+  request: { id: string } | null;
+  seatPurchase: { id: string; code: string } | null;
+}
+
+function resolveCanvaPurchaseTarget(ctx: DemoRunContext) {
+  const scenario = ctx.fixture.requests.find((r) => r.key === 'R61');
+  const subscriptionId = ctx.ids.subscriptions.get('canva');
+  const requestId = ctx.ids.requests.get('R61');
+  const beneficiaries = scenario?.beneficiaries ?? [];
+  if (beneficiaries.length === 0 || !subscriptionId || !requestId) return null;
+  const department = ctx.fixture.people.find((p) => p.code === beneficiaries[0])?.department;
+  const adminCode = ctx.fixture.departments.find((d) => d.code === department)?.itAdmin ?? catalogAdmin(ctx);
+
+  return { subscriptionId, requestId, beneficiaries, adminCode };
+}
+
+/**
+ * Batch seat purchase (`MUA-…`): buys 2 extra seats for the two open GRANT tasks of R61 (`canva-teams`) in one request,
+ * then records the purchase id in `ctx.ids.seatPurchases` for the `SEAT_PURCHASE` invoice step.
+ */
+async function seatPurchases(ctx: DemoRunContext): Promise<StepOutcome> {
+  const target = resolveCanvaPurchaseTarget(ctx);
+  if (!target) return { status: 'conflict', detail: 'canva hoặc R61 chưa có để mua thêm seat' };
+  const admin = await as(ctx, target.adminCode);
+  const detail = await ctx.api.call<{ lines?: Array<{ id: string }> }>(
+    admin,
+    'GET',
+    `/subscriptions/${target.subscriptionId}`,
+  );
+  const lineId = detail.lines?.[0]?.id;
+  if (!lineId) return { status: 'conflict', detail: 'thuê bao canva chưa có dòng' };
+  const changes = await listAll<SeatChangeRow>(ctx, admin, `/subscription-lines/${lineId}/seat-changes`);
+  const existing = changes.find((c) => c.reason === 'TOP_UP' && c.request?.id === target.requestId && c.seatPurchase);
+  if (existing?.seatPurchase) {
+    ctx.ids.seatPurchases.set('canva-topup', existing.seatPurchase.id);
+    return { status: 'present', detail: `${existing.seatPurchase.code} (R61)` };
+  }
+  if (ctx.mode === 'plan') return { status: 'planned', detail: 'Mua thêm 2 seat Canva Teams (MUA-…)' };
+  const created = await ctx.api.call<{ id: string; code: string }>(
+    admin,
+    'POST',
+    `/subscription-lines/${lineId}/purchases`,
+    {
+      items: target.beneficiaries.map((code) => ({
+        requestId: target.requestId,
+        beneficiaryEmployeeId: ctx.ids.employees.get(code),
+      })),
+      purchasedOn: ctx.today,
+    },
+  );
+  ctx.ids.seatPurchases.set('canva-topup', created.id);
+
+  return { status: 'done', detail: `${created.code} (+${target.beneficiaries.length} seat)` };
+}
+
+export const SEAT_PURCHASE_STEPS: readonly DemoStep[] = [
+  {
+    key: 'catalog.seat-purchases',
+    title: 'Mua thêm seat theo lô 2 mục (MUA-…, IT Admin)',
+    needs: ['catalog.subscriptions', 'requests.R61'],
+    run: seatPurchases,
+  },
+];
 
 export const CATALOG_STEPS: readonly DemoStep[] = [
   { key: 'catalog.applications', title: 'Ứng dụng (IT Admin)', needs: ['org.accounts'], run: applications },

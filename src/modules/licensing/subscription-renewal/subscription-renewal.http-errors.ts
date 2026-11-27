@@ -19,7 +19,7 @@ const ANSWERS: Readonly<Record<RenewalProblem, { status: HttpStatus; message: st
   NOT_RENEWABLE: {
     status: HttpStatus.CONFLICT,
     message:
-      'Only a live shared-pool term has an adjustment point (details.reason: PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED, CANCELLED).',
+      'Only a fixed-seat live shared-pool term has an adjustment point (PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED, CANCELLED, MEMBER_COUNTED).',
   },
   CONTRACT_DATA_INCOMPLETE: {
     status: HttpStatus.CONFLICT,
@@ -75,6 +75,18 @@ const ANSWERS: Readonly<Record<RenewalProblem, { status: HttpStatus; message: st
     message:
       'Record the new period the vendor made, unless the cancellation was carried out or a monthly plan was refused.',
   },
+  LINE_QUANTITY_NOT_TARGET: {
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    message: 'One or more line quantities do not match the computed renewal target for that line.',
+  },
+  REDUCTION_AFTER_DEADLINE: {
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    message: 'Seat counts cannot be reduced below the deadline seat count after the annual deadline has passed.',
+  },
+  LINES_REQUIRED: {
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    message: 'This subscription period has multiple lines: submit per-line quantities in `lines[]`.',
+  },
 };
 
 /**
@@ -98,7 +110,7 @@ export function toRenewalApiException(error: unknown): unknown {
 }
 
 const example = (error: Error) => errorExampleOf(toRenewalApiException(error));
-const renewal = (problem: RenewalProblem, details?: Record<string, string | number>) =>
+const renewal = (problem: RenewalProblem, details?: Record<string, unknown>) =>
   example(new RenewalError(problem, details));
 
 /** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
@@ -138,6 +150,13 @@ export const RENEWAL_ERROR_EXAMPLES = {
   SEATS_HAVE_OPEN_TASKS: renewal('SEATS_HAVE_OPEN_TASKS', { seats: 1 }),
   PERIOD_REFUSED: renewal('PERIOD_REFUSED', { reason: 'ALREADY_RENEWED' }),
   NEXT_PERIOD_REQUIRED: renewal('NEXT_PERIOD_REQUIRED'),
+  LINE_QUANTITY_NOT_TARGET: renewal('LINE_QUANTITY_NOT_TARGET', {
+    lines: [{ subscriptionLineId: '<line-id>', target: 11, quantity: 12 }],
+  }),
+  REDUCTION_AFTER_DEADLINE: renewal('REDUCTION_AFTER_DEADLINE', {
+    lines: [{ subscriptionLineId: '<line-id>', minimum: 12 }],
+  }),
+  LINES_REQUIRED: renewal('LINES_REQUIRED', { lineCount: 2 }),
   // The price of a period is in dong, which has no decimals: a price in another currency is PERIOD_REFUSED (PRICE_NOT_VND) before the amount is read.
   MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(0, 'nextPeriod.unitPrice')),
   MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError('nextPeriod.unitPrice')),

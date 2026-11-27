@@ -14,6 +14,7 @@ export interface ActivationRecord {
   deviceId: string;
   planId: string;
   licenseKeyId: string | null;
+  /** License lot id when the key belongs to a lot (`licenseKey.licenseLotId`), falling back to legacy `subscriptionId`. */
   subscriptionId: string | null;
   keyMasked: string | null;
   keyWithdrawn: boolean;

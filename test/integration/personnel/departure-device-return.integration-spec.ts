@@ -110,33 +110,31 @@ describe('departure device return tasks and cancellation lock ordering (integrat
       .expect(201);
     const planId = h.dataOf<{ id: string }>(planRes).id;
 
-    const subRes = await request(h.server())
-      .post('/api/v1/subscriptions')
+    const lotRes = await request(h.server())
+      .post('/api/v1/license-lots')
       .set(h.as(h.it1))
       .send({
         planId,
-        kind: 'PERPETUAL',
-        purchasedQuantity: 2,
+        purpose: 'STOCK',
+        licenseCount: 2,
         unitPrice: { amount: '1000000', currency: 'VND' },
-        startDate: '2026-01-01',
-        responsibleItAdminEmployeeId: h.it1.employeeId,
+        purchasedOn: '2026-01-01',
       })
       .expect(201);
-    const subscriptionId = h.dataOf<{ id: string }>(subRes).id;
+    const lotId = h.dataOf<{ id: string }>(lotRes).id;
 
     await request(h.server())
-      .post('/api/v1/license-keys/imports')
+      .post(`/api/v1/license-lots/${lotId}/keys`)
       .set(h.as(h.it1))
       .send({
-        subscriptionId,
         keys: [`DRKEY-${randomUUID().replace(/-/g, '').slice(0, 16).toUpperCase()}`],
         maxActivations: 10,
       })
       .expect(201);
     const licenseKeyId = (
       await h.ctx.sql.query<{ id: string }>(
-        `SELECT id FROM license_keys WHERE subscription_id = $1 ORDER BY imported_at DESC, id DESC LIMIT 1`,
-        [subscriptionId],
+        `SELECT id FROM license_keys WHERE license_lot_id = $1 ORDER BY imported_at DESC, id DESC LIMIT 1`,
+        [lotId],
       )
     ).rows[0].id;
 

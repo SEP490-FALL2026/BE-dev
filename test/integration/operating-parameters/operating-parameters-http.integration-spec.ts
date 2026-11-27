@@ -146,6 +146,7 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
         'RENEWAL_WINDOW_DAYS',
         'FORECAST_ERROR_THRESHOLD_PERCENT',
         'BUDGET_RESERVE_DEFAULT_PERCENT',
+        'K2_INVOICE_VARIANCE_THRESHOLD_PERCENT',
         'PERSONNEL_NOTICE_REVIEW_WORKING_DAYS',
         'DEPARTURE_REVOCATION_WORKING_DAYS',
         'TRANSFER_GRACE_WORKING_DAYS',
@@ -159,6 +160,8 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
         'SUBSCRIPTION_ADJUSTMENT_DAYS_MONTHLY',
         'SUBSCRIPTION_ADJUSTMENT_DAYS_ANNUAL',
         'SUBSCRIPTION_RED_ALERT_DAYS_ANNUAL',
+        'SEAT_PURCHASE_INVOICE_DUE_WORKING_DAYS',
+        'SEAT_PURCHASE_LATE_INVOICE_DAYS',
         'ACTIVITY_WINDOW_MINUTES',
         'DETECTION_THRESHOLD_DAYS',
         'GHOST_SEAT_NEW_ASSIGNMENT_GRACE_DAYS',
@@ -546,8 +549,9 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
       // review of the new head after a transfer (TRANSFER_REVIEW_WORKING_DAYS, QĐ-110p), less the two ZBB thresholds that went with the
       // zero-based-budget explanation of a line (QĐ-111ab) and the list of alert days before the deadline (RENEWAL_ALERT_DAYS_BEFORE_DEADLINE,
       // S20-T9a), plus the three of the point of adjustment (S20-T9b),
-      // then AI_PROVIDER_MODE (QĐ-102f).
-      expect(parameters.size).toBe(30);
+      // then AI_PROVIDER_MODE (QĐ-102f), then the three of the invoice of a seat purchase of the shared pool (K2_INVOICE_VARIANCE_THRESHOLD_PERCENT,
+      // SEAT_PURCHASE_INVOICE_DUE_WORKING_DAYS, SEAT_PURCHASE_LATE_INVOICE_DAYS: the three parameters of SPEC.md for the invoice of the pool).
+      expect(parameters.size).toBe(33);
     });
 
     it('is 404 for a parameter that does not exist, the time zone included (AC-11)', async () => {

@@ -24,6 +24,7 @@ export interface YearStartCandidate {
   amountCurrency: string | null;
   /** The price of a seat per billing period the approval worked out at, in that currency (`unit_price_minor`, `billing_cycle` of the request). */
   unitPriceMinor: bigint | null;
+  monthlyPriceMinor?: bigint | null;
   billingCycle: BillingCycleCode | null;
 }
 
@@ -47,6 +48,7 @@ interface CandidateRow {
   next_year_amount_minor: bigint | null;
   amount_currency: string | null;
   unit_price_minor: bigint | null;
+  monthly_price_minor: bigint | null;
   billing_cycle: BillingCycleCode | null;
 }
 
@@ -191,7 +193,7 @@ export class YearStartCommitmentsRepo {
     const rows = await tx.$queryRaw<CandidateRow[]>`
       SELECT r."id", r."type"::text AS "type", r."state"::text AS "state", r."plan_id", r."department_id", r."expected_end_date",
              r."term_months", r."budget_year", r."next_year_amount_minor", r."amount_currency", r."unit_price_minor",
-             r."billing_cycle"::text AS "billing_cycle"
+             r."monthly_price_minor", r."billing_cycle"::text AS "billing_cycle"
         FROM "access_requests" r
        WHERE r."organization_id" = ${organizationId}::uuid
          AND r."type" IN ('GRANT', 'SERVICE_ACCOUNT', 'GROUP_GRANT', 'RENEWAL')
@@ -214,6 +216,7 @@ export class YearStartCommitmentsRepo {
       nextYearAmountMinor: row.next_year_amount_minor,
       amountCurrency: row.amount_currency,
       unitPriceMinor: row.unit_price_minor,
+      monthlyPriceMinor: row.amount_currency === DONG ? row.monthly_price_minor : null,
       billingCycle: row.billing_cycle,
     }));
   }
@@ -375,5 +378,63 @@ export class YearStartCommitmentsRepo {
     for (const row of rows) if (row.successorAssignmentId !== null) began.set(row.successorAssignmentId, row.requestId);
 
     return began;
+  }
+
+  /** Confirmed budget invoice ids grouped by `requestId`, for K1 annual 01/01 allocation application. */
+  async confirmedInvoiceIdsByRequests(tx: DbTx, requestIds: readonly string[]): Promise<Map<string, string[]>> {
+    if (requestIds.length === 0) return new Map();
+    const rows = await tx.purchaseInvoice.findMany({
+      where: {
+        requestId: { in: [...new Set(requestIds)] },
+        state: 'CONFIRMED',
+        invoiceId: { not: null },
+      },
+      select: { requestId: true, invoiceId: true },
+      orderBy: [{ serviceMonth: 'asc' }, { decidedAt: 'asc' }, { id: 'asc' }],
+    });
+    const byRequest = new Map<string, string[]>();
+    for (const row of rows) {
+      if (row.requestId === null || row.invoiceId === null) continue;
+      const list = byRequest.get(row.requestId) ?? [];
+      list.push(row.invoiceId);
+      byRequest.set(row.requestId, list);
+    }
+
+    return byRequest;
+  }
+
+  /** Transfer replacement links (`access_requests.replaces_assignment_id`) for K1 annual chain resolution (`F-7`). */
+  async replacedAssignments(
+    tx: DbTx,
+    candidates: readonly YearStartCandidate[],
+  ): Promise<{ requestId: string; assignmentId: string }[]> {
+    const ids = candidates.filter((candidate) => candidate.type !== 'RENEWAL').map((candidate) => candidate.id);
+    if (ids.length === 0) return [];
+    const rows = await tx.accessRequest.findMany({
+      where: { id: { in: ids }, replacesAssignmentId: { not: null } },
+      select: { id: true, replacesAssignmentId: true },
+      orderBy: { id: 'asc' },
+    });
+
+    return rows.flatMap((row) =>
+      row.replacesAssignmentId === null ? [] : [{ requestId: row.id, assignmentId: row.replacesAssignmentId }],
+    );
+  }
+
+  /** Renewal request ids whose `successorAssignmentId` is among `assignmentIds`, for K1 invoice lookup along chains. */
+  async renewalRequestIdsByAssignments(
+    tx: DbTx,
+    assignmentIds: readonly string[],
+  ): Promise<{ requestId: string; assignmentId: string }[]> {
+    if (assignmentIds.length === 0) return [];
+    const rows = await tx.accessRequestRenewal.findMany({
+      where: { successorAssignmentId: { in: [...new Set(assignmentIds)] } },
+      select: { requestId: true, successorAssignmentId: true },
+      orderBy: { requestId: 'asc' },
+    });
+
+    return rows.flatMap((row) =>
+      row.successorAssignmentId === null ? [] : [{ requestId: row.requestId, assignmentId: row.successorAssignmentId }],
+    );
   }
 }

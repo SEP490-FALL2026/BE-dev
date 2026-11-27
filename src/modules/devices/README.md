@@ -71,7 +71,7 @@ SHARE`, tầng `0b`), kèm phần mềm cài sẵn (`DEVICE_KEY`/`DEVICE_BUNDLED
 
 `0b` (`seat_baseline_states` `FOR SHARE` khi nhập hiện trạng) → `0c` (`device_code_counters`) → `1` (`employees` `FOR SHARE`) → `2b`
 (`managed_devices` `FOR UPDATE` theo `id` tăng dần → `device_registrations` `FOR UPDATE` → `device_return_tasks` `FOR UPDATE`) → `6`
-(`subscriptions` `FOR UPDATE`) → `6b` (`license_keys`) → `8` (`device_activations`). Phát hành thông báo: advisory lock đánh số → ghi
+(`subscriptions` `FOR UPDATE`) → `7b` (`license_keys`) → `8` (`device_activations`). Phát hành thông báo: advisory lock đánh số → ghi
 phiên bản → khóa mọi đăng ký mở theo `id`.
 
 ## Extension point

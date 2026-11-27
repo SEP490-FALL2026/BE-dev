@@ -1,16 +1,29 @@
-import type { DemoApplication, DemoPlan, DemoPlanTerms, DemoSeat, DemoSubscription } from '../demo-fixture.types';
+import type {
+  DemoApplication,
+  DemoLot,
+  DemoPlan,
+  DemoPlanTerms,
+  DemoSeat,
+  DemoSubscription,
+} from '../demo-fixture.types';
 import { app, groupOf, k2, k4, monthly } from './catalog-kit';
 
 export const RETIRED_APPLICATIONS = ['skype'];
 
 /** A per-seat plan bought one by one (K1): the control the company has over the seat is the one the vendor allows. */
-const k1 = (key: string, name: string, controlLevel: NonNullable<DemoPlan['controlLevel']>): DemoPlan => ({
+const k1 = (
+  key: string,
+  name: string,
+  controlLevel: NonNullable<DemoPlan['controlLevel']>,
+  extra: Pick<DemoPlan, 'referencePrice' | 'referenceCommitmentMonths'> = {},
+): DemoPlan => ({
   key,
   name,
   provisioningType: 'K1',
   controlLevel,
   dataLossOnRemoval: false,
   sharingPolicy: 'NOT_ALLOWED',
+  ...extra,
 });
 
 /*
@@ -55,8 +68,8 @@ export const EXTRA_APPLICATIONS: DemoApplication[] = [
     'Claude',
     'Anthropic',
     [
-      k1('claude-pro', 'Claude Pro', 'PARTIAL'),
-      // QĐ-113b: the vendor sells Claude Team in two kinds of seat, so each kind is a plan of its own and a workspace of its own.
+      k1('claude-pro', 'Claude Pro', 'PARTIAL', { referencePrice: '508000', referenceCommitmentMonths: 12 }),
+      // QĐ-113b: Claude Team holds two seat tiers (Standard & Premium) inside one workspace and one multi-line subscription.
       k2('claude-team-standard', 'Claude Team Standard'),
       k2('claude-team-premium', 'Claude Team Premium'),
     ],
@@ -67,7 +80,12 @@ export const EXTRA_APPLICATIONS: DemoApplication[] = [
     'copilot',
     'GitHub Copilot',
     'GitHub',
-    [k1('copilot-pro', 'GitHub Copilot Pro', 'UNCONTROLLABLE')],
+    [
+      k1('copilot-pro', 'GitHub Copilot Pro', 'UNCONTROLLABLE', {
+        referencePrice: '254000',
+        referenceCommitmentMonths: 1,
+      }),
+    ],
     'SAAS',
     'HIGH',
   ),
@@ -80,7 +98,7 @@ export const EXTRA_APPLICATIONS: DemoApplication[] = [
     k4('windows-11-pro-oem', 'Windows 11 Pro OEM', { keyBinding: 'DEVICE_BUNDLED' }),
   ]),
   app('office', 'Microsoft Office', 'Microsoft', [
-    k4('office-ltsc-2024', 'Office LTSC 2024', { keyBinding: 'DEVICE_KEY' }),
+    k4('office-home-business-2024', 'Office Home & Business 2024', { keyBinding: 'DEVICE_KEY' }),
   ]),
   app('hubspot', 'HubSpot Sales Hub', 'HubSpot', [k2('hubspot-starter', 'HubSpot Sales Hub Starter')], 'SAAS', 'HIGH'),
   {
@@ -126,54 +144,67 @@ const byMonth = (
   renewalInDays,
 });
 
-/** A K1 plan is bought seat by seat on each grant, so it starts with none; the vendor's dollar quote stays beside the price in dong (FX-1). */
-const k1Subscription = (key: string, amount: string, dollars: string): DemoSubscription => ({
-  ...monthly(key, key, amount, 'NV-ITA1', 0),
-  quantity: 0,
-  originalPrice: { amount: dollars, currency: 'USD' },
-});
-
-/** A key bought once, on a day in the past: its keys come from the key store. */
-const perpetual = (key: string, amount: string, quantity: number): DemoSubscription => ({
+/** Licenses bought once, on a day in the past, by the IT Admin who answers for them: a lot named by the key of its plan; its keys come from the key store. */
+const lot = (key: string, amount: string, licenseCount: number, purpose: DemoLot['purpose'] = 'STOCK'): DemoLot => ({
   key,
   plan: key,
-  kind: 'PERPETUAL',
+  licenseCount,
   unitPrice: { amount, currency: 'VND' },
-  billingCycle: 'MONTHLY',
-  termMonths: 1,
+  purpose,
+  purchasedDaysAgo: 200,
   responsible: 'NV-ITA1',
-  freeAfterBaseline: 0,
-  quantity,
 });
 
 /*
- * Seventeen subscriptions, one per plan but Skype (retired in S21) and the internal attendance plan. Their payment and renewal days are counted
- * from the day of the seed (SPEC 4.5) so that on that day and the next, some stand inside the window of SBF-20 and some outside it:
- * Zoom Pro, Confluence Standard and HubSpot are inside (monthly); Notion Plus, Confluence Premium (a declared deadline) and Adobe (red: its
- * deadline is in 5 days) are inside (annual); Microsoft 365, Notion Business and Photoshop are outside. Zoom Business's renewal day has passed
- * with the automatic renewal on, which the daily job records as an incident (§8). The two Claude Team subscriptions have no date at all.
+ * K2 subscriptions for the second set of apps (plus K4 lots below). K1 plans carry no subscription (only referencePrice & referenceCommitmentMonths on the plan).
+ * Zoom Business carries tier minimum 50 seats (150.000/month, annual). Claude Team is one subscription with two lines (Standard 10, Premium 2, minimumSeatsTotal 2, withoutDates).
  */
 export const EXTRA_SUBSCRIPTIONS: DemoSubscription[] = [
   byMonth('m365-basic', '150000', 'NV-ITA1', 5, 20),
   annual('m365-standard', '3800000', 'NV-ITA1', 2, { renewalInDays: 120 }),
   byMonth('zoom-pro', '360000', 'NV-ITA1', 3, 3),
-  annual('zoom-business', '5200000', 'NV-ITA1', 2, { renewalInDays: -3 }),
+  annual('zoom-business', '1800000', 'NV-ITA1', 49, { renewalInDays: -3, minimumSeats: 50 }),
   byMonth('notion-business', '500000', 'NV-ITA2', 4, 10),
   annual('notion-plus', '2900000', 'NV-ITA2', 2, { renewalInDays: 45 }),
   byMonth('confluence-standard', '160000', 'NV-ITA1', 4, 5),
   annual('confluence-premium', '3700000', 'NV-ITA1', 2, { renewalInDays: 70, noticeDeadlineInDays: 25 }),
   annual('adobe-cc-teams', '22000000', 'NV-ITA2', 3, { renewalInDays: 35 }),
   byMonth('adobe-photoshop', '560000', 'NV-ITA2', 2, 25),
-  k1Subscription('claude-pro', '508000', '20'),
-  // QĐ-113b: two workspaces, two subscriptions, each with its own price: a Standard seat is 500.000 a month billed by the year, a Premium one 2.500.000.
-  annual('claude-team-standard', '6000000', 'NV-ITA1', 2, { withoutDates: true }),
-  annual('claude-team-premium', '30000000', 'NV-ITA1', 1, { withoutDates: true }),
-  k1Subscription('copilot-pro', '254000', '10'),
-  perpetual('visio-pro', '13000000', 3),
-  perpetual('sublime-license', '2500000', 2),
-  // 25 licenses bought once, run on machines through one key of 30 activations (W2-25).
-  perpetual('office-ltsc-2024', '3500000', 25),
+  {
+    key: 'claude-team',
+    kind: 'TERM',
+    billingCycle: 'ANNUAL',
+    termMonths: 12,
+    withoutDates: true,
+    autoRenew: false,
+    minimumSeatsTotal: 2,
+    responsible: 'NV-ITA1',
+    freeAfterBaseline: 0,
+    lines: [
+      {
+        plan: 'claude-team-standard',
+        monthlyUnitPrice: { amount: '500000', currency: 'VND' },
+        freeAfterBaseline: 8,
+      },
+      {
+        plan: 'claude-team-premium',
+        monthlyUnitPrice: { amount: '2500000', currency: 'VND' },
+        quantity: 2,
+      },
+    ],
+  },
   byMonth('hubspot-starter', '450000', 'NV-ITA1', 2, 1),
+];
+
+/**
+ * The lots of licenses of the K4 plans of this file, made through `POST /license-lots`. Windows 11 Pro OEM has none: its key comes with the
+ * machine (`DEVICE_BUNDLED`).
+ */
+export const EXTRA_LOTS: DemoLot[] = [
+  lot('visio-pro', '13000000', 3),
+  lot('sublime-license', '2500000', 2),
+  // 25 licenses bought once and kept in stock, run on machines through one key of 30 activations (W2-25).
+  lot('office-home-business-2024', '3500000', 25, 'STOCK'),
 ];
 
 /*
@@ -223,13 +254,16 @@ const seatsOf = (subscription: string, holders: string[], extra: Partial<DemoSea
  * HubSpot) are old enough to be judged. Two seats ended already and are still held: the queue of rights that ended shows them.
  */
 export const EXTRA_SEATS: DemoSeat[] = [
-  ...seatsOf('m365-basic', ['NV-FINH', 'NV-DEP', 'NV-ITOH']),
+  ...seatsOf('m365-basic', ['NV-DEP', 'NV-ITOH']),
+  ...seatsOf('m365-basic', ['NV-FINH'], { grantedDaysAgo: 0 }),
   ...seatsOf('m365-basic', ['NV-DEV5', 'NV-ITO1', 'NV-BOD1'], { grantedDaysAgo: 300 }),
   ...seatsOf('m365-basic', ['NV-DEV6', 'NV-ITO2', 'NV-BOD2'], { grantedDaysAgo: 240 }),
-  ...seatsOf('m365-basic', ['NV-FIN2', 'NV-BOD3'], { grantedDaysAgo: 180 }),
+  ...seatsOf('m365-basic', ['NV-BOD3'], { grantedDaysAgo: 180 }),
+  ...seatsOf('m365-basic', ['NV-FIN2'], { grantedDaysAgo: 0 }),
   ...seatsOf('m365-basic', ['NV-OPS2'], { grantedDaysAgo: 120 }),
   ...seatsOf('m365-basic', ['NV-DEV7'], { grantedDaysAgo: 60 }),
-  ...seatsOf('m365-standard', ['NV-FINH', 'NV-DEP']),
+  ...seatsOf('m365-standard', ['NV-DEP']),
+  ...seatsOf('m365-standard', ['NV-FINH'], { grantedDaysAgo: 0 }),
   ...seatsOf('zoom-pro', ['NV-SAL3'], { grantedDaysAgo: 180 }),
   ...seatsOf('zoom-pro', ['NV-BOD4'], { grantedDaysAgo: 120 }),
   ...seatsOf('zoom-pro', ['NV-BOD1'], { grantedDaysAgo: 60 }),
@@ -248,9 +282,8 @@ export const EXTRA_SEATS: DemoSeat[] = [
   ...seatsOf('adobe-cc-teams', ['NV-BOD5'], { grantedDaysAgo: 300 }),
   ...seatsOf('adobe-cc-teams', ['NV-BOD4', 'NV-BOD6'], { grantedDaysAgo: 240 }),
   ...seatsOf('adobe-photoshop', ['NV-BOD2'], { grantedDaysAgo: 120 }),
-  // The three seats of Claude Team are split between the two workspaces: no person is in both (QĐ-113b).
-  ...seatsOf('claude-team-premium', ['NV-DEV5'], { grantedDaysAgo: 180 }),
-  ...seatsOf('claude-team-standard', ['NV-DEV6', 'NV-ITO1'], { grantedDaysAgo: 120 }),
+  // Baseline seats on line 1 (Claude Team Standard) of the merged Claude Team subscription; NV-DEV5 holds Premium via R63.
+  ...seatsOf('claude-team', ['NV-DEV6', 'NV-ITO1'], { grantedDaysAgo: 120 }),
   ...seatsOf('hubspot-starter', ['NV-SALH']),
   ...seatsOf('hubspot-starter', ['NV-SAL3', 'NV-SAL4'], { grantedDaysAgo: 120 }),
 ];

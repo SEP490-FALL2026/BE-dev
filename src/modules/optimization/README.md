@@ -26,7 +26,7 @@ operating-parameters, notifications, audit. Được dùng bởi: `dashboards` (
 - `rule-run/` — lượt chạy: claim `INSERT … ON CONFLICT DO NOTHING`, nhận lại sau 2 giờ khi `attempt < 3`, khóa kỳ theo ngày/tuần
   (`RULE_SCHEDULE_G1_G2`), lý do bỏ qua (`rule-run-skip-detail.json.ts`). Mọi lượt (lịch hay chạy tay) giữ session advisory lock
   `ghost-seat-rule-run:<tổ chức>:<bộ luật>` (`ruleRunLockName`) suốt lượt; lượt chạy tay có kỳ riêng `MANUAL-<ISO instant>` (`manualPeriodKeyOf`).
-- `internal-rules/` — `G1` (`internal-rules-g1.service.ts`), `G2` + dọn (`internal-rules-g2.service.ts`), luật thuần (`internal-rules.policy.ts`),
+- `internal-rules/` — `G1` (`internal-rules-g1.service.ts` nhận cả thuê bao `K2` `PER_SEAT` và lô `K4` `ACCOUNT` với `countsTowardVacantCost = false`, loại gói `DEVICE_KEY`/`DEVICE_BUNDLED`), `G2` + dọn (`internal-rules-g2.service.ts`, hỗ trợ quyền cá nhân từ thuê bao lẫn lô `K4` `ACCOUNT`), luật thuần (`internal-rules.policy.ts`),
   điểm vào của lượt (`internal-rules.service.ts`), job (`internal-rules.job.ts`, `InternalRulesSweeper`).
 - `board/` — HTTP: `ghostSeatRecommendationList`/`Get` (bảng, lọc `group`/`tier`/`state`/`applicationId`/`departmentScope MINE|ALL`), `ghostSeatOptimizationSummaryGet`
   (bốn nhóm tách riêng + `limitation` phần mềm nội bộ), `ghostSeatRecommendationReclaim` (mở thu hồi `G2` qua `LicensingApi.openRevocation`, nguồn
@@ -57,11 +57,11 @@ operating-parameters, notifications, audit. Được dùng bởi: `dashboards` (
   HTTP: `ghostSeatEscalationCreate` (`POST /ghost-seat-recommendations/escalations`, IT_ADMIN, kết quả từng mục, mục không đẩy được không làm lô lỗi). Lượt tuần tạo dòng `MONITOR` (tầng _Theo dõi_ 30–59 ngày, `G3`/`G4`, chỉ IT Admin thấy, không định tuyến, không thông báo; lên `REVIEW` cùng dòng khi đủ 60 ngày) để đẩy sớm có đối tượng (`QĐ-111ay`, `FR-4.12`): xem OVERNIGHT-DECISIONS `D-73` (đã đổi sang phương án B ở FIX-B3 `B3A-01`, `D-87`).
 
 - `usage-rules/` (L3 vì nhóm `threshold/` có controller; không ai import) — `G3`/`G4` hằng tuần (`qd103-ghost-seat-g3-g4`): `usage-rules.service.ts` (lượt `RULE_SCHEDULE_G3_G4`,
-  `rule_set = G3_G4`), `usage-rules-context.service.ts` (đọc một lần: bàn giao, điều chuyển, miễn trừ, khuyến nghị có sẵn; mỗi ứng dụng một `evidenceFor`),
+  `rule_set = G3_G4`, bỏ `K5` và chỉ xét `K4` `ACCOUNT` — loại `DEVICE_KEY`/`DEVICE_BUNDLED`), `usage-rules-context.service.ts` (đọc một lần: bàn giao, điều chuyển, miễn trừ, khuyến nghị có sẵn; mỗi ứng dụng một `evidenceFor`),
   `usage-rules-seat.service.ts` (một seat một transaction), `usage-gates.policy.ts` (cổng 2–4, thời hạn ≤ 1 tháng, miễn trừ, thu hồi, ba trạng thái
   `NO_DATA`/`UNMATCHED_IDENTITY`/`INSUFFICIENT_EVIDENCE`, năng lực nguồn, cổng 5 bao phủ), `usage-assessment.policy.ts` (đếm ngày theo **ngày bao phủ**: hợp các cửa
   sổ báo cáo tươi từ ngày dùng được, trừ nghỉ dài; ngưỡng ứng dụng > tham số tổ chức > 30/60/90), `confidence.policy.ts` (CF-1…CF-7, `HIGH/MEDIUM/LOW`, không %),
-  `usage-evidence-snapshot.policy.ts` (bằng chứng chụp lại, không khối lượng), `potential-saving.policy.ts`, `usage-negation.service.ts` + `usage-import.listener.ts`
+  `usage-evidence-snapshot.policy.ts` (bằng chứng chụp lại, không khối lượng), `potential-saving.policy.ts` (`amountAtPoint = seats × monthly × T`, `K2` tính `realisableOn = earliestReducibleOn` và `RENEWAL` 12 tháng / `NEXT_BILLING` 1 tháng, `K1` tính theo `commitmentTermMonths` `1 | 12` và `billingAnchorOn` cho `NEXT_BILLING`, `K4` giữ `realisableAt = 'NEVER'`), `usage-negation.service.ts` + `usage-import.listener.ts`
   (hoạt động mới ⟹ `NEGATED` ngay khi xác nhận báo cáo; đã quyết thu hồi thì chỉ đặt `activity_after_decision_on`), `usage-stale-notice.service.ts`
   (`USAGE_SOURCE_STALE`), `threshold/` (`ghostSeatThresholdList` SUPER_ADMIN/IT_ADMIN, `Set`/`Delete` SUPER_ADMIN). `board/` thêm `ghostSeatSeatStateList` và khối
   `usage` của tóm tắt; bảng trạng thái seat (`ghost_seat_seat_states`) ở `ghost-seat/ghost-seat-seat-state.repo.ts` (L0).
@@ -98,7 +98,7 @@ khóa tác vụ) nên chọn khuyến nghị `FOR UPDATE SKIP LOCKED`; khuyến 
 
 ## TẠM CHỌN của module (chờ Owner / hạng mục sau)
 
-Kho `K4` chưa hỗ trợ (không sinh `G1`); không điểm điều chỉnh và không `nextAdjustmentPoint`; `leftOn` trong bằng chứng `G2` là `null` (chưa có facade ngày nghỉ
+Lô `K4` `DEVICE_KEY`/`DEVICE_BUNDLED` không sinh `G1`–`G4` (chỉ `K4` `ACCOUNT`); `leftOn` trong bằng chứng `G2` là `null` (chưa có facade ngày nghỉ
 việc), `holder_left_on` là ngày lượt chạy phát hiện; thông báo `GHOST_SEAT_G2_DETECTED` mang `recommendationId`, `employeeId`, `applicationId` (quy tắc của hộp thư:
 chỉ gọi người bằng id); enum khai sớm `G3`/`G4`, `PAUSED`, `KEPT`/`NEGATED`/`TRANSFER_SEAT_REVOKED` để luật thay thế `G2` và `KPI-5` chạy được trên DB thật.
 
@@ -110,11 +110,8 @@ chưa đăng ký `RevocationDecisionContributions` (W5 chưa có).
 
 ## TẠM CHỌN của `qd103-ghost-seat-g3-g4`
 
-Xem Verification trong [plan](../../../docs/workspace/items/qd103-ghost-seat-g3-g4/plan.md): chưa có W4/W5 ⟹ `potentialSaving.realisableOn = null`, `realisableAt = 'UNKNOWN'`; `K4`/`K5` bỏ khỏi lượt;
-giá đọc qua `CatalogApi.getPlanPrice` (không thêm `LicensingApi.getSeatPricingFacts`); thông báo `USAGE_SOURCE_STALE` mang `applicationId`, `source`, `coverageTo`, `freshnessDays`
-tới IT Admin đầu tiên dùng được; `EvidenceSource.windows` thêm vào `UsageEvidenceApi` để đếm khoảng hở giữa các báo cáo.
+Xem Verification trong [plan](../../../docs/workspace/items/qd103-ghost-seat-g3-g4/plan.md): giá đọc qua `CatalogApi.getPlanPrice` (không thêm `LicensingApi.getSeatPricingFacts`); thông báo `USAGE_SOURCE_STALE` mang `applicationId`, `source`, `coverageTo`, `freshnessDays` tới IT Admin đầu tiên dùng được; `EvidenceSource.windows` thêm vào `UsageEvidenceApi` để đếm khoảng hở giữa các báo cáo.
 
 ## Chưa làm
 
-kho `K4` (chờ key pool), điểm điều
-chỉnh (`nextAdjustmentPoint`), `notBefore` của tác vụ (chờ `qd103-revocation-grace-notice`).
+Tích hợp `UsageEvidenceApi` thực tế của G7 (khi chưa kết nối nguồn bên ngoài, các seat `G3`/`G4` đánh giá theo dữ liệu bao phủ có sẵn).

@@ -133,6 +133,7 @@ export interface DetailFacts {
   budgetSnapshot: ApprovalDetailWire['budgetSnapshot'];
   nextYearBudget: ApprovalDetailWire['nextYearBudget'];
   annualVendorAmount: ApprovalDetailWire['annualVendorAmount'];
+  vendorChargeUntilRenewal?: ApprovalDetailWire['vendorChargeUntilRenewal'];
 }
 
 /** What the budget snapshot is made of: the year a check read, what the check said, and the confirmation that opened the step. */
@@ -282,5 +283,6 @@ export function approvalDetailOf(facts: DetailFacts): ApprovalDetailWire {
     budgetSnapshot: facts.budgetSnapshot,
     nextYearBudget: facts.nextYearBudget,
     annualVendorAmount: facts.annualVendorAmount,
+    ...(facts.vendorChargeUntilRenewal ? { vendorChargeUntilRenewal: facts.vendorChargeUntilRenewal } : {}),
   };
 }

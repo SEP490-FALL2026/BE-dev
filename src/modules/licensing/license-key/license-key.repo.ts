@@ -3,10 +3,29 @@ import { Prisma, type LicenseKeyStatus } from '../../../generated/prisma/client'
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 
+/**
+ * The purchase a key belongs to: its lot, and for a key that was entered before lots existed (or against a subscription a lot was born from, which
+ * has the same id) its subscription. Everything that asks "the keys of this purchase" reads both columns, so it is right before and after M6.
+ */
+function purchaseIdOf(row: { licenseLotId: string | null; subscriptionId: string | null }): string {
+  const purchaseId = row.licenseLotId ?? row.subscriptionId;
+  if (purchaseId === null) throw new Error('A license key belongs to a lot or a subscription.');
+
+  return purchaseId;
+}
+
+/** The keys of a purchase, by the lot or by the subscription. */
+const ofPurchase = (purchaseId: string): Prisma.LicenseKeyWhereInput => ({
+  OR: [{ licenseLotId: purchaseId }, { subscriptionId: purchaseId }],
+});
+
 /** A key of the vault as a list shows it: never the key itself, its fingerprint or its ciphertext. */
 export interface LicenseKeyListed {
   id: string;
+  /** The purchase of the key: its lot, or the subscription of wave 2 for a key with no lot. */
   subscriptionId: string;
+  /** The lot the key belongs to. */
+  licenseLotId: string | null;
   masked: string;
   status: LicenseKeyStatus;
   importedAt: Date;
@@ -33,6 +52,8 @@ export interface LicenseKeyActivationCounts {
 export interface LicenseKeyHeld {
   id: string;
   subscriptionId: string;
+  licenseLotId: string | null;
+  costBorne: boolean;
   status: LicenseKeyStatus;
   assignmentId: string | null;
   withdrawnAt: Date | null;
@@ -43,6 +64,7 @@ export interface LicenseKeyHeld {
 const LISTED = {
   id: true,
   subscriptionId: true,
+  licenseLotId: true,
   masked: true,
   status: true,
   importedAt: true,
@@ -67,7 +89,12 @@ export interface LicenseKeySealed {
 export interface NewLicenseKey {
   id: string;
   organizationId: string;
-  subscriptionId: string;
+  /** The subscription the key is entered against; a key of a lot that came from no subscription has none. */
+  subscriptionId?: string | null;
+  /** The lot of the key; a key entered against a subscription a lot was born from takes that lot in the database. */
+  licenseLotId?: string | null;
+  /** Who bears the cost: false for a key bought for a request, true for the others (the default of the keys entered for an opening). */
+  costBorne?: boolean;
   fingerprint: string;
   masked: string;
   ciphertext: Buffer;
@@ -94,7 +121,11 @@ export class LicenseKeyRepo {
   async insertManyIfNew(tx: DbTx, keys: readonly NewLicenseKey[]): Promise<Set<string>> {
     if (keys.length === 0) return new Set();
     const kept = await tx.licenseKey.createManyAndReturn({
-      data: keys.map((key) => ({ ...key, ciphertext: new Uint8Array(key.ciphertext) })),
+      data: keys.map((key) => ({
+        ...key,
+        costBorne: key.costBorne ?? true,
+        ciphertext: new Uint8Array(key.ciphertext),
+      })),
       skipDuplicates: true,
       select: { id: true },
     });
@@ -102,9 +133,20 @@ export class LicenseKeyRepo {
     return new Set(kept.map((row) => row.id));
   }
 
+  /** Which of these key fingerprints already exist in the organization's vault. */
+  async existingFingerprints(tx: DbTx, organizationId: string, fingerprints: readonly string[]): Promise<Set<string>> {
+    if (fingerprints.length === 0) return new Set();
+    const rows = await tx.licenseKey.findMany({
+      where: { organizationId, fingerprint: { in: [...fingerprints] } },
+      select: { fingerprint: true },
+    });
+
+    return new Set(rows.map((row) => row.fingerprint));
+  }
+
   /** The keys of the purchase that are in use or can still be given out: assigned, or in the store and not withdrawn. */
   countUsable(subscriptionId: string, tx?: DbTx): Promise<number> {
-    return (tx ?? this.prisma).licenseKey.count({ where: { subscriptionId, withdrawnAt: null } });
+    return (tx ?? this.prisma).licenseKey.count({ where: { ...ofPurchase(subscriptionId), withdrawnAt: null } });
   }
 
   /**
@@ -119,13 +161,13 @@ export class LicenseKeyRepo {
     const rows = await this.prisma.$queryRaw<
       { subscription_id: string; in_store: bigint; assigned: bigint; withdrawn: bigint }[]
     >`
-      SELECT "subscription_id" AS subscription_id,
+      SELECT COALESCE("license_lot_id", "subscription_id") AS subscription_id,
              count(*) FILTER (WHERE "status" = 'IN_STORE' AND "withdrawn_at" IS NULL) AS in_store,
              count(*) FILTER (WHERE "status" = 'ASSIGNED') AS assigned,
              count(*) FILTER (WHERE "withdrawn_at" IS NOT NULL) AS withdrawn
         FROM "license_keys"
-       WHERE "subscription_id" = ANY(${[...subscriptionIds]}::uuid[])
-       GROUP BY "subscription_id"`;
+       WHERE COALESCE("license_lot_id", "subscription_id") = ANY(${[...subscriptionIds]}::uuid[])
+       GROUP BY COALESCE("license_lot_id", "subscription_id")`;
     for (const row of rows) {
       result.set(row.subscription_id, {
         inStore: Number(row.in_store),
@@ -156,27 +198,28 @@ export class LicenseKeyRepo {
     deviceOccupied: number;
     counts: Map<string, LicenseKeyActivationCounts>;
   }> {
-    const where = {
-      subscriptionId: input.subscriptionId,
+    const where: Prisma.LicenseKeyWhereInput = {
+      ...ofPurchase(input.subscriptionId),
       ...(input.status ? { status: input.status } : {}),
       ...(input.withdrawn === undefined ? {} : { withdrawnAt: input.withdrawn ? { not: null } : null }),
     };
 
     return this.prisma.$transaction(
       async (tx) => {
-        const items = await tx.licenseKey.findMany({
+        const rows = await tx.licenseKey.findMany({
           where,
           orderBy: [{ importedAt: 'asc' }, { id: 'asc' }],
           skip: input.skip,
           take: input.take,
           select: LISTED,
         });
+        const items = rows.map(listed);
 
         return {
           items,
           total: await tx.licenseKey.count({ where }),
           usable: await this.countUsable(input.subscriptionId, tx),
-          assigned: await tx.licenseKey.count({ where: { subscriptionId: input.subscriptionId, status: 'ASSIGNED' } }),
+          assigned: await tx.licenseKey.count({ where: { ...ofPurchase(input.subscriptionId), status: 'ASSIGNED' } }),
           deviceOccupied: await this.deviceOccupiedOf(input.subscriptionId, tx),
           counts: await this.activationCountsOf(
             items.map((item) => item.id),
@@ -231,12 +274,12 @@ export class LicenseKeyRepo {
 
   /** How many keys of the purchase are given to a seat. */
   countAssigned(subscriptionId: string, tx?: DbTx): Promise<number> {
-    return (tx ?? this.prisma).licenseKey.count({ where: { subscriptionId, status: 'ASSIGNED' } });
+    return (tx ?? this.prisma).licenseKey.count({ where: { ...ofPurchase(subscriptionId), status: 'ASSIGNED' } });
   }
 
   /** Raises the cap of activations of the key and answers it as a list shows it; the caller holds the row and judged the new cap. */
-  raiseMaxActivations(tx: DbTx, id: string, maxActivations: number): Promise<LicenseKeyListed> {
-    return tx.licenseKey.update({ where: { id }, data: { maxActivations }, select: LISTED });
+  async raiseMaxActivations(tx: DbTx, id: string, maxActivations: number): Promise<LicenseKeyListed> {
+    return listed(await tx.licenseKey.update({ where: { id }, data: { maxActivations }, select: LISTED }));
   }
 
   async findSealed(tx: DbTx, id: string): Promise<LicenseKeySealed | null> {
@@ -245,6 +288,7 @@ export class LicenseKeyRepo {
       select: {
         id: true,
         subscriptionId: true,
+        licenseLotId: true,
         cipherKeyId: true,
         ciphertext: true,
         assignmentId: true,
@@ -252,20 +296,30 @@ export class LicenseKeyRepo {
       },
     });
 
-    return row ? { ...row, ciphertext: Buffer.from(row.ciphertext) } : null;
+    return row
+      ? {
+          id: row.id,
+          subscriptionId: purchaseIdOf(row),
+          cipherKeyId: row.cipherKeyId,
+          ciphertext: Buffer.from(row.ciphertext),
+          assignmentId: row.assignmentId,
+          withdrawnAt: row.withdrawnAt,
+        }
+      : null;
   }
 
   /** The purchase of a key, read without a lock: what the caller locks first, before the key (`licenseKeyImport` order). */
   async subscriptionOf(tx: DbTx, id: string): Promise<string | null> {
-    const row = await tx.licenseKey.findUnique({ where: { id }, select: { subscriptionId: true } });
+    const row = await tx.licenseKey.findUnique({ where: { id }, select: { subscriptionId: true, licenseLotId: true } });
 
-    return row?.subscriptionId ?? null;
+    return row ? purchaseIdOf(row) : null;
   }
 
   /** The key, locked for the transaction (`FOR UPDATE`): two IT Admins who give or withdraw the same key are served one after the other. */
   async lock(tx: DbTx, id: string): Promise<LicenseKeyHeld | null> {
     const rows = await tx.$queryRaw<LicenseKeyHeldRow[]>`
-      SELECT "id", "subscription_id", "status"::text AS "status", "assignment_id", "withdrawn_at", "max_activations", "updated_at"
+      SELECT "id", COALESCE("license_lot_id", "subscription_id") AS "subscription_id", "license_lot_id", "cost_borne",
+             "status"::text AS "status", "assignment_id", "withdrawn_at", "max_activations", "updated_at"
         FROM "license_keys" WHERE "id" = ${id}::uuid FOR UPDATE`;
 
     return rows[0] ? held(rows[0]) : null;
@@ -274,7 +328,8 @@ export class LicenseKeyRepo {
   /** The key given to the assignment, locked for the transaction; null when the seat holds none (one granted before the key pool). */
   async lockOfAssignment(tx: DbTx, assignmentId: string): Promise<LicenseKeyHeld | null> {
     const rows = await tx.$queryRaw<LicenseKeyHeldRow[]>`
-      SELECT "id", "subscription_id", "status"::text AS "status", "assignment_id", "withdrawn_at", "max_activations", "updated_at"
+      SELECT "id", COALESCE("license_lot_id", "subscription_id") AS "subscription_id", "license_lot_id", "cost_borne",
+             "status"::text AS "status", "assignment_id", "withdrawn_at", "max_activations", "updated_at"
         FROM "license_keys" WHERE "assignment_id" = ${assignmentId}::uuid FOR UPDATE`;
 
     return rows[0] ? held(rows[0]) : null;
@@ -283,6 +338,14 @@ export class LicenseKeyRepo {
   /** Gives the key to the assignment. */
   async assign(tx: DbTx, id: string, assignmentId: string): Promise<void> {
     await tx.licenseKey.update({ where: { id }, data: { status: 'ASSIGNED', assignmentId } });
+  }
+
+  /** Marks the key's cost as borne (`false -> true` one-way transition enforced by trigger). */
+  async markCostBorne(tx: DbTx, id: string): Promise<void> {
+    await tx.licenseKey.updateMany({
+      where: { id, costBorne: false },
+      data: { costBorne: true },
+    });
   }
 
   /** Puts the key back in the store, withdrawn from it at once when a withdrawal is given: one write, so it is never free in between. */
@@ -302,18 +365,20 @@ export class LicenseKeyRepo {
   }
 
   /** Withdraws a free key from the store, with its reason, and answers it as a list shows it. */
-  withdraw(
+  async withdraw(
     tx: DbTx,
     id: string,
     withdrawal: { at: Date; byAppUserId: string; reason: string },
   ): Promise<LicenseKeyListed> {
-    return tx.licenseKey.update({ where: { id }, data: withdrawalData(withdrawal), select: LISTED });
+    return listed(await tx.licenseKey.update({ where: { id }, data: withdrawalData(withdrawal), select: LISTED }));
   }
 }
 
 interface LicenseKeyHeldRow {
   id: string;
   subscription_id: string;
+  license_lot_id: string | null;
+  cost_borne: boolean;
   status: LicenseKeyStatus;
   assignment_id: string | null;
   withdrawn_at: Date | null;
@@ -321,9 +386,27 @@ interface LicenseKeyHeldRow {
   updated_at: Date;
 }
 
+/** A row of the list as the list shows it: the purchase of the key is its lot or its subscription. */
+const listed = (row: Prisma.LicenseKeyGetPayload<{ select: typeof LISTED }>): LicenseKeyListed => ({
+  id: row.id,
+  subscriptionId: purchaseIdOf(row),
+  licenseLotId: row.licenseLotId,
+  masked: row.masked,
+  status: row.status,
+  importedAt: row.importedAt,
+  assignmentId: row.assignmentId,
+  withdrawnAt: row.withdrawnAt,
+  withdrawalReason: row.withdrawalReason,
+  maxActivations: row.maxActivations,
+  initialActivationsUsed: row.initialActivationsUsed,
+  updatedAt: row.updatedAt,
+});
+
 const held = (row: LicenseKeyHeldRow): LicenseKeyHeld => ({
   id: row.id,
   subscriptionId: row.subscription_id,
+  licenseLotId: row.license_lot_id,
+  costBorne: row.cost_borne,
   status: row.status,
   assignmentId: row.assignment_id,
   withdrawnAt: row.withdrawn_at,

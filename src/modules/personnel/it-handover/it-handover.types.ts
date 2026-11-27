@@ -24,7 +24,16 @@ export interface HandoverItem {
   organizationId: string;
   subscriptionsAtRecord: number;
   applicationsAtRecord: number;
-  done: { at: Date; toEmployeeId: string; subscriptions: number; applications: number } | null;
+  workspacesAtRecord: number;
+  licenseLotsAtRecord: number;
+  done: {
+    at: Date;
+    toEmployeeId: string;
+    subscriptions: number;
+    applications: number;
+    workspaces: number;
+    licenseLots: number;
+  } | null;
 }
 
 /**

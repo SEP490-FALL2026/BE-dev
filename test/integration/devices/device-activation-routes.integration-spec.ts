@@ -58,28 +58,26 @@ describe('device activation routes & bundled intake (integration, real PostgreSQ
     ).id;
   };
 
-  const purchaseOf = async (planId: string, purchasedQuantity: number): Promise<string> =>
+  const purchaseOf = async (planId: string, licenseCount: number): Promise<string> =>
     h.dataOf<{ id: string }>(
       await request(server())
-        .post('/api/v1/subscriptions')
+        .post('/api/v1/license-lots')
         .set(as(h.it1))
         .send({
           planId,
-          kind: 'PERPETUAL',
-          purchasedQuantity,
+          purpose: 'STOCK',
+          licenseCount,
           unitPrice: { amount: '1500000', currency: 'VND' },
-          startDate: '2026-03-15',
-          responsibleItAdminEmployeeId: h.it1.employeeId,
+          purchasedOn: '2026-03-15',
         })
         .expect(201),
     ).id;
 
-  const importKey = async (subscriptionId: string, maxActivations: number): Promise<string> => {
+  const importKey = async (lotId: string, maxActivations: number): Promise<string> => {
     await request(server())
-      .post('/api/v1/license-keys/imports')
+      .post(`/api/v1/license-lots/${lotId}/keys`)
       .set(as(h.it1))
       .send({
-        subscriptionId,
         keys: [`KEY-${randomUUID().replace(/-/g, '').slice(0, 20).toUpperCase()}`],
         maxActivations,
       })
@@ -87,8 +85,8 @@ describe('device activation routes & bundled intake (integration, real PostgreSQ
 
     return (
       await h.ctx.sql.query<{ id: string }>(
-        `SELECT id FROM license_keys WHERE subscription_id = $1 ORDER BY imported_at DESC, id DESC LIMIT 1`,
-        [subscriptionId],
+        `SELECT id FROM license_keys WHERE license_lot_id = $1 ORDER BY imported_at DESC, id DESC LIMIT 1`,
+        [lotId],
       )
     ).rows[0].id;
   };
@@ -107,10 +105,10 @@ describe('device activation routes & bundled intake (integration, real PostgreSQ
     await h.stop();
   });
 
-  it('activates DEVICE_KEY over HTTP with H17 enforcement, over-cap allowance, lot-full 409, quantity guard 422, and subscription occupancy', async () => {
+  it('activates DEVICE_KEY over HTTP with H17 enforcement, over-cap allowance, lot-full 409, and lot occupancy', async () => {
     const planId = await planOf('DEVICE_KEY');
-    const subscriptionId = await purchaseOf(planId, 2);
-    const keyId = await importKey(subscriptionId, 1);
+    const lotId = await purchaseOf(planId, 2);
+    const keyId = await importKey(lotId, 1);
 
     const held = await h.registered(h.employee.employeeId);
     const inStock1 = h.dataOf<DeviceWire>(
@@ -136,21 +134,10 @@ describe('device activation routes & bundled intake (integration, real PostgreSQ
     const third = await h.activateDevice(inStock2.id, { planId, licenseKeyId: keyId }, h.it1).expect(409);
     expect(h.codeOf(third)).toBe('DEVICE_ACTIVATION.LOT_FULL');
 
-    const seatUsage = h.dataOf<{ occupied: number }>(
-      await request(server()).get(`/api/v1/subscriptions/${subscriptionId}/seat-usage`).set(as(h.it1)).expect(200),
+    const lot = h.dataOf<{ assigned: number; free: number }>(
+      await request(server()).get(`/api/v1/license-lots/${lotId}`).set(as(h.it1)).expect(200),
     );
-    expect(seatUsage.occupied).toBe(2);
-
-    const sub = h.dataOf<{ updatedAt: string }>(
-      await request(server()).get(`/api/v1/subscriptions/${subscriptionId}`).set(as(h.it1)).expect(200),
-    );
-
-    const reduce = await request(server())
-      .patch(`/api/v1/subscriptions/${subscriptionId}`)
-      .set(as(h.it1))
-      .send({ expectedUpdatedAt: sub.updatedAt, purchasedQuantity: 1 })
-      .expect(422);
-    expect(h.codeOf(reduce)).toBe('SUBSCRIPTION.QUANTITY_BELOW_OCCUPIED');
+    expect(lot).toMatchObject({ assigned: 2, free: 0 });
   });
 
   it('rejects NOT_USABLE (both DEVICE_KEY and DEVICE_BUNDLED) and AWAITING_RETURN (DEVICE_KEY)', async () => {
@@ -268,10 +255,10 @@ describe('device activation routes & bundled intake (integration, real PostgreSQ
 
     // (b) Deactivate with LOST_WITH_DEVICE keeps lot occupied.
     await deactivateActivation(moved.activation.id, { licenseRelease: 'LOST_WITH_DEVICE' }).expect(201);
-    const sub = h.dataOf<{ occupied: number }>(
-      await request(server()).get(`/api/v1/subscriptions/${subId}/seat-usage`).set(as(h.it1)).expect(200),
+    const lot = h.dataOf<{ assigned: number }>(
+      await request(server()).get(`/api/v1/license-lots/${subId}`).set(as(h.it1)).expect(200),
     );
-    expect(sub.occupied).toBe(2);
+    expect(lot.assigned).toBe(2);
 
     // (d) Deactivating an already closed activation fails with 409.
     const alreadyClosed = await deactivateActivation(a1.activation.id).expect(409);

@@ -4,8 +4,8 @@ const OWNER = 'api-list-detail-contract-remediation';
 
 /**
  * The nested arrays of a purchase invoice added by `PI-1.4` (`QĐ-111u`, `QĐ-111w`): the files that came with it and the marks laid on it. The
- * files are at most PURCHASE_INVOICE_DOCUMENTS_MAX (20) and the marks at most PURCHASE_INVOICE_FLAGS_MAX (2: over what was approved, outside the term),
- * both the `maxItems` of the schema, so none of them grows the answer.
+ * files are at most PURCHASE_INVOICE_DOCUMENTS_MAX (20) and the marks at most PURCHASE_INVOICE_FLAGS_MAX (3: over what was approved, outside the term,
+ * or missing expected pool amount), both the `maxItems` of the schema, so none of them grows the answer.
  */
 export const NESTED_ARRAYS_PI1: readonly NestedArrayEntry[] = [
   {
@@ -17,15 +17,15 @@ export const NESTED_ARRAYS_PI1: readonly NestedArrayEntry[] = [
   },
   {
     key: 'purchaseInvoiceGet#flags',
-    maxItems: 2,
+    maxItems: 3,
     bound: 'PURCHASE_INVOICE_FLAGS_MAX',
-    rationale: 'The marks laid on the invoice: there are two kinds and each comes at most once.',
+    rationale: 'The marks laid on the invoice: there are three kinds and each comes at most once.',
   },
   {
     key: 'purchaseInvoiceList#flags',
-    maxItems: 2,
+    maxItems: 3,
     bound: 'PURCHASE_INVOICE_FLAGS_MAX',
-    rationale: 'The marks laid on each invoice of the page: there are two kinds and each comes at most once.',
+    rationale: 'The marks laid on each invoice of the page: there are three kinds and each comes at most once.',
   },
 ].map(({ key, maxItems, bound, rationale }): NestedArrayEntry => ({
   key,

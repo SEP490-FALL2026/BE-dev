@@ -14,16 +14,16 @@ export class NextYearBudgetRepo {
 
   /**
    * The sum of the part of `year` that the requests of each Cost Center kept at their approval, those of `exceptRequestIds` left out: the
-   * request the approver reads is compared with what the others hold, not with itself. A Cost Center with none is absent.
+   * request the approver reads is compared with what the others hold, not with itself. Also returns the request ids whose kept amount
+   * was counted so downstream `runningUncommitted` can exclude their already-accounted seats. A Cost Center with none is absent.
    */
   async keptByCostCenter(
     costCenterIds: readonly string[],
     year: number,
     exceptRequestIds: readonly string[],
-  ): Promise<Map<string, bigint>> {
-    if (costCenterIds.length === 0) return new Map();
-    const groups = await this.prisma.accessRequest.groupBy({
-      by: ['costCenterId'],
+  ): Promise<{ totals: Map<string, bigint>; requestIds: string[] }> {
+    if (costCenterIds.length === 0) return { totals: new Map(), requestIds: [] };
+    const rows = await this.prisma.accessRequest.findMany({
       where: {
         costCenterId: { in: [...new Set(costCenterIds)] },
         // The part of the year after is kept at the approval, for the year after the year it was approved in.
@@ -34,13 +34,17 @@ export class NextYearBudgetRepo {
         amountCurrency: DONG,
         id: { notIn: [...exceptRequestIds] },
       },
-      _sum: { nextYearAmountMinor: true },
+      select: { id: true, costCenterId: true, nextYearAmountMinor: true },
     });
 
-    return new Map(
-      groups.flatMap((group) =>
-        group.costCenterId === null ? [] : [[group.costCenterId, group._sum.nextYearAmountMinor ?? 0n] as const],
-      ),
-    );
+    const totals = new Map<string, bigint>();
+    const requestIds: string[] = [];
+    for (const row of rows) {
+      if (row.costCenterId === null || row.nextYearAmountMinor === null) continue;
+      totals.set(row.costCenterId, (totals.get(row.costCenterId) ?? 0n) + row.nextYearAmountMinor);
+      if (row.nextYearAmountMinor > 0n) requestIds.push(row.id);
+    }
+
+    return { totals, requestIds };
   }
 }

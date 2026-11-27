@@ -30,6 +30,17 @@ const seatMonthChargeSchema = z.strictObject({
   appliedToCommitment: moneyView.meta({ description: 'What of the amount took the commitment of the seat down.' }),
 });
 
+const idleCostByLabelSchema = z.strictObject({
+  missedAdjustment: moneyView,
+  reducible: moneyView,
+  lockedUntil: z.record(z.string(), moneyView),
+});
+
+const poolLineFlagsSchema = z.strictObject({
+  NO_PRICE: z.boolean(),
+  NO_QUANTITY: z.boolean(),
+});
+
 const poolLineSchema = z.strictObject({
   subscriptionId: z.uuid(),
   paid: moneyView.nullable().meta({
@@ -40,13 +51,35 @@ const poolLineSchema = z.strictObject({
     description: 'What the invoices of the pool booked to the month cost: the proof of what was paid, not the line.',
   }),
   allocated: moneyView.meta({ description: 'What the seat-months of the month took of it.' }),
+  idleCost: moneyView.nullable().meta({
+    description:
+      'The cost of idle paid seats for the month; null when monthly price or purchased quantity is not known.',
+  }),
+  idleCostByLabel: idleCostByLabelSchema.meta({
+    description: 'Breakdown of idle seat cost by adjustment-window label.',
+  }),
+  invoiceVariance: moneyView.meta({
+    description: 'Confirmed pool invoice variance assigned to the month.',
+  }),
+  invoiceVarianceInReview: moneyView.meta({
+    description: 'Pool invoice variance awaiting Finance review.',
+  }),
+  deviceLotPurchases: moneyView.meta({
+    description: 'Device-lot purchases booked to the shared pool in the month.',
+  }),
+  replacementKeys: moneyView.meta({
+    description: 'Replacement license keys booked to the shared pool in the month.',
+  }),
   unallocated: moneyView.meta({
     description:
-      'The line "not allocated, shared pool": the seats paid for at the price of a month less the seat-months charged to departments (the invoices of the month less them when the seats or the price are not known).',
+      'Total shared-pool line for the month: sum of idle seat cost, invoice variances, device-lot purchases, and replacement keys when price and quantity are known, or invoiced amount less allocated seat-months otherwise.',
   }),
   withoutCostCenter: moneyView.meta({
     description:
       'The line "not allocated to a Cost Center": the part of the seat-months that fell to a department with no Cost Center yet. It is in no Cost Center and not in the line of the pool.',
+  }),
+  flags: poolLineFlagsSchema.meta({
+    description: 'Data-quality flags indicating missing monthly price or purchased seat quantity.',
   }),
 });
 

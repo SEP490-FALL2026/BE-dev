@@ -23,6 +23,7 @@ export const RUNTIME_TABLE_EXCEPTIONS: Readonly<Record<string, readonly string[]
   budget_version_history: ['INSERT', 'SELECT'],
   // An invoice Finance recorded is evidence of what was spent: added to and never changed or deleted.
   invoices: ['INSERT', 'SELECT'],
+  invoice_pool_variance_resolutions: ['INSERT', 'SELECT'],
   // The files that came with a purchase invoice are evidence added with it and never changed (its trigger refuses it first).
   purchase_invoice_documents: ['INSERT', 'SELECT'],
   // The notice, the signed record and the acknowledgement of a machine are evidence: added to and never changed.
@@ -38,6 +39,9 @@ export const RUNTIME_TABLE_EXCEPTIONS: Readonly<Record<string, readonly string[]
   policy_acknowledgements: ['INSERT', 'SELECT'],
   // The answers of a checklist a decision was made with are evidence too: added to and never changed (its triggers refuse it first).
   decision_checklists: ['INSERT', 'SELECT'],
+  // Append-only seat ledger and invoice allocations: added to and never changed (their triggers refuse UPDATE/DELETE/TRUNCATE first).
+  seat_changes: ['INSERT', 'SELECT'],
+  invoice_allocations: ['INSERT', 'SELECT'],
 };
 
 /** Sequence privileges the runtime role holds on every sequence of `public`: drawing numbers (`nextval`) and `currval`. */

@@ -1,7 +1,10 @@
 import type { BusinessDate } from '../../../core/business-date';
 
-/** What a seat is held against: a subscription of a paid plan, or an internal plan that has no subscription. */
-export type SeatTargetRef = { subscriptionId: string } | { planId: string };
+/** What a seat is held against: a subscription of a paid plan (optionally naming the line and serving day), or an internal plan that has no subscription. */
+export type SeatTargetRef =
+  | { subscriptionId: string; planId?: string; servingOn?: BusinessDate }
+  | { licenseLotId: string; planId?: string }
+  | { planId: string };
 
 /** What holds a set of plans: a bounded list of assignments and the counts that are not bounded. */
 export interface OpenSeatHoldings {
@@ -22,6 +25,12 @@ export interface OpenSeatHolding {
 export interface SeatTarget {
   kind: 'SUBSCRIPTION' | 'PLAN';
   subscriptionId: string | null;
+  /** The lot id when targeting a K4 license lot; null/undefined otherwise. */
+  licenseLotId?: string | null;
+  /** The subscription line serving `servingOn` for K2 targets; null for PLAN, K1, K4, or when no line serves that day. */
+  subscriptionLineId?: string | null;
+  /** The IT Admin responsible for the subscription (when kind === 'SUBSCRIPTION'), used for R1 notifications. */
+  responsibleItAdminEmployeeId?: string | null;
   planId: string;
   planName: string;
   applicationId: string;
@@ -30,6 +39,10 @@ export interface SeatTarget {
   provisioningType: 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
   /** How a K4 plan is bound once bought (to an account, to a machine by a key, or bundled with the machine); null for every other kind. */
   keyBinding: 'ACCOUNT' | 'DEVICE_KEY' | 'DEVICE_BUNDLED' | null;
+  /** Reference commitment months on a K1/K2 plan (`1 | 12`), or null when unset or for other kinds. */
+  referenceCommitmentMonths?: 1 | 12 | null;
+  /** Plan reference monthly unit price in minor units of dong (`QĐ-113a`), or null when unset. */
+  monthlyUnitPriceMinor?: bigint | null;
   /** Whether the application of the plan is still in the catalog; a retired one takes no seat. */
   applicationStatus: 'APPROVED' | 'RETIRED';
   /** The state of the subscription; null for a plan that has none. A draft takes no seat (`US-04-03` AC-6). */
@@ -38,6 +51,8 @@ export interface SeatTarget {
   missing: string[];
   /** The seats bought; null while the subscription has no quantity, and always null for a plan with no subscription. */
   purchasedQuantity: number | null;
+  /** How seats are counted for K2 subscriptions (`FIXED` vs `MEMBERS`). */
+  seatCounting?: 'FIXED' | 'MEMBERS';
   /** Whether the subscription can be cut mid-term (a flexible plan); false for a plan that has none (`QĐ-98`, R-15). */
   allowsMidTermReduction: boolean;
 }
@@ -45,19 +60,24 @@ export interface SeatTarget {
 /** A subscription a seat can be taken from today, with the seats bought; a draft takes no seat (`US-04-03` AC-6). */
 export interface PoolSubscription {
   subscriptionId: string;
+  /** The line of the plan on this period for K2; undefined/null for K1, K4, or legacy periods without lines. */
+  subscriptionLineId?: string | null;
+  /** Creation time of the line (used for deterministic line selection ordering). */
+  lineCreatedAt?: Date;
   purchasedQuantity: number | null;
   /** The subscription that prices the plan (`Q-04`): the one a grant that names no subscription takes first. */
   isPrimaryForPlan: boolean;
 }
 
 /**
- * A plan that gives out seats (K2), keys (K4) or personal accounts (K1), with the subscriptions they sit on today: the shared pool of the plan,
- * as a grant reads it (`PoolSubscription`). What the stock summary of the IT Admin counts the plan over (`QĐ-111n`).
+ * A plan that gives out seats (K2) or keys (K4), with what they sit on today: for a K2 plan the subscriptions of the shared pool of the plan, as a grant
+ * reads it (`PoolSubscription`); for a K4 plan its lots, each as an entry whose `subscriptionId` is the id of the lot and whose `purchasedQuantity` is its
+ * licenses (a lot born from a perpetual purchase has the id of that subscription). What the stock summary of the IT Admin counts the plan over (`QĐ-111n`).
  */
 export interface StockPlan {
   planId: string;
   planName: string;
-  provisioningType: 'K1' | 'K2' | 'K4';
+  provisioningType: 'K2' | 'K4';
   /** How a K4 plan is bound once bought; null for a plan of another kind. A key that goes on a machine is counted by licenses, not by keys. */
   keyBinding: 'ACCOUNT' | 'DEVICE_KEY' | 'DEVICE_BUNDLED' | null;
   applicationId: string;
@@ -89,6 +109,8 @@ export interface SubscriptionPrice {
   unitPrice: { amountMinor: bigint; currency: string };
   /** The unit price converted to the reporting currency when it was recorded; null when it was not converted. */
   reportingUnitPrice: { amountMinor: bigint; currency: string } | null;
+  /** The monthly unit price per seat in dong from `monthly_unit_price_minor`; null for perpetual purchases or when unset. */
+  monthlyPriceMinor: bigint | null;
   /** `OTHER` for a perpetual purchase, which has no billing cycle. */
   billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER';
 }
@@ -177,6 +199,14 @@ export interface WorkspaceDuty {
   role: 'PRIMARY_OWNER' | 'OWNER' | 'ADMIN';
   /** The plan declares an emergency account: only that it exists, never its name, its holder or any secret. */
   emergencyAccountDeclared: boolean;
+  /** The workspace the duty is held in: the plan above is the one it is known by. */
+  workspace?: {
+    id: string;
+    name: string;
+    vendorId: string;
+    responsibleItAdminEmployeeId: string | null;
+    members: ReadonlyArray<{ employeeId: string; role: 'OWNER' | 'ADMIN' }>;
+  };
 }
 
 /**
@@ -204,6 +234,8 @@ export interface BaselineSubscription {
   purchasedQuantity: number | null;
   /** The unit price in the reporting currency as recorded when the price was; null when it has none. */
   unitPriceReportingMinor: bigint | null;
+  /** The monthly price per seat in dong from `monthly_unit_price_minor`; null when unset. */
+  monthlyPriceMinor: bigint | null;
   billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER' | null;
   startDate: string | null;
   endDate: string | null;

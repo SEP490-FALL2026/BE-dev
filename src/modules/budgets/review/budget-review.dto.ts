@@ -88,6 +88,22 @@ const periodSchema = z.strictObject({
         .boolean()
         .nullable()
         .meta({ description: 'Whether the line of the pool is above the reserve; null when there is no reserve.' }),
+      sharedPoolLines: z
+        .strictObject({
+          idleCost: moneyView,
+          invoiceVariance: moneyView,
+          invoiceVarianceInReview: moneyView,
+          deviceLotPurchases: moneyView,
+          replacementKeys: moneyView,
+          total: moneyView,
+          reserve: moneyView.nullable(),
+          overReserve: z.boolean().nullable(),
+        })
+        .nullable()
+        .meta({
+          description:
+            'Snapshot breakdown of the shared-pool line into idle seat cost, confirmed variances, variances in review, device-lot purchases, and replacement keys; null when not recorded.',
+        }),
       annualCeiling: moneyView.nullable(),
     })
     .nullable()
@@ -106,6 +122,10 @@ const lineSchema = z.strictObject({
   spentAfterMonth: moneyView.meta({
     description:
       'What was already recorded for the months after the one closed when it was closed: spent, and it took commitments down, so the forecast and what is left count it and the pace does not.',
+  }),
+  priorYearReleased: moneyView.meta({
+    description:
+      'What was released from prior-year seat-month commitments at year end or December month end, shown on the January review.',
   }),
   changedAfterSnapshot: moneyView.meta({
     description:

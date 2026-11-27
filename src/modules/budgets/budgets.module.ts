@@ -24,6 +24,7 @@ import { BudgetTableViewService } from './budget-view/budget-table-view.service'
 import { BudgetViewService } from './budget-view/budget-view.service';
 import { BudgetsController } from './budget-view/budgets.controller';
 import { BudgetsApi } from './public/budgets.api';
+import { BaselineCatalogFacts } from './cycle/baseline-catalog-facts.service';
 import { BaselineFlags } from './cycle/baseline-flags.service';
 import {
   CommitmentReleaseGuardHook,
@@ -33,7 +34,21 @@ import {
   PurchaseInvoiceFactsHook,
 } from './public/budgets.extension-points';
 import { BudgetCommitmentsController } from './commitment/budget-commitments.controller';
+import { CommitmentMonthRepo } from './commitment/month/commitment-month.repo';
+import { CommitmentMonthService } from './commitment/month/commitment-month.service';
+import { CommitmentMonthSettlementService } from './commitment/month/commitment-month-settlement.service';
+import { CommitmentMonthFacadeService } from './commitment/commitment-month-facade.service';
 import { CommitmentService } from './commitment/commitment.service';
+import { SharedPoolLineAlertService } from './shared-pool-line/shared-pool-line-alert.service';
+import { SharedPoolLineFactsService } from './shared-pool-line/shared-pool-line-facts.service';
+import { LicenseLotChargeRepo } from './shared-pool-line/license-lot-charge.repo';
+import { LicenseLotCostService } from './shared-pool-line/license-lot-cost.service';
+import { LicenseLotInvoiceLedgerService } from './invoice/license-lot-invoice-ledger.service';
+import { LicenseLotInvoiceService } from './invoice/license-lot-invoice.service';
+import { InvoiceAllocationRepo } from './invoice/invoice-allocation.repo';
+import { InvoiceAllocationTransferService } from './invoice/invoice-allocation-transfer.service';
+import { InvoiceYearApplicationRepo } from './invoice/invoice-year-application.repo';
+import { K1YearStartApplicationService } from './invoice/k1-year-start-application.service';
 import { BudgetInvoicesController } from './invoice/budget-invoices.controller';
 import { BudgetCyclesController } from './cycle/budget-cycles.controller';
 import { BaselineService } from './cycle/baseline.service';
@@ -105,7 +120,7 @@ import { BudgetReviewPriceService } from './review/budget-review-price.service';
 import { BudgetReviewQueryService } from './review/budget-review-query.service';
 import { BudgetReviewSnapshotService } from './review/budget-review-snapshot.service';
 import { BudgetReviewSignatureService } from './review/budget-review-signature.service';
-import { BudgetReviewReminderService } from './review/budget-review-reminder.service';
+import { BudgetReviewReminderService } from './review/reminder/budget-review-reminder.service';
 import { BudgetReviewSweeper } from './review/budget-review.job';
 import { SeatMonthChargesController } from './seat-month/seat-month-charges.controller';
 import { SeatMonthPoolService } from './seat-month/seat-month-pool.service';
@@ -210,6 +225,7 @@ import { BudgetProposalTemplateListener } from './proposal/budget-proposal-templ
     PendingSpendContributions,
     CarriedOverContributions,
     BaselineFlags,
+    BaselineCatalogFacts,
     SeatMonthRepo,
     BudgetAdjustmentRepo,
     BudgetAdjustmentApplyService,
@@ -249,6 +265,20 @@ import { BudgetProposalTemplateListener } from './proposal/budget-proposal-templ
     BudgetSpendingApproverGrantCheck,
     SpendingApproverWaitListener,
     CommitmentService,
+    CommitmentMonthRepo,
+    CommitmentMonthService,
+    CommitmentMonthFacadeService,
+    CommitmentMonthSettlementService,
+    LicenseLotChargeRepo,
+    LicenseLotInvoiceLedgerService,
+    LicenseLotInvoiceService,
+    LicenseLotCostService,
+    InvoiceAllocationRepo,
+    InvoiceAllocationTransferService,
+    InvoiceYearApplicationRepo,
+    K1YearStartApplicationService,
+    SharedPoolLineFactsService,
+    SharedPoolLineAlertService,
     InvoiceService,
     PurchaseInvoiceRecorderService,
     OutOfProcessSpendRecorderService,

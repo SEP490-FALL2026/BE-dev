@@ -12,13 +12,18 @@ export class DocumentAttachRefusedError extends Error {
   }
 }
 
-/** Why a seat could not be added to a subscription: it does not exist, or it is a draft (a draft has no seats to grant). */
-export type PoolSeatProblem = 'NOT_FOUND' | 'NOT_ACTIVE';
+/** An invoice was already confirmed for this lot (`invoice_actual_minor` is immutable once set). */
+export class LicenseLotAlreadyInvoicedError extends Error {
+  constructor() {
+    super('An invoice has already been confirmed for this license lot.');
+    this.name = 'LicenseLotAlreadyInvoicedError';
+  }
+}
 
-/** A seat was to be bought on a subscription that cannot take one; the caller holds the subscription locked and has judged it usable, so this is a fault of the caller. */
-export class PoolSeatNotAddableError extends Error {
-  constructor(readonly problem: PoolSeatProblem) {
-    super(`A seat cannot be added to the subscription (${problem}).`);
-    this.name = 'PoolSeatNotAddableError';
+/** Remaining free licenses in this REQUEST lot are reserved for the owning request's beneficiaries (`F11`). */
+export class LicenseLotReservedForRequestError extends Error {
+  constructor(readonly lotId: string) {
+    super('The remaining free licenses of this lot are reserved for its owning request.');
+    this.name = 'LicenseLotReservedForRequestError';
   }
 }

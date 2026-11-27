@@ -554,12 +554,16 @@ model ItAdminHandover {
   departmentTransferId  String?   @unique @map("department_transfer_id") @db.Uuid
   subscriptionsAtRecord Int       @map("subscriptions_at_record")
   applicationsAtRecord  Int       @map("applications_at_record")
+  workspacesAtRecord    Int       @default(0) @map("workspaces_at_record")
+  licenseLotsAtRecord   Int       @default(0) @map("license_lots_at_record")
   createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   // Set together when an IT Admin hands everything over (the latest hand-over): the IT Admin who took it, and how many of each were moved.
   doneAt                DateTime? @map("done_at") @db.Timestamptz(3)
   doneToEmployeeId      String?   @map("done_to_employee_id") @db.Uuid
   doneSubscriptions     Int?      @map("done_subscriptions")
   doneApplications      Int?      @map("done_applications")
+  doneWorkspaces        Int?      @map("done_workspaces")
+  doneLicenseLots       Int?      @map("done_license_lots")
 
   organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   offboardingCase    OffboardingCase?    @relation(fields: [offboardingCaseId], references: [id], onDelete: Restrict)

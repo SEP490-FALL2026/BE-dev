@@ -54,6 +54,7 @@ describe('BR-MF4-05 budgetMine selection and visibility', () => {
       committed: format(10n),
       spent: format(20n),
       pendingSpend: format(30n),
+      runningUncommitted: format(0n),
       remainingBase: format(40n),
       remainingWithReserve: format(60n),
     });

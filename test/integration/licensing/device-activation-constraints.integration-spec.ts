@@ -62,14 +62,21 @@ describe('activations of a machine, the keys of a lot and the binding of a plan 
        VALUES ($1, $2, $3, 'PERPETUAL', 'DRAFT', $4)`,
       [id, org, planId, licenses],
     );
+    // A purchase of keys is a lot since M6 (W3-24): the lot of the same id the migration makes of a perpetual purchase.
+    await sql.query(
+      `INSERT INTO license_lots (id, organization_id, plan_id, purchased_on, license_count, unit_price_minor, purpose, legacy_subscription_id, updated_at)
+       SELECT $1, $2, p.id, '2026-01-01', $4, 0, 'OPENING', $1, now() FROM plans p
+        WHERE p.id = $3 AND p.provisioning_type = 'K4' AND p.key_binding IS DISTINCT FROM 'DEVICE_BUNDLED'`,
+      [id, org, planId, licenses],
+    );
 
     return id;
   };
   const key = async (subscriptionId: string): Promise<string> => {
     const id = randomUUID();
     await sql.query(
-      `INSERT INTO license_keys (id, organization_id, subscription_id, fingerprint, masked, ciphertext, cipher_key_id, imported_by_app_user_id)
-       VALUES ($1, $2, $3, $4, '••••1234', $5, 'k1', $6)`,
+      `INSERT INTO license_keys (id, organization_id, subscription_id, cost_borne, fingerprint, masked, ciphertext, cipher_key_id, imported_by_app_user_id)
+       VALUES ($1, $2, $3, true, $4, '••••1234', $5, 'k1', $6)`,
       [id, org, subscriptionId, hex(), randomBytes(40), user],
     );
 

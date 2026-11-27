@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
+import type { BusinessDate } from '../../../core/business-date';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
+import { SubscriptionPeriodApi } from '../../catalog/public/subscription-period.api';
 import type { RuleSeat } from '../../licensing/public/licensing-ghost-seat.types';
 import { GhostSeatSeatStateRepo } from '../ghost-seat/ghost-seat-seat-state.repo';
 import { GhostSeatRepo } from '../ghost-seat/ghost-seat.repo';
@@ -80,6 +82,7 @@ export class UsageRulesSeatService {
     private readonly ghostSeats: GhostSeatService,
     private readonly seatStates: GhostSeatSeatStateRepo,
     private readonly negation: UsageNegationService,
+    private readonly periods: SubscriptionPeriodApi,
   ) {}
 
   async assess(run: UsageRunContext, app: UsageApplicationContext, seat: RuleSeat): Promise<void> {
@@ -342,6 +345,8 @@ export class UsageRulesSeatService {
     finding: Finding,
     previous: { id: string; closeReason: 'KEPT' | 'EXEMPTED'; closedOn: string } | null,
   ) {
+    const subscriptionFacts = await this.subscriptionSavingFacts(c);
+
     return snapshotOf({
       group: finding.group,
       employeeId: c.seat.employeeId,
@@ -355,11 +360,38 @@ export class UsageRulesSeatService {
       potentialSaving: potentialSavingOf({
         provisioningType: c.seat.provisioningType,
         price: await c.app.price(c.seat.planId),
+        ...subscriptionFacts,
       }),
       previousDecision: previous
         ? { recommendationId: previous.id, closeReason: previous.closeReason, closedOn: previous.closedOn }
         : null,
     });
+  }
+
+  private async subscriptionSavingFacts(c: SeatCase): Promise<{
+    commitmentTermMonths: 1 | 12 | null;
+    realisableOn: BusinessDate | null;
+    billingAnchorOn?: BusinessDate | null;
+    today?: BusinessDate;
+  }> {
+    if (c.seat.provisioningType === 'K1') {
+      return {
+        commitmentTermMonths: c.seat.personalCommitmentMonths ?? null,
+        realisableOn: null,
+        billingAnchorOn: c.seat.billingAnchorOn ?? null,
+        today: c.run.today,
+      };
+    }
+    if (c.seat.provisioningType !== 'K2' || c.seat.subscriptionId === null) {
+      return { commitmentTermMonths: null, realisableOn: null };
+    }
+    const [period] = await this.periods.getPurchaseFacts([c.seat.subscriptionId], c.tx);
+    const realisableOn = await this.periods.earliestReducibleOn(c.seat.subscriptionId, c.run.today, c.tx);
+
+    return {
+      commitmentTermMonths: period?.commitmentTermMonths ?? null,
+      realisableOn,
+    };
   }
 
   /** Writes the state of the seat for the board (`FR-5.10`) and gives back what the pass found. */

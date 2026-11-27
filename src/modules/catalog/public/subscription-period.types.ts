@@ -1,4 +1,14 @@
 import type { BusinessDate } from '../../../core/business-date';
+import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+
+export type PeriodAuditActor = AuthenticatedPrincipal | { systemCorrelationId: string };
+
+/** Days before payment/deadline that open adjustment points and the annual red alert. */
+export interface PoolAdjustmentWindows {
+  monthlyDays: number;
+  annualDays: number;
+  redAlertDaysAnnual: number;
+}
 
 /** Where the milestone of a term comes from (`US-04-03`): declared, inferred from the notice period, the end date, or missing. */
 export type PeriodNoticeSource = 'DECLARED' | 'INFERRED_UNCONFIRMED' | 'BY_END_DATE' | 'MISSING' | 'NOT_APPLICABLE';
@@ -55,15 +65,37 @@ export interface RenewalPeriodFacts {
   renewedFromId: string | null;
   /** The period that continues this one, once a renewal recorded it; null while none does. */
   renewedById: string | null;
+  /** How the seats of the period are counted (`FIXED` vs `MEMBERS`). */
+  seatCounting?: 'FIXED' | 'MEMBERS';
+  /** Shared workspace id when the subscription sits in a vendor workspace. */
+  workspaceId?: string | null;
+  /** Minimum total seats across all lines of the period; null when unset. */
+  minimumSeatsTotal?: number | null;
+  /** Notice period days before expiry/renewal when inferred by days. */
+  noticePeriodDays?: number | null;
+  /** Monthly unit price in minor units on single-line/header periods. */
+  monthlyUnitPriceMinor?: bigint | null;
 }
 
-/** The new period the IT Admin records from what the vendor confirmed (`US-11-05` AC-11): a term of the same plan and owner. */
+/** One line of the renewed period. */
+export interface NextPeriodLineInput {
+  previousLineId: string;
+  quantity: number;
+  monthlyUnitPrice?: { amount: string; currency: string };
+  monthlyUnitPricePath?: string;
+}
+
+/** The new period the IT Admin or system records from what the vendor confirmed (`US-11-05` AC-11): a term of the same plan and owner. */
 export interface NextPeriodInput {
   previousSubscriptionId: string;
-  purchasedQuantity: number;
-  unitPrice: { amount: string; currency: string };
+  purchasedQuantity?: number;
+  unitPrice?: { amount: string; currency: string };
   /** Where the price sits in the body of the request the caller answers (`nextPeriod.unitPrice`), so a money error points at that field; `unitPrice` when absent. */
   unitPricePath?: string;
+  lines?: readonly NextPeriodLineInput[];
+  renewalId?: string;
+  autoRecorded?: boolean;
+  recordedByEmployeeId?: string | null;
   billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER';
   startDate: BusinessDate;
   endDate?: BusinessDate;
@@ -114,11 +146,28 @@ export interface SubscriptionPurchaseFacts {
   planId: string;
   /** The IT Admin who answers for the subscription; null when it names none (`QĐ-103v`(4)). */
   responsibleItAdminEmployeeId: string | null;
+  kind: 'TERM' | 'PERPETUAL';
+  status: 'DRAFT' | 'ACTIVE';
+  provisioningType: 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
+  commitmentTermMonths: 1 | 12 | null;
+  billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER' | null;
   purchasedQuantity: number | null;
-  /** What one seat costs a month in dong: the price of a cycle over its months, rounded up; null when the price or the cycle is not known. */
+  /** What one seat costs a month in dong from `monthly_unit_price_minor`; null when unset or non-periodic. */
   monthlyPriceMinor: bigint | null;
   /** The months a payment pays for (1, 3 or 12); null for another cycle or none. */
   cycleMonths: number | null;
+  startDate: BusinessDate | null;
+  endDate: BusinessDate | null;
+  /** Exclusive end of the period for shared-pool day counting: successor start date, else day after endDate, else null. */
+  endExclusive: BusinessDate | null;
   /** The day the period renews; null when none is set. */
   renewalDate: BusinessDate | null;
+  noticeDeadline: BusinessDate | null;
+  noticePeriodDays: number | null;
+  autoRenew: boolean;
+  invoicedLater?: boolean;
+  seatCounting?: 'FIXED' | 'MEMBERS';
+  vendorMinimumSeats: number | null;
+  /** Purchased quantity recorded on a direct successor subscription, if one already exists. */
+  nextPeriodPurchasedQuantity: number | null;
 }

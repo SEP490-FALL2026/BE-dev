@@ -1,6 +1,7 @@
 import { as, listAll, summarize, tag } from '../demo-step-kit';
 import { dayOffset } from '../demo-dates';
 import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
+import { subscriptionMonthlyPriceOf, subscriptionPrimaryPlan } from './catalog.steps';
 import { contractPdf, invoicePdf } from './pdf-builders';
 import { uploadDocument } from './file-kit';
 import { financePerson, money } from './finance-kit';
@@ -10,16 +11,23 @@ interface ContractFixture {
   number: string;
   name: string;
   application: string;
+  /** The periods of the shared pool the contract rests on (K2). */
   subscriptions: string[];
+  /** The lots of licenses (K4) the contract rests on: a lot names its contract itself, a K4 subscription is never linked. */
+  lots?: string[];
   openEnded?: boolean;
 }
 export interface InvoiceFixture {
   number: string;
-  subscription: string;
+  subscription?: string;
+  plan?: string;
   quantity: number;
   target: 'SUBMITTED' | 'CONFIRMED' | 'RETURNED' | 'RESUBMITTED';
   resubmitAs?: string;
   request?: string;
+  seatPurchaseKey?: string;
+  lotRequest?: string;
+  responsible?: string;
 }
 export interface InvoiceRow {
   id: string;
@@ -44,13 +52,15 @@ export const CONTRACTS: ContractFixture[] = [
     number: 'SV-HD-JB-01',
     name: 'Hợp đồng JetBrains (All Products)',
     application: 'jetbrains',
-    subscriptions: ['jetbrains'],
+    subscriptions: [],
+    lots: ['jetbrains', 'jetbrains-second'],
   },
   {
     number: 'SV-HD-MS-01',
     name: 'Hợp đồng Microsoft (365 và Visio)',
     application: 'm365',
-    subscriptions: ['m365-basic', 'm365-standard', 'visio-pro'],
+    subscriptions: ['m365-basic', 'm365-standard'],
+    lots: ['visio-pro'],
   },
   {
     number: 'SV-HD-ADB-01',
@@ -78,8 +88,28 @@ export function contractBody(ctx: DemoRunContext, spec: ContractFixture) {
   };
 }
 
+/** The IT Admin who makes the contract: the one who answers for its first subscription, else for its first lot. */
+function contractAdminOf(ctx: DemoRunContext, spec: ContractFixture): string {
+  const [subscription] = spec.subscriptions;
+  if (subscription) return subscriptionOf(ctx, subscription).responsible;
+  const lot = ctx.fixture.lots.find((candidate) => candidate.key === spec.lots?.[0]);
+  if (!lot) throw new Error(`The contract ${spec.number} rests on nothing the fixture declares`);
+
+  return lot.responsible;
+}
+
+/** A lot rests on a contract by naming it, written by the IT Admin who answers for the lot on the version they read. */
+async function linkLot(ctx: DemoRunContext, key: string, contractId: string): Promise<void> {
+  const lot = ctx.fixture.lots.find((candidate) => candidate.key === key);
+  const lotId = ctx.ids.lots.get(key);
+  if (!lot || !lotId) throw new Error(`The fixture has no lot ${key}`);
+  const owner = await as(ctx, lot.responsible);
+  const current = await ctx.api.call<{ updatedAt: string }>(owner, 'GET', `/license-lots/${lotId}`);
+  await ctx.api.call(owner, 'PATCH', `/license-lots/${lotId}`, { contractId, expectedUpdatedAt: current.updatedAt });
+}
+
 async function oneContract(ctx: DemoRunContext, spec: ContractFixture): Promise<Result> {
-  const admin = await as(ctx, subscriptionOf(ctx, spec.subscriptions[0]).responsible);
+  const admin = await as(ctx, contractAdminOf(ctx, spec));
   const existing = await listAll<{ id: string; number: string | null }>(ctx, admin, '/contracts');
   if (existing.some((row) => row.number === spec.number)) return { status: 'present', label: spec.number };
   if (ctx.mode === 'plan') return { status: 'planned', label: spec.number };
@@ -89,6 +119,7 @@ async function oneContract(ctx: DemoRunContext, spec: ContractFixture): Promise<
     await ctx.api.call(admin, 'POST', `/contracts/${contract.id}/subscriptions`, {
       subscriptionId: ctx.ids.subscriptions.get(key),
     });
+  for (const key of spec.lots ?? []) await linkLot(ctx, key, contract.id);
   const pdf = await contractPdf({
     number: spec.number,
     name: spec.name,
@@ -128,15 +159,32 @@ export const INVOICES: InvoiceFixture[] = [
   { number: 'SV-INV-010', subscription: 'confluence-standard', quantity: 7, target: 'RETURNED' },
   {
     number: 'SV-INV-011',
-    subscription: 'chatgpt',
+    plan: 'chatgpt-plus',
     request: 'R18',
+    responsible: 'NV-ITA1',
     quantity: 1,
     target: 'CONFIRMED',
   },
   {
     number: 'SV-INV-012',
-    subscription: 'copilot-pro',
+    plan: 'copilot-pro',
     request: 'R56',
+    responsible: 'NV-ITA1',
+    quantity: 1,
+    target: 'CONFIRMED',
+  },
+  {
+    number: 'SV-INV-013',
+    subscription: 'canva',
+    seatPurchaseKey: 'canva-topup',
+    quantity: 2,
+    target: 'CONFIRMED',
+  },
+  {
+    number: 'SV-INV-014',
+    plan: 'jetbrains-datagrip',
+    lotRequest: 'R62',
+    responsible: 'NV-ITA1',
     quantity: 1,
     target: 'CONFIRMED',
   },
@@ -153,9 +201,50 @@ export function invoiceMove(spec: InvoiceFixture, rows: readonly InvoiceRow[]) {
   return spec.target === 'CONFIRMED' ? 'confirm' : 'return';
 }
 
+function planKeyOfInvoice(ctx: DemoRunContext, spec: InvoiceFixture): string {
+  if (spec.plan) return spec.plan;
+  if (spec.subscription) return subscriptionPrimaryPlan(subscriptionOf(ctx, spec.subscription));
+  throw new Error(`Invoice ${spec.number} specifies neither subscription nor plan`);
+}
+
+function unitPriceOfInvoice(ctx: DemoRunContext, spec: InvoiceFixture): bigint {
+  if (spec.subscription) {
+    const sub = subscriptionOf(ctx, spec.subscription);
+
+    return BigInt(sub.unitPrice?.amount ?? subscriptionMonthlyPriceOf(sub, spec.plan));
+  }
+  const planKey = planKeyOfInvoice(ctx, spec);
+  const plan = ctx.fixture.applications.flatMap((app) => app.plans).find((candidate) => candidate.key === planKey);
+  if (!plan?.referencePrice) throw new Error(`Plan ${planKey} has no referencePrice for invoice ${spec.number}`);
+
+  return BigInt(plan.referencePrice);
+}
+
+function responsibleOfInvoice(ctx: DemoRunContext, spec: InvoiceFixture): string {
+  if (spec.responsible) return spec.responsible;
+  if (spec.subscription) return subscriptionOf(ctx, spec.subscription).responsible;
+  throw new Error(`Invoice ${spec.number} specifies no responsible IT Admin`);
+}
+
+function invoiceLink(ctx: DemoRunContext, spec: InvoiceFixture) {
+  if (spec.seatPurchaseKey) {
+    return {
+      subscriptionId: ctx.ids.subscriptions.get(spec.subscription!),
+      seatPurchaseId: ctx.ids.seatPurchases.get(spec.seatPurchaseKey),
+    };
+  }
+  if (spec.lotRequest) {
+    return { licenseLotId: ctx.ids.lots.get(`request:${spec.lotRequest}`) };
+  }
+  if (spec.request) {
+    return { requestId: ctx.ids.requests.get(spec.request) };
+  }
+
+  return { subscriptionId: ctx.ids.subscriptions.get(spec.subscription!) };
+}
+
 function invoiceFields(ctx: DemoRunContext, spec: InvoiceFixture, documentId: string, number: string) {
-  const subscription = subscriptionOf(ctx, spec.subscription);
-  const price = BigInt(subscription.unitPrice.amount);
+  const price = unitPriceOfInvoice(ctx, spec);
   return {
     vendorInvoiceNumber: number,
     issuedOn: ctx.today,
@@ -170,9 +259,7 @@ function invoiceFields(ctx: DemoRunContext, spec: InvoiceFixture, documentId: st
 
 export function invoiceBody(ctx: DemoRunContext, spec: InvoiceFixture, documentId: string) {
   return {
-    link: spec.request
-      ? { requestId: ctx.ids.requests.get(spec.request) }
-      : { subscriptionId: ctx.ids.subscriptions.get(spec.subscription) },
+    link: invoiceLink(ctx, spec),
     ...invoiceFields(ctx, spec, documentId, spec.number),
   };
 }
@@ -197,11 +284,10 @@ async function invoiceDocument(
   spec: InvoiceFixture,
   number: string,
 ): Promise<string> {
-  const subscription = subscriptionOf(ctx, spec.subscription);
   const fields = invoiceFields(ctx, spec, '', number);
   const pdf = await invoicePdf({
     vendorInvoiceNumber: number,
-    vendorName: vendorOfPlan(ctx, subscription.plan),
+    vendorName: vendorOfPlan(ctx, planKeyOfInvoice(ctx, spec)),
     issuedOn: fields.issuedOn,
     servicePeriodMonth: fields.servicePeriodMonth,
     quantity: spec.quantity,
@@ -209,6 +295,22 @@ async function invoiceDocument(
     netAmount: fields.netAmount.amount,
   });
   return uploadDocument(ctx, admin, 'PURCHASE_DOCUMENT', pdf);
+}
+
+async function ensureRequestLotId(ctx: DemoRunContext, admin: string, spec: InvoiceFixture): Promise<void> {
+  if (!spec.lotRequest) return;
+  const cacheKey = `request:${spec.lotRequest}`;
+  if (ctx.ids.lots.has(cacheKey)) return;
+  const planId = ctx.ids.plans.get(planKeyOfInvoice(ctx, spec));
+  const requestId = ctx.ids.requests.get(spec.lotRequest);
+  if (!planId || !requestId) return;
+  const lots = await listAll<{ id: string; purpose: string; requestId: string | null }>(
+    ctx,
+    admin,
+    `/license-lots?planId=${planId}`,
+  );
+  const found = lots.find((lot) => lot.purpose === 'REQUEST' && lot.requestId === requestId);
+  if (found) ctx.ids.lots.set(cacheKey, found.id);
 }
 
 async function oneInvoice(
@@ -221,7 +323,8 @@ async function oneInvoice(
   const move = invoiceMove(spec, rows);
   if (move === 'present' || move === 'conflict') return { status: move, label };
   if (ctx.mode === 'plan') return { status: 'planned', label };
-  const admin = await as(ctx, subscriptionOf(ctx, spec.subscription).responsible);
+  const admin = await as(ctx, responsibleOfInvoice(ctx, spec));
+  await ensureRequestLotId(ctx, admin, spec);
   let row = rows.find((candidate) => candidate.vendorInvoiceNumber === spec.number);
   if (!row) {
     const documentId = await invoiceDocument(ctx, admin, spec, spec.number);
@@ -260,13 +363,21 @@ export const DEMO_DOCUMENT_STEPS: readonly DemoStep[] = [
   {
     key: 'demo.contracts',
     title: 'Năm hợp đồng nhà cung cấp với tệp PDF (IT Admin)',
-    needs: ['catalog.subscriptions'],
+    needs: ['catalog.subscriptions', 'catalog.lots'],
     run: contracts,
   },
   {
     key: 'demo.purchase-invoices',
-    title: 'Hóa đơn mua chờ ký, đã ký, bị trả và đã nộp lại',
-    needs: ['catalog.subscriptions', 'org.accounts'],
+    title: 'Hóa đơn mua chờ ký, đã ký, bị trả, đã nộp lại, mua thêm seat và lô K4',
+    needs: [
+      'catalog.subscriptions',
+      'catalog.lots',
+      'catalog.seat-purchases',
+      'requests.R18',
+      'requests.R56',
+      'requests.R62',
+      'org.accounts',
+    ],
     run: invoices,
   },
 ];

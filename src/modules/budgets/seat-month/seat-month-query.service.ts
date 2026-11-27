@@ -4,7 +4,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { BudgetFactsService } from '../budget/budget-facts.service';
 import type { SeatMonthChargeWire, SeatMonthPoolLineWire } from './seat-month.dto';
-import { SeatMonthPoolService } from './seat-month-pool.service';
+import { SharedPoolLineFactsService } from '../shared-pool-line/shared-pool-line-facts.service';
 import { SeatMonthRepo, type SeatMonthChargeRecord } from './seat-month.repo';
 
 export interface SeatMonthChargesFilter {
@@ -34,7 +34,7 @@ export class SeatMonthQueryService {
     private readonly repo: SeatMonthRepo,
     private readonly facts: BudgetFactsService,
     private readonly organizationReads: OrganizationReadApi,
-    private readonly pool: SeatMonthPoolService,
+    private readonly poolFacts: SharedPoolLineFactsService,
   ) {}
 
   async list(
@@ -76,15 +76,31 @@ export class SeatMonthQueryService {
 
   private async poolLines(month: string, subscriptionId: string | undefined): Promise<SeatMonthPoolLineWire[]> {
     const money = await this.facts.formatter(await this.facts.reportingCurrency());
-    const lines = await this.pool.linesOfMonth(month, subscriptionId, MAX_POOL_LINES);
+    const lines = await this.poolFacts.linesOfMonth(month, subscriptionId, MAX_POOL_LINES);
 
     return lines.map((line) => ({
       subscriptionId: line.subscriptionId,
       invoiced: money(line.invoicedMinor),
       allocated: money(line.allocatedMinor),
       paid: line.paidMinor === null ? null : money(line.paidMinor),
+      idleCost: line.idleCostMinor === null ? null : money(line.idleCostMinor),
+      idleCostByLabel: {
+        missedAdjustment: money(line.idleCostByLabel.missedAdjustmentMinor),
+        reducible: money(line.idleCostByLabel.reducibleMinor),
+        lockedUntil: Object.fromEntries(
+          Object.entries(line.idleCostByLabel.lockedUntil).map(([date, minor]) => [date, money(minor)]),
+        ),
+      },
+      invoiceVariance: money(line.invoiceVarianceMinor),
+      invoiceVarianceInReview: money(line.invoiceVarianceInReviewMinor),
+      deviceLotPurchases: money(line.deviceLotPurchasesMinor),
+      replacementKeys: money(line.replacementKeysMinor),
       unallocated: money(line.unallocatedMinor),
       withoutCostCenter: money(line.withoutCostCenterMinor),
+      flags: {
+        NO_PRICE: line.flags.includes('NO_PRICE'),
+        NO_QUANTITY: line.flags.includes('NO_QUANTITY'),
+      },
     }));
   }
 

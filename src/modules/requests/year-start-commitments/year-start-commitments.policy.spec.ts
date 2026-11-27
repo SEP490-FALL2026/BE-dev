@@ -1,5 +1,6 @@
 import { MAX_AMOUNT_MINOR } from '../../../core/money/money';
 import {
+  approvalMonthlyFromSaved,
   bearingDepartmentOf,
   carriedOverByCostCenter,
   judgeYearStart,
@@ -10,11 +11,13 @@ import {
   type YearStartSeat,
 } from './year-start-commitments.policy';
 
-const MONTHLY: YearStartPrice = {
+const vndAt = (monthlyMinor: bigint): YearStartPrice => ({
   kind: 'RECURRING',
-  unitPrice: { amountMinor: 20000n, currency: 'VND' },
+  unitPrice: { amountMinor: monthlyMinor, currency: 'VND' },
+  monthlyPriceMinor: monthlyMinor,
   billingCycle: 'MONTHLY',
-};
+});
+const MONTHLY: YearStartPrice = vndAt(20000n);
 const seat = (patch: Partial<YearStartSeat> = {}): YearStartSeat => ({
   expectedEndDate: null,
   validUntil: null,
@@ -82,11 +85,36 @@ describe('BR-MF1-09: the commitment made on 01/01 for a right that goes on', () 
           ...MONTHLY,
           billingCycle: 'QUARTERLY',
           unitPrice: { amountMinor: 60000n, currency: 'VND' },
+          monthlyPriceMinor: 20000n,
         }),
       ).toMatchObject({ amountMinor: 240000n, seatMonthlyMinor: 20000n });
       expect(
-        amount([seat()], { ...MONTHLY, billingCycle: 'ANNUAL', unitPrice: { amountMinor: 100n, currency: 'VND' } }),
-      ).toMatchObject({ seatMonthlyMinor: 9n });
+        amount([seat()], {
+          ...MONTHLY,
+          billingCycle: 'ANNUAL',
+          unitPrice: { amountMinor: 100n, currency: 'VND' },
+          monthlyPriceMinor: 8n,
+        }),
+      ).toMatchObject({ seatMonthlyMinor: 8n });
+      expect(approvalMonthlyFromSaved(10_000_000n)).toBe(833_333n);
+      expect(
+        amount(
+          [
+            seat({
+              termLimited: true,
+              expectedEndDate: '2027-08-14',
+              savedMinor: 2_000_000n,
+              validUntil: '2027-03-01',
+              approvalPrice: {
+                unitPrice: { amountMinor: 10_000_000n, currency: 'VND' },
+                monthlyPriceMinor: 833_333n,
+                billingCycle: 'ANNUAL',
+              },
+            }),
+          ],
+          vndAt(1_000_000n),
+        ),
+      ).toMatchObject({ amountMinor: 1_666_666n });
     });
 
     it('BR-MF1-09e: a seat already over before 01/01 is left out of the amount', () => {
@@ -98,6 +126,7 @@ describe('BR-MF1-09: the commitment made on 01/01 for a right that goes on', () 
     const at = (monthly: bigint): YearStartPrice => ({
       ...MONTHLY,
       unitPrice: { amountMinor: monthly, currency: 'VND' },
+      monthlyPriceMinor: monthly,
     });
     /** A seat of a request for months of use, which kept `saved` of the year after at its approval. */
     const limited = (saved: bigint | null, patch: Partial<YearStartSeat> = {}) =>
@@ -183,6 +212,7 @@ describe('BR-MF1-09: the commitment made on 01/01 for a right that goes on', () 
       /** The price of a month the approval worked the kept number out at, which is the price of the request and not the one of 01/01. */
       const approvedAt = (monthly: bigint) => ({
         unitPrice: { amountMinor: monthly, currency: 'VND' },
+        monthlyPriceMinor: monthly,
         billingCycle: 'MONTHLY' as const,
       });
 
@@ -270,11 +300,9 @@ describe('BR-MF1-09: the commitment made on 01/01 for a right that goes on', () 
     });
 
     it('BR-MF1-09e: an amount larger than a money value may hold is told as such, not as a missing price', () => {
-      const huge: YearStartPrice = { ...MONTHLY, unitPrice: { amountMinor: 10n ** 15n, currency: 'VND' } };
-      expect(amount([seat()], huge)).toEqual({ status: 'SKIPPED', reason: 'AMOUNT_TOO_LARGE' });
+      expect(amount([seat()], vndAt(10n ** 15n))).toEqual({ status: 'SKIPPED', reason: 'AMOUNT_TOO_LARGE' });
       // Each end date is within the range, the two together are not.
-      const large: YearStartPrice = { ...MONTHLY, unitPrice: { amountMinor: 5n * 10n ** 13n, currency: 'VND' } };
-      expect(amount([seat(), seat({ expectedEndDate: '2027-11-30' })], large)).toEqual({
+      expect(amount([seat(), seat({ expectedEndDate: '2027-11-30' })], vndAt(5n * 10n ** 13n))).toEqual({
         status: 'SKIPPED',
         reason: 'AMOUNT_TOO_LARGE',
       });
@@ -339,10 +367,7 @@ describe('BR-MF1-09e: what the pass does with one request', () => {
   });
 
   it('BR-MF1-09e: an amount too large is left out with that reason', () => {
-    expect(judge({ price: { ...MONTHLY, unitPrice: { amountMinor: 10n ** 15n, currency: 'VND' } } })).toEqual({
-      status: 'LEFT_OUT',
-      reason: 'AMOUNT_TOO_LARGE',
-    });
+    expect(judge({ price: vndAt(10n ** 15n) })).toEqual({ status: 'LEFT_OUT', reason: 'AMOUNT_TOO_LARGE' });
   });
 });
 

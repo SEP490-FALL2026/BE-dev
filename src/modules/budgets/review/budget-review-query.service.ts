@@ -21,6 +21,32 @@ export interface ReviewPeriodDetailView extends Page<ReviewLineWire> {
   period: ReviewPeriodWire;
 }
 
+function companyWireOf(period: ReviewPeriodRecord, format: (minor: bigint) => MoneyView) {
+  const overReserve = sharedPoolOverReserve(period.sharedPoolUnallocatedMinor, period.sharedPoolReserveMinor);
+  const reserve = period.sharedPoolReserveMinor === null ? null : format(period.sharedPoolReserveMinor);
+
+  return {
+    spent: format(period.companySpentMinor),
+    sharedPoolUnallocated: format(period.sharedPoolUnallocatedMinor),
+    sharedPoolReserve: reserve,
+    sharedPoolOverReserve: overReserve,
+    sharedPoolLines:
+      period.sharedPoolIdleMinor === null
+        ? null
+        : {
+            idleCost: format(period.sharedPoolIdleMinor),
+            invoiceVariance: format(period.sharedPoolVarianceMinor ?? 0n),
+            invoiceVarianceInReview: format(period.sharedPoolVarianceInReviewMinor ?? 0n),
+            deviceLotPurchases: format(period.sharedPoolDeviceLotMinor ?? 0n),
+            replacementKeys: format(period.sharedPoolReplacementMinor ?? 0n),
+            total: format(period.sharedPoolUnallocatedMinor),
+            reserve,
+            overReserve,
+          },
+    annualCeiling: period.annualCeilingMinor === null ? null : format(period.annualCeilingMinor),
+  };
+}
+
 /**
  * Reads the review periods for Finance and the spending approver, who read all of them, and for a manager, who reads the lines of the Cost Center of their own
  * department (`D8`: a manager with no Cost Center of the year reads nothing, and an id outside their scope is a 404). The picture is read as it was written;
@@ -116,20 +142,7 @@ export class BudgetReviewQueryService {
         signedAt: period.signedAt?.toISOString() ?? null,
         note: period.note,
         lightCounts: counts.get(period.id) as ReviewLightCounts,
-        company:
-          scope === null
-            ? {
-                spent: format(period.companySpentMinor),
-                sharedPoolUnallocated: format(period.sharedPoolUnallocatedMinor),
-                sharedPoolReserve:
-                  period.sharedPoolReserveMinor === null ? null : format(period.sharedPoolReserveMinor),
-                sharedPoolOverReserve: sharedPoolOverReserve(
-                  period.sharedPoolUnallocatedMinor,
-                  period.sharedPoolReserveMinor,
-                ),
-                annualCeiling: period.annualCeilingMinor === null ? null : format(period.annualCeilingMinor),
-              }
-            : null,
+        company: scope === null ? companyWireOf(period, format) : null,
       });
     }
 
@@ -153,6 +166,7 @@ export class BudgetReviewQueryService {
       reserve: money(row.reserveMinor),
       spent: money(row.spentMinor),
       spentAfterMonth: money(row.spentAfterMonthMinor),
+      priorYearReleased: money(row.priorYearReleasedMinor),
       changedAfterSnapshot: money((now.get(heldKey(row.costCenterId, period.year)) ?? 0n) - row.spentMinor),
       committed: money(row.committedMinor),
       pendingSpend: money(row.pendingSpendMinor),

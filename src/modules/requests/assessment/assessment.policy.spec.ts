@@ -368,9 +368,11 @@ describe('QĐ-113a: the monthly price a quote gives the reference price of the p
     expect(monthlyPriceOfQuote(quoteOf(6_000_000n, 'ANNUAL')).amountMinor).toBe(500_000n);
   });
 
-  it('rounds up to the dong', () => {
-    expect(monthlyPriceOfQuote(quoteOf(1_000_000n, 'QUARTERLY')).amountMinor).toBe(333_334n);
-    expect(monthlyPriceOfQuote(quoteOf(1_000_001n, 'ANNUAL')).amountMinor).toBe(83_334n);
+  it('rounds half away from zero to the dong (annual 10.000.000 -> 833.333)', () => {
+    expect(monthlyPriceOfQuote(quoteOf(10_000_000n, 'ANNUAL')).amountMinor).toBe(833_333n);
+    expect(monthlyPriceOfQuote(quoteOf(10_000_002n, 'ANNUAL')).amountMinor).toBe(833_334n);
+    expect(monthlyPriceOfQuote(quoteOf(1_000_000n, 'QUARTERLY')).amountMinor).toBe(333_333n);
+    expect(monthlyPriceOfQuote(quoteOf(1_000_001n, 'ANNUAL')).amountMinor).toBe(83_333n);
     expect(monthlyPriceOfQuote(quoteOf(0n, 'ANNUAL')).amountMinor).toBe(0n);
   });
 });

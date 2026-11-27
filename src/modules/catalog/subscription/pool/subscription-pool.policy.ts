@@ -6,13 +6,15 @@ import {
   SubscriptionCommitmentTermRequiredError,
   SubscriptionK1MonthlyOnlyError,
   SubscriptionK4PerpetualOnlyError,
+  SubscriptionMembersMonthlyOnlyError,
+  SubscriptionMembersPaymentDayRequiredError,
   SubscriptionResponsibleRequiredError,
-  SubscriptionVendorAdminsRequiredError,
 } from '../subscription.errors';
 import type {
   BillingCycle,
   DeclarableBillingCycle,
   ProvisioningType,
+  SeatCounting,
   SubscriptionKind,
   SubscriptionWarning,
 } from '../subscription.types';
@@ -24,26 +26,14 @@ export interface PoolTermsInput {
   commitmentTermMonths: number | null;
   /** The subscription is becoming active with this write: a new one that is complete, or a draft that was just completed. */
   activating: boolean;
+  /** The subscription stays active after this write (including updates on an already active subscription). */
+  active?: boolean;
+  /** How the seats are counted and the payment day of a subscription counted by its members; left out, the rules of a fixed count apply. */
+  seatCounting?: SeatCounting | undefined;
+  renewalDate?: string | null | undefined;
 }
 
 const DECLARABLE_CYCLES: readonly string[] = ['MONTHLY', 'ANNUAL'] satisfies readonly DeclarableBillingCycle[];
-
-/**
- * The IT Admin a new subscription answers to (`QĐ-111g`, `BB-3`): the one the declaration names, else the IT Admin responsible for its
- * application while they are still a usable IT Admin (the test of `IdentityAccessApi.findUsableItAdminEmployeeIds`), else nobody. Only a
- * declaration is judged here, never a subscription that exists; the rule that an active one names somebody is `assertResponsibleNamed`.
- */
-export function defaultResponsibleOf(input: {
-  named: string | undefined;
-  applicationResponsible: string | null;
-  applicationResponsibleIsUsable: boolean;
-}): string | null {
-  if (input.named !== undefined) return input.named;
-
-  return input.applicationResponsible !== null && input.applicationResponsibleIsUsable
-    ? input.applicationResponsible
-    : null;
-}
 
 /** A new write names only a monthly or an annual billing cycle (`Q-09`); `QUARTERLY` and `OTHER` stay readable on data written earlier. */
 export function assertDeclarableCycle(billingCycle: string | undefined): void {
@@ -74,6 +64,7 @@ export function assertPoolTerms(input: PoolTermsInput): void {
 
     return;
   }
+  assertMembersTerms(input);
   if (input.commitmentTermMonths === 1 && input.billingCycle === 'ANNUAL') {
     throw new SubscriptionBillingLongerThanCommitmentError();
   }
@@ -81,52 +72,23 @@ export function assertPoolTerms(input: PoolTermsInput): void {
   if (input.activating && input.commitmentTermMonths === null) throw new SubscriptionCommitmentTermRequiredError();
 }
 
-/** An active subscription names the IT Admin who answers for it (`QĐ-103v`(4)). */
-export function assertResponsibleNamed(responsibleItAdminEmployeeId: string | null, activating: boolean): void {
-  if (activating && responsibleItAdminEmployeeId === null) throw new SubscriptionResponsibleRequiredError();
-}
-
-/** The fewest different working IT Admins at the vendor a plan that needs them has before it is activated. */
-const MIN_RECORDED_VENDOR_ADMINS = 2;
-
 /**
- * A subscription of a plan that needs admins at the vendor (`K2`, or `K4` with an admin console) is not activated, nor a pool made, while
- * fewer than two different IT Admins who administer it at the vendor are still working (outside the open seat-baseline phase). Throws
- * SubscriptionVendorAdminsRequiredError.
+ * A subscription counted by the members the vendor counts (`MEMBERS`, `QĐ-115g`) commits for one month only, and once active names its payment day in
+ * `renewalDate`. A fixed count is judged by nothing here. Throws SubscriptionMembersMonthlyOnlyError, SubscriptionMembersPaymentDayRequiredError.
  */
-export function assertVendorAdminsRecorded(input: { needs: boolean; given: number; planId: string }): void {
-  if (input.needs && input.given < MIN_RECORDED_VENDOR_ADMINS) {
-    throw new SubscriptionVendorAdminsRequiredError(input.planId, input.given, MIN_RECORDED_VENDOR_ADMINS);
+function assertMembersTerms(input: PoolTermsInput): void {
+  if (input.seatCounting !== 'MEMBERS') return;
+  if (input.commitmentTermMonths !== null && input.commitmentTermMonths !== 1) {
+    throw new SubscriptionMembersMonthlyOnlyError();
+  }
+  if ((input.activating || input.active) && (input.renewalDate ?? null) === null) {
+    throw new SubscriptionMembersPaymentDayRequiredError();
   }
 }
 
-/**
- * What a reader sees of the vendor admins of a subscription, never a refusal (`QĐ-110k`, `QĐ-110u`): fewer than two of the admins recorded still
- * work, and no email of the company account that owns the plan at the vendor is recorded. A plan that needs no admins raises neither; a
- * subscription older than the rule has the flags and nothing blocks it.
- */
-export function vendorAdminFlags(input: {
-  needs: boolean;
-  admins: ReadonlyArray<{ employeeId: string; working: boolean }>;
-  ownerAccountEmail: string | null;
-}): { vendorAdminsBelowMinimum: boolean; ownerAccountEmailMissing: boolean } {
-  if (!input.needs) return { vendorAdminsBelowMinimum: false, ownerAccountEmailMissing: false };
-  const working = new Set(input.admins.filter((admin) => admin.working).map((admin) => admin.employeeId)).size;
-
-  return {
-    vendorAdminsBelowMinimum: working < MIN_RECORDED_VENDOR_ADMINS,
-    ownerAccountEmailMissing: input.ownerAccountEmail === null,
-  };
-}
-
-/**
- * A subscription as someone who is not an IT Admin reads it (Finance reads subscriptions too, SPEC P19): who administers the plan at the vendor, the email
- * of the company account that owns it there and the note are the IT Admin's alone, so they are emptied; the shape and the two flags stay.
- */
-export function withoutVendorAdminDetail<
-  T extends { vendorAdmins: unknown[]; ownerAccountEmail: string | null; adminNote: string | null },
->(view: T): T {
-  return { ...view, vendorAdmins: [], ownerAccountEmail: null, adminNote: null };
+/** An active subscription names the IT Admin who answers for it (`QĐ-103v`(4)). */
+export function assertResponsibleNamed(responsibleItAdminEmployeeId: string | null, activating: boolean): void {
+  if (activating && responsibleItAdminEmployeeId === null) throw new SubscriptionResponsibleRequiredError();
 }
 
 /** The data-quality warnings of a stored subscription that come from data written before the shared-pool rules. */
@@ -219,6 +181,7 @@ function compareStart(a: string | null, b: string | null): number {
 export interface LivenessFacts {
   id: string;
   planId: string;
+  workspaceId?: string | null;
   status: 'DRAFT' | 'ACTIVE';
   kind: SubscriptionKind;
   endDate: string | null;
@@ -247,6 +210,31 @@ export function liveIdsByPlan(rows: readonly LivenessFacts[], today: string): Ma
   return live;
 }
 
+const workspacePlanKey = (workspaceId: string | null | undefined, planId: string): string =>
+  `${workspaceId ?? ''}:${planId}`;
+
+/** The live subscriptions keyed by `(workspaceId, planId)`, each list in the order given. */
+export function liveIdsByWorkspacePlan(rows: readonly LivenessFacts[], today: string): Map<string, string[]> {
+  const live = new Map<string, string[]>();
+  for (const row of rows) {
+    if (!isLiveSubscription(row, today)) continue;
+    const key = workspacePlanKey(row.workspaceId, row.planId);
+    live.set(key, [...(live.get(key) ?? []), row.id]);
+  }
+
+  return live;
+}
+
+/** The other live subscriptions of `(workspaceId, planId)` than `selfId`. */
+export function liveWorkspaceSiblingsOf(
+  live: ReadonlyMap<string, readonly string[]>,
+  workspaceId: string | null | undefined,
+  planId: string,
+  selfId: string | null,
+) {
+  return (live.get(workspacePlanKey(workspaceId, planId)) ?? []).filter((id) => id !== selfId);
+}
+
 /** The other live subscriptions of the plan than `selfId` (a subscription being written has none yet: pass null). */
 export function liveSiblingsOf(live: ReadonlyMap<string, readonly string[]>, planId: string, selfId: string | null) {
   return (live.get(planId) ?? []).filter((id) => id !== selfId);
@@ -267,8 +255,10 @@ export function isPooledPlan(type: ProvisioningType): boolean {
 export function withoutPeriodsAhead<T extends { id: string; renewedFromId: string | null; startDate: Date | null }>(
   rows: readonly T[],
   today: BusinessDate,
+  knownIds?: ReadonlySet<string>,
 ): T[] {
   const ids = new Set(rows.map((row) => row.id));
+  if (knownIds) for (const id of knownIds) ids.add(id);
 
   return rows.filter(
     (row) =>

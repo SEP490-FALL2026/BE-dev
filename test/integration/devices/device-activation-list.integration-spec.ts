@@ -51,28 +51,26 @@ describe('device activation list, withdrawn key replacement & idleDevice filter 
     ).id;
   };
 
-  const purchaseOf = async (planId: string, purchasedQuantity: number): Promise<string> =>
+  const purchaseOf = async (planId: string, licenseCount: number): Promise<string> =>
     h.dataOf<{ id: string }>(
       await request(server())
-        .post('/api/v1/subscriptions')
+        .post('/api/v1/license-lots')
         .set(as(h.it1))
         .send({
           planId,
-          kind: 'PERPETUAL',
-          purchasedQuantity,
+          purpose: 'STOCK',
+          licenseCount,
           unitPrice: { amount: '1200000', currency: 'VND' },
-          startDate: '2026-03-15',
-          responsibleItAdminEmployeeId: h.it1.employeeId,
+          purchasedOn: '2026-03-15',
         })
         .expect(201),
     ).id;
 
-  const importKey = async (subscriptionId: string, maxActivations = 10): Promise<string> => {
+  const importKey = async (lotId: string, maxActivations = 10): Promise<string> => {
     await request(server())
-      .post('/api/v1/license-keys/imports')
+      .post(`/api/v1/license-lots/${lotId}/keys`)
       .set(as(h.it1))
       .send({
-        subscriptionId,
         keys: [`KEY-${randomUUID().replace(/-/g, '').slice(0, 20).toUpperCase()}`],
         maxActivations,
       })
@@ -80,8 +78,8 @@ describe('device activation list, withdrawn key replacement & idleDevice filter 
 
     return (
       await h.ctx.sql.query<{ id: string }>(
-        `SELECT id FROM license_keys WHERE subscription_id = $1 ORDER BY imported_at DESC, id DESC LIMIT 1`,
-        [subscriptionId],
+        `SELECT id FROM license_keys WHERE license_lot_id = $1 ORDER BY imported_at DESC, id DESC LIMIT 1`,
+        [lotId],
       )
     ).rows[0].id;
   };

@@ -456,7 +456,11 @@ describe('the budget cycle: draft, open, locked (integration, real PostgreSQL)',
           )
           .items.map((item) => item.key);
 
-      expect(await keysOf(h.as(h.finance))).toEqual(['BUDGET_RESERVE_DEFAULT_PERCENT']);
+      // The variance threshold of the invoice of the pool is a parameter Finance sets (`owner: 'FINANCE'`, SPEC.md operating-parameters row).
+      expect(await keysOf(h.as(h.finance))).toEqual([
+        'BUDGET_RESERVE_DEFAULT_PERCENT',
+        'K2_INVOICE_VARIANCE_THRESHOLD_PERCENT',
+      ]);
       expect(await keysOf(asToken(h.admin))).toEqual(
         expect.arrayContaining(['BUDGET_RESERVE_DEFAULT_PERCENT', 'FORECAST_ERROR_THRESHOLD_PERCENT']),
       );

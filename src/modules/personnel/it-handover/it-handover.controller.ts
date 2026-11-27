@@ -52,6 +52,8 @@ const wire = (result: ItHandoverResult) => ({
   toItAdminEmployeeId: result.toEmployeeId,
   subscriptions: result.subscriptions,
   applications: result.applications,
+  workspaces: result.workspaces,
+  licenseLots: result.licenseLots,
   handedOverAt: result.at.toISOString(),
 });
 
@@ -72,7 +74,7 @@ export class ItHandoverController {
   })
   @ApiSuccessResponse(ItHandoverResultResponseDto, {
     message: 'OFFBOARDING_CASE.IT_ADMIN_HANDED_OVER',
-    description: `${WHO}Every subscription and every application the person answers for now goes to the IT Admin named, in one operation: the Audit Trail names the person who gave them up, the one who took them and the departure, the log of the case says so, and the one who took them is told. The case is read again for its itHandover section.`,
+    description: `${WHO}Every subscription, application, workspace and license lot the person answers for now goes to the IT Admin named, in one operation, and the answer and the notice of the one who took them count each kind: the Audit Trail names the person who gave them up, the one who took them and the departure, the log of the case says so, and the one who took them is told. The case is read again for its itHandover section.`,
   })
   @ApiErrorResponses(...COMMON, NOT_FOUND)
   async handOverOffboarding(
@@ -97,7 +99,7 @@ export class ItHandoverController {
   })
   @ApiSuccessResponse(ItHandoverResultResponseDto, {
     message: 'DEPARTMENT_TRANSFER.IT_ADMIN_HANDED_OVER',
-    description: `${WHO}Every subscription and every application the person answers for now goes to the IT Admin named, in one operation: the Audit Trail names the person who gave them up, the one who took them and the transfer, and the one who took them is told. The transfer is read again for its itHandover section.`,
+    description: `${WHO}Every subscription, application, workspace and license lot the person answers for now goes to the IT Admin named, in one operation, and the answer and the notice of the one who took them count each kind: the Audit Trail names the person who gave them up, the one who took them and the transfer, and the one who took them is told. The transfer is read again for its itHandover section.`,
   })
   @ApiErrorResponses(...COMMON, NOT_FOUND)
   async handOverTransfer(

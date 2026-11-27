@@ -11,7 +11,7 @@ import { ApiSuccessResponse } from '../../../../infrastructure/http/decorators/a
 import { RequireRoles } from '../../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
-import { withoutVendorAdminDetail } from '../pool/subscription-pool.policy';
+import { withoutVendorAdminDetail } from '../pool/subscription-vendor-admins-pool.policy';
 import { SubscriptionIdParamDto, SubscriptionResponsibleChangeResponseDto } from '../subscription.dto';
 import { SUBSCRIPTION_ERROR_EXAMPLES as EXAMPLES, toSubscriptionApiException } from '../subscription.http-errors';
 import { ChangeResponsibleBodyDto } from './subscription-responsible.dto';
@@ -65,14 +65,17 @@ export class SubscriptionResponsibleController {
   ) {
     try {
       const { subscription, changed } = await this.responsible.change(actor, params.id, body);
-      const view = withoutVendorAdminDetail(subscription);
-
-      return {
-        ...view,
-        createdAt: view.createdAt.toISOString(),
-        updatedAt: view.updatedAt.toISOString(),
+      const wire: Record<string, unknown> = {
+        ...withoutVendorAdminDetail(subscription),
+        lines: subscription.lines ?? [],
+        createdAt: subscription.createdAt.toISOString(),
+        updatedAt: subscription.updatedAt.toISOString(),
         changed,
       };
+      delete wire.lineCount;
+      delete wire.seatsToday;
+
+      return wire;
     } catch (error) {
       throw toSubscriptionApiException(error);
     }

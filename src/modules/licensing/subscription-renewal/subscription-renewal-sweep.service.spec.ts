@@ -3,6 +3,7 @@ import type { SubscriptionPeriodApi } from '../../catalog/public/subscription-pe
 import type { PeriodAdjustment, RenewalPeriodFacts } from '../../catalog/public/subscription-period.types';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { RenewalAlertsService } from './alerts/renewal-alerts.service';
+import type { SeatPurchaseInvoiceDueService } from '../shared-pool/seat-purchase-invoice-due.service';
 import type { RenewalDeadlineService } from './deadline/renewal-deadline.service';
 import type { RenewalSeatsNeededService } from './seats-needed/renewal-seats-needed.service';
 import type { RenewalPartiesService } from './subscription-renewal-parties.service';
@@ -54,6 +55,8 @@ function build(
   const sendDue = jest.fn<Promise<number>, [subject: Written]>().mockResolvedValue(1);
   const dataQualityWarning = jest.fn<Promise<number>, [subject: Written]>().mockResolvedValue(1);
   const recordPassedRenewalDay = jest.fn<Promise<boolean>, [subject: Written]>().mockResolvedValue(true);
+  const closeExpiredPeriod = jest.fn<Promise<boolean>, [subject: Written]>().mockResolvedValue(true);
+  const workspaceAdminSweep = jest.fn<Promise<number>, [organizationId: string]>().mockResolvedValue(0);
   const service = new SubscriptionRenewalSweepService(
     { listAdjustmentSubjects: jest.fn().mockResolvedValue(subjects) } as unknown as SubscriptionPeriodApi,
     { ofSubscriptions, endingAmong, deadlineEventsOf } as unknown as SubscriptionRenewalRepo,
@@ -63,11 +66,24 @@ function build(
       businessToday: jest.fn(() => Promise.resolve(TODAY.value)),
     } as unknown as OrganizationReadApi,
     { countFor } as unknown as RenewalSeatsNeededService,
-    { sendDue, dataQualityWarning } as unknown as RenewalAlertsService,
-    { recordPassedRenewalDay } as unknown as RenewalDeadlineService,
+    { sendDue, dataQualityWarning, sweepWorkspaceAdmins: workspaceAdminSweep } as unknown as RenewalAlertsService,
+    { recordPassedRenewalDay, closeExpiredPeriod } as unknown as RenewalDeadlineService,
+    {
+      remindOverdue: jest.fn().mockResolvedValue({ told: 0, failed: 0 }),
+    } as unknown as SeatPurchaseInvoiceDueService,
   );
 
-  return { service, ofSubscriptions, sharedPeople, countFor, sendDue, dataQualityWarning, recordPassedRenewalDay };
+  return {
+    service,
+    ofSubscriptions,
+    sharedPeople,
+    countFor,
+    sendDue,
+    dataQualityWarning,
+    recordPassedRenewalDay,
+    closeExpiredPeriod,
+    workspaceAdminSweep,
+  };
 }
 
 const sweep = (service: SubscriptionRenewalSweepService) => service.sweep(new Date('2026-11-10T05:00:00.000Z'));
@@ -130,16 +146,20 @@ describe('the pass over the points of adjustment (SBF-20 §4.5)', () => {
     expect(sendDue).not.toHaveBeenCalled();
   });
 
-  it('marks the end of a plan that does not renew itself, and records nothing when no seat is held or the event exists', async () => {
+  it('marks the end of a plan that does not renew itself regardless of holdsSeats (F-11), and skips incident/already-recorded', async () => {
     TODAY.value = '2026-12-07';
     const ends = periodOf('a', annual, { autoRenew: false });
     const marked = build([ends]);
     await sweep(marked.service);
     expect(marked.recordPassedRenewalDay.mock.calls[0][0]).toMatchObject({ kind: 'EXPIRY_MARKED' });
 
-    const empty = build([ends], { counts: { activeSeatsToday: 0 } });
-    expect(await sweep(empty.service)).toEqual({ told: 0, deadlineEvents: 0, failed: 0 });
-    expect(empty.recordPassedRenewalDay).not.toHaveBeenCalled();
+    const emptyEnds = build([ends], { counts: { activeSeatsToday: 0 } });
+    expect(await sweep(emptyEnds.service)).toEqual({ told: 0, deadlineEvents: 1, failed: 0 });
+    expect(emptyEnds.recordPassedRenewalDay.mock.calls[0][0]).toMatchObject({ kind: 'EXPIRY_MARKED' });
+
+    const emptyAuto = build([periodOf('a', annual, { autoRenew: true })], { counts: { activeSeatsToday: 0 } });
+    expect(await sweep(emptyAuto.service)).toEqual({ told: 0, deadlineEvents: 0, failed: 0 });
+    expect(emptyAuto.recordPassedRenewalDay).not.toHaveBeenCalled();
 
     const already = build([ends], { events: ['a'] });
     await sweep(already.service);
@@ -229,5 +249,33 @@ describe('the pass over the points of adjustment (SBF-20 §4.5)', () => {
     } finally {
       error.mockRestore();
     }
+  });
+
+  it('runs the workspace admin alert sweep even when no renewal subjects are due (W3-12)', async () => {
+    const { service, workspaceAdminSweep } = build([]);
+    workspaceAdminSweep.mockResolvedValue(2);
+
+    expect(await sweep(service)).toEqual({ told: 2, deadlineEvents: 0, failed: 0 });
+    expect(workspaceAdminSweep).toHaveBeenCalledWith('org');
+  });
+
+  it('closes live lines ENDED on renewalDate - 1 when autoRenew=false, endDate=null, renewalDate<today and adjustment=null (F-11)', async () => {
+    TODAY.value = '2027-07-02';
+    const noEndExpired: RenewalPeriodFacts = {
+      ...periodOf('sub-no-end', null),
+      autoRenew: false,
+      endDate: null,
+      renewalDate: '2027-07-01',
+      renewedById: null,
+    };
+    const { service, closeExpiredPeriod } = build([noEndExpired]);
+
+    await sweep(service);
+
+    expect(closeExpiredPeriod).toHaveBeenCalledTimes(1);
+    expect(closeExpiredPeriod.mock.calls[0][0]).toMatchObject({
+      period: noEndExpired,
+      adjustment: { end: '2027-07-01', kind: 'RENEWAL_DATE' },
+    });
   });
 });

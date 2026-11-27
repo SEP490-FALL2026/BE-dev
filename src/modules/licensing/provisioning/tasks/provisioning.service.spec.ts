@@ -16,7 +16,7 @@ const ACTOR: AuthenticatedPrincipal = {
 const tx = { name: 'tx' } as unknown as DbTx;
 
 type Action = {
-  beforeLock?: (tx: DbTx, task: ProvisioningTaskRecord) => Promise<void>;
+  beforeLock: ((tx: DbTx, task: ProvisioningTaskRecord) => Promise<void>) | null;
 };
 
 function claimWith(holders: { holdBeneficiaryOfTask: jest.Mock; requireCanBeginTask: jest.Mock }) {

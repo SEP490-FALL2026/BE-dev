@@ -3,7 +3,7 @@
 Phần của [SPEC.md](SPEC.md). **Tự đứng được:** không cần bảng Workspace hay dòng thuê bao; mọi công thức dùng dữ liệu hiện có
 (một kỳ thuê bao = một gói, số seat của kỳ = `subscriptions.purchased_quantity`). B3 thay nguồn số seat bằng sổ mà **không**
 đổi công thức (W3-22). Migration: M1, M2, M3 ([SPEC §5](SPEC.md#5-mô-hình-dữ-liệu-mới-và-migration)). `file:line` tính từ
-`src/modules/`, đọc trên `int/redesign-w2` `8a4c8b70` (= `origin/dev` `b7a7cc80` + đợt 2; đợt 2 vào `dev` trước khi tách nhánh).
+`src/modules/`, đọc trên `int/redesign-w2` `8a4c8b70`, đối chiếu lại `origin/dev` `70543271` ở [DELTA-W2-FINAL.md](DELTA-W2-FINAL.md) (= `origin/dev` `b7a7cc80` + đợt 2; đợt 2 vào `dev` trước khi tách nhánh).
 
 Ví dụ dùng chung (công ty mẫu của `Docs/Requiments/giai-thich-kho-gia-han-chi-phi-ngan-sach.md`): Claude Team Standard **500.000 đ**,
 Premium **2.500.000 đ** / seat-tháng, cam kết 12 tháng trả năm, kỳ 01/07/2026 → 30/06/2027, gia hạn **01/07/2027**, hạn chót báo

@@ -20,6 +20,8 @@ const SECTION_KEYS = {
   itAdmin: [
     'cancellationDeadlines',
     'departures',
+    'deviceReturnTasksOpen',
+    'deviceReturnTasksOverdue',
     'discrepancies',
     'ghostSeats',
     'grantTasks',
@@ -34,6 +36,7 @@ const SECTION_KEYS = {
     'termsToReview',
     'transfers',
     'unconfirmedDevices',
+    'workspacesBelowVendorAdminMinimum',
   ],
   superAdmin: [
     'accountCandidates',
@@ -48,6 +51,7 @@ const SECTION_KEYS = {
     'seatsReturned',
     'superAdminRole',
     'transfers',
+    'workspacesBelowVendorAdminMinimum',
   ],
 };
 
@@ -107,7 +111,7 @@ describe('role overviews (integration, real PostgreSQL)', () => {
     e2 = await h.employeeIn(eng.department, 'G-E2');
     e3 = await h.employeeIn(des.department, 'D-E3');
     const figma = await h.subscription(10, 'K2');
-    const notion = await h.subscription(10, 'K1');
+    const notion = await h.subscription(10, 'K2');
     const engTool = await h.subscription(10, 'K2');
     const office = await h.subscription(10, 'K4');
     seats.e1Figma = await h.rightOf(e1, 'D-E1', { subscriptionId: figma });
@@ -398,6 +402,12 @@ describe('role overviews (integration, real PostgreSQL)', () => {
 
   // US-12-15 AC-4, US-01-11: IT2 takes over a task of P-DES; the audit names both, and the task stays in IT1's overview.
   it('lets IT2 work a task of P-DES, with both people in the audit trail and the task still counted for IT1', async () => {
+    await h.ctx.sql.query(
+      `INSERT INTO department_it_substitutes
+         (id, organization_id, department_id, substitute_employee_id, replaced_employee_id, reason, appointed_at, appointed_by_app_user_id)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, 'Coverage', now(), $5)`,
+      [h.seed.organizationId, des.department.id, it2.employeeId, it1.employeeId, h.sa.appUserId],
+    );
     await request(h.server())
       .post(`/api/v1/provisioning-tasks/${desGrantTask}/claim`)
       .set(h.as(it2.account))

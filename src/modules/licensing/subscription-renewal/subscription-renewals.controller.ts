@@ -20,6 +20,8 @@ import {
   SubscriptionRenewalAdjustmentQueryDto,
   SubscriptionRenewalAdjustmentResponseDto,
   SubscriptionRenewalListQueryDto,
+  SubscriptionRenewalMissedAdjustmentKpiQueryDto,
+  SubscriptionRenewalMissedAdjustmentKpiResponseDto,
   SubscriptionRenewalProposeBodyDto,
   SubscriptionRenewalOutcomeBodyDto,
   SubscriptionRenewalIdParamDto,
@@ -28,6 +30,7 @@ import {
   SubscriptionRenewalSeatRankingQueryDto,
   SubscriptionRenewalSeatRankingResponseDto,
 } from './subscription-renewal.dto';
+import { toMissedAdjustmentKpiWire } from './subscription-renewal.mapper';
 import { RENEWAL_ERROR_EXAMPLES as EXAMPLES, toRenewalApiException } from './subscription-renewal.http-errors';
 import { RenewalViewService } from './subscription-renewal-view.service';
 
@@ -53,6 +56,23 @@ const NOT_FOUND: ErrorResponseDeclaration = {
   status: HttpStatus.NOT_FOUND,
   description: 'There is no renewal with this id (SUBSCRIPTION_RENEWAL.NOT_FOUND).',
   examples: [EXAMPLES.NOT_FOUND],
+};
+const PROPOSE_UNPROCESSABLE: ErrorResponseDeclaration = {
+  status: HttpStatus.UNPROCESSABLE_ENTITY,
+  description:
+    'Validation or business rules failed on the proposal: invalid line quantities, reduction after deadline, missing lines[] on multi-line periods, missing vendor minimum evidence, missing nextPeriod, or invalid VND price.',
+  examples: [
+    VALIDATION_EXAMPLE,
+    EXAMPLES.QUANTITY_INVALID,
+    EXAMPLES.VENDOR_MINIMUM_EVIDENCE_REQUIRED,
+    EXAMPLES.NEXT_PERIOD_REQUIRED,
+    EXAMPLES.OUTCOME_MISMATCH,
+    EXAMPLES.LINE_QUANTITY_NOT_TARGET,
+    EXAMPLES.REDUCTION_AFTER_DEADLINE,
+    EXAMPLES.LINES_REQUIRED,
+    EXAMPLES.MONEY_SCALE_EXCEEDED,
+    EXAMPLES.MONEY_OUT_OF_RANGE,
+  ],
 };
 
 // The renewal of a subscription at its point of adjustment (QĐ-103e, SBF-20): the IT Admin records the result once
@@ -112,7 +132,7 @@ export class SubscriptionRenewalsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The subscription has no point of adjustment: a perpetual purchase, internal software, a term that is not a workspace of the shared pool (a key or a one-time license), a draft, a period already continued or a subscription already recorded as cancelled (SUBSCRIPTION_RENEWAL.NOT_RENEWABLE, details.reason PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED or CANCELLED); a cancellation decided before the one-write rule still waits for its outcome (SUBSCRIPTION_RENEWAL.ALREADY_PROPOSED, details.renewalId: the IT Admin records its outcome first); no date gives its point and its contract data must be completed first (SUBSCRIPTION_RENEWAL.CONTRACT_DATA_INCOMPLETE).',
+        'The subscription has no point of adjustment: a perpetual purchase, internal software, a term that is not a workspace of the shared pool (a key or a one-time license), a draft, a period already continued, a subscription counted by its members, or a subscription already recorded as cancelled (SUBSCRIPTION_RENEWAL.NOT_RENEWABLE, details.reason PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED, MEMBER_COUNTED or CANCELLED); a cancellation decided before the one-write rule still waits for its outcome (SUBSCRIPTION_RENEWAL.ALREADY_PROPOSED, details.renewalId: the IT Admin records its outcome first); no date gives its point and its contract data must be completed first (SUBSCRIPTION_RENEWAL.CONTRACT_DATA_INCOMPLETE).',
       examples: [EXAMPLES.NOT_RENEWABLE, EXAMPLES.ALREADY_PROPOSED, EXAMPLES.CONTRACT_DATA_INCOMPLETE],
     },
     INVALID,
@@ -192,7 +212,7 @@ export class SubscriptionRenewalsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The subscription has no point of adjustment: a perpetual purchase, internal software, a term that is not a workspace of the shared pool, a draft, a period already continued or a subscription already recorded as cancelled (SUBSCRIPTION_RENEWAL.NOT_RENEWABLE, details.reason PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED or CANCELLED); no date gives its point and its contract data must be completed first (SUBSCRIPTION_RENEWAL.CONTRACT_DATA_INCOMPLETE); the point has not come (SUBSCRIPTION_RENEWAL.BEFORE_ADJUSTMENT_POINT, details.adjustmentPointOn, details.deadline); the quantity is not the seats the next period needs (SUBSCRIPTION_RENEWAL.QUANTITY_NOT_SEATS_NEEDED, details.seatsNeeded, vendorMinimumSeats, target, quantity); a cancellation while seats are needed, in effect or a request of the plan is open (SUBSCRIPTION_RENEWAL.CANCEL_NOT_ALLOWED, details.seatsNeeded, heldPastRenewal, pendingContinuations, approvedAwaitingGrant, activeSeatsToday, openRequests); the period already has its result, or a case of before (a cancellation decided before the rule too) still waits for its outcome (SUBSCRIPTION_RENEWAL.ALREADY_PROPOSED, details.renewalId); more seats are held than the new period buys (SUBSCRIPTION_RENEWAL.EXCESS_NOT_REVOKED); a seat to carry has an open task (SUBSCRIPTION_RENEWAL.SEATS_HAVE_OPEN_TASKS); the new period cannot be recorded as the continuation (SUBSCRIPTION_RENEWAL.PERIOD_REFUSED, details.reason NOT_ON_RENEWAL_DAY with details.renewalOn when nextPeriod.startDate is not the renewal day: renewalOn or the day after it for a plan by the year, the payment day for a plan by the month; or another reason such as ALREADY_RENEWED, PRICE_NOT_VND). Nothing is written.',
+        'The subscription has no point of adjustment, missing contract dates, before adjustment point, quantity mismatch, cancel not allowed, already proposed, excess seats in use, open provisioning tasks, or next period refused.',
       examples: [
         EXAMPLES.NOT_RENEWABLE,
         EXAMPLES.CONTRACT_DATA_INCOMPLETE,
@@ -205,20 +225,7 @@ export class SubscriptionRenewalsController {
         EXAMPLES.PERIOD_REFUSED,
       ],
     },
-    {
-      status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description:
-        'A field is invalid or one the route does not know (VALIDATION_ERROR), among them a note missing when the vendor refused or did otherwise and a closure not confirmed for a cancellation; the quantity does not fit the choice: a renewal names the seats bought, a reduction fewer, an increase more, a cancellation none (SUBSCRIPTION_RENEWAL.QUANTITY_INVALID); the seats are the vendor minimum above the need and note gives no evidence (SUBSCRIPTION_RENEWAL.VENDOR_MINIMUM_EVIDENCE_REQUIRED, details.seatsNeeded, vendorMinimumSeats); a renewal, a reduction or an increase with no nextPeriod, except a vendor that refused a plan by the month, and a cancellation the vendor refused or did otherwise with no nextPeriod (SUBSCRIPTION_RENEWAL.NEXT_PERIOD_REQUIRED); an outcome as decided whose new period does not have the seats recorded (SUBSCRIPTION_RENEWAL.OUTCOME_MISMATCH); the price of the new period has decimals, which dong does not have (MONEY_SCALE_EXCEEDED, details.allowedDecimals 0), or is below nothing or too large (MONEY_OUT_OF_RANGE), both with details.path nextPeriod.unitPrice.',
-      examples: [
-        VALIDATION_EXAMPLE,
-        EXAMPLES.QUANTITY_INVALID,
-        EXAMPLES.VENDOR_MINIMUM_EVIDENCE_REQUIRED,
-        EXAMPLES.NEXT_PERIOD_REQUIRED,
-        EXAMPLES.OUTCOME_MISMATCH,
-        EXAMPLES.MONEY_SCALE_EXCEEDED,
-        EXAMPLES.MONEY_OUT_OF_RANGE,
-      ],
-    },
+    PROPOSE_UNPROCESSABLE,
   )
   async propose(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: SubscriptionRenewalProposeBodyDto) {
     try {
@@ -249,7 +256,7 @@ export class SubscriptionRenewalsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The case is not waiting for its outcome (SUBSCRIPTION_RENEWAL.NOT_AWAITING_OUTCOME); more seats are held than the new period buys, or a cancelled subscription still has seats (SUBSCRIPTION_RENEWAL.EXCESS_NOT_REVOKED, details.seatsInUse, details.quantity); a seat to carry has an open task (SUBSCRIPTION_RENEWAL.SEATS_HAVE_OPEN_TASKS); the new period cannot be recorded as the continuation, for example the period was already continued, or its unit price is not in dong: a price is entered in dong only (SUBSCRIPTION_RENEWAL.PERIOD_REFUSED, details.reason ALREADY_RENEWED, PRICE_NOT_VND and the others). Nothing is written.',
+        'The case is not waiting for its outcome (SUBSCRIPTION_RENEWAL.NOT_AWAITING_OUTCOME); more seats are held than the new period buys, or a cancelled subscription still has seats (SUBSCRIPTION_RENEWAL.EXCESS_NOT_REVOKED, details.seatsInUse, details.quantity); a seat to carry has an open task (SUBSCRIPTION_RENEWAL.SEATS_HAVE_OPEN_TASKS); the new period cannot be recorded as the continuation, for example the period was already continued, or its unit price is not in dong: a price is entered in dong only (SUBSCRIPTION_RENEWAL.PERIOD_REFUSED, details.reason ALREADY_RENEWED, PRICE_NOT_VND and the others; details.planId names the plan when details.reason is APPLICATION_RETIRED). Nothing is written.',
       examples: [
         EXAMPLES.NOT_AWAITING_OUTCOME,
         EXAMPLES.EXCESS_NOT_REVOKED,
@@ -264,6 +271,8 @@ export class SubscriptionRenewalsController {
       examples: [
         VALIDATION_EXAMPLE,
         EXAMPLES.OUTCOME_MISMATCH,
+        EXAMPLES.QUANTITY_INVALID,
+        EXAMPLES.LINES_REQUIRED,
         EXAMPLES.MONEY_SCALE_EXCEEDED,
         EXAMPLES.MONEY_OUT_OF_RANGE,
       ],
@@ -306,6 +315,39 @@ export class SubscriptionRenewalsController {
   async deadlineEvents(@Query() query: SubscriptionDeadlineEventListQueryDto) {
     try {
       return await this.views.deadlineEvents(query);
+    } catch (error) {
+      throw toRenewalApiException(error);
+    }
+  }
+
+  @Get('subscriptions/:id/renewals/missed-adjustment-kpi')
+  @AuthenticatedOnly()
+  @ApiOperation({
+    operationId: 'subscriptionRenewalMissedAdjustmentKpiGet',
+    summary: 'Read missed adjustment seat-months and cost for a subscription',
+  })
+  @ApiSuccessResponse(SubscriptionRenewalMissedAdjustmentKpiResponseDto, {
+    message: 'SUBSCRIPTION_RENEWAL.KPI4_RETRIEVED',
+    description:
+      'Summary of unused seats kept past the adjustment point across requested calendar months, with per-line and per-month seat-month and cost breakdowns in dong. Read by the IT Admin and Finance.',
+  })
+  @ApiErrorResponses(
+    ...AUTH_ERRORS,
+    READERS_ONLY,
+    {
+      status: HttpStatus.NOT_FOUND,
+      description: 'The subscription does not exist (SUBSCRIPTION_RENEWAL.NOT_FOUND).',
+      examples: [EXAMPLES.NOT_FOUND],
+    },
+    INVALID,
+  )
+  async missedAdjustmentKpi(
+    @CurrentPrincipal() actor: AuthenticatedPrincipal,
+    @Param() params: SubscriptionRenewalIdParamDto,
+    @Query() query: SubscriptionRenewalMissedAdjustmentKpiQueryDto,
+  ) {
+    try {
+      return { kpi: toMissedAdjustmentKpiWire(await this.views.missedAdjustmentKpiOf(actor, params.id, query.months)) };
     } catch (error) {
       throw toRenewalApiException(error);
     }

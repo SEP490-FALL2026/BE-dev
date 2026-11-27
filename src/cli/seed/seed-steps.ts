@@ -5,7 +5,8 @@ import { ASSET_STEPS } from './steps/assets.steps';
 import { BASELINE_STEPS } from './steps/baseline.steps';
 import { budgetSteps } from './steps/budget.steps';
 import { CATALOG_EXTRA_STEPS } from './steps/catalog-extra.steps';
-import { CATALOG_STEPS } from './steps/catalog.steps';
+import { CATALOG_STEPS, SEAT_PURCHASE_STEPS } from './steps/catalog.steps';
+import { CATALOG_LOT_STEPS } from './steps/catalog-lots.steps';
 import { DEMO_STEPS } from './steps/demo.steps';
 import { DEMO_DOCUMENT_STEPS } from './steps/demo-documents.steps';
 import { DEVICE_INITIAL_STEPS, DEVICE_STEPS } from './steps/devices.steps';
@@ -58,6 +59,7 @@ export function demoSteps(fixture: DemoFixture): DemoStep[] {
     ...PEOPLE_ADMIN_STEPS,
     pick('finance.cost-centers'),
     ...CATALOG_STEPS,
+    ...CATALOG_LOT_STEPS,
     ...CATALOG_EXTRA_STEPS,
     pick('finance.tax-profile'),
     // Before the baseline closes (S-14): the keys with the activations they already had, then the old machines that ran them. After it, the
@@ -69,6 +71,7 @@ export function demoSteps(fixture: DemoFixture): DemoStep[] {
     pick('budget.cycles'),
     ...budgetSteps(),
     ...requestSteps(fixture.requests),
+    ...SEAT_PURCHASE_STEPS,
     ...RETURN_STEPS,
     ...SAAS_ISSUE_STEPS,
     ...extraSteps(),

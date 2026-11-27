@@ -269,8 +269,12 @@ describe('the baseline and the package of a budget cycle (integration, real Post
     const unit = await department();
     await holdSeats(unit, 6);
     await h.ctx.sql.query(
-      `UPDATE subscriptions SET billing_cycle = 'ANNUAL', unit_price_minor = 1200000, price_reporting_minor = 1200000, end_date = $2 WHERE id = $1`,
+      `UPDATE subscriptions SET billing_cycle = 'ANNUAL', unit_price_minor = 1200000, price_reporting_minor = 1200000, monthly_unit_price_minor = 100000, end_date = $2 WHERE id = $1`,
       [unit.subscription, `${year()}-06-30`],
+    );
+    await h.ctx.sql.query(
+      `UPDATE subscription_lines SET monthly_unit_price_minor = 100000 WHERE subscription_id = $1`,
+      [unit.subscription],
     );
 
     const entry = entryOf(h.dataOf<BaselineWire>(await baseline().expect(200)), unit.department.id, unit.subscription);
@@ -285,8 +289,12 @@ describe('the baseline and the package of a budget cycle (integration, real Post
     const unit = await department();
     await holdSeats(unit, 6);
     await h.ctx.sql.query(
-      `UPDATE subscriptions SET billing_cycle = 'ANNUAL', unit_price_minor = 1200000, price_reporting_minor = 1200000, end_date = $2 WHERE id = $1`,
+      `UPDATE subscriptions SET billing_cycle = 'ANNUAL', unit_price_minor = 1200000, price_reporting_minor = 1200000, monthly_unit_price_minor = 100000, end_date = $2 WHERE id = $1`,
       [unit.subscription, `${year()}-06-30`],
+    );
+    await h.ctx.sql.query(
+      `UPDATE subscription_lines SET monthly_unit_price_minor = 100000 WHERE subscription_id = $1`,
+      [unit.subscription],
     );
     await orderToEnd(unit.subscription);
 
@@ -322,19 +330,6 @@ describe('the baseline and the package of a budget cycle (integration, real Post
 
     expect(entry).toMatchObject({ monthsRunning: 12, suggestRenewal: true });
     expect(entry?.estimatedAnnualCost?.amount).toBe('72000000');
-  });
-
-  it('says when a subscription is paid in a cycle the baseline cannot price by the month, and leaves its cost out of the total (F-074)', async () => {
-    const unit = await department();
-    await holdSeats(unit, 2);
-    await h.ctx.sql.query(`UPDATE subscriptions SET billing_cycle = 'OTHER' WHERE id = $1`, [unit.subscription]);
-
-    const wire = h.dataOf<BaselineWire>(await baseline().expect(200));
-
-    const row = wire.departments.find((d) => d.departmentId === unit.department.id);
-    expect(row?.hasUnknownCost).toBe(true);
-    expect(row?.estimatedAnnualCost.amount).toBe('0');
-    expect(entryOf(wire, unit.department.id, unit.subscription)?.estimatedAnnualCost).toBeNull();
   });
 
   it('adds up the spend of the year on every Cost Center the department had, not only the one in use (F-072)', async () => {

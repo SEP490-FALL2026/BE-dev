@@ -26,6 +26,7 @@ export const NAME_KIND_BY_KEY: Readonly<Record<string, NameKind>> = {
   beneficiaryEmployeeId: 'EMPLOYEE',
   fromEmployeeId: 'EMPLOYEE',
   changedByEmployeeId: 'EMPLOYEE',
+  recordedByEmployeeId: 'EMPLOYEE',
   substituteEmployeeId: 'EMPLOYEE',
   replacedEmployeeId: 'EMPLOYEE',
   inChargeEmployeeId: 'EMPLOYEE',
@@ -39,6 +40,8 @@ export const NAME_KIND_BY_KEY: Readonly<Record<string, NameKind>> = {
   suggestedPlanId: 'PLAN',
   alternativePlanId: 'PLAN',
   subscriptionId: 'SUBSCRIPTION',
+  workspaceId: 'WORKSPACE',
+  lotId: 'LICENSE_LOT',
 };
 
 /**
@@ -54,4 +57,6 @@ export const NAME_FALLBACK: Readonly<Record<NameKind, Readonly<Record<Notificati
   APPLICATION: { vi: '(không rõ tên)', en: '(unnamed)' },
   PLAN: { vi: '(không rõ tên)', en: '(unnamed)' },
   SUBSCRIPTION: { vi: '(không rõ tên)', en: '(unnamed)' },
+  WORKSPACE: { vi: '(không rõ tên)', en: '(unnamed)' },
+  LICENSE_LOT: { vi: '(không rõ tên)', en: '(unnamed)' },
 };

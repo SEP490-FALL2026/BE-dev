@@ -33,3 +33,43 @@ export function seatIncreaseRecipients(input: {
 
   return input.superAdmin !== null && input.superAdmin !== input.actor ? [input.superAdmin] : [];
 }
+
+/** True when an active K2 subscription reduces its purchasedQuantity. */
+export function seatReductionNoticeOwed(input: {
+  planProvisioningType: ProvisioningType;
+  status: SubscriptionStatus;
+  from: number | null;
+  to: number | null;
+}): boolean {
+  return (
+    input.planProvisioningType === 'K2' &&
+    input.status === 'ACTIVE' &&
+    input.from !== null &&
+    input.to !== null &&
+    input.to < input.from
+  );
+}
+
+/**
+ * Recipients of a K2 seat reduction: R1 (usable responsible IT Admin if not actor, else usable Super Admin if
+ * not actor) plus R2 (usable Finance account if not actor, deduplicated).
+ */
+export function seatReductionRecipients(input: {
+  responsible: string | null;
+  responsibleUsable: boolean;
+  superAdmin: string | null;
+  finance: string | null;
+  actor: string;
+}): string[] {
+  const primary = seatIncreaseRecipients({
+    responsible: input.responsible,
+    responsibleUsable: input.responsibleUsable,
+    superAdmin: input.superAdmin,
+    actor: input.actor,
+  });
+  if (input.finance === null || input.finance === input.actor || primary.includes(input.finance)) {
+    return primary;
+  }
+
+  return [...primary, input.finance];
+}

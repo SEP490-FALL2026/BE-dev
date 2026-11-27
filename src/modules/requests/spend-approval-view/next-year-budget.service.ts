@@ -59,6 +59,9 @@ export class NextYearBudgetService {
         subjects.map((subject) => subject.requestId),
       ),
     ]);
+    const runningUncommitted = await this.budgets.runningUncommittedOfYear(costCenterIds, year, {
+      exceptRequestIds: kept.requestIds,
+    });
 
     const result = new Map<string, NextYearBudgetWire | null>(subjects.map((subject) => [subject.requestId, null]));
     const formatters = new Map<string, Awaited<ReturnType<SpendWireViewService['formatter']>>>();
@@ -67,7 +70,8 @@ export class NextYearBudgetService {
       const figures = nextYearBudgetOf({
         year,
         approvedMinor: budget ? budget.baseMinor + budget.reserveMinor : null,
-        keptByOthersMinor: kept.get(subject.costCenterId as string) ?? 0n,
+        keptByOthersMinor: kept.totals.get(subject.costCenterId as string) ?? 0n,
+        runningUncommittedMinor: runningUncommitted.get(subject.costCenterId as string) ?? 0n,
         thisMinor: subject.nextYearAmountMinor ?? 0n,
       });
       if (figures === null) continue;

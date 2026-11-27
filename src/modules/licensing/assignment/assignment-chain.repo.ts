@@ -78,4 +78,41 @@ export class AssignmentChainRepo {
 
     return rows.map((row) => row.id);
   }
+
+  /** Resolves the top-most K1 annual ancestor (`predecessor_id` or `replaces_assignment_id`) for Tier 0 advisory locking. */
+  async k1RootOf(tx: DbTx, assignmentId: string): Promise<string> {
+    const rows = await tx.$queryRaw<{ id: string }[]>`
+      WITH RECURSIVE anc AS (
+        SELECT "id", "predecessor_id", "replaces_assignment_id", 0 AS depth
+          FROM "license_assignments" WHERE "id" = ${assignmentId}::uuid
+        UNION
+        SELECT a."id", a."predecessor_id", a."replaces_assignment_id", anc.depth + 1
+          FROM "license_assignments" a
+          JOIN anc ON a."id" = anc."predecessor_id" OR a."id" = anc."replaces_assignment_id"
+         WHERE anc.depth < 64
+      )
+      SELECT "id"::text AS id FROM anc ORDER BY depth DESC, "id" ASC LIMIT 1`;
+
+    return rows[0]?.id ?? assignmentId;
+  }
+
+  /** Reads K1 commitment terms stored on an assignment (`personalCommitmentMonths`, `billingAnchorOn`). */
+  async k1TermsOf(
+    db: Pick<DbTx, '$queryRaw'>,
+    assignmentId: string,
+  ): Promise<{ personalCommitmentMonths: 1 | 12 | null; billingAnchorOn: BusinessDate | null } | null> {
+    const rows = await db.$queryRaw<{ pcm: number | null; anchor: string | null }[]>`
+      SELECT "personal_commitment_months" AS pcm,
+             to_char("billing_anchor_on", 'YYYY-MM-DD') AS anchor
+        FROM "license_assignments"
+       WHERE "id" = ${assignmentId}::uuid
+       LIMIT 1`;
+    const row = rows[0];
+    if (!row) return null;
+
+    return {
+      personalCommitmentMonths: row.pcm === 1 || row.pcm === 12 ? row.pcm : null,
+      billingAnchorOn: row.anchor,
+    };
+  }
 }

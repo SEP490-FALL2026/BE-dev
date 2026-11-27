@@ -1,42 +1,184 @@
-import { potentialSavingOf } from './potential-saving.policy';
+import { potentialSavingOf, type SavingFacts } from './potential-saving.policy';
 
-const price = (amountMinor: bigint, billingCycle: 'MONTHLY' | 'ANNUAL' | 'QUARTERLY' | 'OTHER') => ({
-  amountMinor,
-  currency: 'USD',
+const price = (monthlyPriceMinor: bigint | null, billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER') => ({
+  monthlyPriceMinor,
+  currency: 'VND',
   billingCycle,
 });
 
-describe('the potential saving of a seat (FR-4.15, R-J09, US-10-04 AC-3, DA6-31)', () => {
-  it('K2 on an annual plan is the month and the year at the renewal (15 and 180)', () => {
-    expect(potentialSavingOf({ provisioningType: 'K2', price: price(180n, 'ANNUAL') })).toMatchObject({
-      monthlyAmountMinor: '15',
-      amountAtPointMinor: '180',
-      currency: 'USD',
-      realisableAt: 'UNKNOWN',
-      realisableOn: null,
+describe('the potential saving of a seat (FR-4.15, R-J09, US-10-04 AC-3, DA6-31, W3-02, W3-09)', () => {
+  it.each<{
+    name: string;
+    input: SavingFacts;
+    expected: ReturnType<typeof potentialSavingOf>;
+  }>([
+    {
+      name: 'Standard K2 12-month upfront (before 01/06 deadline), 2 seats -> 12.000.000 đ at 2026-07-01 (RENEWAL)',
+      input: {
+        provisioningType: 'K2',
+        price: price(500_000n, 'ANNUAL'),
+        seats: 2,
+        commitmentTermMonths: 12,
+        realisableOn: '2026-07-01',
+      },
+      expected: {
+        monthlyAmountMinor: '500000',
+        amountAtPointMinor: '12000000',
+        currency: 'VND',
+        realisableOn: '2026-07-01',
+        realisableAt: 'RENEWAL',
+      },
+    },
+    {
+      name: 'Standard K2 12-month past 01/06 deadline (Q-F) -> rolled to next cycle 2027-07-01 (RENEWAL)',
+      input: {
+        provisioningType: 'K2',
+        price: price(500_000n, 'ANNUAL'),
+        seats: 2,
+        commitmentTermMonths: 12,
+        realisableOn: '2027-07-01',
+      },
+      expected: {
+        monthlyAmountMinor: '500000',
+        amountAtPointMinor: '12000000',
+        currency: 'VND',
+        realisableOn: '2027-07-01',
+        realisableAt: 'RENEWAL',
+      },
+    },
+    {
+      name: 'Figma K2 1-month monthly before determination point (10/02) -> x1 at 2026-03-01 (NEXT_BILLING)',
+      input: {
+        provisioningType: 'K2',
+        price: price(500_000n, 'MONTHLY'),
+        seats: 1,
+        commitmentTermMonths: 1,
+        realisableOn: '2026-03-01',
+      },
+      expected: {
+        monthlyAmountMinor: '500000',
+        amountAtPointMinor: '500000',
+        currency: 'VND',
+        realisableOn: '2026-03-01',
+        realisableAt: 'NEXT_BILLING',
+      },
+    },
+    {
+      name: 'Figma K2 1-month between determination and B1-R3 deadline (16/02) -> x1 at 2026-03-01 (NEXT_BILLING)',
+      input: {
+        provisioningType: 'K2',
+        price: price(500_000n, 'MONTHLY'),
+        seats: 1,
+        commitmentTermMonths: 1,
+        realisableOn: '2026-03-01',
+      },
+      expected: {
+        monthlyAmountMinor: '500000',
+        amountAtPointMinor: '500000',
+        currency: 'VND',
+        realisableOn: '2026-03-01',
+        realisableAt: 'NEXT_BILLING',
+      },
+    },
+    {
+      name: 'Claude K2 12-month commitment paid monthly -> still x12 at renewal (RENEWAL)',
+      input: {
+        provisioningType: 'K2',
+        price: price(500_000n, 'MONTHLY'),
+        seats: 1,
+        commitmentTermMonths: 12,
+        realisableOn: '2026-07-01',
+      },
+      expected: {
+        monthlyAmountMinor: '500000',
+        amountAtPointMinor: '6000000',
+        currency: 'VND',
+        realisableOn: '2026-07-01',
+        realisableAt: 'RENEWAL',
+      },
+    },
+    {
+      name: 'K1 stays UNKNOWN in B1 with 1 month amountAtPoint',
+      input: {
+        provisioningType: 'K1',
+        price: price(15n, 'QUARTERLY'),
+      },
+      expected: {
+        monthlyAmountMinor: '15',
+        amountAtPointMinor: '15',
+        currency: 'VND',
+        realisableOn: null,
+        realisableAt: 'UNKNOWN',
+      },
+    },
+    {
+      name: 'K4 can never be had (NEVER)',
+      input: {
+        provisioningType: 'K4',
+        price: price(15n, 'MONTHLY'),
+      },
+      expected: {
+        monthlyAmountMinor: null,
+        amountAtPointMinor: null,
+        currency: null,
+        realisableOn: null,
+        realisableAt: 'NEVER',
+      },
+    },
+  ])('$name', ({ input, expected }) => {
+    expect(potentialSavingOf(input)).toEqual(expected);
+  });
+
+  it('W3-02: reads pre-rounded monthlyPriceMinor directly without floor division', () => {
+    expect(potentialSavingOf({ provisioningType: 'K2', price: price(83_334n, 'ANNUAL') })).toMatchObject({
+      monthlyAmountMinor: '83334',
+      amountAtPointMinor: '1000008',
+      realisableAt: 'RENEWAL',
+    });
+    expect(potentialSavingOf({ provisioningType: 'K2', price: price(83_333n, 'ANNUAL') })).toMatchObject({
+      monthlyAmountMinor: '83333',
+      amountAtPointMinor: '999996',
+      realisableAt: 'RENEWAL',
     });
   });
 
-  it('K2 on a monthly plan is a month at the point (15 and 15)', () => {
-    expect(potentialSavingOf({ provisioningType: 'K2', price: price(15n, 'MONTHLY') })).toMatchObject({
-      monthlyAmountMinor: '15',
-      amountAtPointMinor: '15',
-    });
-  });
-
-  it('K1 is a month at the next billing; a quarter is a third', () => {
-    expect(potentialSavingOf({ provisioningType: 'K1', price: price(45n, 'QUARTERLY') })).toMatchObject({
-      monthlyAmountMinor: '15',
-      amountAtPointMinor: '15',
-    });
-  });
-
-  it('K4 can never be had; a plan with no price or an unknown cycle has none', () => {
-    expect(potentialSavingOf({ provisioningType: 'K4', price: price(15n, 'MONTHLY') })).toMatchObject({
-      realisableAt: 'NEVER',
-      monthlyAmountMinor: null,
-    });
+  it('returns null when plan has no price, null monthlyPriceMinor, or OTHER cycle', () => {
     expect(potentialSavingOf({ provisioningType: 'K2', price: null })).toBeNull();
+    expect(potentialSavingOf({ provisioningType: 'K2', price: price(null, 'ANNUAL') })).toBeNull();
     expect(potentialSavingOf({ provisioningType: 'K2', price: price(15n, 'OTHER') })).toBeNull();
+  });
+
+  it('W3-17 Case 7: K1 annual saves monthly x 12 from paidThroughOn + 1 with NEXT_BILLING; K1 monthly saves monthly x 1 from next billing date', () => {
+    expect(
+      potentialSavingOf({
+        provisioningType: 'K1',
+        price: price(450_000n, 'MONTHLY'),
+        commitmentTermMonths: 12,
+        billingAnchorOn: '2026-11-05',
+        today: '2027-03-20',
+      }),
+    ).toEqual({
+      monthlyAmountMinor: '450000',
+      amountAtPointMinor: '5400000',
+      currency: 'VND',
+      realisableOn: '2027-11-05',
+      realisableAt: 'NEXT_BILLING',
+    });
+
+    expect(
+      potentialSavingOf({
+        provisioningType: 'K1',
+        price: price(450_000n, 'MONTHLY'),
+        commitmentTermMonths: 1,
+        billingAnchorOn: '2026-11-05',
+        today: '2027-03-20',
+      }),
+    ).toEqual({
+      monthlyAmountMinor: '450000',
+      amountAtPointMinor: '450000',
+      currency: 'VND',
+      realisableOn: '2027-04-05',
+      realisableAt: 'NEXT_BILLING',
+    });
   });
 });

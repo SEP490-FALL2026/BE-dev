@@ -108,6 +108,8 @@ const TERM_MESSAGES: Readonly<Record<TermRefusal, string>> = {
   TERM_LONG_TERM_NOT_ALLOWED:
     'A contractor, a freelancer or an intern gets access for a term: give the months, not a right with no end.',
   TERM_CONTRACT_ENDED: 'The contract of the person ended before the time of use begins: no access is given beyond it.',
+  K1_ANNUAL_TERM_FIXED: 'This K1 annual-commitment plan requires a fixed term of 12 months.',
+  K1_ANNUAL_CONTRACT_TOO_SHORT: 'The person’s contract ends before the 12-month K1 annual commitment completes.',
 };
 
 /**

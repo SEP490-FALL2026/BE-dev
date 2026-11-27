@@ -6,7 +6,19 @@ import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { BaselineSubscription } from '../public/catalog.types';
 import { pickPriceSource, type LivenessFacts } from './pool/subscription-pool.policy';
-import { livePricedOf, PLAN_KIND, PRICE_FIELDS, pricedOn, withPriceSource } from './subscription-priced.repo';
+import { monthlyPriceOf } from './price/subscription-price.policy';
+import { derivedMonthlyUnitPriceMinor } from './subscription.policy';
+import {
+  PLAN_KIND,
+  PRICE_FIELDS,
+  findPricedCyclesInDb,
+  findPricedLineOfPlan,
+  livePricedOf,
+  pricedOn,
+  toPricedOfPlan,
+  withPriceSource,
+  type PricedOfPlanResult,
+} from './subscription-priced.repo';
 import type {
   NewSubscription,
   OriginalPriceRecord,
@@ -21,6 +33,7 @@ import type {
 
 /** The plan, its application and the vendor of it, only as far as a subscription is answered with them. */
 const WITH_PLAN = {
+  workspace: { select: { id: true, name: true } },
   plan: {
     select: {
       name: true,
@@ -107,6 +120,7 @@ function toRecord(row: Row): SubscriptionRecord {
     status: row.status,
     purchasedQuantity: row.purchasedQuantity,
     unitPrice: unitPriceOf(row),
+    monthlyUnitPriceMinor: row.monthlyUnitPriceMinor,
     priceSnapshot: priceSnapshotOf(row),
     originalPrice: originalPriceOf(row),
     billingCycle: row.billingCycle,
@@ -123,6 +137,10 @@ function toRecord(row: Row): SubscriptionRecord {
     vendorMinimumSeats: row.vendorMinimumSeats,
     isPrimaryForPlan: row.isPrimaryForPlan,
     renewedFromId: row.renewedFromId,
+    workspace: row.workspace ? { id: row.workspace.id, name: row.workspace.name } : null,
+    seatCounting: row.seatCounting === 'MEMBERS' ? 'MEMBERS' : 'FIXED',
+    minimumSeatsTotal: row.minimumSeatsTotal,
+    invoicedLater: row.invoicedLater,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -135,6 +153,10 @@ function columnsOf(state: SubscriptionState) {
     purchasedQuantity: state.purchasedQuantity,
     unitPriceMinor: state.unitPrice?.amountMinor ?? null,
     unitPriceCurrency: state.unitPrice?.currency ?? null,
+    monthlyUnitPriceMinor:
+      state.monthlyUnitPriceMinor !== undefined
+        ? state.monthlyUnitPriceMinor
+        : derivedMonthlyUnitPriceMinor(state.unitPrice, state.billingCycle),
     priceRecordedOn: state.unitPrice ? toDateColumn(state.unitPrice.recordedOn) : null,
     priceRate: state.priceSnapshot ? formatRate(state.priceSnapshot.rate) : null,
     priceRateDate: state.priceSnapshot ? toDateColumn(state.priceSnapshot.rateDate) : null,
@@ -156,6 +178,10 @@ function columnsOf(state: SubscriptionState) {
     responsibleItAdminEmployeeId: state.responsibleItAdminEmployeeId,
     vendorMinimumSeats: state.vendorMinimumSeats,
     isPrimaryForPlan: state.isPrimaryForPlan,
+    ...(state.workspaceId === undefined ? {} : { workspaceId: state.workspaceId }),
+    ...(state.seatCounting === undefined ? {} : { seatCounting: state.seatCounting }),
+    ...(state.minimumSeatsTotal === undefined ? {} : { minimumSeatsTotal: state.minimumSeatsTotal }),
+    ...(state.invoicedLater === undefined ? {} : { invoicedLater: state.invoicedLater }),
   };
 }
 
@@ -304,21 +330,25 @@ export class SubscriptionRepo {
     return new Map(rows.map((row) => [row.employee_id, row.total]));
   }
 
-  /** The subscriptions and perpetual purchases of these plans: only what a rule about their term needs. */
+  /**
+   * The subscriptions and perpetual purchases of these plans: only what a rule about their term needs. A period belongs to a plan by its own
+   * plan and by each live line, and is named once: with its own plan when that is one of these, else the first plan of its live lines that is.
+   */
   async findOfPlans(
     planIds: readonly string[],
     tx?: DbTx,
   ): Promise<{ subscriptionId: string; planId: string; kind: SubscriptionKind; endDate: BusinessDate | null }[]> {
     if (planIds.length === 0) return [];
+    const live = { planId: { in: [...planIds] }, closedReason: null };
     const rows = await (tx ?? this.prisma).subscription.findMany({
-      where: { planId: { in: [...planIds] } },
-      select: { id: true, planId: true, kind: true, endDate: true },
+      where: { OR: [{ planId: { in: [...planIds] } }, { lines: { some: live } }] },
+      select: { id: true, planId: true, kind: true, endDate: true, lines: { where: live, select: { planId: true } } },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     });
 
     return rows.map((row) => ({
       subscriptionId: row.id,
-      planId: row.planId,
+      planId: planIds.includes(row.planId) ? row.planId : row.lines.map((line) => line.planId).sort()[0],
       kind: row.kind,
       endDate: row.endDate ? fromDateColumn(row.endDate) : null,
     }));
@@ -332,17 +362,26 @@ export class SubscriptionRepo {
     if (planIds.length === 0) return [];
     const rows = await (tx ?? this.prisma).subscription.findMany({
       where: { planId: { in: [...planIds] }, plan: { provisioningType: { in: ['K2', 'K4'] } }, renewedBy: null },
-      select: { id: true, planId: true, status: true, kind: true, endDate: true },
+      select: {
+        id: true,
+        planId: true,
+        workspaceId: true,
+        status: true,
+        kind: true,
+        endDate: true,
+        lines: { select: { closedReason: true } },
+      },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     });
 
     return rows.map((row) => ({
       id: row.id,
       planId: row.planId,
+      workspaceId: row.workspaceId,
       status: row.status,
       kind: row.kind,
       endDate: date(row.endDate),
-      renewed: false,
+      renewed: row.lines.length > 0 && row.lines.every((line) => line.closedReason !== null),
     }));
   }
 
@@ -353,69 +392,35 @@ export class SubscriptionRepo {
    * period that has begun by it, so a price recorded for a period that begins later is not used before its day. When no period
    * runs on the day (the period ended and its renewal is not recorded yet), the newest priced one as without `on`.
    */
-  async findPricedOfPlan(
-    planId: string,
-    tx?: DbTx,
-    on?: BusinessDate,
-  ): Promise<{
-    subscriptionId: string;
-    subscriptionKind: 'TERM' | 'PERPETUAL';
-    unitPriceMinor: bigint;
-    currency: string;
-    /** The unit price converted to the reporting currency when it was recorded; null when it was not converted. */
-    reporting: { amountMinor: bigint; currency: string } | null;
-    billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER';
-    allowsMidTermReduction: boolean;
-  } | null> {
+  async findPricedOfPlan(planId: string, tx?: DbTx, on?: BusinessDate): Promise<PricedOfPlanResult | null> {
     const db = tx ?? this.prisma;
+    const fromLines = await findPricedLineOfPlan(db, planId, on);
+    if (fromLines) return fromLines;
+
     const select = { id: true, startDate: true, isPrimaryForPlan: true, ...PRICE_FIELDS, ...PLAN_KIND } as const;
     let row =
       on === undefined
         ? null
         : pickPriceSource(
-            (await db.subscription.findMany({ where: { planId, ...pricedOn(on) }, select })).map(withPriceSource),
+            (await db.subscription.findMany({ where: { planId, ...pricedOn(on), lines: { none: {} } }, select })).map(
+              withPriceSource,
+            ),
           );
     row ??= pickPriceSource(
-      (await db.subscription.findMany({ where: { planId, ...livePricedOf() }, select })).map(withPriceSource),
+      (await db.subscription.findMany({ where: { planId, ...livePricedOf(), lines: { none: {} } }, select })).map(
+        withPriceSource,
+      ),
     );
-    if (!row || row.unitPriceMinor === null || row.unitPriceCurrency === null) return null;
 
-    return {
-      subscriptionId: row.id,
-      subscriptionKind: row.plan.provisioningType === 'K4' ? 'PERPETUAL' : row.kind,
-      unitPriceMinor: row.unitPriceMinor,
-      currency: row.unitPriceCurrency,
-      reporting:
-        row.priceReportingMinor !== null && row.priceReportingCurrency !== null
-          ? { amountMinor: row.priceReportingMinor, currency: row.priceReportingCurrency }
-          : null,
-      billingCycle: row.billingCycle,
-      allowsMidTermReduction: row.allowsMidTermReduction,
-    };
+    return row ? toPricedOfPlan(row) : null;
   }
 
   /** The billing cycles of the main subscriptions pricing these plans, one per plan (`ONE_TIME` for a perpetual purchase); no department is asked. */
-  async findPricedCyclesOfPlans(
+  findPricedCyclesOfPlans(
     planIds: readonly string[],
     tx?: DbTx,
   ): Promise<Map<string, 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER' | 'ONE_TIME'>> {
-    const cycles = new Map<string, 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER' | 'ONE_TIME'>();
-    if (planIds.length === 0) return cycles;
-    const rows = await (tx ?? this.prisma).subscription.findMany({
-      where: { planId: { in: [...planIds] }, ...livePricedOf() },
-      select: { id: true, planId: true, startDate: true, isPrimaryForPlan: true, ...PRICE_FIELDS, ...PLAN_KIND },
-    });
-    const byPlan = new Map<string, Array<ReturnType<typeof withPriceSource> & { kind: SubscriptionKind }>>();
-    for (const row of rows) {
-      const kind: SubscriptionKind = row.plan.provisioningType === 'K4' ? 'PERPETUAL' : row.kind;
-      byPlan.set(row.planId, [...(byPlan.get(row.planId) ?? []), { ...withPriceSource(row), kind }]);
-    }
-    for (const [planId, sources] of byPlan) {
-      const chosen = pickPriceSource(sources);
-      if (chosen) cycles.set(planId, chosen.kind === 'PERPETUAL' ? 'ONE_TIME' : chosen.billingCycle);
-    }
-
-    return cycles;
+    return findPricedCyclesInDb(tx ?? this.prisma, planIds);
   }
 
   async find(id: string, tx?: DbTx): Promise<SubscriptionRecord | null> {
@@ -475,6 +480,7 @@ export class SubscriptionRepo {
         planId: true,
         purchasedQuantity: true,
         priceReportingMinor: true,
+        monthlyUnitPriceMinor: true,
         billingCycle: true,
         startDate: true,
         endDate: true,
@@ -493,6 +499,7 @@ export class SubscriptionRepo {
       provisioningType: row.plan.provisioningType,
       purchasedQuantity: row.purchasedQuantity,
       unitPriceReportingMinor: row.priceReportingMinor,
+      monthlyPriceMinor: monthlyPriceOf(row),
       billingCycle: row.billingCycle,
       startDate: row.startDate ? fromDateColumn(row.startDate) : null,
       endDate: row.endDate ? fromDateColumn(row.endDate) : null,
@@ -565,6 +572,7 @@ export class SubscriptionRepo {
         : []),
       ...(filter.applicationId ? [{ plan: { applicationId: filter.applicationId } }] : []),
       ...(filter.planId ? [{ planId: filter.planId }] : []),
+      ...(filter.workspaceId ? [{ workspaceId: filter.workspaceId }] : []),
       ...(filter.status ? [{ status: filter.status }] : []),
       ...(filter.kind ? [{ kind: filter.kind }] : []),
       // The rule that derives the NO_ALERT_ANCHOR warning, as a filter: a term subscription with no declared deadline,

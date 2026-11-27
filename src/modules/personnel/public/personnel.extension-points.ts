@@ -28,11 +28,11 @@ export interface PersonnelFileEvent {
  * a statement of a hook that fails in the database leaves the transaction aborted for whatever comes after it.
  */
 export interface PersonnelFileHook {
-  onRecorded?(tx: DbTx, event: PersonnelFileEvent): Promise<void>;
-  onDueChanged?(tx: DbTx, event: PersonnelFileEvent & { previousDueOn: BusinessDate }): Promise<void>;
-  onCancelled?(tx: DbTx, event: PersonnelFileEvent): Promise<void>;
+  onRecorded(tx: DbTx, event: PersonnelFileEvent): Promise<void>;
+  onDueChanged(tx: DbTx, event: PersonnelFileEvent & { previousDueOn: BusinessDate }): Promise<void>;
+  onCancelled(tx: DbTx, event: PersonnelFileEvent): Promise<void>;
   /** The person became `LEFT` (a departure only): the day it took effect is `dueOn`. */
-  onLeft?(tx: DbTx, event: PersonnelFileEvent): Promise<void>;
+  onLeft(tx: DbTx, event: PersonnelFileEvent): Promise<void>;
 }
 
 /**

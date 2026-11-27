@@ -19,20 +19,19 @@ export type StockPlanFacts = Pick<StockPlan, 'provisioningType' | 'subscriptions
 
 /**
  * What a plan holds, by what it gives out (`QĐ-111n`): seats of a K2 plan (`purchased` and `free` are null when a subscription has no quantity),
- * keys of a K4 plan, the rights of a K1 plan.
+ * keys of a K4 plan (a plan of personal accounts, K1, has no subscription and no row).
  */
 export type StockBlock =
   | { kind: 'SEATS'; purchased: number | null; assigned: number; free: number | null; revoking: number }
   | { kind: 'KEYS'; inStore: number; assigned: number; withdrawn: number }
-  | { kind: 'LICENSES'; purchased: number | null; occupied: number; free: number | null }
-  | { kind: 'HOLDERS'; holders: number };
+  | { kind: 'LICENSES'; purchased: number | null; occupied: number; free: number | null };
 
 /** One plan of the summary: the plan with its application and what it holds. */
 export interface StockSummaryRow {
   plan: {
     planId: string;
     planName: string;
-    provisioningType: 'K1' | 'K2' | 'K4';
+    provisioningType: 'K2' | 'K4';
     applicationId: string;
     applicationName: string;
     logoUrl: string | null;

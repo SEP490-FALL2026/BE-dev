@@ -4,6 +4,7 @@ import { isCheckViolation } from '../../../infrastructure/database/unique-violat
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { CatalogApi } from '../../catalog/public/catalog.api';
+import { LicenseLotApi } from '../../catalog/public/license-lot.api';
 import { LicenseKeyNotFoundError, ProvisioningPlanBoundToDeviceError } from '../public/licensing.errors';
 import type { KeyDisposition } from '../public/licensing.types';
 import { licensingAuditEvent } from '../licensing-audit-event.mapper';
@@ -13,7 +14,7 @@ import { LicenseKeyRepo } from './license-key.repo';
 /**
  * The keys of the K4 pool as seats take and give them back (`BR-MF1-09`, `QĐ-103d`): the grant of a K4 seat is completed by giving it a
  * free key of its purchase, and the revocation of the seat puts the key back in the store, or back and withdrawn from it at once. Both run
- * in the transaction of the task, with their audit event. Lock order: the subscription, then the key (the order of an import and of a
+ * in the transaction of the task, with their audit event. Lock order: the lot/subscription, then the key (the order of an import and of a
  * withdrawal), so the grant, the withdrawal and the import of the same purchase never wait for each other in a circle.
  */
 @Injectable()
@@ -22,26 +23,43 @@ export class LicenseKeyAssignmentService {
     private readonly repo: LicenseKeyRepo,
     private readonly catalog: CatalogApi,
     private readonly audit: AuditApi,
+    private readonly lotApi: LicenseLotApi,
   ) {}
 
   /**
-   * Gives the key to the seat of the grant: a free key of the store, not withdrawn, of the purchase the seat sits on. Two IT Admins who
-   * give the same last key are served one after the other, and the second is refused. Throws LicenseKeyNotFoundError and
+   * Gives the key to the seat of the grant: a free key of the store, not withdrawn, of the lot (or legacy subscription) the seat sits on.
+   * Locks the target lot/subscription first (`tier 6a`), then the key (`tier 7b`). Throws LicenseKeyNotFoundError and
    * LicenseKeyStateError (`WITHDRAWN`, `NOT_IN_STORE`, `SUBSCRIPTION_MISMATCH`).
    */
   async assign(
     tx: DbTx,
     actor: AuthenticatedPrincipal,
-    input: { organizationId: string; licenseKeyId: string; assignmentId: string; subscriptionId: string | null },
-  ): Promise<void> {
-    if (input.subscriptionId !== null) await this.catalog.lockSeatTarget(tx, { subscriptionId: input.subscriptionId });
+    input: {
+      organizationId: string;
+      licenseKeyId: string;
+      assignmentId: string;
+      subscriptionId: string | null;
+      licenseLotId?: string | null;
+    },
+  ): Promise<{ licenseKeyId: string; licenseLotId: string | null; costBorne: boolean }> {
+    if (input.licenseLotId) {
+      await this.lotApi.lockLot(tx, input.licenseLotId);
+    } else if (input.subscriptionId !== null) {
+      await this.catalog.lockSeatTarget(tx, { subscriptionId: input.subscriptionId });
+    }
     const key = await this.repo.lock(tx, input.licenseKeyId);
     if (!key) throw new LicenseKeyNotFoundError();
-    assertAssignable(key, input.subscriptionId);
+    assertAssignable(key, input.subscriptionId, input.licenseLotId);
     try {
       await this.repo.assign(tx, key.id, input.assignmentId);
     } catch (error) {
-      if (isCheckViolation(error, 'license_key_assignment_plan_account')) {
+      if (
+        isCheckViolation(
+          error,
+          'license_key_assignment_plan_account',
+          'A license key is given to a person only when its plan is bound to an account',
+        )
+      ) {
         throw new ProvisioningPlanBoundToDeviceError();
       }
       throw error;
@@ -54,6 +72,17 @@ export class LicenseKeyAssignmentService {
         assignmentId: input.assignmentId,
       }),
     );
+
+    return {
+      licenseKeyId: key.id,
+      licenseLotId: key.licenseLotId ?? key.subscriptionId,
+      costBorne: key.costBorne ?? true,
+    };
+  }
+
+  /** Transitions key `cost_borne` from false to true once granted. */
+  markCostBorne(tx: DbTx, licenseKeyId: string): Promise<void> {
+    return this.repo.markCostBorne(tx, licenseKeyId);
   }
 
   /** Whether the seat holds a key, its row locked until commit; a seat granted before the key pool holds none. */

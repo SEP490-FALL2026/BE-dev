@@ -4,12 +4,61 @@ import type {
   PurchaseInvoiceLabel,
   PurchaseInvoiceLabelResult,
 } from './labels/purchase-invoice-labels.policy';
+import type { PoolInvoiceExpectationSource } from './pool-expectation/purchase-invoice-pool-expectation.policy';
 import type { OriginalPrice, PurchaseInvoiceMatch } from './purchase-invoice-match.policy';
+
+export interface SeatPricing {
+  monthlyMinor: bigint | null;
+  cycleMonths: number | null;
+  renewalDate: BusinessDate | null;
+}
+
+/** One part of what an invoice of the pool may cost: the seats of a line (or of a purchase) at the price of that line. */
+export interface CeilingPart {
+  quantity: number | null;
+  pricing: SeatPricing;
+}
+
+export interface LinkFacts {
+  organizationId: string;
+  link: PurchaseInvoiceLink;
+  vendorId: string;
+  continuation: boolean;
+  startMonth: BusinessDate | null;
+  termMonths: number | null;
+  expectedQuantity: number | null;
+  expectedUnitPrice: OriginalPrice | null;
+  requestCostCenterId: string | null;
+  requestId: string | null;
+  holderBound: boolean;
+  failedGrantDepartmentId: string | null;
+  poolSubscriptionId: string | null;
+  /** What the invoice of the pool is judged by, part by part; empty when the link is not judged by a ceiling. */
+  ceilingParts: readonly CeilingPart[];
+  poolSource: PoolInvoiceExpectationSource | null;
+  renewedAssignmentId: string | null;
+  licenseLotId: string | null;
+}
+
+export type PoolExpectationFacts =
+  | {
+      isK2: true;
+      poolSubscriptionId: string | null;
+      timeZone: string;
+      source: PoolInvoiceExpectationSource;
+    }
+  | { isK2: false };
 
 /** The request or subscription an invoice is for, as the IT Admin works it. */
 export type PurchaseInvoiceLink =
   | { kind: 'REQUEST'; requestId: string; provisioningTaskId: string | null }
-  | { kind: 'SUBSCRIPTION'; subscriptionId: string };
+  | {
+      kind: 'SUBSCRIPTION';
+      subscriptionId: string;
+      seatPurchaseId: string | null;
+      subscriptionLineIds: readonly string[];
+    }
+  | { kind: 'LICENSE_LOT'; licenseLotId: string };
 
 /** What the invoice says in money: dong taken out, and the price of one in the currency it states. */
 export interface PurchaseInvoiceMoney {

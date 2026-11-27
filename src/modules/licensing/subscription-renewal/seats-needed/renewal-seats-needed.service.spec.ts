@@ -1,6 +1,8 @@
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
+import type { SeatLedgerApi } from '../../../catalog/public/seat-ledger.api';
 import { RenewalHoldHook, type RenewalHold } from '../../public/licensing.extension-points';
 import type { PendingRenewal } from '../../public/licensing-renewal.types';
+import type { SharedPoolService } from '../../shared-pool/shared-pool.service';
 import type { SubscriptionRenewalSeatRepo } from '../subscription-renewal-seat.repo';
 import type { SeatsNeededFacts } from '../subscription-renewal.types';
 import { RenewalSeatsNeededService } from './renewal-seats-needed.service';
@@ -21,7 +23,12 @@ function build(facts: Partial<SeatsNeededFacts>, pendingIds: string[] = [], open
   const approvedAwaitingGrantOfPlan = jest.fn().mockResolvedValue(awaitingGrant);
   const hook = new RenewalHoldHook();
   hook.bind({ pendingRenewalsOf, openRequestsOfPlan, approvedAwaitingGrantOfPlan } as unknown as RenewalHold);
-  const service = new RenewalSeatsNeededService({ seatsNeededFacts } as unknown as SubscriptionRenewalSeatRepo, hook);
+  const service = new RenewalSeatsNeededService(
+    { seatsNeededFacts } as unknown as SubscriptionRenewalSeatRepo,
+    hook,
+    { linesOfSubscription: jest.fn().mockResolvedValue([]) } as unknown as SeatLedgerApi,
+    { chosenLinesOfPlans: jest.fn().mockResolvedValue(new Map()) } as unknown as SharedPoolService,
+  );
 
   return { service, seatsNeededFacts, pendingRenewalsOf, openRequestsOfPlan, approvedAwaitingGrantOfPlan };
 }
@@ -97,5 +104,50 @@ describe('RenewalSeatsNeededService', () => {
 
     expect((await service.countFor(period())).openRequests).toBe(3);
     expect(openRequestsOfPlan).toHaveBeenCalledWith('plan-1', undefined);
+  });
+
+  it('B2-R7: aggregates per-line facts, chooseLine awaiting grants, and minimumSeatsTotal shortfall across lines', async () => {
+    const seatsNeededFactsByPlan = jest.fn().mockResolvedValue(
+      new Map([
+        ['plan-std', { heldPastRenewal: 4, endingAssignmentIds: ['a-1'], activeSeatsToday: 5 }],
+        ['plan-prm', { heldPastRenewal: 0, endingAssignmentIds: [], activeSeatsToday: 2 }],
+      ]),
+    );
+    const hold = new RenewalHoldHook();
+    hold.bind({
+      pendingRenewalsOf: jest.fn().mockResolvedValue(new Map()),
+      openRequestsOfPlan: jest.fn().mockResolvedValue(1),
+      approvedAwaitingGrantOfPlan: jest.fn().mockResolvedValue(1),
+    } as unknown as RenewalHold);
+    const seatLedger = {
+      linesOfSubscription: jest.fn().mockResolvedValue([
+        { id: 'line-std', planId: 'plan-std', minimumSeats: null },
+        { id: 'line-prm', planId: 'plan-prm', minimumSeats: null },
+      ]),
+    } as unknown as SeatLedgerApi;
+    const sharedPool = {
+      chosenLinesOfPlans: jest
+        .fn()
+        .mockResolvedValue(new Map([['plan-std', { subscriptionId: 'sub-1', subscriptionLineId: 'line-std' }]])),
+    } as unknown as SharedPoolService;
+
+    const service = new RenewalSeatsNeededService(
+      { seatsNeededFactsByPlan } as unknown as SubscriptionRenewalSeatRepo,
+      hold,
+      seatLedger,
+      sharedPool,
+    );
+
+    const counts = await service.countFor(period({ minimumSeatsTotal: 7, isPrimaryForPlan: false }));
+    expect(counts).toEqual({
+      heldPastRenewal: 4,
+      pendingContinuations: 0,
+      approvedAwaitingGrant: 1,
+      seatsNeeded: 5,
+      vendorMinimumSeats: null,
+      target: 7,
+      activeSeatsToday: 7,
+      openRequests: 2,
+    });
   });
 });
