@@ -54,7 +54,7 @@ không chờ duyệt giữa gói; câu nhỏ tự chọn theo căn cứ và ghi 
      Không có đúng tên ⟹ skill gần nhất, ghi mapping. Skill chỉ chuẩn hóa cách làm; LUẬT CỨNG, PLAN, SPEC thắng skill.
 2. Đọc trong repo: `AGENTS.md`, `ARCHITECTURE.md`, `docs/rules/README.md`, `docs/guides/quy-trinh-code-ai.md`, `docs/rules/module-structure.md`,
    `docs/rules/security-jobs.md`, `docs/rules/database-business.md`, `test/README.md`, `docs/guides/containers.md`.
-3. Đọc trọn **`SPEC.md`** (bản 2.1), **`PLAN.md`** (bản 1.1), `ADR-DRAFT.md`. Luật ở SPEC §5, tiêu chí ở §6, test ở §7. SPEC §10 (đã chốt), §11 (tự chốt), §14 (review đã áp): không
+3. Đọc trọn **`SPEC.md`** (bản 2.4), **`PLAN.md`** (bản 1.4), `ADR-DRAFT.md`. Luật ở SPEC §5, tiêu chí ở §6, test ở §7. SPEC §10 (đã chốt), §11 (tự chốt), §14 (review đã áp): không
    hỏi lại, không tự đổi. `OWNER-ANSWERS.md` để tra lý do.
 4. Đọc `PROGRESS-tech.md`, `OVERNIGHT-DECISIONS-tech.md` (nếu có) — trí nhớ qua compact.
 5. Đầu mỗi báo cáo liệt kê skill/rule đã đọc và mục đích.
@@ -143,11 +143,14 @@ Dừng gói đó, ghi `PROGRESS-tech.md` kèm `file:line`, 2–3 lựa chọn v�
    quyền `DELETE` mới cho vai runtime ⟹ dừng; việc dọn chạm sweeper nghiệp vụ ⟹ dừng.
 3. Cần gói npm ngoài `ioredis`, `@nest-lab/throttler-storage-redis`, `@bull-board/api`, `@bull-board/express`; hoặc `@nest-lab/throttler-storage-redis` không có bản khai hỗ
    trợ `@nestjs/throttler` 6.x phát hành ≥ 14 ngày, hoặc không nhận client `ioredis` dựng sẵn; hoặc `@bull-board/api`/`@bull-board/express` không có bản (≥ 14 ngày) hợp
-   `bullmq` 6 và Express 5.
+   `bullmq` 6 và Express 5. **Trạng thái (review R-12, 27/11): đã kiểm, không dừng** — dùng đúng bản ghim SPEC §2.3 mục 4 (`ioredis@5.11.1`,
+   `@nest-lab/throttler-storage-redis@1.2.0`, `@bull-board/api@9.13.1`, `@bull-board/express@9.13.1`); chỉ dừng nếu `pnpm audit --prod --audit-level high` đỏ vì chính các
+   bản đó hoặc `pnpm why ioredis` ra hơn một bản mà không gộp được.
 4. Gate chỉ xanh khi nới gate / thêm suppression / thêm mục registry ngoài PLAN (LUẬT CỨNG 4).
-5. Giao diện Bull Board không chạy dưới CSP mặc định của `helmet()` (Owner: không nới CSP).
+5. Giao diện Bull Board không chạy dưới CSP mặc định của `helmet()` (Owner: không nới CSP). Kiểm tĩnh bản 9.13.1 đạt (SPEC §5.9); còn bước trình duyệt R-06 (h).
 6. Hành vi BullMQ 6 thật khác SPEC (`deduplication` Simple Mode không bỏ qua job trùng khi job chưa xong, hoặc không gỡ khóa khi job `completed`/`failed`;
-   `stackTraceLimit: 0` vẫn lưu stack) — ghi bằng chứng (test integration đỏ + trích tài liệu).
+   dedup có `ttl` vẫn bị gỡ khi job xong; `stackTraceLimit: 0` vẫn lưu stack; `Queue` dựng theo luật kết nối SPEC §5.3 không tự chạy lại khi Redis có lại) — ghi bằng
+   chứng (test integration đỏ + trích tài liệu).
 7. Thiếu nền/thư mục việc ở `origin/dev`; cây làm việc có thay đổi lạ; git identity không phải của Bảo.
 
 ## 6. Không được làm

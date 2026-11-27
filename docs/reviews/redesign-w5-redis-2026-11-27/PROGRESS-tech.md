@@ -27,7 +27,7 @@ Tracker sống qua compact context. Người code đọc lại file này **đầ
 | T7  | notifications: điều kiện chung, `claimById`, M4       | chưa       |     |                                                 |               |                          |
 | T8  | queue + relay + công tắc                              | chưa       |     |                                                 |               |                          |
 | T9  | consumer mail                                         | chưa       |     |                                                 |               |                          |
-| T9b | R-11 job dọn đêm (sau khi Owner trả lời OQ-W5R-7 → 9) | chưa       |     |                                                 |               |                          |
+| T9b | R-11 job dọn đêm (Owner 27/11: C1–C4, 30 ngày, chạy khi khởi động) | chưa       |     |                                                 |               |                          |
 | T10 | Bull Board                                            | chưa       |     |                                                 |               |                          |
 | T11 | chốt, ca diệt đột biến                                | chưa       |     |                                                 |               |                          |
 | C2  | CI full toàn đợt                                      | chưa       |     |                                                 |               |                          |

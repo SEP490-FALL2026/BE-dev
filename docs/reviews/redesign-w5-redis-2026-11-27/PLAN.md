@@ -1,4 +1,7 @@
-# PLAN — Đợt 5 phần 1: Redis, BullMQ qua outbox relay, rate-limit Redis (27/11/2026, bản 1.3)
+# PLAN — Đợt 5 phần 1: Redis, BullMQ qua outbox relay, rate-limit Redis (27/11/2026, bản 1.4)
+
+> **Bản 1.4 (27/11):** áp review R-12 (SPEC §14.4) — bản ghim gói; luật kết nối BullMQ (`Queue` với `skipWaitingForReady` + `skipVersionCheck`, client chặn
+> không `lazyConnect`); proxy TCP bật/tắt trong harness; job khởi động R-11 dedup có `ttl`; `failExhausted` đặt `updated_at`; board tắt `x-powered-by`.
 
 > **Bản 1.3 (27/11):** Owner chốt OQ-W5R-7 → 9 = A; T9b áp review R-11 (SPEC §14.3) — chạy khi khởi động là cơ chế bù duy nhất, C2 hai bước, facade riêng.
 >
@@ -7,7 +10,7 @@
 > **Bản 1.1 (27/11):** áp review lượt 2 (SPEC §14.2) — T1 liệt kê spec env đổi kỳ vọng; `WorkerModule.forTransport`; client không chặn `connect()` lúc
 > bootstrap; ca `CLIENT PAUSE` sang `_serial`; mã lỗi job `jobErrorCodeFor`; `export-environment.ts`; Bull Board là Nest module; Caddy thay `X-Request-Id`; GP-6, GP-7.
 
-Spec: [SPEC.md](SPEC.md) bản 2.1 + [OWNER-ANSWERS.md](OWNER-ANSWERS.md) + [ADR-DRAFT.md](ADR-DRAFT.md). Prompt code: [CODE-PROMPT.md](CODE-PROMPT.md). Tracker:
+Spec: [SPEC.md](SPEC.md) bản 2.4 + [OWNER-ANSWERS.md](OWNER-ANSWERS.md) + [ADR-DRAFT.md](ADR-DRAFT.md). Prompt code: [CODE-PROMPT.md](CODE-PROMPT.md). Tracker:
 [PROGRESS-tech.md](PROGRESS-tech.md). Quy trình: [`docs/guides/quy-trinh-code-ai.md`](../../guides/quy-trinh-code-ai.md). Đường dẫn tính từ gốc repo BE. Mỗi file
 `*.ts` có logic mới kèm spec **cùng thư mục, cùng tên** — ghi `(+spec)`.
 
@@ -252,23 +255,23 @@ không sửa được bằng mặc định ⟹ dừng hỏi.
 ### T2 — Client Redis + theo dõi kết nối + `retryable` (S)
 
 **Files:** Create `src/infrastructure/redis/redis-client.factory.ts` (+spec). Modify `src/infrastructure/observability/operator-error.ts` (+spec),
-`test/gates/deployment-roles.gate-spec.ts` (`ioredis` vào danh sách `needed`, dòng 402-414), `package.json`/lock (`pnpm add -E ioredis@<bản>`).
+`test/gates/deployment-roles.gate-spec.ts` (`ioredis` vào danh sách `needed`, dòng 402-414), `package.json`/lock (`pnpm add -E ioredis@5.11.1` — SPEC §2.3 mục 4; `pnpm why ioredis` ra một bản).
 
 **Interfaces — Consumes:** `RedisSettings` (T1). **Produces:**
 
 ```ts
-export function createBlockingRedisClient(settings: RedisSettings, name: string): Redis; // maxRetriesPerRequest: null
+export function createBlockingRedisClient(settings: RedisSettings, name: string): Redis; // maxRetriesPerRequest: null, lazyConnect: false, không keyPrefix
 export function createFailFastRedisClient(
   settings: RedisSettings,
   name: string,
   options?: { commandTimeoutMs?: number; keyPrefix?: string },
-): Redis; // enableOfflineQueue: false, maxRetriesPerRequest: 1
+): Redis; // enableOfflineQueue: false, maxRetriesPerRequest: 1, lazyConnect: true; keyPrefix chỉ cho throttler (BullMQ ném lỗi nếu client có keyPrefix)
 export function watchConnection(client: Redis, logger: LoggerService, name: string): void; // 1 dòng khi mất, 1 dòng khi có lại
 export function connectQuietly(client: Redis, logger: LoggerService, name: string): Promise<void>; // provider gọi trong onApplicationBootstrap
 ```
 
 **Test trước:** tùy chọn của hai kiểu client (`toMatchObject` trên `client.options`: `host`, `port`, `password`, `tls`, `maxRetriesPerRequest`, `enableOfflineQueue`,
-`commandTimeout`, `keyPrefix`, `lazyConnect: true`); `connectQuietly(client, logger, name)` gọi `client.connect()`, lỗi chỉ log một dòng, không ném (RV2-I2); `watchConnection`: phát `end`/`error` rồi `ready` 3 lần ⟹ `logger.warn` 3 lần + `logger.log` 3 lần, không log thêm
+`commandTimeout`, `keyPrefix`; `lazyConnect: true` **chỉ** ở client không chặn, client chặn `lazyConnect: false` — SPEC §5.3 luật dựng kết nối BullMQ, R-12); `connectQuietly(client, logger, name)` gọi `client.connect()`, lỗi chỉ log một dòng, không ném (RV2-I2); `watchConnection`: phát `end`/`error` rồi `ready` 3 lần ⟹ `logger.warn` 3 lần + `logger.log` 3 lần, không log thêm
 khi `error` lặp lúc đang mất (R-08 a); `describeForOperator` của lỗi có `code: 'ECONNREFUSED'`, `ETIMEDOUT`, `name: 'MaxRetriesPerRequestError'`, message `Connection is
 closed.` ⟹ chứa `retryable=true`; `ReplyError` `WRONGPASS` ⟹ `retryable=false` (Trọng tâm review 1).
 
@@ -288,9 +291,16 @@ export async function withRedisPrefix(): Promise<{ prefix: string; admin: Redis;
 export async function pauseServer(admin: Redis, ms: number): Promise<void>; // CLIENT PAUSE <ms> — dừng MỌI client; chỉ dùng ở test/integration/_serial/
 export async function killClient(admin: Redis, client: Redis): Promise<void>; // CLIENT KILL ID <client.call('CLIENT','ID')>
 export async function keysUnder(admin: Redis, prefix: string): Promise<string[]>; // SCAN MATCH <prefix>:*
+export async function toggleableRedisProxy(): Promise<{
+  port: number;
+  stop(): Promise<void>;
+  start(): Promise<void>;
+  close(): Promise<void>;
+}>;
+// net.Server cổng ngẫu nhiên → TEST_REDIS_URL; stop() đóng server + mọi socket; start() mở lại cùng cổng (R-03 e, R-11 i — cùng instance, R-12)
 ```
 
-**Test:** `redis-harness.integration-spec.ts` — kết nối được; `cleanup` xóa hết khóa của tiền tố; `CI=true` + xóa `TEST_REDIS_URL` ⟹ `redisTestUrl()` ném (R-09 c).
+**Test:** `redis-harness.integration-spec.ts` — kết nối được; `cleanup` xóa hết khóa của tiền tố; qua `toggleableRedisProxy`: `stop()` ⟹ lệnh lỗi, `start()` ⟹ client tự nối lại và lệnh chạy; `CI=true` + xóa `TEST_REDIS_URL` ⟹ `redisTestUrl()` ném (R-09 c).
 Gate `test-support-structure` phải xanh (harness là fixture, không chứa `expect`).
 
 **Kiểm:** push nhánh, `gh workflow run ci.yml --ref feat/redesign-w5-redis`, log job `integration` có `redis-harness` chạy (R-09 b).
@@ -299,7 +309,7 @@ Gate `test-support-structure` phải xanh (harness là fixture, không chứa `e
 
 **Files:** Create `src/infrastructure/security/fallback-throttler.storage.ts` (+spec), `test/integration/platform/redis-rate-limit.integration-spec.ts`. Modify
 `src/infrastructure/security/rate-limit.options.ts`, `src/infrastructure/security/security.module.ts`, `test/http/platform/rate-limit.http-spec.ts` (chỉ comment 5-9),
-`test/gates/deployment-roles.gate-spec.ts` (thêm `@nest-lab/throttler-storage-redis`), `scripts/dev/export-environment.ts` (`RATE_LIMIT_STORE: 'memory'` trong môi
+`test/gates/deployment-roles.gate-spec.ts` (thêm `@nest-lab/throttler-storage-redis`, ghim `1.2.0`), `scripts/dev/export-environment.ts` (`RATE_LIMIT_STORE: 'memory'` trong môi
 trường xuất — RV2-I5), `package.json`/lock. Create thêm `test/integration/_serial/redis-client-pause.integration-spec.ts`.
 
 **Interfaces — Consumes:** `createFailFastRedisClient`, `watchConnection` (T2), `redisSettingsFrom` (T1). **Produces:**
@@ -329,8 +339,8 @@ export function createRateLimitOptions(config, storage: ThrottlerStorage): Throt
 
 `security.module.ts`: `RATE_LIMIT_STORE=memory` ⟹ storage là `ThrottlerStorageService` thường (đúng hôm nay); `redis` ⟹ `FallbackThrottlerStorage(new
 ThrottlerStorageRedisService(client), new ThrottlerStorageService(), client, logger)` với `client = createFailFastRedisClient(settings, 'rate-limit', { commandTimeoutMs:
-RATE_LIMIT_REDIS_TIMEOUT_MS, keyPrefix: '<p>:rl:' })`. Người code đọc mã nguồn bản `@nest-lab/throttler-storage-redis` đã ghim để biết nó nhận client thế nào; nó tự dựng
-client theo cách khác (offline queue bật) ⟹ truyền client đã dựng, không để nó dựng.
+RATE_LIMIT_REDIS_TIMEOUT_MS, keyPrefix: '<p>:rl:' })`. Bản 1.2.0 đã đọc (SPEC §5.8): nhận client khi `instanceof Redis` của cùng gói `ioredis`, khác bản thì
+âm thầm tự dựng client mặc định (offline queue bật) ⟹ truyền client đã dựng; U-3 thêm ca `expect(redisStorage.redis).toBe(client)` trên đối tượng thật.
 
 **Test trước** (`fallback-throttler.storage.spec.ts`, storage giả + đồng hồ giả): Redis ổn ⟹ trả kết quả của primary, fallback không gọi; primary ném (ECONNREFUSED, timeout,
 `OOM command not allowed` — Trọng tâm review 2) ⟹ trả kết quả của fallback, không ném, log `fell back` một lần; trong 5 000 ms sau đó primary **0 lời gọi** (spy, R-02 d),
@@ -401,7 +411,7 @@ deliverOne(outboxId: string, isUsable: TokenUsability): Promise<DeliveryResult>;
 ```
 
 Repo: hàm `dueCondition(now: string): Prisma.Sql` trả đoạn `((status = 'PENDING' AND next_attempt_at <= now) OR (status = 'SENDING' AND lease_expires_at <= now))` (instant truyền dạng chuỗi ISO `::timestamptz` như `notifications.repo.ts:61-69`), dùng ở `claimDue`, `claimById`, `dueIds`; `failExhausted(tx, now, id?)`: `UPDATE … SET status='FAILED', last_error_code='ATTEMPTS_EXHAUSTED', lease
-null, payload null WHERE <dueCondition> AND status='SENDING' AND attempts >= 5 [AND id = $id]`, chạy trước bước nhận trong cùng transaction ở `claimDue` và `claimById`;
+null, payload null, updated_at = now() WHERE <dueCondition> AND status='SENDING' AND attempts >= 5 [AND id = $id]`, chạy trước bước nhận trong cùng transaction ở `claimDue` và `claimById`;
 `claimById(tx, { id, now, leaseId, leaseExpiresAt }): Promise<ClaimedEmail | 'EXHAUSTED' | null>`; `dueIds(now, limit)`: `SELECT id … WHERE <dueCondition> ORDER BY
 next_attempt_at, id LIMIT`. `deliver()` trả `DeliveryResult` cho từng nhánh của `email-dispatcher.service.ts:65-120`; `dispatchDue` giữ chữ ký và giá trị trả.
 
@@ -442,11 +452,11 @@ export const RELAY_SOURCES = Symbol('RELAY_SOURCES'); // RelaySource[]
 // queue-producers.ts
 export class QueueProducers {
   get(name: QueueName): Queue;
-} // client không chặn, prefix '<p>:bull', đóng ở onModuleDestroy
+} // client không chặn, prefix '<p>:bull', skipWaitingForReady: true, skipVersionCheck: true (SPEC §5.3, R-12), đóng ở onModuleDestroy
 // queue-worker-factory.ts
 export class QueueWorkerFactory {
   create(name: QueueName, processor: Processor, concurrency: number): Worker;
-} // client chặn, autorun: false
+} // client chặn (không lazyConnect), autorun: false
 // outbox-relay.job.ts
 export class OutboxRelayLoop implements OnApplicationBootstrap, OnModuleDestroy {
   tick(now?: Date): Promise<void>;
@@ -460,14 +470,15 @@ export class OutboxRelayLoop implements OnApplicationBootstrap, OnModuleDestroy 
 `['WorkerModule', WorkerModule]`, **thêm** `['WorkerModule(bullmq)', …]` (bọc `@Module({ imports: [WorkerModule.forTransport('bullmq')] })` trong `test/support` nếu bộ
 gom đồ thị chỉ nhận `Type`). `src/worker/worker.module.spec.ts` của đợt 3 không phải sửa.
 
-**Test trước:** `queue-registry.spec.ts` — `jobOptionsFor('email-delivery', id)` bằng đúng đối tượng ở Ràng buộc chung; `outbox-relay.job.spec.ts` (nguồn/queue giả):
+**Test trước:** `queue-registry.spec.ts` — `jobOptionsFor('email-delivery', id)` bằng đúng đối tượng ở Ràng buộc chung; `queue-producers.spec.ts` — `Queue` dựng với
+`skipWaitingForReady: true`, `skipVersionCheck: true`, client không `keyPrefix`; `outbox-relay.job.spec.ts` (nguồn/queue giả):
 `addBulk` nhận đúng `{ name: 'deliver', data: { outboxId }, opts: jobOptionsFor(...) }` cho từng id; `addBulk` ném ECONNREFUSED / OOM ⟹ `tick` không ném, nguồn không bị gọi
 ghi, log tồn đọng tối đa một dòng mỗi 60 000 ms (đồng hồ giả); `onModuleDestroy` chờ tick đang chạy.
 
 **Integration** (`email-queue-relay.integration-spec.ts`, Redis + PostgreSQL thật, consumer **không** chạy, relay 200 ms): R-03 (a) commit ⟹ job trong ≤ 400 ms, rollback ⟹ 0
 job; (b) `Object.keys(job.data) = ['outboxId']`; (c) hai `OutboxRelayLoop` chạy 20 tick trên 10 dòng ⟹ `queue.getJobCounts('waiting')` = 10; (d) dòng `PENDING` tương lai
-và dòng `SENDING` lease còn hạn ⟹ 20 tick, 0 job; (e) (gói sở hữu R-03 e) relay với `unreachableRedisSettings` 30 tick ⟹ không ném, dòng không đổi, có log tồn đọng; đổi sang Redis thật ⟹
-đủ job trong ≤ 2 tick; (f) `keysUnder` + `DEL` mọi khóa `<p>:bull:*` ⟹ tick kế thêm lại đủ job (phần "đúng 1 thư" ở T9). `QueueProducers` gọi `connectQuietly` lúc
+và dòng `SENDING` lease còn hạn ⟹ 20 tick, 0 job; (e) (gói sở hữu R-03 e) relay + `QueueProducers` dựng khi `toggleableRedisProxy` đang `stop()`: 30 tick ⟹ không ném, mỗi tick < 1 chu kỳ, dòng không đổi, có log tồn đọng;
+`start()` **cùng** instance ⟹ đủ job trong ≤ 2 tick sau khi client `ready` (không dựng lại relay/queue — R-12); (f) `keysUnder` + `DEL` mọi khóa `<p>:bull:*` ⟹ tick kế thêm lại đủ job (phần "đúng 1 thư" ở T9). `QueueProducers` gọi `connectQuietly` lúc
 bootstrap (RV2-I2).
 
 **Gate:** `module-graph` — `QueueInfrastructureModule` có ở `WorkerModule(bullmq)`, không ở `WorkerModule` (`poll`), không ở API, không ở lệnh CLI; vẫn **không** `@Processor(` /
@@ -511,7 +522,9 @@ R-04 (a)–(f), (j) theo SPEC §6 ((j): SMTP sink trả 421 năm lần ⟹ dòng
 `<p>:bull:*` sau khi job thêm, trước khi consumer chạy ⟹ đúng 1 thư; (h) `app.close()` khi SMTP sink giữ phiên 1 s ⟹ dòng `SENT` trước khi `close` trả về; mở app mới ⟹ 0 thư thêm; (i) cuối file: `keysUnder(prefix)`,
 đọc từng khóa theo kiểu (`TYPE` → `GET`/`HGETALL`/`LRANGE`/`ZRANGE`) ⟹ không chuỗi nào chứa địa chỉ người nhận hay chữ của payload, mọi `failedReason` thuộc
 `EMAIL_JOB_ERROR_CODES` ∪ {thông báo _stalled_ của BullMQ (`job stalled more than allowable limit`)}; R-01 (d) khóa `:bull:`; R-05 (d) worker `poll` + consumer `bullmq` cùng DB, 5 dòng ⟹ 5 thư; Trọng tâm review 4: thêm tay job cho dòng đã `SENT` ⟹ `completed`
-`NOT_CLAIMED`, 0 thư; R-08 (c) bắt log ⟹ không có địa chỉ.
+`NOT_CLAIMED`, 0 thư; R-08 (c) bắt log ⟹ không có địa chỉ. Dedup khi job _stalled_ (R-12, K-1): Worker A `lockDuration: 1000` bị `close(true)` giữa job, Worker B
+`stalledInterval: 500` đưa job về `wait` ⟹ trong lúc đó 5 tick relay không thêm job thứ hai (khóa `<p>:bull:email-delivery:de:<outboxId>` còn); job chạy lại xong ⟹
+khóa bị gỡ, dòng ở kết cục cuối, ≤ 1 thư.
 
 ### T9b — Job dọn đêm (M) — Owner đã chốt OQ-W5R-7 → 9 = A
 
@@ -546,7 +559,9 @@ export class NightlyMaintenanceRunner {
 export interface MaintenanceReport { tasks: { name: string; deleted: number; moreRemain: boolean; failed: boolean }[] }
 // nightly-maintenance.job.ts
 export function nextMidnightInVietnam(now: Date): Date;                // Intl.DateTimeFormat 'Asia/Ho_Chi_Minh'
-export class NightlyMaintenanceScheduler implements OnApplicationBootstrap, OnModuleDestroy { } // bullmq: (nền, thử lại 30 s) upsert → rồi tạo Worker → sau 60 s job khởi động
+export const BOOT_RUN_DELAY_MS = 60_000; // nhận qua constructor, test đặt ngắn
+export const BOOT_RUN_DEDUP = { id: 'nightly-maintenance-boot', ttl: 600_000 } as const; // có ttl: khóa không bị gỡ khi job xong (SPEC §5.16, R-12)
+export class NightlyMaintenanceScheduler implements OnApplicationBootstrap, OnModuleDestroy { } // bullmq: (nền, thử lại 30 s) upsert → rồi tạo Worker → sau BOOT_RUN_DELAY_MS job khởi động
 export class NightlyMaintenanceTimer implements OnApplicationBootstrap, OnModuleDestroy { } // poll: setTimeout tới nextMidnightInVietnam
 ```
 
@@ -562,9 +577,9 @@ email/uuid (g); khóa không lấy được ⟹ `'BUSY'`, không gọi việc n�
 `2026-11-27T17:00:00Z`; `2026-11-27T17:00:01Z` → `2026-11-28T17:00:00Z`; `2026-12-31T18:00:00Z` → `2027-01-01T17:00:00Z` (h).
 
 **Integration** (`nightly-maintenance.integration-spec.ts`, Redis + PostgreSQL thật): R-11 (a) upsert hai lần ⟹ một scheduler, `pattern`/`tz` đúng, job kế _delayed_;
-(b) mỗi việc: dòng quá mốc 1 phút xóa, dưới mốc 1 phút giữ; `INVITE` mới nhất đã hết hạn 60 ngày vẫn giữ; refresh token của phiên còn sống giữ; (c) **chạy khi khởi động**: dựng dòng quá hạn, bật worker ⟹ trong ≤ 70 s đúng một lượt, dòng bị xóa (không dùng `every`/cron — nhánh đó không chứng minh được cơ
-chế bù, RV3-1); C2: một phiên chết có 1 200 token ⟹ token xóa theo lô, phiên xóa khi hết token, không lỗi FK; (d) hai worker cùng bootstrap ⟹ một lượt chạy khi khởi động;
-(e) chạy lại ngay ⟹ xóa 0; (g) bắt log ⟹ chỉ số đếm; (i) worker bật khi Redis không tới được ⟹ khởi động xong, đổi sang Redis thật ⟹ scheduler có.
+(b) mỗi việc: dòng quá mốc 1 phút xóa, dưới mốc 1 phút giữ; `INVITE` mới nhất đã hết hạn 60 ngày vẫn giữ; refresh token của phiên còn sống giữ; (c) **chạy khi khởi động**: dựng dòng quá hạn, bật worker (`BOOT_RUN_DELAY_MS` ngắn) ⟹ trong ≤ `BOOT_RUN_DELAY_MS` + 10 s đúng một lượt, dòng bị xóa (không dùng `every`/cron — nhánh đó không chứng minh được cơ
+chế bù, RV3-1); C2: một phiên chết có 1 200 token ⟹ token xóa theo lô, phiên xóa khi hết token, không lỗi FK; (d) hai worker cùng bootstrap ⟹ một lượt chạy khi khởi động; worker thứ hai thêm job khởi động **sau** khi lượt của worker đầu đã `completed` ⟹ vẫn một lượt (dedup `ttl`);
+(e) chạy lại ngay ⟹ xóa 0; (g) bắt log ⟹ chỉ số đếm; (i) worker bật khi `toggleableRedisProxy` đang `stop()` ⟹ khởi động xong; `start()` cùng tiến trình ⟹ scheduler có, `Worker` của hàng chạy, job khởi động chạy (R-12).
 
 **Kiểm:** `pnpm arch:capabilities --module identity-access`, `--module notifications`; gate `module-graph` (facade mới chỉ ở `identity-access-housekeeping-facade.module.ts`, chỉ worker import;
 `extension-wiring` hai biến thể worker); `deployment-roles`/`database-role-judgement` **không** đổi (bốn bảng đã có `DELETE`).
@@ -576,7 +591,7 @@ chế bù, RV3-1); C2: một phiên chết có 1 200 token ⟹ token xóa theo l
 **Files:** Create `src/infrastructure/queue/queue-board.module.ts`, `src/infrastructure/queue/queue-board.mount.ts` (+spec), `src/infrastructure/queue/queue-board-auth.ts`
 (+spec), `test/integration/platform/queue-board.integration-spec.ts`. Modify `src/app/app.module.ts` (import tĩnh `QueueBoardModule` — GP-6),
 `test/gates/module-graph.gate-spec.ts` (`QueueBoardModule` ở API, không ở worker/CLI), `test/gates/deployment-roles.gate-spec.ts` (`@bull-board/api`,
-`@bull-board/express`), `package.json`/lock. **Không** sửa `src/app/configure-application.ts` (router gắn qua `HttpAdapterHost` lúc `app.init()`, sau `helmet()`).
+`@bull-board/express`), `package.json`/lock (`pnpm add -E @bull-board/api@9.13.1 @bull-board/express@9.13.1`). **Không** sửa `src/app/configure-application.ts` (router gắn qua `HttpAdapterHost` lúc `app.init()`, sau `helmet()`).
 
 **Interfaces — Produces:**
 
@@ -597,8 +612,8 @@ export class QueueBoardModule {}
 **Test trước** (`queue-board-auth.spec.ts`, `queue-board.mount.spec.ts`): `credentialsMatch` — đúng ⟹ true; sai tên/sai mật khẩu/khác độ dài/thiếu header/không phải `Basic`/base64 hỏng ⟹ false (không ném);
 mật khẩu chứa `:` và chữ có dấu ⟹ tách ở `:` đầu, true (Trọng tâm review 5); spy `crypto.timingSafeEqual` được gọi với hai `Buffer` 32 byte (R-06 g); `QueueBoardMount` tắt ⟹ spy factory client 0 lời gọi (R-06 i).
 
-**Integration** (supertest, Redis thật): R-06 (a)–(f); (i) board bật, `app.close()` ⟹ không handle mở (`--detectOpenHandles` lượt local, ghi PROGRESS). Router dựng với `readOnlyMode: true`; (e) gửi `PUT`/`POST` tới các đường đổi job của API Bull Board (`…/api/queues/
-email-delivery/retry/failed`, `…/clean/completed`, `…/<id>/promote`, `…/<id>` `DELETE`) ⟹ không 2xx và job không đổi.
+**Integration** (supertest, Redis thật): R-06 (a)–(f); (i) board bật, `app.close()` ⟹ không handle mở (`--detectOpenHandles` lượt local, ghi PROGRESS). Router dựng với `readOnlyMode: true` và `serverAdapter.getRouter().disable('x-powered-by')` (app Express con, SPEC §5.9); (e) gửi `PUT`/`POST` tới các đường đổi job của API Bull Board (`…/api/queues/
+email-delivery/retry/failed`, `…/clean/completed`, `…/<id>/promote`, `…/<id>` `DELETE`) ⟹ **405** và job không đổi; (f) thêm: phản hồi không có `X-Powered-By`.
 
 **Kiểm tay:** `QUEUE_BOARD_ENABLED=true` local, mở `http://localhost:3000/ops/queues` trên trình duyệt, đăng nhập, thấy hàng `email-delivery`; console **không** lỗi CSP;
 ghi ảnh/nhận xét vào PROGRESS (R-06 h).

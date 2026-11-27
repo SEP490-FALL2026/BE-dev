@@ -68,7 +68,8 @@ phê duyệt.
     thuật hết dùng (mail đã xong, phiên/token đã chết, bộ đếm đăng nhập cũ), mỗi việc ở module sở hữu bảng, theo lô, idempotent, một khóa phiên chống chạy trùng. Thời gian giữ 30 ngày (Owner 27/11). Mọi
     sweeper nghiệp vụ — kể cả các sweeper dọn nghiệp vụ — vẫn ở API.
 12. Dùng lớp `Queue`/`Worker` của `bullmq` 6 trực tiếp trong provider có vòng đời tường minh; gỡ `@nestjs/bullmq`; thêm `ioredis` (peer của `bullmq` 6 và của thư viện
-    storage).
+    storage). Kết nối của BullMQ chỉ khởi tạo **một lần** khi dựng `Queue`/`Worker`, nên mọi `Queue` dựng ở chế độ "lỗi nhanh" (`skipWaitingForReady`,
+    `skipVersionCheck`, client không chặn) và client của `Worker` không dùng kết nối lười — để Redis chết lúc khởi động không làm hàng hỏng tới khi khởi động lại.
 
 ## Hệ quả
 
