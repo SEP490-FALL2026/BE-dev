@@ -56,19 +56,22 @@ describe('the lines of a period: renewal price, zero price, move, declarer and r
         unit_price_currency: string;
         price_rate: string;
         price_reporting_minor: string;
+        plan_id: string;
+        monthly_unit_price_minor: string;
       }>(
-        `SELECT unit_price_minor::text, unit_price_currency, price_rate::text, price_reporting_minor::text
+        `SELECT unit_price_minor::text, unit_price_currency, price_rate::text, price_reporting_minor::text, plan_id,
+                monthly_unit_price_minor::text
            FROM subscriptions WHERE id = $1`,
         [id],
       )
     ).rows[0];
-  const renew = async (period: PeriodWire, startDate: string) => {
+  const renew = async (period: PeriodWire, startDate: string, quantities: readonly number[] = []) => {
     const actor = await principalOf(h.ctx, h.it1.accessToken);
 
     return h.ctx.app.get(TransactionRunner).run((tx) =>
       h.ctx.app.get(SubscriptionPeriodApi).recordNextPeriod(tx, actor, {
         previousSubscriptionId: period.id,
-        lines: period.lines.map((line) => ({ previousLineId: line.id, quantity: 2 })),
+        lines: period.lines.map((line, index) => ({ previousLineId: line.id, quantity: quantities[index] ?? 2 })),
         billingCycle: 'ANNUAL',
         startDate,
         autoRenew: true,
@@ -109,6 +112,21 @@ describe('the lines of a period: renewal price, zero price, move, declarer and r
       expect(row.price_rate).toBe(declaredRow.price_rate);
       const price = await h.ctx.app.get(CatalogApi).getPlanPrice(plans[0].planId);
       expect(price).toMatchObject({ monthlyPriceMinor: 500000n });
+    });
+  });
+
+  describe('A-1: the first line a renewal keeps is one source for the price of the period', () => {
+    it('prices the period by the second line when the first keeps no seat: 12 x 800.000, and the plan stays the plan of the period it continues', async () => {
+      const { plans } = await vendorPlans(2);
+      const declared = h.dataOf<PeriodWire>(
+        await declareLines(plans, ['500000', '800000'], { startDate: '2025-01-01', endDate: '2025-12-31' }).expect(201),
+      );
+
+      const next = await renew(await read(declared.id), '2026-01-01', [0, 2]);
+
+      const row = await periodRow(next.subscriptionId);
+      expect(row).toMatchObject({ unit_price_minor: '9600000', plan_id: plans[0].planId });
+      expect(row.monthly_unit_price_minor).toBe('800000');
     });
   });
 

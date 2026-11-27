@@ -128,6 +128,18 @@ function scheduleOf(row: PaidTermRow): PaymentScheduleFacts | null {
 }
 
 /**
+ * The line a renewed period takes its price from: the first of the lines it keeps by the order the lines were made (`created_at`,
+ * `id`) on the period before, whatever the order the renewal named them in.
+ */
+function firstLineOf<T extends { oldLine: Pick<SubscriptionLineRecord, 'id' | 'createdAt'> }>(
+  entries: readonly T[],
+): T | undefined {
+  return [...entries].sort(
+    (a, b) => a.oldLine.createdAt.getTime() - b.oldLine.createdAt.getTime() || (a.oldLine.id < b.oldLine.id ? -1 : 1),
+  )[0];
+}
+
+/**
  * The periods of the subscriptions as the renewal of a subscription reads and continues them (`QĐ-16`, `US-11-03`): the milestone
  * derived by the same rule the subscription is read with, the period that already continues one, and the new period recorded
  * from what the vendor confirmed, chained to the old one in the transaction of the caller. Nothing here decides a renewal.
@@ -365,7 +377,7 @@ export class SubscriptionPeriodService {
     const resolved = await this.resolveInputLines(oldLines, input);
     const kept = resolved.filter((entry) => entry.quantity > 0);
     const single = this.singleLinePrice(kept, oldLines.length, input.billingCycle);
-    const first = resolved[0];
+    const first = firstLineOf(kept) ?? firstLineOf(resolved);
     const unitMoney = first
       ? resolveSubscriptionPrices({
           kind: 'TERM',
@@ -376,7 +388,7 @@ export class SubscriptionPeriodService {
         }).unitMoney
       : null;
     const priced = await this.pricing.priceToday(tx, unitMoney);
-    const minor = kept[0]?.monthlyUnitPriceMinor ?? previous.monthlyUnitPriceMinor ?? 0n;
+    const minor = firstLineOf(kept)?.monthlyUnitPriceMinor ?? previous.monthlyUnitPriceMinor ?? 0n;
     const activePriced = priced;
 
     return {

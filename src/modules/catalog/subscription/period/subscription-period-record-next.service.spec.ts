@@ -92,19 +92,19 @@ describe('SubscriptionPeriodService.recordNext multi-line ACTIVE pricing', () =>
         id: 'line-std',
         subscriptionId: 'sub-1',
         workspaceId: 'ws-1',
-        planId: 'plan-1',
         monthlyUnitPriceMinor: 500000n,
         minimumSeats: 5,
         closedReason: null,
+        createdAt: new Date('2026-01-01T00:00:00Z'),
       },
       {
         id: 'line-prm',
         subscriptionId: 'sub-1',
         workspaceId: 'ws-1',
-        planId: 'plan-2',
         monthlyUnitPriceMinor: 2500000n,
         minimumSeats: null,
         closedReason: null,
+        createdAt: new Date('2026-01-02T00:00:00Z'),
       },
     ];
     const periodLines = {
@@ -166,12 +166,26 @@ describe('SubscriptionPeriodService.recordNext multi-line ACTIVE pricing', () =>
     });
   });
 
-  it('takes the price of the period from the line named first, not from the plan of the previous period', async () => {
+  it('takes the price of the period from the first line it keeps by creation (created_at, id), not from the order the renewal names the lines in', async () => {
     const inserted = await renewWith([...bothLines].reverse());
+
+    expect(inserted).toMatchObject({
+      unitPrice: { amountMinor: 6_000_000n, currency: 'VND' },
+      priceSnapshot: { reportingMinor: 6_000_000n, rate: RATE_ONE },
+      monthlyUnitPriceMinor: 500000n,
+    });
+  });
+
+  it('skips a line that is no longer kept (no seat): the next kept line by creation prices the period', async () => {
+    const inserted = await renewWith([
+      { previousLineId: 'line-std', quantity: 0 },
+      { previousLineId: 'line-prm', quantity: 2 },
+    ]);
 
     expect(inserted).toMatchObject({
       unitPrice: { amountMinor: 30_000_000n, currency: 'VND' },
       priceSnapshot: { reportingMinor: 30_000_000n, rate: RATE_ONE },
+      monthlyUnitPriceMinor: 2_500_000n,
     });
   });
 });
