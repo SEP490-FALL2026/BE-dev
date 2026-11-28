@@ -286,7 +286,8 @@ describe('API inventory (e2e): openapi presentation and wire messages', () => {
       // 459 with the six workspace routes of redesign wave 3.
       // 465 with the six routes of the lots of licenses.
       // 471 with the six routes of subscription-lines (W3 multi-line & seat ledger); 472 with F-16 missed-adjustment KPI.
-      expect(operations).toHaveLength(472);
+      // 474 with W4 Lane N ticket routes (POST /request-tickets/{id}/withdrawal + GET /request-tickets/{id}).
+      expect(operations).toHaveLength(474);
       expect(missing).toEqual([]);
     });
 
