@@ -160,10 +160,11 @@ describe('the checklist of the wasted seats (integration, real PostgreSQL)', () 
   });
 
   describe('the early push of the IT Admin (5.3)', () => {
-    /** A watch of a holder of a department with a head. */
+    let pushDepartmentId: string | null = null;
+    /** A watch of a holder of a department with a head and `w.it1` in charge. */
     async function watch(tag: string) {
-      const dept = await w.headedDepartment(`P-${tag}`);
-      const holder = await w.seatIn(`E-${tag}`, dept.departmentId);
+      pushDepartmentId ??= (await w.headedDepartment('P-CK53', w.it1.employeeId)).departmentId;
+      const holder = await w.seatIn(`E-${tag}`, pushDepartmentId);
       const id = await w.seedRecommendation({
         group: 'G4',
         state: 'OPEN',

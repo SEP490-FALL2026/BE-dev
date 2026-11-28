@@ -1,5 +1,6 @@
-/** Why the invoice of a purchase could not be recorded (`PI-1`): the number is already taken by an invoice of the vendor, the amounts are not above nothing, or nothing says where to book it. */
-export type PurchaseInvoiceRecordRefusal = 'DUPLICATE_NUMBER' | 'AMOUNT_NOT_POSITIVE' | 'NO_PLACE';
+/** Why the invoice of a purchase could not be recorded (`PI-1`): the number is already taken by an invoice of the vendor, the amounts are not above nothing, the lot already has a confirmed invoice, or nothing says where to book it. */
+export type PurchaseInvoiceRecordRefusal =
+  'DUPLICATE_NUMBER' | 'AMOUNT_NOT_POSITIVE' | 'NO_PLACE' | 'LOT_ALREADY_INVOICED';
 
 export class PurchaseInvoiceRecordRefusedError extends Error {
   constructor(readonly reason: PurchaseInvoiceRecordRefusal) {

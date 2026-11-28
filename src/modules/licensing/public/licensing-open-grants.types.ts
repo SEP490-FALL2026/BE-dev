@@ -75,3 +75,38 @@ export interface GrantExecution {
   claimedByAppUserId: string | null;
   createdAt: Date;
 }
+
+/** A completed grant task that topped up a shared pool when fulfilling a request (`POOL_TOP_UP`). */
+export interface PoolTopUpPurchase {
+  taskId: string;
+  purchasedAt: Date | null;
+}
+
+/** One holder segment along the chain of a K1 annual assignment (initial grant, handover, or transfer replacement). */
+export interface K1AnnualHolderSegment {
+  assignmentId: string;
+  requestId: string | null;
+  owningDepartmentId: string | null;
+  billingAnchorOn: string | null;
+  endedOn: string | null;
+  replacedFromAssignmentId: string | null;
+}
+
+/** Timeline of a K1 annual right starting at `rootAssignmentId`, used for advisory locks and post-transfer confirmations. */
+export interface K1AnnualHolderTimeline {
+  rootAssignmentId: string;
+  segments: K1AnnualHolderSegment[];
+}
+
+/** Root assignment and lineage assignments/requests for a K1 annual request, for Tier 0 locking and 01/01 pairing. */
+export interface K1AnnualChainDetail {
+  rootAssignmentId: string;
+  chainAssignmentIds: string[];
+  chainRequestIds: string[];
+}
+
+/** Closed non-replaced K1 annual seat that may still have an active paid 12-month cycle crossing `onDate` (`F9(c)`). */
+export interface K1AnnualPaidSeat extends GrantedSeatOfRequest {
+  personalCommitmentMonths: 12;
+  billingAnchorOn: string;
+}

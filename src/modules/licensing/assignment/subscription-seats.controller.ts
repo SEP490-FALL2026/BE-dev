@@ -11,13 +11,13 @@ import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { LICENSING_ERROR_EXAMPLES, toLicensingApiException } from '../licensing.http-errors';
 import { SeatUsageResponseDto, SubscriptionSeatsParamDto } from './assignment.dto';
-import { AssignmentService } from './assignment.service';
+import { SubscriptionSeatUsageService } from './occupancy/seat-usage-occupancy.service';
 
 /** The seats of a subscription taken and free (`US-02-05` AC-1): the seats bought minus the assignments occupying today. */
 @ApiTags('subscriptions')
 @Controller({ path: 'subscriptions', version: '1' })
 export class SubscriptionSeatsController {
-  constructor(private readonly assignments: AssignmentService) {}
+  constructor(private readonly seatUsages: SubscriptionSeatUsageService) {}
 
   @Get(':id/seat-usage')
   @RequireRoles('IT_ADMIN')
@@ -25,7 +25,7 @@ export class SubscriptionSeatsController {
   @ApiSuccessResponse(SeatUsageResponseDto, {
     message: 'SUBSCRIPTION_SEAT_USAGE.FETCHED',
     description:
-      'The seats bought, the assignments occupying today in the organization calendar and the seats free; purchased and free are null while the subscription has no quantity.',
+      'The seats bought (for K2 subscriptions, the sum of seats today across lines serving today), those taken today in the organization calendar (the assignments occupying and, for a lot of keys on machines, the open activations on machines) and the seats free; purchased and free are null while the subscription has no quantity.',
   })
   @ApiErrorResponses(
     UNAUTHENTICATED_RESPONSE,
@@ -48,7 +48,7 @@ export class SubscriptionSeatsController {
   )
   async seatUsage(@Param() params: SubscriptionSeatsParamDto) {
     try {
-      return await this.assignments.seatUsage(params.id);
+      return await this.seatUsages.get(params.id);
     } catch (error) {
       throw toLicensingApiException(error);
     }

@@ -186,4 +186,94 @@ export const SUBSCRIPTION_TEXTS = {
         '{changedByEmployeeId:name} increased the seats of subscription {subscriptionId:name} from {fromQuantity} to {toQuantity}.',
     },
   },
+  SUBSCRIPTION_SEATS_REDUCED: {
+    vi: {
+      title: 'Thuê bao bị giảm số chỗ',
+      message:
+        '{changedByEmployeeId:name} đã giảm số chỗ của thuê bao {subscriptionId:name} từ {fromQuantity} xuống {toQuantity}.',
+    },
+    en: {
+      title: 'Seats reduced on a subscription',
+      message:
+        '{changedByEmployeeId:name} reduced the seats of subscription {subscriptionId:name} from {fromQuantity} to {toQuantity}.',
+    },
+  },
+  SUBSCRIPTION_SEATS_BOUGHT: {
+    vi: {
+      title: 'Đã ghi nhận mua thêm chỗ',
+      message: '{recordedByEmployeeId:name} đã ghi nhận mua thêm {quantity} chỗ cho thuê bao {subscriptionId:name}.',
+    },
+    en: {
+      title: 'Additional seats purchased',
+      message:
+        '{recordedByEmployeeId:name} recorded a purchase of {quantity} seat(s) for subscription {subscriptionId:name}.',
+    },
+  },
+  SEAT_PURCHASE_INVOICE_OVERDUE: {
+    vi: {
+      title: 'Hóa đơn mua thêm chỗ quá hạn',
+      message:
+        'Lần mua chỗ trên thuê bao {subscriptionId:name} đã quá hạn nộp hóa đơn ({dueOn:date}). Vui lòng nộp hóa đơn.',
+    },
+    en: {
+      title: 'Seat purchase invoice overdue',
+      message:
+        'A seat purchase on subscription {subscriptionId:name} has passed its invoice due date ({dueOn:date}). Please submit the invoice.',
+    },
+  },
+  SEAT_LEDGER_VENDOR_RECORDED: {
+    vi: {
+      title: 'Đã ghi nhận điều chỉnh seat theo nhà cung cấp',
+      message:
+        '{recordedByEmployeeId:name} đã ghi nhận điều chỉnh {delta} seat theo nhà cung cấp cho thuê bao {subscriptionId:name} (hiệu lực {effectiveOn:date}).',
+    },
+    en: {
+      title: 'Vendor seat ledger adjustment recorded',
+      message:
+        '{recordedByEmployeeId:name} recorded a vendor seat adjustment of {delta} seat(s) on subscription {subscriptionId:name} (effective {effectiveOn:date}).',
+    },
+  },
+  IDLE_SEAT_COST_RATIO_HIGH: {
+    vi: {
+      title: 'Chi phí seat trống vượt ngưỡng 10 %',
+      message: 'Chi phí seat trống của {subscriptionId:name} tháng {month} là {ratioPercent} %, vượt 10 %.',
+    },
+    en: {
+      title: 'Idle seat cost exceeds 10 %',
+      message: 'The idle seat cost of {subscriptionId:name} in {month} is {ratioPercent} %, exceeding 10 %.',
+    },
+  },
+  LICENSE_LOT_IDLE_COST_HIGH: {
+    vi: {
+      title: 'Chi phí license trống vượt ngưỡng 10 %',
+      message: 'Chi phí license trống của lô {lotId:name} tháng {month} là {ratioPercent} %, vượt 10 %.',
+    },
+    en: {
+      title: 'Idle license cost exceeds 10 %',
+      message: 'The idle license cost of lot {lotId:name} in {month} is {ratioPercent} %, exceeding 10 %.',
+    },
+  },
+  SUBSCRIPTION_PRICE_REVIEW: {
+    vi: {
+      title: 'Cần cập nhật giá tháng thuê bao',
+      message: 'Hóa đơn của {subscriptionId:name} lệch do tỷ giá hoặc phí thẻ; hãy cập nhật giá tháng.',
+    },
+    en: {
+      title: 'Subscription monthly price review needed',
+      message:
+        'An invoice for {subscriptionId:name} differed due to exchange rate or card fees; please update the monthly price.',
+    },
+  },
+  WORKSPACE_ADMIN_NOT_WORKING: {
+    vi: {
+      title: 'Quản trị viên workspace thôi làm việc',
+      message:
+        '{employeeId:name} trên workspace {workspaceId:name} không còn là IT Admin đang làm việc; hiện còn {workingAdminCount} quản trị viên đang làm việc.',
+    },
+    en: {
+      title: 'Workspace admin no longer working',
+      message:
+        '{employeeId:name} on workspace {workspaceId:name} is no longer a working IT Admin; {workingAdminCount} working admin(s) remain.',
+    },
+  },
 } satisfies Partial<Record<InAppNotificationCode, NotificationTexts>>;

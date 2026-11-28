@@ -1,7 +1,5 @@
+import { randomUUID } from 'node:crypto';
 import request from 'supertest';
-import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
-import { CatalogApi } from '../../../src/modules/catalog/public/catalog.api';
-import { principal } from '../../support/ai-assist-fakes';
 import { SeatHarness } from '../../support/seat-baseline-harness';
 
 const h = new SeatHarness();
@@ -23,95 +21,242 @@ describe('subscription quantity change rules (real PostgreSQL)', () => {
     await h.stop();
   });
 
-  it('refuses changing purchasedQuantity without expectedUpdatedAt: 422 SUBSCRIPTION.VERSION_REQUIRED', async () => {
+  it('W3-27: refuses PATCH /subscriptions/:id changing purchasedQuantity (even without expectedUpdatedAt) with 409 SUBSCRIPTION.SEAT_COUNT_VIA_LEDGER', async () => {
     const id = await h.subscription(10, 'K2');
 
-    const res = await patch(id, { purchasedQuantity: 12, quantityChangeReason: 'Expansion' }).expect(422);
+    const res = await patch(id, { purchasedQuantity: 12, quantityChangeReason: 'Expansion' }).expect(409);
 
-    expect(h.codeOf(res)).toBe('SUBSCRIPTION.VERSION_REQUIRED');
+    expect(h.codeOf(res)).toBe('SUBSCRIPTION.SEAT_COUNT_VIA_LEDGER');
   });
 
-  it('refuses a PATCH with stale expectedUpdatedAt after addPoolSeat: 409 SUBSCRIPTION.STALE', async () => {
+  it('refuses a PATCH with stale expectedUpdatedAt after an earlier PATCH: 409 SUBSCRIPTION.STALE', async () => {
     const id = await h.subscription(6, 'K2');
     const seen = await read(id);
 
-    const catalog = h.ctx.app.get(CatalogApi, { strict: false });
-    await h.ctx.app.get(TransactionRunner).run(async (tx) => {
-      await catalog.lockSeatTarget(tx, { subscriptionId: id });
-      await catalog.addPoolSeat(tx, principal(h.it1.employeeId), id, null);
-    });
+    await patch(id, {
+      autoRenew: true,
+      expectedUpdatedAt: seen,
+    }).expect(200);
 
     const res = await patch(id, {
-      purchasedQuantity: 10,
-      quantityChangeReason: 'Team growth',
+      autoRenew: false,
       expectedUpdatedAt: seen,
     }).expect(409);
 
     expect(h.codeOf(res)).toBe('SUBSCRIPTION.STALE');
   });
 
-  it('blocks reducing a 12-month active K2 subscription without mid-term reduction: 409 SUBSCRIPTION.MID_TERM_REDUCTION_NOT_ALLOWED', async () => {
+  it('W3-27: records SEAT_LEDGER.VENDOR_RECORDED in audit events when increasing seats via line seat-corrections', async () => {
     const id = await h.subscription(10, 'K2');
-    await h.ctx.sql.query(
-      `UPDATE subscriptions SET commitment_term_months = 12, allows_mid_term_reduction = false WHERE id = $1`,
-      [id],
-    );
-    const seen = await read(id);
+    await h.ctx.sql.query(`UPDATE subscriptions SET responsible_it_admin_employee_id = $2 WHERE id = $1`, [
+      id,
+      h.it1.employeeId,
+    ]);
+    const lineRow = (
+      await h.ctx.sql.query<{ id: string; updated_at: Date; today: string }>(
+        `SELECT id, updated_at, (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date::text AS today
+           FROM subscription_lines WHERE subscription_id = $1`,
+        [id],
+      )
+    ).rows[0];
 
-    const res = await patch(id, {
-      purchasedQuantity: 8,
-      commitmentTermMonths: 1,
-      allowsMidTermReduction: true,
-      expectedUpdatedAt: seen,
-    }).expect(409);
+    const created = await request(h.server())
+      .post(`/api/v1/subscription-lines/${lineRow.id}/seat-corrections`)
+      .set(h.as(h.it1))
+      .send({
+        delta: 3,
+        effectiveOn: lineRow.today,
+        note: 'New onboarding cohort',
+        expectedUpdatedAt: lineRow.updated_at.toISOString(),
+      })
+      .expect(201);
 
-    expect(h.codeOf(res)).toBe('SUBSCRIPTION.MID_TERM_REDUCTION_NOT_ALLOWED');
-  });
-
-  it('allows reducing a 12-month active K2 subscription when allowsMidTermReduction is true', async () => {
-    const id = await h.subscription(10, 'K2');
-    await h.ctx.sql.query(
-      `UPDATE subscriptions SET commitment_term_months = 12, allows_mid_term_reduction = true WHERE id = $1`,
-      [id],
-    );
-    const seen = await read(id);
-
-    const res = await patch(id, { purchasedQuantity: 8, expectedUpdatedAt: seen }).expect(200);
-
-    expect(h.dataOf<{ purchasedQuantity: number }>(res).purchasedQuantity).toBe(8);
-  });
-
-  it('requires quantityChangeReason when increasing an active K2 subscription: 422 SUBSCRIPTION.QUANTITY_REASON_REQUIRED', async () => {
-    const id = await h.subscription(10, 'K2');
-    const seen = await read(id);
-
-    const res = await patch(id, { purchasedQuantity: 12, expectedUpdatedAt: seen }).expect(422);
-
-    expect(h.codeOf(res)).toBe('SUBSCRIPTION.QUANTITY_REASON_REQUIRED');
-  });
-
-  it('records quantityChangeReason in the SUBSCRIPTION.UPDATED audit after snapshot when increasing an active K2 subscription', async () => {
-    const id = await h.subscription(10, 'K2');
-    const seen = await read(id);
-
-    await patch(id, {
-      purchasedQuantity: 13,
-      quantityChangeReason: 'New onboarding cohort',
-      expectedUpdatedAt: seen,
-    }).expect(200);
-
+    const changeId = h.dataOf<{ id: string }>(created).id;
     const audits = (
       await h.ctx.sql.query<{ after: Record<string, unknown> }>(
         `SELECT after FROM audit_events
-          WHERE action = 'SUBSCRIPTION.UPDATED' AND resource_id = $1
+          WHERE action = 'SEAT_LEDGER.VENDOR_RECORDED' AND resource_id = $1
           ORDER BY occurred_at DESC LIMIT 1`,
-        [id],
+        [changeId],
       )
     ).rows;
     expect(audits).toHaveLength(1);
     expect(audits[0].after).toMatchObject({
-      quantity: 13,
-      quantityChangeReason: 'New onboarding cohort',
+      subscriptionLineId: lineRow.id,
+      delta: 3,
     });
+  });
+
+  it('F-12: two seat-corrections with the same expectedUpdatedAt return 201 then 409 SUBSCRIPTION_LINE.STALE', async () => {
+    const id = await h.subscription(6, 'K2');
+    await h.ctx.sql.query(`UPDATE subscriptions SET responsible_it_admin_employee_id = $2 WHERE id = $1`, [
+      id,
+      h.it1.employeeId,
+    ]);
+    const lineRow = (
+      await h.ctx.sql.query<{ id: string; updated_at: Date; today: string }>(
+        `SELECT id, updated_at, (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date::text AS today
+           FROM subscription_lines WHERE subscription_id = $1`,
+        [id],
+      )
+    ).rows[0];
+    const seen = lineRow.updated_at.toISOString();
+
+    await request(h.server())
+      .post(`/api/v1/subscription-lines/${lineRow.id}/seat-corrections`)
+      .set(h.as(h.it1))
+      .send({
+        delta: 1,
+        effectiveOn: lineRow.today,
+        note: 'First vendor adjustment',
+        expectedUpdatedAt: seen,
+      })
+      .expect(201);
+
+    const stale = await request(h.server())
+      .post(`/api/v1/subscription-lines/${lineRow.id}/seat-corrections`)
+      .set(h.as(h.it1))
+      .send({
+        delta: 1,
+        effectiveOn: lineRow.today,
+        note: 'Second vendor adjustment with stale version',
+        expectedUpdatedAt: seen,
+      })
+      .expect(409);
+
+    expect(h.codeOf(stale)).toBe('SUBSCRIPTION_LINE.STALE');
+  });
+
+  it('F-14: seat-corrections delta -1 sets outOfProcess=true on 12-month without allowsMidTermReduction and false when allowed', async () => {
+    const blockedSub = await h.subscription(6, 'K2');
+    await h.ctx.sql.query(
+      `UPDATE subscriptions
+          SET responsible_it_admin_employee_id = $2,
+              commitment_term_months = 12,
+              allows_mid_term_reduction = false
+        WHERE id = $1`,
+      [blockedSub, h.it1.employeeId],
+    );
+    const blockedLine = (
+      await h.ctx.sql.query<{ id: string; updated_at: Date; today: string }>(
+        `SELECT id, updated_at, (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date::text AS today
+           FROM subscription_lines WHERE subscription_id = $1`,
+        [blockedSub],
+      )
+    ).rows[0];
+    const res1 = await request(h.server())
+      .post(`/api/v1/subscription-lines/${blockedLine.id}/seat-corrections`)
+      .set(h.as(h.it1))
+      .send({
+        delta: -1,
+        effectiveOn: blockedLine.today,
+        note: 'Vendor reduced without clause',
+        expectedUpdatedAt: blockedLine.updated_at.toISOString(),
+      })
+      .expect(201);
+    expect(h.dataOf<{ outOfProcess: boolean }>(res1).outOfProcess).toBe(true);
+
+    const allowedSub = await h.subscription(6, 'K2');
+    await h.ctx.sql.query(
+      `UPDATE subscriptions
+          SET responsible_it_admin_employee_id = $2,
+              commitment_term_months = 12,
+              allows_mid_term_reduction = true
+        WHERE id = $1`,
+      [allowedSub, h.it1.employeeId],
+    );
+    const allowedLine = (
+      await h.ctx.sql.query<{ id: string; updated_at: Date; today: string }>(
+        `SELECT id, updated_at, (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date::text AS today
+           FROM subscription_lines WHERE subscription_id = $1`,
+        [allowedSub],
+      )
+    ).rows[0];
+    const res2 = await request(h.server())
+      .post(`/api/v1/subscription-lines/${allowedLine.id}/seat-corrections`)
+      .set(h.as(h.it1))
+      .send({
+        delta: -1,
+        effectiveOn: allowedLine.today,
+        note: 'Allowed mid-term reduction',
+        expectedUpdatedAt: allowedLine.updated_at.toISOString(),
+      })
+      .expect(201);
+    expect(h.dataOf<{ outOfProcess: boolean }>(res2).outOfProcess).toBe(false);
+  });
+
+  it('R-3: refuses missing or blank note on seat-corrections and seat-reductions with 422 VALIDATION_ERROR', async () => {
+    const id = await h.subscription(10, 'K2');
+    await h.ctx.sql.query(
+      `UPDATE subscriptions
+          SET responsible_it_admin_employee_id = $2,
+              commitment_term_months = 12,
+              allows_mid_term_reduction = true
+        WHERE id = $1`,
+      [id, h.it1.employeeId],
+    );
+    const lineRow = (
+      await h.ctx.sql.query<{ id: string; updated_at: Date; today: string }>(
+        `SELECT id, updated_at, (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date::text AS today
+           FROM subscription_lines WHERE subscription_id = $1`,
+        [id],
+      )
+    ).rows[0];
+    const lineUpdatedAt = lineRow.updated_at.toISOString();
+
+    for (const badNote of [undefined, '', '   ']) {
+      const corrRes = await request(h.server())
+        .post(`/api/v1/subscription-lines/${lineRow.id}/seat-corrections`)
+        .set(h.as(h.it1))
+        .send({
+          delta: 1,
+          effectiveOn: lineRow.today,
+          ...(badNote === undefined ? {} : { note: badNote }),
+          expectedUpdatedAt: lineUpdatedAt,
+        })
+        .expect(422);
+      expect(h.codeOf(corrRes)).toBe('VALIDATION_ERROR');
+      const corrIssues = h.detailsOf(corrRes).issues as Array<{ path: string }>;
+      expect(corrIssues.length).toBeGreaterThan(0);
+      expect(corrIssues.every((issue) => issue.path === 'note')).toBe(true);
+
+      const redRes = await request(h.server())
+        .post(`/api/v1/subscription-lines/${lineRow.id}/seat-reductions`)
+        .set(h.as(h.it1))
+        .send({
+          refundedSeatChangeId: randomUUID(),
+          quantity: 1,
+          effectiveOn: lineRow.today,
+          ...(badNote === undefined ? {} : { note: badNote }),
+          expectedUpdatedAt: lineUpdatedAt,
+        })
+        .expect(422);
+      expect(h.codeOf(redRes)).toBe('VALIDATION_ERROR');
+      const redIssues = h.detailsOf(redRes).issues as Array<{ path: string }>;
+      expect(redIssues.length).toBeGreaterThan(0);
+      expect(redIssues.every((issue) => issue.path === 'note')).toBe(true);
+    }
+  });
+
+  it('R-5: K2 PER_SEAT draft created without purchasedQuantity returns status DRAFT and missing QUANTITY on POST and GET', async () => {
+    const planId = await h.plan('K2', 'PER_SEAT');
+    const createdRes = await request(h.server())
+      .post('/api/v1/subscriptions')
+      .set(h.as(h.it1))
+      .send({
+        planId,
+        kind: 'TERM',
+        monthlyUnitPrice: { amount: '500000', currency: 'VND' },
+        billingCycle: 'MONTHLY',
+        startDate: '2026-01-05',
+      })
+      .expect(201);
+    const created = h.dataOf<{ id: string; status: string; missing: string[] }>(createdRes);
+    expect(created).toMatchObject({ status: 'DRAFT', missing: ['QUANTITY'] });
+
+    const fetched = h.dataOf<{ id: string; status: string; missing: string[] }>(
+      await request(h.server()).get(`/api/v1/subscriptions/${created.id}`).set(h.as(h.it1)).expect(200),
+    );
+    expect(fetched).toMatchObject({ id: created.id, status: 'DRAFT', missing: ['QUANTITY'] });
   });
 });

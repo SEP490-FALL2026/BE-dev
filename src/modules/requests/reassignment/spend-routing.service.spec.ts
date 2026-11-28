@@ -37,10 +37,15 @@ describe('SpendRoutingService conversion & assessment entry', () => {
       markOneStep: jest.fn(),
       setOneStepBlockedReason: jest.fn(),
       setState: jest.fn(),
+      addAssessmentStep: jest.fn(),
     };
     const checks = { run: jest.fn() };
     const steps = { findOpen: jest.fn(), open: jest.fn() };
-    const targets = { isRequesterHead: jest.fn(), usableSpendingApproverEmployeeId: jest.fn() };
+    const targets = {
+      isRequesterHead: jest.fn(),
+      usableSpendingApproverEmployeeId: jest.fn(),
+      assessmentTarget: jest.fn(),
+    };
     const audit = { record: jest.fn() };
     const service = new SpendRoutingService(
       requests as never,
@@ -171,5 +176,20 @@ describe('SpendRoutingService conversion & assessment entry', () => {
     await service.finishConversion(tx, baseRequest() as never, now);
 
     expect(checks.run).not.toHaveBeenCalled();
+  });
+
+  it('starts ONE_STEP NEW_SOFTWARE assessment using request.departmentId', async () => {
+    const { service, targets, requests, audit } = makeService();
+    const oneStepProposal = baseRequest({
+      routing: { mode: 'ONE_STEP', oneStepReason: 'REQUESTER_IS_HEAD', oneStepBlockedReason: null },
+    });
+    requests.findById.mockResolvedValue(oneStepProposal);
+    targets.assessmentTarget.mockResolvedValue('it-sub');
+
+    await service.start(tx, actor, 'req-1', now);
+
+    expect(targets.assessmentTarget).toHaveBeenCalledWith(tx, 'dept-1');
+    expect(requests.addAssessmentStep).toHaveBeenCalledWith(tx, 'req-1', 'it-sub', 2, now);
+    expect(audit.record).toHaveBeenCalledTimes(1);
   });
 });

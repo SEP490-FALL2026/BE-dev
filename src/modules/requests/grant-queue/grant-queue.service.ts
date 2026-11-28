@@ -54,7 +54,7 @@ export class GrantQueueService {
       pageSize: number;
     },
   ): Promise<Page<GrantQueueItemWire>> {
-    const departmentIds = await this.organizationReads.getItAdminScope(actor.employeeId, (ids) =>
+    const departmentIds = await this.organizationReads.getItAdminActingScope(actor.employeeId, (ids) =>
       this.identity.findUsableItAdminEmployeeIds(ids),
     );
     if (departmentIds.length === 0) return pageOf([], 0, query.page, query.pageSize);

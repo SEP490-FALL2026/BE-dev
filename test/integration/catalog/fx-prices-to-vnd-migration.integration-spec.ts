@@ -94,9 +94,9 @@ describe('the migration that turns prices into dong (integration, real PostgreSQ
       `INSERT INTO subscriptions (id, organization_id, plan_id, kind, status, purchased_quantity,
          unit_price_minor, unit_price_currency, price_recorded_on,
          price_rate, price_rate_date, price_rate_source, price_reporting_minor, price_reporting_currency, price_exchange_rate_id,
-         billing_cycle, commitment_term_months, start_date)
+         monthly_unit_price_minor, billing_cycle, commitment_term_months, start_date)
        VALUES ($1, $2, $3, 'TERM', $4::"SubscriptionStatus", 10, $5, $6, '2026-09-01',
-         $7, $8, $9::"PriceRateSource", $10, $11, $12, 'MONTHLY', 1, '2026-09-01')`,
+         $7, $8, $9::"PriceRateSource", $10, $11, $12, $5, 'MONTHLY', 1, '2026-09-01')`,
       [
         id,
         organizationId(),

@@ -2,12 +2,13 @@ import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { ResponsibilityHandoverService } from '../application-responsibility/responsibility-handover.service';
-import { VendorAdminMinimumService } from '../plan/vendor-admin-minimum.service';
-import { VendorAdminRolesService } from '../plan/vendor-admin-roles.service';
+import { VendorAdminMinimumService } from '../plan/vendor-admin/vendor-admin-minimum.service';
+import { VendorAdminRolesService } from '../plan/vendor-admin/vendor-admin-roles.service';
 import type {
   ResponsibilitiesTransferred,
   ResponsibilityCounts,
   VendorAdminRole,
+  WorkspaceNotWorkingAdmins,
 } from './catalog-responsibility.types';
 
 /**
@@ -26,6 +27,21 @@ export class CatalogResponsibilityApi {
   /** How many subscriptions and applications each of these employees answers for; an employee with none is counted zero. */
   countResponsibilitiesOf(employeeIds: readonly string[], tx?: DbTx): Promise<Map<string, ResponsibilityCounts>> {
     return this.handover.countOf(employeeIds, tx);
+  }
+
+  /** Working IT Admins currently named responsible on active subscriptions of the plan. */
+  usableSubscriptionItAdminsOfPlan(planId: string, tx?: DbTx): Promise<string[]> {
+    return this.handover.usableSubscriptionItAdminsOfPlan(planId, tx);
+  }
+
+  /** How many workspaces in use are short of administrators who work now: the same judgment as the flag of the workspace. */
+  countWorkspacesBelowMinimum(tx?: DbTx): Promise<number> {
+    return this.minimum.countWorkspacesBelowMinimum(tx);
+  }
+
+  /** Workspaces that currently list at least one administrator who is not a working IT Admin. */
+  workspacesWithNotWorkingAdmins(tx?: DbTx): Promise<WorkspaceNotWorkingAdmins[]> {
+    return this.minimum.workspacesWithNotWorkingAdmins(tx);
   }
 
   /**

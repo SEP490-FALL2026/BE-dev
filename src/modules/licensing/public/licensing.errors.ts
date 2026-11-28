@@ -440,3 +440,13 @@ export class RevocationHookRefusedError extends Error {
     this.name = 'RevocationHookRefusedError';
   }
 }
+
+/** A K4 plan changed from `ACCOUNT` to a device-bound mode after the Request was submitted, so no seat or store key can be granted (`W2-18`, S-4). */
+export class ProvisioningPlanBoundToDeviceError extends Error {
+  constructor() {
+    super(
+      'This plan is bound to a device, not a user account, and cannot be granted through a seat provisioning task.',
+    );
+    this.name = 'ProvisioningPlanBoundToDeviceError';
+  }
+}

@@ -18,9 +18,10 @@ describe('a subscription recorded as cancelled leaves the adjustment and the sto
   const closure = { dataExported: true, adminsTransferred: true };
 
   /** A plan by the month, paid on a day 5 days away and renewing itself, with 10 seats and none held: it may be cancelled today. */
-  const monthly = async (planId: string, purchasedQuantity = 10): Promise<string> =>
+  const monthly = async (planId: string, purchasedQuantity = 10, workspaceId?: string): Promise<string> =>
     declareSubscription(h.ctx, h.it1.accessToken, {
       planId,
+      ...(workspaceId ? { workspaceId } : {}),
       kind: 'TERM',
       purchasedQuantity,
       unitPrice: { amount: '1000000', currency: 'VND' },
@@ -30,6 +31,22 @@ describe('a subscription recorded as cancelled leaves the adjustment and the sto
       autoRenew: true,
       allowsMidTermReduction: false,
     });
+  const secondWorkspaceOf = async (planId: string): Promise<string> => {
+    const vendorId = (
+      await h.ctx.sql.query<{ vendor_id: string }>(
+        `SELECT a.vendor_id FROM plans p JOIN applications a ON a.id = p.application_id WHERE p.id = $1`,
+        [planId],
+      )
+    ).rows[0].vendor_id;
+
+    return h.dataOf<{ id: string }>(
+      await request(h.server())
+        .post('/api/v1/workspaces')
+        .set(h.as(h.it1))
+        .send({ vendorId, name: h.unique('SpareWS') })
+        .expect(201),
+    ).id;
+  };
   const record = (body: object) =>
     request(h.server()).post('/api/v1/subscription-renewals').set(h.as(h.it1)).send(body);
   const adjustment = (subscriptionId: string) =>
@@ -59,6 +76,10 @@ describe('a subscription recorded as cancelled leaves the adjustment and the sto
 
   beforeAll(async () => {
     await h.start();
+    await h.ctx.sql.query(`UPDATE departments SET it_admin_employee_id = $2 WHERE id = $1`, [
+      h.seed.departmentId,
+      h.it1.employeeId,
+    ]);
     people = [];
     for (let i = 0; i < 12; i += 1) people.push(await h.person(`E-CXX-${i}`));
   }, 300000);
@@ -109,7 +130,7 @@ describe('a subscription recorded as cancelled leaves the adjustment and the sto
   it('A1C-02 grants no seat from the cancelled subscription: the other subscription of the plan with room gives it', async () => {
     const planId = await h.plan('K2', 'PER_SEAT');
     const cancelled = await monthly(planId, 10);
-    const spare = await monthly(planId, 3);
+    const spare = await monthly(planId, 3, await secondWorkspaceOf(planId));
     await cancel(cancelled).expect(201);
 
     const task = await h.granted(person(), planId);
@@ -136,7 +157,7 @@ describe('a subscription recorded as cancelled leaves the adjustment and the sto
   it('A1C-02 counts no free seat of the cancelled subscription in the stock of the plan', async () => {
     const planId = await h.plan('K2', 'PER_SEAT');
     const cancelled = await monthly(planId, 10);
-    const spare = await monthly(planId, 3);
+    const spare = await monthly(planId, 3, await secondWorkspaceOf(planId));
     const pool = h.ctx.app.get(SharedPoolService, { strict: false });
     expect((await pool.stockOfPlans([planId], h.today())).get(planId)).toMatchObject({ free: 13 });
 
@@ -145,5 +166,51 @@ describe('a subscription recorded as cancelled leaves the adjustment and the sto
     expect((await pool.stockOfPlans([planId], h.today())).get(planId)).toMatchObject({ free: 3 });
     const inTransaction = await h.ctx.app.get(TransactionRunner).run((tx) => pool.stockOf(tx, planId, h.today(), 'K2'));
     expect([...inTransaction.freeBySubscription.keys()]).toEqual([spare]);
+  });
+
+  it('F-11: CANCEL closes K2 lines ENDED so re-declaring the same (workspace, plan) returns 201, and renewalDate-only expiry sets closed_on = renewalDay - 1', async () => {
+    const planId = await h.plan('K2', 'PER_SEAT');
+    const cancelled = await monthly(planId, 5);
+    await cancel(cancelled).expect(201);
+
+    const closedCancel = await h.ctx.sql.query<{ closed_reason: string | null; workspace_id: string }>(
+      `SELECT closed_reason, workspace_id FROM subscription_lines WHERE subscription_id = $1`,
+      [cancelled],
+    );
+    expect(closedCancel.rows).toHaveLength(1);
+    expect(closedCancel.rows[0].closed_reason).toBe('ENDED');
+
+    const redeclared = await declareSubscription(h.ctx, h.it1.accessToken, {
+      planId,
+      workspaceId: closedCancel.rows[0].workspace_id,
+      kind: 'TERM',
+      purchasedQuantity: 4,
+      unitPrice: { amount: '1000000', currency: 'VND' },
+      billingCycle: 'MONTHLY',
+      startDate: h.today(),
+      renewalDate: h.inDays(30),
+      autoRenew: true,
+      allowsMidTermReduction: false,
+    });
+    expect(redeclared).toBeTruthy();
+
+    const planNoEnd = await h.plan('K2', 'PER_SEAT');
+    const subNoEnd = await declareSubscription(h.ctx, h.it1.accessToken, {
+      planId: planNoEnd,
+      kind: 'TERM',
+      purchasedQuantity: 3,
+      unitPrice: { amount: '12000000', currency: 'VND' },
+      billingCycle: 'ANNUAL',
+      startDate: '2026-07-01',
+      renewalDate: '2027-07-01',
+      autoRenew: false,
+      allowsMidTermReduction: false,
+    });
+    await sweepOn('2027-07-02');
+    const closedNoEnd = await h.ctx.sql.query<{ closed_on: string | null; closed_reason: string | null }>(
+      `SELECT closed_on::text, closed_reason FROM subscription_lines WHERE subscription_id = $1`,
+      [subNoEnd],
+    );
+    expect(closedNoEnd.rows).toEqual([{ closed_on: '2027-06-30', closed_reason: 'ENDED' }]);
   });
 });

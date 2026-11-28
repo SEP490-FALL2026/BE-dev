@@ -6,7 +6,11 @@ import type {
   GrantCompletion,
   GrantExecution,
   GrantedSeatOfRequest,
+  K1AnnualChainDetail,
+  K1AnnualHolderTimeline,
+  K1AnnualPaidSeat,
   OpenGrantTask,
+  PoolTopUpPurchase,
   SeatRootsOfRequests,
 } from '../../public/licensing-open-grants.types';
 import { OpenGrantTaskRepo } from './open-grant-task.repo';
@@ -71,8 +75,33 @@ export class OpenGrantTaskService {
     return this.repo.grantCompletionsOf(requestIds, tx);
   }
 
+  /** Completed `POOL_TOP_UP` grant tasks for a request, used to compute pooled top-up invoice expectation. */
+  completedPoolTopUpPurchasesOf(requestId: string, tx?: DbTx): Promise<PoolTopUpPurchase[]> {
+    return this.repo.completedPoolTopUpPurchasesOf(requestId, tx);
+  }
+
   /** Where the grant of each person of these requests stands: their grant tasks that were not cancelled, the newest first. */
   grantExecutionsOf(requestIds: readonly string[], tx?: DbTx): Promise<GrantExecution[]> {
     return this.repo.grantExecutionsOf(requestIds, tx);
+  }
+
+  k1AnnualHolderTimeline(
+    requestId: string,
+    renewedAssignmentId: string | null,
+    tx?: DbTx,
+  ): Promise<K1AnnualHolderTimeline | null> {
+    return this.repo.k1AnnualHolderTimeline(requestId, renewedAssignmentId, tx);
+  }
+
+  k1AnnualRootsOfRequests(roots: SeatRootsOfRequests, tx?: DbTx): Promise<Map<string, string>> {
+    return this.repo.k1AnnualRootsOfRequests(roots, tx);
+  }
+
+  k1AnnualChainDetails(roots: SeatRootsOfRequests, tx?: DbTx): Promise<Map<string, K1AnnualChainDetail>> {
+    return this.repo.k1AnnualChainDetails(roots, tx);
+  }
+
+  listK1AnnualPaidSeatsOn(roots: SeatRootsOfRequests, onDate: BusinessDate, tx?: DbTx): Promise<K1AnnualPaidSeat[]> {
+    return this.repo.listK1AnnualPaidSeatsOn(roots, onDate, tx);
   }
 }

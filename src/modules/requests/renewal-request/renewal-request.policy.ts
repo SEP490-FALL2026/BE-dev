@@ -1,4 +1,5 @@
 import { addDays, type BusinessDate } from '../../../core/business-date';
+import { K1_ANNUAL_COMMITMENT_MONTHS, type TermKind } from '../../../core/term-limit';
 
 /**
  * The rules of the renewal of a right that ends on a day (`US-05-14`): who asks, which right may be renewed, whether the ask comes
@@ -93,9 +94,18 @@ export function renewalWindowOf(facts: { today: BusinessDate; previousEnd: Busin
 }
 
 /**
- * The time of use a renewal asks for, in months (`QĐ-111l`, `QĐ-111i`): the months the holder gave, or none for a right to go on with no end
- * (_Dùng lâu dài_). The kind of the plan and the person say whether that is allowed (`checkTermMonths`).
+ * The time of use a renewal asks for, in months (`QĐ-111l`, `QĐ-111i`, `QĐ-116d`): the months the holder gave, or none for a right
+ * to go on with no end (_Dùng lâu dài_). An annual K1 renewal defaults to fixed 12 months when omitted while preserving explicit non-12 values to fail validation.
  */
-export function renewalTermMonthsOf(body: { extensionMonths?: number; longTerm?: true }): number | null {
-  return body.longTerm === true ? null : (body.extensionMonths ?? null);
+export function renewalTermMonthsOf(
+  body: { extensionMonths?: number; longTerm?: true },
+  plan?: { provisioningType?: TermKind; referenceCommitmentMonths?: number | null },
+): number | null {
+  if (body.longTerm === true) return null;
+  if (body.extensionMonths !== undefined) return body.extensionMonths;
+  if (plan?.provisioningType === 'K1' && plan.referenceCommitmentMonths === K1_ANNUAL_COMMITMENT_MONTHS) {
+    return K1_ANNUAL_COMMITMENT_MONTHS;
+  }
+
+  return null;
 }

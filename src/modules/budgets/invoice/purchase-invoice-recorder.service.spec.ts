@@ -7,6 +7,9 @@ import type { InvoiceRecord, InvoiceRepo } from '../budget/invoice.repo';
 import { PurchaseInvoiceRecordRefusedError } from '../public/budgets.errors';
 import type { PurchaseInvoiceRecordInput } from '../public/budgets.types';
 import type { ThresholdAlertService } from '../threshold/threshold-alert.service';
+import type { InvoiceAllocationRepo } from './invoice-allocation.repo';
+import type { InvoiceYearApplicationRepo } from './invoice-year-application.repo';
+import type { LicenseLotInvoiceService } from './license-lot-invoice.service';
 import { PurchaseInvoiceRecorderService } from './purchase-invoice-recorder.service';
 
 const ACTOR = { employeeId: 'finance-1', appUserId: 'u-1', roles: ['FINANCE'] } as unknown as AuthenticatedPrincipal;
@@ -47,7 +50,7 @@ const input = (over: Partial<PurchaseInvoiceRecordInput> = {}): PurchaseInvoiceR
 
 function build(opts: { commitments?: ReturnType<typeof commitment>[]; exists?: boolean } = {}) {
   const calls: string[] = [];
-  const lockOfRequest = jest.fn(() => {
+  const lockOfRequest = jest.fn<Promise<ReturnType<typeof commitment>[]>, [unknown, string]>(() => {
     calls.push('lock');
 
     return Promise.resolve(opts.commitments ?? [commitment()]);
@@ -74,6 +77,21 @@ function build(opts: { commitments?: ReturnType<typeof commitment>[]; exists?: b
   });
   const watch = jest.fn().mockResolvedValue({ pairs: [], usedBefore: new Map() });
   const settle = jest.fn().mockResolvedValue(0);
+  const lockK1AllocationYears = jest.fn(() => {
+    calls.push('k1Lock');
+
+    return Promise.resolve();
+  });
+  const allocInsertMany = jest.fn((_tx: unknown, lines: readonly Record<string, unknown>[]) => {
+    calls.push('allocInsertMany');
+
+    return Promise.resolve(lines.map((line, i) => ({ id: `alloc-${i + 1}`, ...line })));
+  });
+  const appInsert = jest.fn((_tx: unknown, row: Record<string, unknown>) => {
+    calls.push('appInsert');
+
+    return Promise.resolve({ id: 'app-1', ...row });
+  });
   const service = new PurchaseInvoiceRecorderService(
     { lockOfRequest, applyInvoice } as unknown as CommitmentRepo,
     {
@@ -83,9 +101,28 @@ function build(opts: { commitments?: ReturnType<typeof commitment>[]; exists?: b
     { lock },
     { record } as unknown as AuditApi,
     { watch, settle } as unknown as ThresholdAlertService,
+    { lockK1AllocationYears, insertMany: allocInsertMany } as unknown as InvoiceAllocationRepo,
+    { insert: appInsert } as unknown as InvoiceYearApplicationRepo,
+    {
+      recordLotInvoiceConfirmation: jest.fn(),
+      recordLotWithdrawalAfterInvoice: jest.fn().mockResolvedValue(undefined),
+    } as unknown as LicenseLotInvoiceService,
   );
 
-  return { service, calls, lockOfRequest, applyInvoice, insert, lock, record, watch, settle };
+  return {
+    service,
+    calls,
+    lockOfRequest,
+    applyInvoice,
+    insert,
+    lock,
+    record,
+    watch,
+    settle,
+    lockK1AllocationYears,
+    allocInsertMany,
+    appInsert,
+  };
 }
 
 describe('PurchaseInvoiceRecorderService.record (PI-1.5, PI-1.7)', () => {
@@ -268,7 +305,25 @@ describe('PurchaseInvoiceRecorderService.record (PI-1.5, PI-1.7)', () => {
 
       expect(recorded).toMatchObject({ booking: 'SUBSCRIPTION', subscriptionId: 's-1', commitmentId: null });
       expect(lockOfRequest).not.toHaveBeenCalled();
-      expect(insert.mock.calls[0][1]).toMatchObject({ subscriptionId: 's-1', costCenterId: null });
+      expect(insert.mock.calls[0][1]).toMatchObject({ subscriptionId: 's-1', costCenterId: null, poolFigures: null });
+    });
+
+    it('forwards poolFigures when provided for a pooled-quota invoice', async () => {
+      const { service, insert } = build();
+      const poolFigures = {
+        expectedMinor: 66_000_000n,
+        varianceMinor: 3_500_000n,
+        varianceMonth: '2027-07-01',
+        inReview: true,
+      };
+
+      await service.record(
+        TX,
+        ACTOR,
+        input({ requestId: null, subscriptionId: 's-1', chargedCostCenterId: null, poolFigures }),
+      );
+
+      expect(insert.mock.calls[0][1]).toMatchObject({ subscriptionId: 's-1', poolFigures });
     });
   });
 
@@ -292,6 +347,15 @@ describe('PurchaseInvoiceRecorderService.record (PI-1.5, PI-1.7)', () => {
       await expect(service.record(TX, ACTOR, input({ chargedCostCenterId: null }))).rejects.toMatchObject({
         reason: 'NO_PLACE',
       });
+      expect(insert).not.toHaveBeenCalled();
+    });
+
+    it('FIX-B1 F9 (A M-6): throws NO_PLACE before DUPLICATE_NUMBER when both apply', async () => {
+      const { service, insert } = build({ commitments: [], exists: true });
+
+      const err = await service.record(TX, ACTOR, input({ chargedCostCenterId: null })).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(PurchaseInvoiceRecordRefusedError);
+      expect((err as PurchaseInvoiceRecordRefusedError).reason).toBe('NO_PLACE');
       expect(insert).not.toHaveBeenCalled();
     });
 

@@ -3,6 +3,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { CatalogResponsibilityApi } from '../../catalog/public/catalog-responsibility.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { PersonnelFileHookContributions, type PersonnelFileEvent } from '../public/personnel.extension-points';
+import { remainingResponsibilities } from './it-handover.policy';
 import { ItHandoverRepo } from './it-handover.repo';
 
 /**
@@ -24,12 +25,18 @@ export class ItHandoverRecorder implements OnModuleInit {
   ) {}
 
   onModuleInit(): void {
-    this.hooks.add('personnel.it-handover', { onRecorded: (tx, event) => this.keep(tx, event) });
+    const noop = () => Promise.resolve();
+    this.hooks.add('personnel.it-handover', {
+      onRecorded: (tx, event) => this.keep(tx, event),
+      onDueChanged: noop,
+      onCancelled: noop,
+      onLeft: noop,
+    });
   }
 
   private async keep(tx: DbTx, event: PersonnelFileEvent): Promise<void> {
     const left = (await this.catalog.countResponsibilitiesOf([event.employeeId], tx)).get(event.employeeId);
-    if (!left || left.subscriptions + left.applications === 0) return;
+    if (!left || remainingResponsibilities(left) === 0) return;
     const organization = await this.organizationReads.getOrganization(tx);
     if (!organization) return;
 
@@ -38,6 +45,8 @@ export class ItHandoverRecorder implements OnModuleInit {
       source: { kind: event.fileKind === 'OFFBOARDING' ? 'OFFBOARDING_CASE' : 'DEPARTMENT_TRANSFER', id: event.fileId },
       subscriptions: left.subscriptions,
       applications: left.applications,
+      workspaces: left.workspaces,
+      licenseLots: left.licenseLots,
     });
   }
 }

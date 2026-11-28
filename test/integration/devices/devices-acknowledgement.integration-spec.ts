@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
 import { ApiAccount } from '../../support/api-accounts';
+import { createDepartment, enterEmployee } from '../../support/builders/organization.builder';
 import {
   DevicesHarness,
   NOTICE_TEXT,
@@ -265,5 +266,65 @@ describe('the notice, the signed BM-06 and the acknowledgement of the holder (in
       ]),
     );
     expect(secret.rowCount).toBe(0);
+  });
+
+  it('W2-07 (b), (c), (e): hides NO_COLLECTOR machines from AWAITING_ACKNOWLEDGEMENT, blocks acknowledgement, and enables collector with H17 & working guard', async () => {
+    await h.published();
+    const person = await holder();
+    const noCollector = await h.registered(person.employeeId, { collectorInstalled: false });
+
+    // Filtered out of AWAITING_ACKNOWLEDGEMENT, visible under NO_COLLECTOR, and my-devices reports NOT_REQUIRED / COLLECTOR_NOT_INSTALLED.
+    expect(noCollector.state).toBe('NO_COLLECTOR');
+    const awaitingIds = h
+      .dataOf<{ items: DeviceWire[] }>(await h.listDevices('?state=AWAITING_ACKNOWLEDGEMENT').expect(200))
+      .items.map((item) => item.id);
+    expect(awaitingIds).not.toContain(noCollector.id);
+
+    const myEntry = (await mine(person)).find((item) => item.registrationId === noCollector.registrationId);
+    expect(myEntry).toMatchObject({
+      acknowledgementState: 'NOT_REQUIRED',
+      blockedReason: 'COLLECTOR_NOT_INSTALLED',
+      canAcknowledge: false,
+    });
+
+    const notice = await h.published();
+    expect(h.codeOf(await h.acknowledge(person, noCollector.registrationId as string, notice.id).expect(409))).toBe(
+      'DEVICE_ACKNOWLEDGEMENT.COLLECTOR_NOT_INSTALLED',
+    );
+
+    // Non-acting IT Admin cannot enable collector -> 403 DEVICE.NOT_IN_CHARGE.
+    const d2 = await createDepartment(h.ctx, h.admin, { code: 'W207-D2', name: 'Collector Dept 2' });
+    const otherEmp = (
+      await enterEmployee(h.ctx, h.admin, {
+        employeeCode: 'E-W207IT2',
+        fullName: 'IT W207 Other',
+        workEmail: 'w207it2@acme.vn',
+        employmentType: 'STAFF',
+        hireDate: '2025-01-01',
+        departmentCode: d2.code,
+        jobTitle: 'IT Admin',
+      })
+    ).id;
+    const otherIt = await h.account('E-W207IT2', otherEmp, 'IT_ADMIN');
+    expect(h.codeOf(await h.enableCollector(noCollector.registrationId as string, otherIt).expect(403))).toBe(
+      'DEVICE.NOT_IN_CHARGE',
+    );
+
+    // Acting IT enables collector -> transitions to AWAITING_ACKNOWLEDGEMENT; repeating -> 409 COLLECTOR_ALREADY_INSTALLED.
+    const enabled = h.dataOf<DeviceWire>(
+      await h.enableCollector(noCollector.registrationId as string, h.it1).expect(201),
+    );
+    expect(enabled).toMatchObject({ state: 'AWAITING_ACKNOWLEDGEMENT', collectorInstalled: true });
+    expect(h.codeOf(await h.enableCollector(noCollector.registrationId as string, h.it1).expect(409))).toBe(
+      'DEVICE_REGISTRATION.COLLECTOR_ALREADY_INSTALLED',
+    );
+
+    // (e) Holder has left -> enabling collector on another NO_COLLECTOR machine returns 409 DEVICE.HOLDER_NOT_WORKING.
+    const leaver = await holder();
+    const leaverMachine = await h.registered(leaver.employeeId, { collectorInstalled: false });
+    await sql().query(`UPDATE employees SET work_state = 'LEFT' WHERE id = $1`, [leaver.employeeId]);
+    expect(h.codeOf(await h.enableCollector(leaverMachine.registrationId as string, h.it1).expect(409))).toBe(
+      'DEVICE.HOLDER_NOT_WORKING',
+    );
   });
 });

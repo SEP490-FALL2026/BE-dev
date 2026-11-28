@@ -49,6 +49,9 @@ import { ProfileQueryService } from './profile/profile-query.service';
 import { RecoveryTicketService } from './recovery/recovery-ticket.service';
 import { LoginEmailChangeNotice } from './accounts/app-users/login-email-change-app-users.service';
 import { EmployeeAccountsListener } from './accounts/employee-accounts.listener';
+import { ItCoverageNotifier } from './it-coverage/it-coverage-notifier.service';
+import { ItCoverageSweepService } from './it-coverage/it-coverage-sweep.service';
+import { ItCoverageSweeper } from './it-coverage/it-coverage.job';
 import { RecoveryRepo } from './recovery/recovery.repo';
 
 @Module({
@@ -114,6 +117,9 @@ import { RecoveryRepo } from './recovery/recovery.repo';
     ProfilePhoneService,
     ProfilePurgeService,
     ProfilePurgeSweeper,
+    ItCoverageNotifier,
+    ItCoverageSweepService,
+    ItCoverageSweeper,
     TokenService,
     JwtAccessTokenVerifier,
     { provide: ACCESS_TOKEN_VERIFIER, useExisting: JwtAccessTokenVerifier },

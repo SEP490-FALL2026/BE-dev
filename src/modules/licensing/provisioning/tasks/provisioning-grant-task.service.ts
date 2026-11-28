@@ -33,6 +33,7 @@ export class ProvisioningGrantTaskService {
       purchase: { purchased: false } | { purchased: true; kind: 'POOL_TOP_UP' | 'KEY_PURCHASE'; reason: string | null };
       carriesOn: boolean;
       selfExecuted: boolean | null;
+      bySubstitute?: boolean;
     },
   ): Promise<ProvisioningTaskRecord> {
     const bought = grantPurchaseOf(facts.provisioningType, facts.purchase, new Date(), facts.carriesOn);
@@ -49,20 +50,16 @@ export class ProvisioningGrantTaskService {
 
     await this.audit.record(
       tx,
-      licensingAuditEvent(
-        actor,
-        facts.organizationId,
-        'PROVISIONING_TASK.CREATED',
-        'ProvisioningTask',
-        task.id,
-        null,
-        grantTaskAudit(facts.requestId, facts.assignmentId, task, facts.selfExecuted),
-      ),
+      licensingAuditEvent(actor, facts.organizationId, 'PROVISIONING_TASK.CREATED', 'ProvisioningTask', task.id, null, {
+        ...grantTaskAudit(facts.requestId, facts.assignmentId, task, facts.selfExecuted),
+        ...(facts.bySubstitute ? { bySubstitute: true } : {}),
+      }),
     );
     const taken = await this.takeTask(tx, actor, {
       task,
       organizationId: facts.organizationId,
       selfExecuted: facts.selfExecuted,
+      bySubstitute: facts.bySubstitute,
     });
     if (facts.selfExecuted === true) {
       await this.frame.tellSuperAdmin(tx, facts.organizationId, task.id, actor.employeeId);
@@ -74,7 +71,12 @@ export class ProvisioningGrantTaskService {
   private async takeTask(
     tx: DbTx,
     actor: AuthenticatedPrincipal,
-    facts: { task: ProvisioningTaskRecord; organizationId: string; selfExecuted: boolean | null },
+    facts: {
+      task: ProvisioningTaskRecord;
+      organizationId: string;
+      selfExecuted: boolean | null;
+      bySubstitute?: boolean;
+    },
   ): Promise<ProvisioningTaskRecord> {
     const { task } = facts;
     await this.repo.markClaimed(tx, task.id, actor.appUserId, new Date());
@@ -97,6 +99,7 @@ export class ProvisioningGrantTaskService {
           claimedBy: actor.appUserId,
           defaultResponsibleEmployeeId: task.defaultResponsibleEmployeeId,
           selfExecuted: facts.selfExecuted === true,
+          ...(facts.bySubstitute ? { bySubstitute: true } : {}),
         },
       ),
     );

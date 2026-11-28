@@ -10,6 +10,8 @@ export interface NextYearBudgetFigures {
   approvedMinor: bigint | null;
   /** What the other requests approved as spend kept of that year in the Cost Center. */
   keptByOthersMinor: bigint;
+  /** Live K2 seats running without a HELD commitment for that year. */
+  runningUncommittedMinor?: bigint;
   /** What this request keeps of that year. */
   thisMinor: bigint;
 }
@@ -31,7 +33,7 @@ export function nextYearBudgetOf(figures: NextYearBudgetFigures): NextYearBudget
   if (approvedMinor === null) {
     return { year, approvedMinor: null, remainingMinor: null, remainingAfterMinor: null, warning: false };
   }
-  const remainingMinor = approvedMinor - figures.keptByOthersMinor;
+  const remainingMinor = approvedMinor - figures.keptByOthersMinor - (figures.runningUncommittedMinor ?? 0n);
   const remainingAfterMinor = remainingMinor - figures.thisMinor;
 
   return { year, approvedMinor, remainingMinor, remainingAfterMinor, warning: remainingAfterMinor < 0n };

@@ -3,7 +3,7 @@ name: slm-production
 # PostgreSQL identities (H7, docs/guides/containers.md#postgresql-roles-h7):
 # - `.env` beside this file feeds Compose interpolation only: POSTGRES_* (the cluster superuser of the image),
 #   DATABASE_DEPLOY_* (owns the schema: backup, preflight, migrate, reconcile) and DATABASE_RUNTIME_* (the API and the
-#   worker). A missing password stops every Compose command before anything runs.
+#   worker), and REDIS_PASSWORD. A missing password stops Compose before anything runs.
 # - `.env.app` holds the application settings and never a database credential: it is the only file the API and the
 #   worker read, and their DATABASE_URL is the runtime role.
 # - migrate, backup (profile "deploy") and db-admin (profile "admin") run only through `docker compose run`.
@@ -39,20 +39,54 @@ services:
       - slm-network
 
   # ----------------------------------------------------------------------------
+  # REDIS: rate limits and background queues on the private network.
+  # ----------------------------------------------------------------------------
+  redis:
+    image: redis:8-alpine
+    container_name: slm-redis
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
+      - --appendonly
+      - 'yes'
+      - --appendfsync
+      - everysec
+      - --maxmemory
+      - 128mb
+      - --maxmemory-policy
+      - noeviction
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
+    volumes: [redis-data:/data]
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [slm-network]
+
+  # ----------------------------------------------------------------------------
   # 2. BACKEND API: NestJS Core — runtime role only
   # ----------------------------------------------------------------------------
   api:
-    image: ${API_IMAGE:-ghcr.io/baophipham/slm-api:latest}
+    image: ${API_IMAGE:-ghcr.io/sep490-fall2026/be-dev:latest}
     container_name: slm-api
     restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_started
     env_file:
       - .env.app
     environment:
       NODE_ENV: production
       PORT: ${PORT:-3000}
+      TRUST_PROXY_HOPS: "1"
+      REDIS_HOST: redis
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
       DATABASE_URL: postgresql://${DATABASE_RUNTIME_USER:-slm_runtime}:${DATABASE_RUNTIME_PASSWORD:?Set DATABASE_RUNTIME_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-software_license_management}
     expose:
       - "${PORT:-3000}"
@@ -60,20 +94,27 @@ services:
       - slm-network
 
   # ----------------------------------------------------------------------------
-  # 3. BACKGROUND WORKER: gửi email outbox (thăm dò PostgreSQL, không dùng Redis/BullMQ — ADR-0012, E2 = A) — runtime role
+  # 3. BACKGROUND WORKER: gửi email từ outbox — runtime role
   # ----------------------------------------------------------------------------
   worker:
-    image: ${API_IMAGE:-ghcr.io/baophipham/slm-api:latest}
+    image: ${API_IMAGE:-ghcr.io/sep490-fall2026/be-dev:latest}
     container_name: slm-worker
     restart: unless-stopped
+    stop_grace_period: 40s
     command: ["node", "dist/worker.js"]
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_started
     env_file:
       - .env.app
     environment:
       NODE_ENV: production
+      # The worker shares the production environment validator with the API.
+      TRUST_PROXY_HOPS: "1"
+      REDIS_HOST: redis
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
       DATABASE_URL: postgresql://${DATABASE_RUNTIME_USER:-slm_runtime}:${DATABASE_RUNTIME_PASSWORD:?Set DATABASE_RUNTIME_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-software_license_management}
     networks:
       - slm-network
@@ -82,7 +123,7 @@ services:
   # 4. DEPLOY STEPS: preflight, prisma migrate deploy, ops:db-roles reconcile/verify, ops:inspect — deploy role
   # ----------------------------------------------------------------------------
   migrate:
-    image: ${API_IMAGE:-ghcr.io/baophipham/slm-api:latest}
+    image: ${API_IMAGE:-ghcr.io/sep490-fall2026/be-dev:latest}
     profiles: ["deploy"]
     environment:
       NODE_ENV: production
@@ -111,7 +152,7 @@ services:
   # 6. ROLE PROVISIONING (once, after a restore, or to rotate a password): ops:db-roles provision — cluster superuser
   # ----------------------------------------------------------------------------
   db-admin:
-    image: ${API_IMAGE:-ghcr.io/baophipham/slm-api:latest}
+    image: ${API_IMAGE:-ghcr.io/sep490-fall2026/be-dev:latest}
     profiles: ["admin"]
     command: ["node", "dist/database-roles-cli.js", "provision"]
     environment:
@@ -148,6 +189,7 @@ services:
 
 volumes:
   postgres-data:
+  redis-data:
   caddy-data:
   caddy-config:
 

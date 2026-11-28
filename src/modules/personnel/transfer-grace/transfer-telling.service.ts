@@ -1,14 +1,18 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
-import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
+import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import { describeForOperator, traceForOperator } from '../../../infrastructure/observability/operator-error';
+import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { AuditApi } from '../../audit/public/audit.api';
 import { LicensingApi } from '../../licensing/public/licensing.api';
+import type { SystemActor } from '../../licensing/public/licensing.types';
 import { OrganizationApi } from '../../organization/public/organization.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
+import { personnelAuditEvent, personnelSystemAuditEvent } from '../personnel-audit-event.mapper';
 import { TransferGraceRepo } from './transfer-grace.repo';
 import { heldOnOrBefore } from './transfer-grace.policy';
-import type { SweptRef } from './transfer-grace.types';
+import type { HeldTransfer, SweptRef } from './transfer-grace.types';
 import { snapshotRightOf } from './transfer-snapshot.json';
 import { legacyAnnouncementDue, pictureIdsOf, reminderDue, rightsToTakeBack, sweptOf } from './transfer-sweep.policy';
 
@@ -42,8 +46,53 @@ export class TransferTellingService {
     private readonly organization: OrganizationApi,
     private readonly organizationReads: OrganizationReadApi,
     private readonly licensing: LicensingApi,
+    private readonly audit: AuditApi,
     private readonly notifier: PersonnelNotifier,
   ) {}
+
+  /** Records the audit event and notifies the mover and destination acting IT Admins when transfer revocations open. */
+  async revocationOpened(
+    tx: DbTx,
+    held: HeldTransfer,
+    done: { created: number; reasonAdded: number },
+    actor: AuthenticatedPrincipal | SystemActor,
+    bySubstitute = false,
+  ): Promise<void> {
+    const after = {
+      employeeId: held.employeeId,
+      tasksCreated: done.created,
+      reasonsAdded: done.reasonAdded,
+      ...(bySubstitute ? { bySubstitute: true } : {}),
+    };
+    const event =
+      'kind' in actor && actor.kind === 'SYSTEM'
+        ? personnelSystemAuditEvent(
+            held.organizationId,
+            'DEPARTMENT_TRANSFER.REVOCATION_OPENED',
+            'DepartmentTransfer',
+            held.id,
+            actor.correlationId,
+            null,
+            after,
+          )
+        : personnelAuditEvent(
+            { kind: 'USER', principal: actor as AuthenticatedPrincipal },
+            held.organizationId,
+            'DEPARTMENT_TRANSFER.REVOCATION_OPENED',
+            'DepartmentTransfer',
+            held.id,
+            null,
+            after,
+          );
+    await this.audit.record(tx, event);
+    await this.notifier.transferRightsRevoking(tx, {
+      organizationId: held.organizationId,
+      transferId: held.id,
+      employeeId: held.employeeId,
+      toDepartmentId: held.toDepartmentId,
+      rightCount: done.created + done.reasonAdded,
+    });
+  }
 
   /** The people told once more that their rights are about to be taken back. */
   async remind(now: Date = new Date()): Promise<TellingPass> {

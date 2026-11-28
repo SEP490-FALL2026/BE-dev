@@ -1,19 +1,36 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
+import { isCheckViolation, isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { catalogAuditEvent } from '../catalog-audit-event.mapper';
 import { PlanFactsService } from '../plan/plan-facts.service';
 import {
+  SubscriptionDuplicatePlanError,
   SubscriptionNotFoundError,
   SubscriptionPlanNotFoundError,
+  SubscriptionPriceOnLinesError,
   SubscriptionStaleError,
   SubscriptionStillDraftError,
+  SubscriptionSeatCountingFixedError,
   SubscriptionUpdateEmptyError,
+  SubscriptionWorkspaceMovedError,
 } from './subscription.errors';
+import { retryOnWorkspaceMove } from './pool/subscription-pool.service';
+
+/** How the seats are counted does not change once the subscription is active. Throws SubscriptionSeatCountingFixedError. */
+function assertSeatCountingOpen(
+  current: SubscriptionRecord,
+  requested: SubscriptionRecord['seatCounting'] | undefined,
+): void {
+  if (current.status === 'ACTIVE' && requested !== undefined && requested !== current.seatCounting) {
+    throw new SubscriptionSeatCountingFixedError();
+  }
+}
 import { sameState, snapshotOf, stateOf } from './subscription.mapper';
 import {
   assertSubscriptionShape,
+  assertUpdateWritesNoRetiredField,
   assertVersionForQuantityChange,
   deriveNotice,
   isStaleEdit,
@@ -21,6 +38,7 @@ import {
   missingDataOf,
   nextStateOf,
   noticeInputOf,
+  resolveSubscriptionPrices,
   sameUnitPrice,
   subscriptionStatusOf,
 } from './subscription.policy';
@@ -29,6 +47,7 @@ import { SubscriptionRepo } from './subscription.repo';
 import { SubscriptionChangeGuard } from './subscription-change-guard.service';
 import { SubscriptionPricingService } from './subscription-pricing.service';
 import { SubscriptionViewService } from './subscription-view.service';
+import { SubscriptionPeriodLinesService } from '../subscription-line/subscription-period-lines.service';
 import type {
   OriginalPriceRecord,
   SubscriptionRecord,
@@ -52,6 +71,7 @@ export class SubscriptionChangeService {
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
     private readonly guard: SubscriptionChangeGuard,
+    private readonly periodLines: SubscriptionPeriodLinesService,
   ) {}
 
   /**
@@ -69,17 +89,29 @@ export class SubscriptionChangeService {
     if (Object.entries(input).every(([key, value]) => key === 'quantityChangeReason' || value === undefined)) {
       throw new SubscriptionUpdateEmptyError();
     }
+    assertUpdateWritesNoRetiredField(input);
     assertVersionForQuantityChange(input.purchasedQuantity, expectedUpdatedAt);
     assertDeclarableCycle(input.billingCycle);
-    const money = input.unitPrice ? await this.pricing.read(input.unitPrice) : null;
+    const sentUnit = input.unitPrice ? await this.pricing.read(input.unitPrice, 'unitPrice') : undefined;
+    const sentMonthly = input.monthlyUnitPrice
+      ? await this.pricing.read(input.monthlyUnitPrice, 'monthlyUnitPrice')
+      : undefined;
     const originalPrice = input.originalPrice
       ? await this.pricing.readOriginal(input.originalPrice)
       : input.originalPrice;
     const organizationId = await this.guard.requireOrganizationId();
-    await this.guard.requireResponsible(input.responsibleItAdminEmployeeId);
 
-    const record = await this.runner.run((tx) =>
-      this.changeIn(tx, actor, id, { input, money, originalPrice, organizationId, expectedUpdatedAt }),
+    const record = await retryOnWorkspaceMove(() =>
+      this.runner.run((tx) =>
+        this.changeIn(tx, actor, id, {
+          input,
+          sentUnit,
+          sentMonthly,
+          originalPrice,
+          organizationId,
+          expectedUpdatedAt,
+        }),
+      ),
     );
 
     return (await this.views.viewAll([record]))[0];
@@ -91,26 +123,23 @@ export class SubscriptionChangeService {
     id: string,
     change: {
       input: UpdateSubscriptionInput;
-      money: { amountMinor: bigint; currency: string } | null;
+      sentUnit: { amountMinor: bigint; currency: string } | undefined;
+      sentMonthly: { amountMinor: bigint; currency: string } | undefined;
       /** What the change gives: the price read, `null` to take it away, `undefined` when it says nothing. */
       originalPrice: OriginalPriceRecord | null | undefined;
       organizationId: string;
       expectedUpdatedAt?: Date;
     },
   ): Promise<SubscriptionRecord> {
-    const { input, money, originalPrice, organizationId, expectedUpdatedAt } = change;
-    const current = input.isPrimaryForPlan
-      ? await this.lockForPrimaryChange(tx, id, expectedUpdatedAt)
-      : await this.lockFresh(tx, id, expectedUpdatedAt);
-    // The plan is locked for writing when this subscription is to price it: the subscriptions of one plan take turns.
-    const plan = input.isPrimaryForPlan
-      ? await this.plans.lockExclusive(tx, current.planId)
-      : await this.plans.lockShared(tx, current.planId);
-    if (!plan) throw new SubscriptionPlanNotFoundError();
+    const { input, sentUnit, sentMonthly, originalPrice, organizationId, expectedUpdatedAt } = change;
+    const { current, plan } = await this.lockForChange(tx, id, input, expectedUpdatedAt);
+    if ((sentUnit !== undefined || sentMonthly !== undefined) && (await this.periodLines.hasLines(current.id, tx))) {
+      throw new SubscriptionPriceOnLinesError();
+    }
     const quantityChangeReason = this.quantityReasonOf(current, input);
     await this.guard.assertNotBelowOccupied(tx, id, current.purchasedQuantity, input.purchasedQuantity);
 
-    const next = nextStateOf(current, input);
+    const next = { ...nextStateOf(current, input), workspaceId: input.workspaceId ?? current.workspace?.id ?? null };
     assertSubscriptionShape({
       kind: current.kind,
       applicationKind: plan.applicationKind,
@@ -118,25 +147,161 @@ export class SubscriptionChangeService {
       ...next,
     });
 
-    const samePrice = sameUnitPrice(current.unitPrice, money);
+    const resolvedPrice = resolveSubscriptionPrices({
+      kind: current.kind,
+      billingCycle: next.billingCycle,
+      cycleChanged: input.billingCycle !== undefined && input.billingCycle !== current.billingCycle,
+      sentMonthly,
+      sentUnit,
+      currentMonthlyMinor: current.monthlyUnitPriceMinor,
+      currentUnitMoney: current.unitPrice
+        ? { amountMinor: current.unitPrice.amountMinor, currency: current.unitPrice.currency }
+        : null,
+    });
+    const samePrice = sameUnitPrice(current.unitPrice, resolvedPrice.unitMoney);
     const priced = samePrice
       ? { unitPrice: current.unitPrice, priceSnapshot: current.priceSnapshot }
-      : await this.pricing.priceToday(tx, money);
+      : await this.pricing.priceToday(tx, resolvedPrice.unitMoney);
     const state: SubscriptionState = {
       ...next,
       ...priced,
+      monthlyUnitPriceMinor: resolvedPrice.monthlyUnitPriceMinor,
       originalPrice: originalPrice === undefined ? current.originalPrice : originalPrice,
       status: this.statusAfter(plan, current, { ...next, ...priced }),
     };
     await this.guard.judgePool(tx, { plan, current, state, input, actor, organizationId });
+    await this.assertLinesFitWorkspace(tx, current, input.workspaceId);
     if (sameState(state, stateOf(current))) return current;
 
-    const updated = await this.subscriptions.update(tx, id, state);
+    const updated = await this.saveState(tx, id, state);
+    await this.syncLinesAfterChange(tx, actor, organizationId, current, updated);
     await this.auditChange(tx, actor, { current, updated, organizationId, quantityChangeReason });
+    await this.notifySeatChange(tx, actor, current, updated, organizationId);
+
+    return updated;
+  }
+
+  /**
+   * A period that moves takes its live lines to the other workspace, where a plan has one live line at most: a plan that already has one there
+   * refuses the move. Judged under the locks of both workspaces. Throws SubscriptionDuplicatePlanError.
+   */
+  private async assertLinesFitWorkspace(
+    tx: DbTx,
+    current: SubscriptionRecord,
+    workspaceId: string | undefined,
+  ): Promise<void> {
+    if (workspaceId === undefined || workspaceId === (current.workspace?.id ?? null)) return;
+    for (const line of await this.periodLines.linesOf(current.id, tx)) {
+      if (line.closedReason !== null) continue;
+      const taken = await this.periodLines.hasLiveLine(workspaceId, line.planId, tx);
+      if (taken) throw new SubscriptionDuplicatePlanError([taken.subscriptionId]);
+    }
+  }
+
+  private async saveState(tx: DbTx, id: string, state: SubscriptionState): Promise<SubscriptionRecord> {
+    try {
+      return await this.subscriptions.update(tx, id, state);
+    } catch (error) {
+      if (isCheckViolation(error, 'subscriptions_active_term_monthly_price')) {
+        throw new SubscriptionStillDraftError(['UNIT_PRICE']);
+      }
+      if (isUniqueViolation(error, 'subscription_lines_workspace_plan_live')) {
+        throw new SubscriptionDuplicatePlanError([]);
+      }
+      throw error;
+    }
+  }
+
+  private async syncLinesAfterChange(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    organizationId: string,
+    current: SubscriptionRecord,
+    updated: SubscriptionRecord,
+  ): Promise<void> {
+    if (updated.planProvisioningType !== 'K2' || updated.kind !== 'TERM') return;
+    if (current.status === 'DRAFT' && updated.status === 'ACTIVE') {
+      await this.periodLines.activatePeriod(tx, updated, actor.employeeId);
+      return;
+    }
+    if (current.status === 'DRAFT' && updated.status === 'DRAFT') {
+      await this.periodLines.syncDraftUpdate(tx, {
+        organizationId,
+        workspaceId: updated.workspace?.id ?? null,
+        subscriptionId: updated.id,
+        planId: updated.planId,
+        monthlyUnitPriceMinor: updated.monthlyUnitPriceMinor,
+        minimumSeats: updated.vendorMinimumSeats,
+      });
+    }
+  }
+
+  /**
+   * The locks of a change, in the order of the lock table: the workspaces of a move first (tier 5b, N5: read without a lock, lock, lock the
+   * period, read again, a subscription that moved meanwhile starts the write again), then the period, then the plan (for writing when this subscription
+   * is to price it). Judges how the seats are counted on what is stored under the lock. Throws SubscriptionWorkspaceMovedError,
+   * SubscriptionSeatCountingFixedError, SubscriptionPlanNotFoundError.
+   */
+  private async lockForChange(tx: DbTx, id: string, input: UpdateSubscriptionInput, expectedUpdatedAt?: Date) {
+    const probe = input.workspaceId === undefined ? null : await this.subscriptions.find(id, tx);
+    if (probe) await this.lockMove(tx, probe, input.workspaceId);
+    const current = input.isPrimaryForPlan
+      ? await this.lockForPrimaryChange(tx, id, expectedUpdatedAt)
+      : await this.lockFresh(tx, id, expectedUpdatedAt);
+    const plan = input.isPrimaryForPlan
+      ? await this.plans.lockExclusive(tx, current.planId)
+      : await this.plans.lockShared(tx, current.planId);
+    if (!plan) throw new SubscriptionPlanNotFoundError();
+    this.assertNotMoved(probe, current);
+    assertSeatCountingOpen(current, input.seatCounting);
+
+    return { current, plan };
+  }
+
+  /** The workspace the subscription is in is the one read before the locks: else the write starts again (N5). */
+  private assertNotMoved(probe: SubscriptionRecord | null, current: SubscriptionRecord): void {
+    if (probe && (current.workspace?.id ?? null) !== (probe.workspace?.id ?? null)) {
+      throw new SubscriptionWorkspaceMovedError(current.updatedAt);
+    }
+  }
+
+  /** Locks the workspace the subscription is in and the one it moves to, in id order, each held at the vendor of its plan. */
+  private async lockMove(tx: DbTx, probe: SubscriptionRecord, to: string | undefined): Promise<void> {
+    const [plan] = await this.plans.lookups([probe.planId], tx);
+    if (!plan) throw new SubscriptionPlanNotFoundError();
+    await this.guard.lockWorkspaces(tx, plan, [probe.workspace?.id ?? null, to ?? null]);
+  }
+
+  private async notifySeatChange(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    current: SubscriptionRecord,
+    updated: SubscriptionRecord,
+    organizationId: string,
+  ): Promise<void> {
+    if (
+      current.purchasedQuantity !== null &&
+      updated.purchasedQuantity !== null &&
+      updated.purchasedQuantity < current.purchasedQuantity
+    ) {
+      await this.guard.tellSeatReduction(tx, {
+        organizationId,
+        subscriptionId: current.id,
+        planProvisioningType: current.planProvisioningType,
+        status: current.status,
+        responsibleItAdminEmployeeId: updated.responsibleItAdminEmployeeId,
+        from: current.purchasedQuantity,
+        to: updated.purchasedQuantity,
+        updatedAt: updated.updatedAt,
+        actor,
+      });
+
+      return;
+    }
     // A rise of the seats of a K2 or K4 pool is told to the IT Admin who answers for it, whoever changed the number (`QĐ-110v`, SPEC P24).
     await this.guard.tellSeatIncrease(tx, {
       organizationId,
-      subscriptionId: id,
+      subscriptionId: current.id,
       planProvisioningType: current.planProvisioningType,
       status: current.status,
       responsibleItAdminEmployeeId: updated.responsibleItAdminEmployeeId,
@@ -145,8 +310,6 @@ export class SubscriptionChangeService {
       requestId: null,
       actor,
     });
-
-    return updated;
   }
 
   private quantityReasonOf(current: SubscriptionRecord, input: UpdateSubscriptionInput): string | undefined {

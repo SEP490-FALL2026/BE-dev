@@ -26,8 +26,9 @@ import { OffboardingDetailService } from './detail/offboarding-detail.service';
 const E = OFFBOARDING_ERROR_EXAMPLES;
 const FORBIDDEN = {
   status: HttpStatus.FORBIDDEN,
-  description: 'Only an IT Admin records the lock of the account or takes the rights away (AUTHORIZATION.FORBIDDEN).',
-  examples: [FORBIDDEN_EXAMPLE],
+  description:
+    'Only an acting IT Admin of the department (usable in-charge or appointed substitute, never the leaver) may handle this offboarding case (AUTHORIZATION.FORBIDDEN, OFFBOARDING_CASE.NOT_IN_CHARGE).',
+  examples: [FORBIDDEN_EXAMPLE, E.NOT_IN_CHARGE],
 } as const;
 const COMMON = [UNAUTHENTICATED_RESPONSE, FORBIDDEN, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 const NOT_FOUND = {
@@ -71,8 +72,8 @@ export class OffboardingStepsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The person is not blocked yet (OFFBOARDING_CASE.CASE_NOT_BLOCKED: the last working day has not passed and they have not left) or the lock was recorded already (ALREADY_RECORDED).',
-      examples: [E.CASE_NOT_BLOCKED, E.ALREADY_RECORDED],
+        'The person has not started working in a department yet (EMPLOYEE.NOT_STARTED), is not blocked yet (OFFBOARDING_CASE.CASE_NOT_BLOCKED: the last working day has not passed and they have not left), or the lock was recorded already (ALREADY_RECORDED).',
+      examples: [E.EMPLOYEE_NOT_STARTED, E.CASE_NOT_BLOCKED, E.ALREADY_RECORDED],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -105,8 +106,15 @@ export class OffboardingStepsController {
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
-      description: `The person is not blocked yet (OFFBOARDING_CASE.CASE_NOT_BLOCKED) or the case is closed (CASE_CLOSED), the lock of the company account is not recorded (ACCOUNT_LOCK_NOT_RECORDED) or was recorded already (ALREADY_RECORDED), a seat named has no revocation (REVOCATION_NOT_SUPPORTED, with details.problem SOURCE_REQUIRED, ASSIGNMENT_IS_SERVICE_ACCOUNT or TYPE_NOT_SUPPORTED, and details.provisioningType when it is the kind of the seat), there is nothing left to take away or all selected seats already carry the reason of this departure (NOTHING_TO_REVOKE), or ${CONCURRENT}.`,
-      examples: [E.CASE_NOT_BLOCKED, E.CASE_CLOSED, ...LOCK_REFUSALS, E.REVOCATION_NOT_SUPPORTED, E.NOTHING_TO_REVOKE],
+      description: `The person has not started working in a department yet (EMPLOYEE.NOT_STARTED), is not blocked yet (OFFBOARDING_CASE.CASE_NOT_BLOCKED) or the case is closed (CASE_CLOSED), the lock of the company account is not recorded (ACCOUNT_LOCK_NOT_RECORDED) or was recorded already (ALREADY_RECORDED), a seat named has no revocation (REVOCATION_NOT_SUPPORTED, with details.problem SOURCE_REQUIRED, ASSIGNMENT_IS_SERVICE_ACCOUNT or TYPE_NOT_SUPPORTED, and details.provisioningType when it is the kind of the seat), there is nothing left to take away or all selected seats already carry the reason of this departure (NOTHING_TO_REVOKE), or ${CONCURRENT}.`,
+      examples: [
+        E.EMPLOYEE_NOT_STARTED,
+        E.CASE_NOT_BLOCKED,
+        E.CASE_CLOSED,
+        ...LOCK_REFUSALS,
+        E.REVOCATION_NOT_SUPPORTED,
+        E.NOTHING_TO_REVOKE,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,

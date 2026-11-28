@@ -3,8 +3,12 @@ import type { ProvisioningTaskRepo } from '../provisioning-task.repo';
 import type { ProvisioningTaskReasonRepo } from '../provisioning-task-reason.repo';
 import type { AssignmentEndService } from '../../assignment/assignment-end.service';
 import type { CatalogApi } from '../../../catalog/public/catalog.api';
+import type { IdentityAccessApi } from '../../../identity-access/public/identity-access.api';
+import type { NotificationsApi } from '../../../notifications/public/notifications.api';
+import type { OperatingParametersApi } from '../../../operating-parameters/public/operating-parameters.api';
+import type { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import type { ProvisioningTaskFrame } from '../provisioning-task-frame.service';
-import type { RevocationTaskFactory } from '../revocation-task-factory.service';
+import { RevocationTaskFactory } from '../revocation-task-factory.service';
 import type { RevocationRecorder } from '../revocation-recorder.service';
 import type { RevocationReadRepo } from '../revocation-read.repo';
 import type { SystemActor } from '../../public/licensing.types';
@@ -104,5 +108,109 @@ describe('RevocationService.open (noReopenAfterFailure)', () => {
     });
     expect(create).toHaveBeenCalledTimes(1);
     expect(record).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('RevocationTaskFactory (unplaced work waiting notice)', () => {
+  const tx = {} as DbTx;
+  const actor: SystemActor = { kind: 'SYSTEM', correlationId: 'offboarding:case-1' };
+
+  it('notifies usable Super Admin with UNPLACED_WORK_WAITING when opening a revocation for a never-placed employee', async () => {
+    const insertRevocation = jest.fn().mockResolvedValue({ id: 'rev-task-1', status: 'QUEUED' });
+    const notifyInApp = jest.fn().mockResolvedValue(true);
+    const factory = new RevocationTaskFactory(
+      { insertRevocation } as unknown as ProvisioningTaskRepo,
+      {
+        businessToday: jest.fn().mockResolvedValue('2026-11-23'),
+        workDepartmentsOf: jest.fn().mockResolvedValue(new Map()),
+        itAdminsActingFor: jest.fn(),
+        notStartedAmong: jest.fn().mockResolvedValue(new Set()),
+        unplacedAmong: jest.fn().mockResolvedValue(new Set(['emp-unplaced'])),
+      } as unknown as OrganizationReadApi,
+      {
+        findUsableItAdminEmployeeIds: jest.fn(),
+        findUsableSuperAdminEmployeeId: jest.fn().mockResolvedValue('emp-sa'),
+      } as unknown as IdentityAccessApi,
+      { getValue: jest.fn().mockResolvedValue('3') } as unknown as OperatingParametersApi,
+      { notifyInApp } as unknown as NotificationsApi,
+    );
+
+    await factory.create(tx, actor, {
+      organizationId: 'org-1',
+      assignment: { id: 'asg-1', employeeId: 'emp-unplaced' },
+      source: 'DEPARTURE',
+      now: new Date('2026-11-23T00:00:00Z'),
+    });
+
+    expect(notifyInApp).toHaveBeenCalledWith(tx, {
+      organizationId: 'org-1',
+      recipientEmployeeId: 'emp-sa',
+      code: 'UNPLACED_WORK_WAITING',
+      subject: null,
+      params: { workKind: 'PROVISIONING_TASK', workId: 'rev-task-1', employeeId: 'emp-unplaced' },
+      eventKey: 'unplacedWork:PROVISIONING_TASK:rev-task-1',
+    });
+  });
+
+  it('does not notify UNPLACED_WORK_WAITING when beneficiary has a work department', async () => {
+    const insertRevocation = jest.fn().mockResolvedValue({ id: 'rev-task-2', status: 'QUEUED' });
+    const notifyInApp = jest.fn();
+    const factory = new RevocationTaskFactory(
+      { insertRevocation } as unknown as ProvisioningTaskRepo,
+      {
+        businessToday: jest.fn().mockResolvedValue('2026-11-23'),
+        workDepartmentsOf: jest.fn().mockResolvedValue(new Map([['emp-1', 'dept-1']])),
+        itAdminsActingFor: jest.fn().mockResolvedValue(new Map([['dept-1', { defaultAssignee: 'it-1' }]])),
+        unplacedAmong: jest.fn(),
+      } as unknown as OrganizationReadApi,
+      {
+        findUsableItAdminEmployeeIds: jest.fn(),
+        findUsableSuperAdminEmployeeId: jest.fn(),
+      } as unknown as IdentityAccessApi,
+      { getValue: jest.fn().mockResolvedValue('3') } as unknown as OperatingParametersApi,
+      { notifyInApp } as unknown as NotificationsApi,
+    );
+
+    await factory.create(tx, actor, {
+      organizationId: 'org-1',
+      assignment: { id: 'asg-1', employeeId: 'emp-1' },
+      source: 'DEPARTURE',
+      now: new Date('2026-11-23T00:00:00Z'),
+    });
+
+    expect(notifyInApp).not.toHaveBeenCalled();
+  });
+
+  it('rejects creating a revocation task with EmployeeNotStartedError when the employee only has a future placement', async () => {
+    const { EmployeeNotStartedError } = await import('../../../organization/public/organization.errors');
+    const insertRevocation = jest.fn();
+    const notifyInApp = jest.fn();
+    const factory = new RevocationTaskFactory(
+      { insertRevocation } as unknown as ProvisioningTaskRepo,
+      {
+        businessToday: jest.fn().mockResolvedValue('2026-11-23'),
+        workDepartmentsOf: jest.fn().mockResolvedValue(new Map()),
+        itAdminsActingFor: jest.fn(),
+        notStartedAmong: jest.fn().mockResolvedValue(new Set(['emp-future'])),
+        unplacedAmong: jest.fn(),
+      } as unknown as OrganizationReadApi,
+      {
+        findUsableItAdminEmployeeIds: jest.fn(),
+        findUsableSuperAdminEmployeeId: jest.fn(),
+      } as unknown as IdentityAccessApi,
+      { getValue: jest.fn().mockResolvedValue('3') } as unknown as OperatingParametersApi,
+      { notifyInApp } as unknown as NotificationsApi,
+    );
+
+    await expect(
+      factory.create(tx, actor, {
+        organizationId: 'org-1',
+        assignment: { id: 'asg-1', employeeId: 'emp-future' },
+        source: 'DEPARTURE',
+        now: new Date('2026-11-23T00:00:00Z'),
+      }),
+    ).rejects.toBeInstanceOf(EmployeeNotStartedError);
+    expect(insertRevocation).not.toHaveBeenCalled();
+    expect(notifyInApp).not.toHaveBeenCalled();
   });
 });

@@ -6,6 +6,7 @@ import { CatalogApi } from '../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { RenewalHoldHook } from '../public/licensing.extension-points';
 import type { PendingRenewal } from '../public/licensing-renewal.types';
+import { ProvisioningTaskFrame } from '../provisioning/provisioning-task-frame.service';
 import { RevocationService } from '../provisioning/revocation.service';
 import type { ExpiredRightWire, StartedRevocationWire } from './expiry.dto';
 import { ExpiryError } from './expiry.errors';
@@ -33,6 +34,7 @@ export class ExpiryQueueService {
     private readonly repo: ExpiryQueueRepo,
     private readonly renewals: RenewalHoldHook,
     private readonly revocations: RevocationService,
+    private readonly frame: ProvisioningTaskFrame,
     private readonly organizationReads: OrganizationReadApi,
     private readonly catalog: CatalogApi,
     private readonly runner: TransactionRunner,
@@ -92,9 +94,10 @@ export class ExpiryQueueService {
       status: queueStatusOf({ revocationOpen: facts.revocation !== null, renewalPending }),
     });
     if (refusal) throw new ExpiryError(refusal);
+    await this.frame.requireActingItAdmin(undefined, actor, { beneficiaryEmployeeId: facts.employeeId, now });
 
-    const opened = await this.runner.run((tx) =>
-      this.revocations.open(tx, actor, {
+    const opened = await this.runner.run(async (tx) => {
+      const result = await this.revocations.open(tx, actor, {
         assignmentId,
         source: 'TIME_LIMITED_EXPIRY',
         // The end date the right was given decides, not a person (`FR-2.8`).
@@ -105,8 +108,13 @@ export class ExpiryQueueService {
           referenceId: assignmentId,
         },
         now,
-      }),
-    );
+      });
+      const locked = await this.repo.factsOf(assignmentId, tx);
+      if (!locked) throw new ExpiryError('NOT_FOUND');
+      await this.frame.requireActingItAdmin(tx, actor, { beneficiaryEmployeeId: locked.employeeId, now });
+
+      return result;
+    });
 
     return {
       assignmentId,

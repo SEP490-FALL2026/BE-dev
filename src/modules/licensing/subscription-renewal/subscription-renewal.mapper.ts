@@ -1,9 +1,12 @@
+import { DONG, formatAmount } from '../../../core/money/money';
 import type { PeriodAdjustment, RenewalPeriodFacts } from '../../catalog/public/subscription-period.types';
+import type { SubscriptionKpi4Summary } from './kpi/subscription-renewal-kpi.types';
 import { cancelProblem, suggestedChoiceOf, type SeatsNeededCounts } from './seats-needed/renewal-seats-needed.policy';
 import type {
   DeadlineEventWire,
   RenewalAdjustmentWire,
   RenewalDetailWire,
+  RenewalLineWire,
   RenewalSummaryWire,
 } from './subscription-renewal.dto';
 import type { DeadlineEventRecord, ReleasedSeat, RenewalRecord } from './subscription-renewal.types';
@@ -26,6 +29,7 @@ export function toRenewalSummary(
   record: RenewalRecord,
   period: RenewalPeriodFacts,
   admins: ReadonlyMap<string, ItAdminWire>,
+  lineCount = 1,
 ): RenewalSummaryWire {
   return {
     id: record.id,
@@ -40,6 +44,7 @@ export function toRenewalSummary(
     lateFlagged: record.lateFlaggedAt !== null,
     // No case waits for a head any more (QĐ-103e): the field stays null for the readers that still have it.
     waitingReason: null,
+    lineCount,
     proposedAt: record.proposedAt.toISOString(),
   };
 }
@@ -80,13 +85,16 @@ export function toRenewalDetail(
     lateRenewal: boolean;
     /** False for the IT Admin: the money the head saw is not theirs to read (`L-617`). */
     showSnapshot: boolean;
+    lines?: RenewalLineWire[];
+    shortfall?: number;
   },
 ): RenewalDetailWire {
   const { period, released } = context;
   const { decision, outcome } = record;
+  const lines = context.lines ?? [];
 
   return {
-    ...toRenewalSummary(record, period, context.admins),
+    ...toRenewalSummary(record, period, context.admins, lines.length > 0 ? lines.length : 1),
     period: {
       purchasedQuantity: period.purchasedQuantity,
       billingCycle: period.billingCycle,
@@ -119,6 +127,9 @@ export function toRenewalDetail(
       realisedSavings: context.savings,
       lateRenewal: context.lateRenewal,
     },
+    lines,
+    minimumSeatsTotal: period.minimumSeatsTotal ?? null,
+    shortfall: context.shortfall ?? 0,
   };
 }
 
@@ -144,10 +155,11 @@ export function toDeadlineEvent(
  * false for a reader who is not, and when nobody is responsible.
  */
 export function toAdjustmentWire(
-  period: Pick<RenewalPeriodFacts, 'subscriptionId' | 'purchasedQuantity' | 'vendorMinimumSeats'>,
+  period: Pick<RenewalPeriodFacts, 'subscriptionId' | 'purchasedQuantity' | 'vendorMinimumSeats' | 'minimumSeatsTotal'>,
   adjustment: PeriodAdjustment,
   counts: SeatsNeededCounts,
   who: { responsibleItAdminEmployeeId: string | null; callerEmployeeId: string; recordedRenewalId: string | null },
+  lineInfo?: { lines: RenewalLineWire[]; shortfall: number },
 ): RenewalAdjustmentWire {
   return {
     subscriptionId: period.subscriptionId,
@@ -173,5 +185,69 @@ export function toAdjustmentWire(
     responsibleItAdminEmployeeId: who.responsibleItAdminEmployeeId,
     callerIsResponsible: who.responsibleItAdminEmployeeId === who.callerEmployeeId,
     recordedRenewalId: who.recordedRenewalId,
+    lines: lineInfo?.lines ?? [],
+    minimumSeatsTotal: period.minimumSeatsTotal ?? null,
+    shortfall: lineInfo?.shortfall ?? 0,
+  };
+}
+
+const toVndMoney = (amountMinor: bigint) => ({
+  amount: formatAmount(amountMinor, 0),
+  currency: DONG,
+});
+
+/** Maps missed-adjustment seat-months into keyed records without nested arrays. */
+export function toMissedAdjustmentKpiWire(summary: SubscriptionKpi4Summary) {
+  const linesById: Record<
+    string,
+    {
+      planId: string;
+      missedSeats: number;
+      seatMonths: number;
+      amount: { amount: string; currency: string };
+      monthsByMonth: Record<
+        string,
+        {
+          missedIdleSeatDays: number;
+          daysInMonth: number;
+          seatMonths: number;
+          amount: { amount: string; currency: string };
+        }
+      >;
+    }
+  > = {};
+
+  for (const line of summary.lines) {
+    const monthsByMonth: Record<
+      string,
+      {
+        missedIdleSeatDays: number;
+        daysInMonth: number;
+        seatMonths: number;
+        amount: { amount: string; currency: string };
+      }
+    > = {};
+    for (const month of line.months) {
+      monthsByMonth[month.month] = {
+        missedIdleSeatDays: month.missedIdleSeatDays,
+        daysInMonth: month.daysInMonth,
+        seatMonths: month.seatMonths,
+        amount: toVndMoney(month.amountMinor),
+      };
+    }
+    linesById[line.subscriptionLineId] = {
+      planId: line.planId,
+      missedSeats: line.missedSeats,
+      seatMonths: line.seatMonths,
+      amount: toVndMoney(line.amountMinor),
+      monthsByMonth,
+    };
+  }
+
+  return {
+    subscriptionId: summary.subscriptionId,
+    totalSeatMonths: summary.totalSeatMonths,
+    totalAmount: toVndMoney(summary.totalAmountMinor),
+    linesById,
   };
 }

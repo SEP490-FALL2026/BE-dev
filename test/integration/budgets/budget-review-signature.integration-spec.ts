@@ -5,7 +5,7 @@ import {
   BudgetReviewPoolWatchService,
   type SharedPoolFigures,
 } from '../../../src/modules/budgets/review/budget-review-pool-watch.service';
-import { BudgetReviewReminderService } from '../../../src/modules/budgets/review/budget-review-reminder.service';
+import { BudgetReviewReminderService } from '../../../src/modules/budgets/review/reminder/budget-review-reminder.service';
 import { OperatingParametersApi } from '../../../src/modules/operating-parameters/public/operating-parameters.api';
 import { InvoiceHarness } from '../../support/invoice-harness';
 import { pretendBusinessToday } from '../../support/pretend-today';

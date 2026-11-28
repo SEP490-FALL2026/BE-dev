@@ -2,12 +2,14 @@ import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
+import { EmployeeNotStartedError } from '../../organization/public/organization.errors';
 import { successorRequiredException, toPersonnelAccessApiException } from '../personnel-access.http-errors';
 import { OffboardingRefusedError } from './offboarding.errors';
 
 /** The answer of each refusal, by its semantic code. A code the table does not know is a programming error and stays a 500. */
 const STATUS: Readonly<Record<string, HttpStatus>> = {
   NOT_FOUND: HttpStatus.NOT_FOUND,
+  NOT_IN_CHARGE: HttpStatus.FORBIDDEN,
   EMPLOYEE_NOT_FOUND: HttpStatus.NOT_FOUND,
   EMPLOYEE_LEFT: HttpStatus.CONFLICT,
   ALREADY_HANDING_OVER: HttpStatus.CONFLICT,
@@ -41,6 +43,7 @@ const STATUS: Readonly<Record<string, HttpStatus>> = {
 
 const MESSAGES: Readonly<Record<string, string>> = {
   NOT_FOUND: 'The offboarding case does not exist.',
+  NOT_IN_CHARGE: 'Only the acting IT Admin of the department may handle this offboarding case.',
   EMPLOYEE_NOT_FOUND: 'The employee does not exist.',
   EMPLOYEE_LEFT: 'The employee has left the organization.',
   ALREADY_HANDING_OVER: 'The employee is already handing over before leaving.',
@@ -83,6 +86,12 @@ const MESSAGES: Readonly<Record<string, string>> = {
  */
 export function toOffboardingApiException(error: unknown): unknown {
   if (error instanceof ApiException) return error;
+  if (error instanceof EmployeeNotStartedError) {
+    return new ApiException(HttpStatus.CONFLICT, {
+      code: 'EMPLOYEE.NOT_STARTED',
+      message: error.message,
+    });
+  }
   const refused = toPersonnelAccessApiException(error);
   if (refused) return refused;
   if (!(error instanceof OffboardingRefusedError)) return toUnavailableApiException(error) ?? error;
@@ -106,6 +115,7 @@ const example = (error: Error) => errorExampleOf(toOffboardingApiException(error
  */
 export const OFFBOARDING_ERROR_EXAMPLES = {
   NOT_FOUND: example(new OffboardingRefusedError('NOT_FOUND')),
+  NOT_IN_CHARGE: example(new OffboardingRefusedError('NOT_IN_CHARGE')),
   EMPLOYEE_NOT_FOUND: example(new OffboardingRefusedError('EMPLOYEE_NOT_FOUND')),
   EMPLOYEE_LEFT: example(new OffboardingRefusedError('EMPLOYEE_LEFT')),
   ALREADY_HANDING_OVER: example(new OffboardingRefusedError('ALREADY_HANDING_OVER')),
@@ -160,4 +170,5 @@ export const OFFBOARDING_ERROR_EXAMPLES = {
     new OffboardingRefusedError('PLACEMENT_OVERLAP', { reason: 'FIRST_PLACEMENT_PENDING', validFrom: '2026-01-01' }),
   ),
   CONCURRENT_CHANGE: example(new OffboardingRefusedError('CONCURRENT_CHANGE')),
+  EMPLOYEE_NOT_STARTED: example(new EmployeeNotStartedError()),
 } as const;

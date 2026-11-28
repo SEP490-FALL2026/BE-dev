@@ -9,25 +9,26 @@ function keyValues(count: number, subscription: string): string[] {
   );
 }
 
-/** The key store of each K4 subscription of the fixture: keys imported by the IT Admin in charge, once (a store with keys is the dataset's). */
+/** The key store of each lot of the fixture: keys imported by the IT Admin who answers for the lot, once (a store with keys is the dataset's). */
 async function keys(ctx: DemoRunContext): Promise<StepOutcome> {
   const results: { status: StepOutcome['status']; label: string }[] = [];
   for (const spec of ctx.fixture.keys) {
-    const subscription = ctx.fixture.subscriptions.find((candidate) => candidate.key === spec.subscription);
-    const subscriptionId = ctx.ids.subscriptions.get(spec.subscription);
-    if (!subscription || !subscriptionId) {
-      results.push({ status: 'conflict', label: `${spec.subscription}: thuê bao chưa có` });
+    const lot = ctx.fixture.lots.find((candidate) => candidate.key === spec.lot);
+    const lotId = ctx.ids.lots.get(spec.lot);
+    if (!lot || !lotId) {
+      results.push({ status: 'conflict', label: `${spec.lot}: lô chưa có` });
       continue;
     }
-    const admin = await as(ctx, subscription.responsible);
-    const label = `${spec.subscription}: ${spec.count} khóa`;
-    const stored = await listAll<{ id: string }>(ctx, admin, `/license-keys?subscriptionId=${subscriptionId}`);
+    const admin = await as(ctx, lot.responsible);
+    const label = `${spec.lot}: ${spec.count} khóa`;
+    const stored = await listAll<{ id: string }>(ctx, admin, `/license-keys?licenseLotId=${lotId}`);
     if (stored.length > 0) results.push({ status: 'present', label });
     else if (ctx.mode === 'plan') results.push({ status: 'planned', label });
     else {
-      await ctx.api.call(admin, 'POST', '/license-keys/imports', {
-        subscriptionId,
-        keys: keyValues(spec.count, spec.subscription),
+      await ctx.api.call(admin, 'POST', `/license-lots/${lotId}/keys`, {
+        keys: keyValues(spec.count, spec.lot),
+        ...(spec.maxActivations !== undefined ? { maxActivations: spec.maxActivations } : {}),
+        ...(spec.initialActivationsUsed !== undefined ? { initialActivationsUsed: spec.initialActivationsUsed } : {}),
       });
       results.push({ status: 'done', label });
     }
@@ -37,5 +38,5 @@ async function keys(ctx: DemoRunContext): Promise<StepOutcome> {
 }
 
 export const ASSET_STEPS: readonly DemoStep[] = [
-  { key: 'assets.keys', title: 'Kho khóa của gói K4 (IT Admin)', needs: ['catalog.subscriptions'], run: keys },
+  { key: 'assets.keys', title: 'Kho khóa của gói K4 (IT Admin)', needs: ['catalog.lots'], run: keys },
 ];

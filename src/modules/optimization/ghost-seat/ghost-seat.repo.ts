@@ -274,20 +274,20 @@ export class GhostSeatRepo {
   async lastKeptOrExemptedOf(
     seatChainIds: readonly string[],
     tx?: DbTx,
-  ): Promise<Map<string, { id: string; closeReason: 'KEPT' | 'EXEMPTED'; closedOn: BusinessDate }>> {
+  ): Promise<Map<string, { id: string; closeReason: 'KEPT' | 'EXEMPTED'; closedAt: Date }>> {
     if (seatChainIds.length === 0) return new Map();
     const rows = await (tx ?? this.prisma).ghostSeatRecommendation.findMany({
       where: { seatChainId: { in: [...seatChainIds] }, state: 'CLOSED', closeReason: { in: ['KEPT', 'EXEMPTED'] } },
       orderBy: [{ closedAt: 'desc' }, { id: 'asc' }],
       select: { id: true, seatChainId: true, closeReason: true, closedAt: true },
     });
-    const out = new Map<string, { id: string; closeReason: 'KEPT' | 'EXEMPTED'; closedOn: BusinessDate }>();
+    const out = new Map<string, { id: string; closeReason: 'KEPT' | 'EXEMPTED'; closedAt: Date }>();
     for (const row of rows) {
       if (!row.seatChainId || out.has(row.seatChainId) || !row.closedAt) continue;
       out.set(row.seatChainId, {
         id: row.id,
         closeReason: row.closeReason as 'KEPT' | 'EXEMPTED',
-        closedOn: row.closedAt.toISOString().slice(0, 10),
+        closedAt: row.closedAt,
       });
     }
 
@@ -386,5 +386,30 @@ export class GhostSeatRepo {
       where: { organizationId, createdAt: { gte: from, lt: to } },
       select: { group: true, tier: true, state: true, closeReason: true },
     });
+  }
+
+  /**
+   * The first `take` unclosed ghost seat recommendations owned by or routed to the department, ordered by id,
+   * and how many there are in all.
+   */
+  async openOfDepartment(
+    departmentId: string,
+    take: number,
+    tx?: DbTx,
+  ): Promise<{ items: { id: string; group: GhostSeatGroup }[]; total: number }> {
+    const db = tx ?? this.prisma;
+    const where: Prisma.GhostSeatRecommendationWhereInput = {
+      state: { not: 'CLOSED' },
+      OR: [{ departmentId }, { deciderDepartmentId: departmentId }],
+    };
+    const rows = await db.ghostSeatRecommendation.findMany({
+      where,
+      select: { id: true, group: true },
+      orderBy: { id: 'asc' },
+      take: Math.max(0, take),
+    });
+    const total = await db.ghostSeatRecommendation.count({ where });
+
+    return { items: rows, total };
   }
 }

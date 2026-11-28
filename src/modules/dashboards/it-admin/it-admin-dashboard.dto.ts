@@ -47,6 +47,10 @@ const itAdminDashboardSchema = z.strictObject({
     ghostSeats: section(
       'The recommendations of wasted seats not closed: the seats of people who left (G2) and the free seats of subscriptions (G1 open).',
     ),
+    deviceReturnTasksOpen: section('Open offboarding device return tasks where the caller is an acting IT Admin.'),
+    deviceReturnTasksOverdue: section(
+      'Overdue open offboarding device return tasks where the caller is an acting IT Admin.',
+    ),
   }),
 });
 

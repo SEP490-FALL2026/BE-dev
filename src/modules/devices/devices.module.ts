@@ -3,6 +3,7 @@ import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { AuditModule } from '../audit/audit.module';
 import { CatalogModule } from '../catalog/catalog.module';
 import { IdentityAccessFacadeModule } from '../identity-access/identity-access-facade.module';
+import { LicensingModule } from '../licensing/licensing.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { OperatingParametersModule } from '../operating-parameters/operating-parameters.module';
 import { OrganizationModule } from '../organization/organization.module';
@@ -10,6 +11,16 @@ import { DEVICE_CREDENTIAL_VERIFIER } from '../../infrastructure/security/tokens
 import { AcknowledgementController } from './acknowledgement/acknowledgement.controller';
 import { AcknowledgementRepo } from './acknowledgement/acknowledgement.repo';
 import { AcknowledgementService } from './acknowledgement/acknowledgement.service';
+import { ActivationQueryService } from './activation/activation-query.service';
+import { DeviceActivationController } from './activation/activation.controller';
+import { DeviceActivationCommandService } from './activation/activation.service';
+import { DeviceActivationsController } from './activation/device-activations.controller';
+import { MeDeviceSoftwareController } from './activation/me-device-software.controller';
+import { AssetCodeRepo } from './asset-code/asset-code.repo';
+import { AssetCodeService } from './asset-code/asset-code.service';
+import { DeviceAttributesController } from './attributes/device-attributes.controller';
+import { DeviceAttributesRepo } from './attributes/device-attributes.repo';
+import { DeviceAttributesService } from './attributes/device-attributes.service';
 import { CredentialController } from './credential/credential.controller';
 import { CredentialQueryService } from './credential/credential-query.service';
 import { CredentialRepo } from './credential/credential.repo';
@@ -19,6 +30,19 @@ import { DeviceEnrollmentController } from './credential/enrollment/device-enrol
 import { CredentialEnrollmentService } from './credential/enrollment/credential-enrollment.service';
 import { DeviceSessionController } from './credential/session/device-session.controller';
 import { CredentialSessionService } from './credential/session/credential-session.service';
+import { InitialRecordActivationService } from './initial-record/initial-record-activation.service';
+import { InitialRecordController } from './initial-record/initial-record.controller';
+import { InitialRecordQueryService } from './initial-record/initial-record-query.service';
+import { InitialRecordService } from './initial-record/initial-record.service';
+import { ConditionService } from './lifecycle/condition.service';
+import { DeviceReceiptService } from './lifecycle/device-receipt.service';
+import { HolderChangeService } from './lifecycle/holder-change.service';
+import { LifecycleController } from './lifecycle/lifecycle.controller';
+import { ReplacementService } from './lifecycle/replacement.service';
+import { RetirementService } from './lifecycle/retirement.service';
+import { ReturnTaskCompletionController } from './lifecycle/return-task-completion.controller';
+import { ReturnTaskCompletionService } from './lifecycle/return-task-completion.service';
+import { VoidService } from './lifecycle/void.service';
 import { MyDevicesController } from './my-devices/my-devices.controller';
 import { MyDevicesRepo } from './my-devices/my-devices.repo';
 import { MyDevicesService } from './my-devices/my-devices.service';
@@ -27,12 +51,21 @@ import { NoticeRepo } from './notice/notice.repo';
 import { NoticeService } from './notice/notice.service';
 import { DevicesApi } from './public/devices.api';
 import { CollectorAllowlistHook } from './public/devices.extension-points';
+import { CollectorInstallationService } from './registry/collector-installation.service';
 import { RegistrationEndService } from './registry/registration-end.service';
 import { RegistryController } from './registry/registry.controller';
 import { RegistryQueryRepo } from './registry/registry-query.repo';
 import { RegistryQueryService } from './registry/registry-query.service';
 import { RegistryRepo } from './registry/registry.repo';
 import { RegistryService } from './registry/registry.service';
+import { DeviceReturnTaskController } from './return-task/device-return-task.controller';
+import { DeviceReturnTaskOpenWorkReader } from './return-task/department-open-work.listener';
+import { DeviceReturnOverdueSweeper } from './return-task/device-return-task.job';
+import { DeviceReturnTaskNotifier } from './return-task/device-return-task-notifier.service';
+import { DeviceReturnTaskQueryService } from './return-task/device-return-task-query.service';
+import { DeviceReturnTaskRepo } from './return-task/device-return-task.repo';
+import { DeviceReturnTaskSweepService } from './return-task/device-return-task-sweep.service';
+import { DeviceReturnTaskService } from './return-task/device-return-task.service';
 import { SignatureRecordController } from './registry/signature-record.controller';
 import { SignatureRecordService } from './registry/signature-record.service';
 import { StopRequestController } from './stop-request/stop-request.controller';
@@ -57,11 +90,20 @@ import { StopRequestSweepService } from './stop-request/stop-request-sweep.servi
     OperatingParametersModule,
     CatalogModule,
     IdentityAccessFacadeModule,
+    LicensingModule,
     NotificationsModule,
   ],
   controllers: [
     NoticeController,
     RegistryController,
+    InitialRecordController,
+    LifecycleController,
+    DeviceReturnTaskController,
+    ReturnTaskCompletionController,
+    DeviceActivationController,
+    DeviceActivationsController,
+    MeDeviceSoftwareController,
+    DeviceAttributesController,
     SignatureRecordController,
     AcknowledgementController,
     MyDevicesController,
@@ -77,8 +119,32 @@ import { StopRequestSweepService } from './stop-request/stop-request-sweep.servi
     RegistryQueryRepo,
     RegistryQueryService,
     RegistryService,
+    InitialRecordActivationService,
+    InitialRecordQueryService,
+    InitialRecordService,
+    HolderChangeService,
+    DeviceReceiptService,
+    ConditionService,
+    RetirementService,
+    ReplacementService,
+    ReturnTaskCompletionService,
+    VoidService,
+    DeviceActivationCommandService,
+    ActivationQueryService,
+    AssetCodeRepo,
+    AssetCodeService,
+    DeviceAttributesRepo,
+    DeviceAttributesService,
     RegistrationEndService,
+    DeviceReturnTaskRepo,
+    DeviceReturnTaskOpenWorkReader,
+    DeviceReturnTaskNotifier,
+    DeviceReturnTaskQueryService,
+    DeviceReturnTaskService,
+    DeviceReturnTaskSweepService,
+    DeviceReturnOverdueSweeper,
     SignatureRecordService,
+    CollectorInstallationService,
     AcknowledgementRepo,
     AcknowledgementService,
     StopRequestRepo,

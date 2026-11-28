@@ -36,14 +36,25 @@ describe('the final release over a database the compatibility release ran on (in
     if (before.code !== 0) throw new Error(`Deploying the compatibility history failed: ${before.stdout}`);
 
     world = await expansionWorld(sql);
+    const otherPlanId = randomUUID();
+    await sql.query(
+      `INSERT INTO plans (id, organization_id, application_id, name, normalized_name, provisioning_type, pricing_model, control_level)
+       SELECT $1, organization_id, application_id, 'Figma plan 2', 'figma plan 2', 'K2', 'PER_SEAT', 'FULL'
+         FROM plans WHERE id = $2`,
+      [otherPlanId, world.planId],
+    );
     // The operator steps of the compatibility release: the Cost Centers of the departments are linked by the schema (their old
-    // column), the link is activated, one subscription has its owner assigned on a stated basis, one was owned from the start.
+    // column), the link is activated, one subscription has its owner assigned on a stated basis, one was owned from the start
+    // (on a distinct K2 plan so M5 never sees two live periods of one (workspace, plan)).
     await activateCostCenterLink(sql, world.organizationId);
-    for (const id of [ids.assigned, ids.ownedAlready]) {
+    for (const [id, planId] of [
+      [ids.assigned, world.planId],
+      [ids.ownedAlready, otherPlanId],
+    ] as const) {
       await sql.query(
         `INSERT INTO subscriptions (id, organization_id, plan_id, kind, status, auto_renew, allows_mid_term_reduction)
          VALUES ($1, $2, $3, 'TERM', 'DRAFT', false, false)`,
-        [id, world.organizationId, world.planId],
+        [id, world.organizationId, planId],
       );
     }
     await sql.query(`UPDATE subscriptions SET owner_department_id = $2 WHERE id = $1`, [

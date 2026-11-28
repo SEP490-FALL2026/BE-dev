@@ -138,12 +138,10 @@ export class SpendHarness extends BudgetHarness {
    */
   async setPayments(requestId: string, spec: PaidSpec): Promise<void> {
     const year = spec.year ?? this.year;
+    const monthlySql =
+      "CASE WHEN price_kind = 'ONE_TIME' THEN NULL WHEN billing_cycle = 'QUARTERLY' THEN (unit_price_minor * 2 + 3) / 6 WHEN billing_cycle = 'ANNUAL' THEN (unit_price_minor * 2 + 12) / 24 ELSE COALESCE(unit_price_minor, 1000000) END";
     await this.ctx.sql.query(
-      `UPDATE access_requests
-          SET amount_minor = $2, amount_currency = $3, budget_year = $4,
-              pricing_status = 'PRICED', price_missing_reason = NULL,
-              unit_price_minor = COALESCE(unit_price_minor, 1000000), billing_cycle = COALESCE(billing_cycle, 'MONTHLY')
-        WHERE id = $1`,
+      `UPDATE access_requests SET amount_minor = $2, amount_currency = $3, budget_year = $4, pricing_status = 'PRICED', price_missing_reason = NULL, unit_price_minor = COALESCE(unit_price_minor, 1000000), monthly_price_minor = COALESCE(monthly_price_minor, ${monthlySql}), billing_cycle = COALESCE(billing_cycle, 'MONTHLY') WHERE id = $1`,
       [requestId, spec.amount ?? 1_000_000, spec.currency ?? this.reporting, year],
     );
     this.frozen.freeze(this.ctx.app, requestId);

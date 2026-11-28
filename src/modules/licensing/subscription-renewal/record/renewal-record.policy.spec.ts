@@ -348,6 +348,9 @@ describe('the point of adjustment read before a result is recorded (SBF-20 §5, 
     expect(pointOf(period({ applicationKind: 'INTERNAL', provisioningType: 'K5' }), false)).toEqual({
       refusal: { problem: 'NOT_RENEWABLE', details: { reason: 'INTERNAL' } },
     });
+    expect(pointOf(period({ seatCounting: 'MEMBERS' }), false)).toEqual({
+      refusal: { problem: 'NOT_RENEWABLE', details: { reason: 'MEMBER_COUNTED' } },
+    });
   });
 
   it('names a subscription recorded as cancelled, which has no point to adjust any more (A1C-02)', () => {

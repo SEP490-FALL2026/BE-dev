@@ -11,10 +11,11 @@ import {
   AccessRequestApplicationRetiredError,
   AccessRequestNoDepartmentError,
   AccessRequestNotFoundError,
+  AccessRequestPlanBoundToDeviceError,
   AccessRequestPlanNotFoundError,
   AccessRequestSuperAdminCannotRequestError,
 } from '../access-request/access-request.errors';
-import { FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
+import { EmployeeNotStartedError, FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
 import {
   DepartmentSoftwareNoteInvalidError,
   DepartmentSoftwareNotInCatalogError,
@@ -47,9 +48,18 @@ const refuse = (
 /** Maps the errors of the proposal and assessment routes; what is not theirs is mapped as a request error. */
 export function toAssessmentApiException(error: unknown): unknown {
   if (error instanceof AssessmentRefusedError) {
-    return error.reason === 'OWN_REQUEST'
-      ? refuse(HttpStatus.FORBIDDEN, 'ACCESS_REQUEST.OWN_REQUEST', error.message)
-      : refuse(HttpStatus.CONFLICT, 'ACCESS_REQUEST.NOT_AWAITING_ASSESSMENT', error.message);
+    if (error.reason === 'OWN_REQUEST') {
+      return refuse(HttpStatus.FORBIDDEN, 'ACCESS_REQUEST.OWN_REQUEST', error.message);
+    }
+    if (error.reason === 'ASSESSMENT_NOT_IN_CHARGE') {
+      return refuse(
+        HttpStatus.FORBIDDEN,
+        'ACCESS_REQUEST.ASSESSMENT_NOT_IN_CHARGE',
+        'Only the acting IT Admin of the requester’s department may assess this request.',
+      );
+    }
+
+    return refuse(HttpStatus.CONFLICT, 'ACCESS_REQUEST.NOT_AWAITING_ASSESSMENT', error.message);
   }
   if (error instanceof AssessmentIncompleteError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'ASSESSMENT.INCOMPLETE', error.message, { missing: error.missing });
@@ -133,6 +143,7 @@ const quote = (reason: ConstructorParameters<typeof AssessmentQuoteRefusedError>
 export const ASSESSMENT_ERROR_EXAMPLES = {
   NOT_FOUND: example(new AccessRequestNotFoundError()),
   NO_DEPARTMENT: example(new AccessRequestNoDepartmentError()),
+  EMPLOYEE_NOT_STARTED: example(new EmployeeNotStartedError()),
   REQUEST_PARTY_INELIGIBLE: example(
     new RequestPartyIneligibleError({
       reason: 'SPENDING_APPROVER',
@@ -143,8 +154,10 @@ export const ASSESSMENT_ERROR_EXAMPLES = {
   FINANCE_SETUP_INCOMPLETE: example(new FinanceSetupIncompleteError('<department-id>')),
   SUPER_ADMIN_CANNOT_REQUEST: example(new AccessRequestSuperAdminCannotRequestError()),
   PLAN_NOT_FOUND: example(new AccessRequestPlanNotFoundError()),
+  PLAN_BOUND_TO_DEVICE: example(new AccessRequestPlanBoundToDeviceError()),
   APPLICATION_RETIRED: example(new AccessRequestApplicationRetiredError()),
   OWN_REQUEST: example(new AssessmentRefusedError('OWN_REQUEST')),
+  ASSESSMENT_NOT_IN_CHARGE: example(new AssessmentRefusedError('ASSESSMENT_NOT_IN_CHARGE')),
   NOT_AWAITING_ASSESSMENT: example(new AssessmentRefusedError('NOT_AWAITING_ASSESSMENT')),
   INCOMPLETE: example(new AssessmentIncompleteError(['quote'])),
   INCOMPLETE_DATA_SENSITIVITY: example(new AssessmentIncompleteError(['dataSensitivity'])),

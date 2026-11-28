@@ -28,7 +28,7 @@ export class StockSummaryController {
   @ApiSuccessResponse(StockSummaryResponseDto, {
     message: 'STOCK_SUMMARY.LISTED',
     description:
-      'A page of plans by application and plan, each with what it holds counted by what it gives out and never by the records of its subscriptions: the seats of a shared plan (stock.kind SEATS: bought, assigned, free, revoking), the keys of a license-key plan (KEYS: in the store, assigned, withdrawn) and the people who hold a personal account (HOLDERS). It counts over the subscriptions a seat can be taken from today; the seats of a plan are the sum of the seats of those subscriptions in the list of subscriptions. mine=true keeps the plans the caller answers for as their IT Admin and counts only those subscriptions, planId a single plan.',
+      'A page of plans by application and plan, each with what it holds counted by what it gives out and never by the records of its subscriptions: the seats of a shared plan (stock.kind SEATS: bought, assigned, free, revoking), and the keys or licenses of a license-key plan (KEYS: in the store, assigned, withdrawn; LICENSES: bought, held on machines, free), counted over its lots. A plan of personal accounts has no subscription and is not listed. It counts a seat plan over the subscriptions a seat can be taken from today; the seats of a plan are the sum of the seats of those subscriptions in the list of subscriptions. mine=true keeps the plans the caller answers for as their IT Admin and counts only those subscriptions, planId a single plan.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,

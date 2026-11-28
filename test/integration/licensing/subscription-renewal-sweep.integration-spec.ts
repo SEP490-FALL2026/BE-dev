@@ -152,7 +152,11 @@ describe('the pass over the points of adjustment (integration, real PostgreSQL)'
       expect(rows.map((row) => row.recipient_employee_id).sort()).toEqual(
         sorted(h.it1.employeeId, h.finance.employeeId, h.boss.employeeId),
       );
-      expect(rows[0].params).toEqual({ subscriptionId, baseDate: h.inDays(64), renewalId: null });
+      expect(rows[0].params).toMatchObject({
+        subscriptionId,
+        baseDate: h.inDays(64),
+      });
+      expect(typeof rows[0].params.renewalId).toBe('string');
       expect(rows[0].event_key).toBe(`subscription-incident:${subscriptionId}:${h.inDays(64)}`);
       const audit = await auditOf(subscriptionId, 'SUBSCRIPTION.AUTO_RENEWAL_INCIDENT');
       expect(audit).toHaveLength(1);

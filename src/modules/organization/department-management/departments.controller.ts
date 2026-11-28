@@ -38,6 +38,7 @@ import {
   DepartmentPageResponseDto,
   DepartmentResponseDto,
   DepartmentTechnicalMembersResponseDto,
+  DepartmentUpdateResponseDto,
   DepartmentWarningsResponseDto,
   ListWarningsQueryDto,
   ListDepartmentsQueryDto,
@@ -223,7 +224,7 @@ export class DepartmentsController {
   @Patch('departments/:id')
   @RequireRoles('SUPER_ADMIN')
   @ApiOperation({ operationId: 'departmentUpdate', summary: 'Update a department profile' })
-  @ApiSuccessResponse(DepartmentResponseDto, {
+  @ApiSuccessResponse(DepartmentUpdateResponseDto, {
     message: 'DEPARTMENT.UPDATED',
     description:
       'The name, the description or the IT Admin in charge changed. The Cost Center and the people do not. A body that carries an HR basis is refused (VALIDATION_ERROR): the Audit Trail records who, when, before and after.',
@@ -243,13 +244,13 @@ export class DepartmentsController {
     @Body() body: UpdateDepartmentBodyDto,
   ) {
     try {
-      await this.departments.update(actor, params.id, {
+      const itAdminLoad = await this.departments.update(actor, params.id, {
         name: body.name,
         functionDescription: body.function,
         itAdminEmployeeId: body.itAdminEmployeeId,
       });
 
-      return await this.profileAfter(actor, params.id);
+      return { ...(await this.profileAfter(actor, params.id)), itAdminLoad };
     } catch (error) {
       throw toDepartmentApiException(error);
     }
@@ -317,7 +318,7 @@ export class DepartmentsController {
   @ApiErrorResponses(...AUTH_ERRORS, SUPER_ADMIN_ONLY, VALIDATION_ERROR, NOT_FOUND, {
     status: HttpStatus.CONFLICT,
     description:
-      'Something still keeps it in use (DEPARTMENT.IN_USE; details lists each group with its first things and its total): the people in it, the service accounts it owns, and open work (Requests not over, personnel events waiting, open tasks). Subscriptions never keep a department in use: a subscription has no owning department.',
+      'Something still keeps it in use (DEPARTMENT.IN_USE; details lists each group with its first things and its total): the people in it, the service accounts it owns, and open work (Requests not over, personnel events waiting, open tasks, device return tasks still open, software issue reports not closed, and ghost-seat recommendations still waiting for a decision; details.openWork lists each with its kind). Subscriptions never keep a department in use: a subscription has no owning department.',
     examples: [DEPARTMENT_ERROR_EXAMPLES.DEPARTMENT_IN_USE],
   })
   async deactivate(

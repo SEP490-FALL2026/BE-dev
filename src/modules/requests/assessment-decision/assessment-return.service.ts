@@ -34,7 +34,7 @@ export class AssessmentReturnService {
   ): Promise<AccessRequestRecord> {
     return this.runner.run(async (tx) => {
       const request = await this.gate.lockProposal(tx, requestId);
-      this.gate.requireAssessor(actor, request);
+      const { bySubstitute } = await this.gate.requireAssessor(tx, actor, request);
       const { verdict, reason } = await this.gate.judgeRefusal(tx, request, {
         decision: 'RETURN',
         checklist: body.checklist,
@@ -52,7 +52,13 @@ export class AssessmentReturnService {
           'ACCESS_REQUEST.ASSESSMENT_RETURNED',
           'ACCESS_REQUEST',
           requestId,
-          { requestId, reason, actingForAssignee: standsIn, requestState: 'AWAITING_REQUESTER_REVISION' },
+          {
+            requestId,
+            reason,
+            actingForAssignee: standsIn,
+            ...(bySubstitute ? { bySubstitute: true } : {}),
+            requestState: 'AWAITING_REQUESTER_REVISION',
+          },
         ),
       );
       await this.gate.keepChecklist(tx, actor, request, { verdict, decision: 'RETURN', decidedAt: now });

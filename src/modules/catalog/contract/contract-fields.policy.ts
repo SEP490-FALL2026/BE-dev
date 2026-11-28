@@ -6,6 +6,7 @@ import {
   ContractIncompleteError,
   ContractReasonRequiredError,
   ContractSubscriptionKindNotAllowedError,
+  ContractSubscriptionNotK2Error,
   ContractSubscriptionVendorMismatchError,
   ContractUpdateEmptyError,
   ContractVendorRequiredError,
@@ -16,7 +17,7 @@ import { cleanContractName } from './contract.policy';
 export type ContractStatus = 'INCOMPLETE' | 'NOT_YET_EFFECTIVE' | 'ACTIVE' | 'EXPIRED';
 
 /** The kinds of provisioning whose stock is shared by the company: the only subscriptions a contract rests on (`QĐ-111t`). */
-const SHARED_STOCK_KINDS: ReadonlySet<string> = new Set(['K2', 'K4']);
+const SHARED_STOCK_KINDS: ReadonlySet<string> = new Set(['K2']);
 
 export const MAX_CONTRACT_NUMBER_LENGTH = 100;
 export const MAX_CONTRACT_NOTE_LENGTH = 2000;
@@ -174,6 +175,7 @@ export function assertSubscriptionLinkable(input: {
   subscriptionVendorId: string | null;
   contractVendorId: string | null;
 }): void {
+  if (input.provisioningType === 'K4') throw new ContractSubscriptionNotK2Error();
   if (!SHARED_STOCK_KINDS.has(input.provisioningType)) {
     throw new ContractSubscriptionKindNotAllowedError(input.provisioningType);
   }

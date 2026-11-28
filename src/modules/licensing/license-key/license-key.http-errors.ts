@@ -8,7 +8,19 @@ import {
   SeatTargetNotFoundError,
 } from '../public/licensing.errors';
 import { toLicensingApiException } from '../licensing.http-errors';
-import { LicenseKeyApplicationRetiredError, LicenseKeyStateError } from './license-key.errors';
+import {
+  LicenseKeyApplicationRetiredError,
+  LicenseKeyInitialActivationsExceedMaxError,
+  LicenseKeyInitialActivationsOnAccountPlanError,
+  LicenseKeyInitializationClosedError,
+  LicenseKeyLotKeysExceedLicensesError,
+  LicenseKeyLotNotFoundError,
+  LicenseKeyLotNotResponsibleError,
+  LicenseKeyMaxActivationsNotRaisedError,
+  LicenseKeyPlanHasNoKeysError,
+  LicenseKeyStaleError,
+  LicenseKeyStateError,
+} from './license-key.errors';
 
 const refuse = (status: HttpStatus, code: string, message: string, details?: Record<string, unknown>): ApiException =>
   new ApiException(status, { code, message, ...(details ? { details } : {}) });
@@ -28,8 +40,45 @@ export function toLicenseKeyApiException(error: unknown): unknown {
     // The same code the global rate limit answers with: to a client it is one kind of refusal.
     return refuse(HttpStatus.TOO_MANY_REQUESTS, 'HTTP_TOO_MANY_REQUESTS', error.message);
   }
+  if (error instanceof LicenseKeyLotNotFoundError) {
+    return refuse(HttpStatus.NOT_FOUND, 'LICENSE_LOT.NOT_FOUND', error.message);
+  }
+  if (error instanceof LicenseKeyLotNotResponsibleError) {
+    return refuse(HttpStatus.FORBIDDEN, 'LICENSE_LOT.NOT_RESPONSIBLE', error.message);
+  }
+  if (error instanceof LicenseKeyLotKeysExceedLicensesError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'LICENSE_LOT.KEYS_EXCEED_LICENSES', error.message, {
+      licenseCount: error.licenseCount,
+      keysNotWithdrawn: error.keysNotWithdrawn,
+    });
+  }
   if (error instanceof LicenseKeyApplicationRetiredError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'LICENSE_KEY.APPLICATION_RETIRED', error.message);
+  }
+  if (error instanceof LicenseKeyInitializationClosedError) {
+    return refuse(HttpStatus.CONFLICT, 'LICENSE_KEY.INITIALIZATION_CLOSED', error.message);
+  }
+  if (error instanceof LicenseKeyInitialActivationsExceedMaxError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'LICENSE_KEY.INITIAL_ACTIVATIONS_EXCEED_MAX', error.message, {
+      initialActivationsUsed: error.initialActivationsUsed,
+      maxActivations: error.maxActivations,
+    });
+  }
+  if (error instanceof LicenseKeyInitialActivationsOnAccountPlanError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'LICENSE_KEY.INITIAL_ACTIVATIONS_ON_ACCOUNT_PLAN', error.message);
+  }
+  if (error instanceof LicenseKeyPlanHasNoKeysError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'LICENSE_KEY.PLAN_HAS_NO_KEYS', error.message);
+  }
+  if (error instanceof LicenseKeyMaxActivationsNotRaisedError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'LICENSE_KEY.MAX_ACTIVATIONS_NOT_RAISED', error.message, {
+      current: error.current,
+    });
+  }
+  if (error instanceof LicenseKeyStaleError) {
+    return refuse(HttpStatus.CONFLICT, 'LICENSE_KEY.STALE', error.message, {
+      currentUpdatedAt: error.currentUpdatedAt.toISOString(),
+    });
   }
   if (error instanceof LicenseKeyStateError) {
     return refuse(HttpStatus.CONFLICT, `LICENSE_KEY.${error.problem}`, error.message);
@@ -57,4 +106,13 @@ export const LICENSE_KEY_ERROR_EXAMPLES = {
   ALREADY_WITHDRAWN: example(new LicenseKeyStateError('ALREADY_WITHDRAWN')),
   NOT_IN_STORE: example(new LicenseKeyStateError('NOT_IN_STORE')),
   SUBSCRIPTION_MISMATCH: example(new LicenseKeyStateError('SUBSCRIPTION_MISMATCH')),
+  INITIALIZATION_CLOSED: example(new LicenseKeyInitializationClosedError()),
+  LOT_NOT_FOUND: example(new LicenseKeyLotNotFoundError()),
+  LOT_NOT_RESPONSIBLE: example(new LicenseKeyLotNotResponsibleError()),
+  LOT_KEYS_EXCEED_LICENSES: example(new LicenseKeyLotKeysExceedLicensesError(3, 3)),
+  PLAN_HAS_NO_KEYS: example(new LicenseKeyPlanHasNoKeysError()),
+  INITIAL_ACTIVATIONS_EXCEED_MAX: example(new LicenseKeyInitialActivationsExceedMaxError(6, 5)),
+  INITIAL_ACTIVATIONS_ON_ACCOUNT_PLAN: example(new LicenseKeyInitialActivationsOnAccountPlanError()),
+  MAX_ACTIVATIONS_NOT_RAISED: example(new LicenseKeyMaxActivationsNotRaisedError(30)),
+  STALE: example(new LicenseKeyStaleError(new Date('2026-01-01T00:00:00.000Z'))),
 } as const;

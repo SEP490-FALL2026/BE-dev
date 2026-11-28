@@ -5,6 +5,7 @@ import { AuditApi } from '../../audit/public/audit.api';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { RequestSenderService } from '../request-intake/request-sender.service';
+import { AccessRequestPlanBoundToDeviceError } from '../access-request/access-request.errors';
 import { RequestDraftRepo, type DraftRow } from '../request-draft/request-draft.repo';
 import { RequestDraftService } from './request-draft.service';
 
@@ -91,6 +92,7 @@ describe('RequestDraftService.save', () => {
   const organization = {
     businessToday: jest.fn(),
     getOwningUnits: jest.fn(),
+    notStartedAmong: jest.fn(),
   };
   const sender = { lockEligible: jest.fn() };
   const catalog = { findPlanSeatTargets: jest.fn() };
@@ -102,6 +104,7 @@ describe('RequestDraftService.save', () => {
     sender.lockEligible.mockResolvedValue({ organizationId: 'o-1' });
     organization.businessToday.mockResolvedValue('2026-10-28');
     organization.getOwningUnits.mockResolvedValue(new Map([['e-owner', { departmentId: 'd-1', costCenter: null }]]));
+    organization.notStartedAmong.mockResolvedValue(new Set());
     catalog.findPlanSeatTargets.mockResolvedValue([{ planId: PLAN, applicationKind: 'INTERNAL' }]);
     drafts.insert.mockResolvedValue(
       row({
@@ -171,6 +174,56 @@ describe('RequestDraftService.save', () => {
       } as never),
     ).rejects.toThrow('refused');
 
+    expect(drafts.insert).not.toHaveBeenCalled();
+  });
+
+  it.each(['DEVICE_KEY', 'DEVICE_BUNDLED'] as const)(
+    'refuses saving a draft for a %s plan with AccessRequestPlanBoundToDeviceError (W2-18)',
+    async (keyBinding) => {
+      catalog.findPlanSeatTargets.mockResolvedValue([
+        { planId: PLAN, applicationKind: 'LICENSED', provisioningType: 'K4', keyBinding },
+      ]);
+
+      await expect(
+        service.save(principal('e-owner'), {
+          kind: 'INDIVIDUAL',
+          planId: PLAN,
+          businessReason: 'Need AutoCAD',
+        } as never),
+      ).rejects.toBeInstanceOf(AccessRequestPlanBoundToDeviceError);
+
+      expect(drafts.insert).not.toHaveBeenCalled();
+    },
+  );
+
+  it('rejects saving an individual draft when sender only has a future placement', async () => {
+    const { EmployeeNotStartedError } = await import('../../organization/public/organization.errors');
+    organization.getOwningUnits.mockResolvedValue(new Map());
+    organization.notStartedAmong.mockResolvedValue(new Set(['e-owner']));
+
+    await expect(
+      service.save(principal('e-owner'), {
+        kind: 'INDIVIDUAL',
+        planId: PLAN,
+        businessReason: 'Need license',
+      } as never),
+    ).rejects.toBeInstanceOf(EmployeeNotStartedError);
+    expect(drafts.insert).not.toHaveBeenCalled();
+  });
+
+  it('rejects saving a group draft when any line employee only has a future placement', async () => {
+    const { EmployeeNotStartedError } = await import('../../organization/public/organization.errors');
+    organization.notStartedAmong.mockResolvedValue(new Set(['e-2']));
+
+    await expect(
+      service.save(principal('e-owner'), {
+        kind: 'GROUP',
+        planId: PLAN,
+        lines: [{ employeeId: 'e-1' }, { employeeId: 'e-2' }],
+        businessReason: 'Team license',
+        termMonths: 3,
+      } as never),
+    ).rejects.toBeInstanceOf(EmployeeNotStartedError);
     expect(drafts.insert).not.toHaveBeenCalled();
   });
 });

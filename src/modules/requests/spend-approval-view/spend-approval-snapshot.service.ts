@@ -96,21 +96,34 @@ export class SpendApprovalSnapshotService {
   }
 
   /**
-   * What the vendor is paid for a whole year when the plan is bought for the first time on a yearly price (`BR-MF1-07b`): the price of a
-   * year times the people, when the plan has no subscription yet that a seat can be taken from. Null for any other request.
+   * What the vendor is paid for a whole year when the plan is bought for the first time on a yearly commitment (`BR-MF1-07b`):
+   * for K2, `referenceCommitmentMonths` 12 or NULL (read as 12) shows `monthly × 12 × people` when no grantable subscription exists yet.
+   * Null for any other request.
    */
   async annualVendorAmountOf(request: AccessRequestRecord): Promise<ApprovalDetailWire['annualVendorAmount']> {
     const { pricing } = request;
-    if (pricing.status !== 'PRICED' || pricing.kind !== 'RECURRING' || pricing.billingCycle !== 'ANNUAL') return null;
-    if (pricing.unitPrice === null) return null;
+    if (pricing.status !== 'PRICED' || pricing.kind !== 'RECURRING' || pricing.unitPrice === null) return null;
+    let provisioningType: 'K1' | 'K2' | 'K3' | 'K4' | 'K5' | undefined;
+    let referenceCommitmentMonths: 1 | 12 | null | undefined;
+    let monthlyPriceMinor = pricing.monthlyPriceMinor;
     if (request.planId !== null) {
       const today = await this.organizationReads.businessToday();
       if ((await this.catalog.getGrantableSubscriptions(request.planId, today)).length > 0) return null;
+      const [target] = await this.catalog.findPlanSeatTargets([request.planId]);
+      provisioningType = target?.provisioningType;
+      referenceCommitmentMonths = target?.referenceCommitmentMonths;
+      if (monthlyPriceMinor === undefined || monthlyPriceMinor === null) {
+        monthlyPriceMinor = (await this.catalog.getPlanPrice(request.planId))?.monthlyPriceMinor;
+      }
     }
     const perPerson = annualVendorAmountOf({
       kind: pricing.kind,
       unitPrice: pricing.unitPrice,
+      monthlyPriceMinor,
       billingCycle: pricing.billingCycle,
+      provisioningType,
+      referenceCommitmentMonths,
+      firstPurchaseOnly: true,
     });
     if (perPerson === null) return null;
 

@@ -6,8 +6,8 @@ Mục đích: hai kênh báo tin — email qua outbox giao dịch (worker gửi 
 
 Tầng: T1 ([tiers.cjs](../../../scripts/arch/tiers.cjs)). Phụ thuộc: không module nghiệp vụ nào
 (`infrastructure/database`, `infrastructure/mail`). Được dùng bởi: budgets, data-import, identity-access, licensing,
-organization, personnel, requests ([module-graph](../../../docs/generated/module-graph.md)); worker
-`worker/email-dispatch.job.ts`.
+organization, personnel, requests ([module-graph](../../../docs/generated/module-graph.md)); worker dùng
+`worker/email-queue.job.ts` và `worker/outbox-relay.job.ts` ở chế độ BullMQ, `worker/email-dispatch.job.ts` ở chế độ poll.
 
 ## Public API (`public/`)
 
@@ -17,8 +17,10 @@ organization, personnel, requests ([module-graph](../../../docs/generated/module
   - `holdForDepartment(tx, input)` — giữ thông báo cho phòng ban chưa có trưởng (F67, T-11).
   - `deliverHeldToHead(tx, input)` — giao mọi thông báo đang giữ cho trưởng phòng đầu tiên, một lần.
   - `cancelPendingForTokens(tx, hashes)`, `deliveryStates(hashes)` — hủy mail chưa gửi / đọc trạng thái gửi theo token.
-- `EmailDeliveryApi` ([public/email-delivery.api.ts](public/email-delivery.api.ts)): `dispatchDue(isUsable)` — gửi
-  một lô outbox đến hạn; chỉ vòng mail của worker gọi.
+- `EmailDeliveryApi` ([public/email-delivery.api.ts](public/email-delivery.api.ts)): `dispatchDue(isUsable)` gửi
+  một lô đến hạn cho `poll`. Relay gọi `dueIds(limit, now)` để lấy ID, consumer gọi `deliverOne(outboxId, isUsable)` để lấy
+  lease và gửi. Job dọn đêm dùng `purgeFinished(before, limit)` để xóa mail đã kết thúc sau 30 ngày.
+  Khi mail lời mời đã được dọn, `invitation.delivery` có giá trị `null`.
 - `public/notifications.types.ts` — `EmailTemplate`, `IN_APP_NOTIFICATION_CODES` (bảng mã đóng; hai nhóm cuối là cảnh báo license
   của `a03-license-inbox-alerts` và mười mã `SUBSCRIPTION_*` của gia hạn thuê bao ở `a06-*`: `SUBSCRIPTION_RENEWAL_ALERT`,
   `_RENEWAL_RED_ALERT`, `_RENEWAL_KEPT`, `_RENEWAL_DATA_QUALITY`, `_RENEWAL_PROPOSED`, `_RENEWAL_DECIDED`, `_RENEWAL_LATE`,
@@ -32,10 +34,16 @@ organization, personnel, requests ([module-graph](../../../docs/generated/module
       `SAAS_ISSUE_STATE_CHANGED` (`issueId, issueCode, fromState, toState, trigger`; subject `SAAS_ISSUE`) — IT Admin được giao khi gửi và khi quá hạn phản hồi; bên
       còn lại khi đổi trạng thái (người báo hoặc IT Admin theo `trigger`) (`licensing/saas-issue/saas-issue-notifier.service.ts`).
     - `OUT_OF_PROCESS_CASE_REPORTED` (`caseId, applicationId, vendorId, employeeId`; subject `OUT_OF_PROCESS_CASE`) — người dùng và trưởng phòng hôm nay của phòng họ khi ca
-      đóng `REPORT_ONLY`; `VENDOR_ACCOUNT_DISCREPANCY_OPENED` (`applicationId, vendorId, source, newCount`; không subject) — IT Admin phụ trách ứng dụng, không thì mọi IT Admin
+      đóng `REPORT_ONLY`; `VENDOR_ACCOUNT_DISCREPANCY_OPENED` (`applicationId, vendorId, source, newCount`; không subject) — IT Admin phụ trách ứng dụng, không thì Super Admin
       dùng được (`usage/vendor-account-review/vendor-account-review-notifier.service.ts`).
-    - `DEVICE_STOP_REQUESTED`, `DEVICE_STOP_REQUEST_OVERDUE` (`stopRequestId, registrationId, deviceId, holderEmployeeId, dueAt, dueOn`; subject `DEVICE_STOP_REQUEST`) — IT Admin
-      phụ trách phòng của người giữ, không thì mọi IT Admin dùng được, không bao giờ chính người giữ (`devices/stop-request/stop-request-notifier.service.ts`).
+    - `DEVICE_STOP_REQUESTED`, `DEVICE_STOP_REQUEST_OVERDUE` (`stopRequestId, registrationId, deviceId, holderEmployeeId, dueAt, dueOn`; subject `DEVICE_STOP_REQUEST`) — acting IT Admins
+      của phòng người giữ (không bao giờ chính người giữ), không có thì fallback Super Admin dùng được (`devices/stop-request/stop-request-notifier.service.ts`).
+  - Tám mã vận hành đợt 2 (đều có khóa ở `PARAM_KEYS_BY_CODE` và đích ở `notification-target.policy.ts`):
+    - `SAAS_ISSUE_AWAITING_ASSIGNEE` (`issueId, issueCode, category, impact, applicationId, departmentId`; subject `SAAS_ISSUE`; đích `saasIssueList`) — Super Admin khi phiếu báo lỗi SaaS của phòng chưa có acting IT Admin (`licensing/saas-issue/saas-issue-notifier.service.ts`).
+    - `DEPARTMENT_IT_SUBSTITUTE_APPOINTED` (`substituteId, departmentId, substituteEmployeeId, replacedEmployeeId`; subject `DEPARTMENT_IT_SUBSTITUTE`; đích `departmentItSubstituteList`) — IT Admin được chỉ định làm thay (và người phụ trách cũ nếu còn dùng được); `DEPARTMENT_IT_SUBSTITUTE_ENDED` (`substituteId, departmentId, substituteEmployeeId, endCause`; subject `DEPARTMENT_IT_SUBSTITUTE`; đích `departmentItSubstituteList`) — IT Admin làm thay khi chỉ định kết thúc (`organization/department-it-substitute/department-it-substitute.service.ts`).
+    - `DEPARTMENT_IT_COVERAGE_MISSING` (`departmentId, departmentName, inChargeEmployeeId, reason`; subject `DEPARTMENT`; đích `departmentGet`) — Super Admin mỗi ngày trong tuần khi một phòng hoạt động (trừ phòng khởi tạo) không có acting IT Admin (`identity-access/it-coverage/it-coverage-notifier.service.ts`).
+    - `DEVICE_RETURN_OVERDUE` (`taskId, deviceId, assetCode, employeeId, dueOn`; subject `DEVICE_RETURN_TASK`; đích `deviceReturnTaskList`) — acting IT Admins (trừ người nghỉ) và Super Admin mỗi ngày làm việc khi tác vụ thu máy nghỉ việc quá hạn; `DEVICE_RETURN_WAITING` (`taskId, deviceId, assetCode, employeeId, departmentId, dueOn`; subject `DEVICE_RETURN_TASK`; đích `deviceReturnTaskList`) — Super Admin khi mở tác vụ thu máy cho phòng chưa có acting IT Admin (`devices/return-task/device-return-task-notifier.service.ts`).
+    - `UNPLACED_WORK_WAITING` (`workKind, workId, employeeId`; không subject; đích `unplacedWorkDesignationList`) — Super Admin khi có việc của người chưa từng xếp phòng chưa có IT Admin xử lý hoặc người được chỉ định không còn dùng được (`identity-access/it-coverage`, `personnel`, `licensing`, `devices`); `UNPLACED_WORK_DESIGNATED` (`designationId, workKind, workId, employeeId`; subject `UNPLACED_WORK_DESIGNATION`; đích `unplacedWorkDesignationList`) — IT Admin được chỉ định (`organization/unplaced-work-designation/unplaced-work-designation.service.ts`).
   - `STEP_ASSIGNED` (`requestId, stepKind, cause`) có thêm hai giá trị `cause`: `RESUBMITTED` (người gửi gửi lại sau _Trả về_, báo người giữ bước mở lại) và `SPEND_SENT` (bước duyệt chi
     mở khi trưởng phòng xác nhận dự phòng riêng, ngoài lô).
 - `public/notifications.errors.ts` — `InvalidInAppNotificationError`.

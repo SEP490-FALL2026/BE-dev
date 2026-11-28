@@ -50,7 +50,7 @@ export class AssessmentCompletionService {
   ): Promise<AccessRequestRecord> {
     return this.runner.run(async (tx) => {
       const request = await this.gate.lockProposal(tx, requestId);
-      this.gate.requireAssessor(actor, request);
+      const { bySubstitute } = await this.gate.requireAssessor(tx, actor, request);
       const { assessment, proposal } = await this.gate.requireProposalFacts(tx, requestId);
       const scope = assessmentScopeOf(proposal);
       const quote = this.completableQuote(assessment, scope, await this.gate.namesInternalApplication(tx, proposal));
@@ -77,7 +77,7 @@ export class AssessmentCompletionService {
           'ACCESS_REQUEST.ASSESSMENT_COMPLETED',
           'ACCESS_REQUEST',
           requestId,
-          completedAuditDetail(requestId, concluded, pricing, standsIn, fitted),
+          completedAuditDetail(requestId, concluded, pricing, standsIn, fitted, bySubstitute),
         ),
       );
 
@@ -129,6 +129,7 @@ function completedAuditDetail(
   pricing: PricingRecord,
   actingForAssignee: boolean,
   fitted: FittedTerm,
+  bySubstitute: boolean,
 ) {
   return {
     requestId,
@@ -145,5 +146,6 @@ function completedAuditDetail(
     termMonths: fitted.request.termMonths,
     termMonthsCleared: fitted.termMonthsCleared,
     actingForAssignee,
+    ...(bySubstitute ? { bySubstitute: true } : {}),
   };
 }

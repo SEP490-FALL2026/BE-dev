@@ -89,7 +89,9 @@ export const saasIssueSummarySchema = z.strictObject({
   reporter: employeeBrief,
   /** The department the reporter is placed in today; null when they are placed in none (they left). */
   department: z.strictObject({ id: z.uuid(), name: z.string() }).nullable(),
-  assignedItAdmin: employeeBrief,
+  assignedItAdmin: employeeBrief.nullable().meta({
+    description: 'The IT Admin assigned to handle the report, or null while awaiting an IT Admin.',
+  }),
   responseDueOn: z.string(),
   overdue: z.boolean(),
   createdAt: z.iso.datetime(),

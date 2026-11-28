@@ -1,9 +1,23 @@
+import { ApiException } from '../../../../infrastructure/http/errors/api.exception';
 import {
   SubscriptionMidTermReductionNotAllowedError,
   SubscriptionQuantityReasonRequiredError,
   SubscriptionVersionRequiredError,
 } from '../subscription.errors';
+import { toSubscriptionApiException } from '../subscription.http-errors';
 import { assertVersionForQuantityChange, judgeQuantityChange } from '../subscription.policy';
+
+function expectSubCode(fn: () => unknown, code: string): unknown {
+  try {
+    fn();
+    throw new Error(`Expected ${code}`);
+  } catch (error) {
+    const mapped = toSubscriptionApiException(error);
+    expect(mapped).toBeInstanceOf(ApiException);
+    expect((mapped as ApiException).getResponse()).toMatchObject({ code });
+    return error;
+  }
+}
 
 describe('assertVersionForQuantityChange', () => {
   it('allows omitting expectedUpdatedAt when purchasedQuantity is not sent', () => {
@@ -16,8 +30,12 @@ describe('assertVersionForQuantityChange', () => {
   });
 
   it('refuses sending purchasedQuantity without expectedUpdatedAt', () => {
-    expect(() => assertVersionForQuantityChange(5, undefined)).toThrow(SubscriptionVersionRequiredError);
-    expect(() => assertVersionForQuantityChange(0, undefined)).toThrow(SubscriptionVersionRequiredError);
+    expect(
+      expectSubCode(() => assertVersionForQuantityChange(5, undefined), 'SUBSCRIPTION.VERSION_REQUIRED'),
+    ).toBeInstanceOf(SubscriptionVersionRequiredError);
+    expect(
+      expectSubCode(() => assertVersionForQuantityChange(0, undefined), 'SUBSCRIPTION.VERSION_REQUIRED'),
+    ).toBeInstanceOf(SubscriptionVersionRequiredError);
   });
 });
 
@@ -31,9 +49,12 @@ describe('judgeQuantityChange', () => {
   };
 
   it('blocks reducing a 12-month active K2 subscription when mid-term reduction is off', () => {
-    expect(() => judgeQuantityChange({ ...base, requestedQuantity: 8, quantityChangeReason: undefined })).toThrow(
-      SubscriptionMidTermReductionNotAllowedError,
-    );
+    expect(
+      expectSubCode(
+        () => judgeQuantityChange({ ...base, requestedQuantity: 8, quantityChangeReason: undefined }),
+        'SUBSCRIPTION.MID_TERM_REDUCTION_NOT_ALLOWED',
+      ),
+    ).toBeInstanceOf(SubscriptionMidTermReductionNotAllowedError);
   });
 
   it('allows reducing an active K2 subscription when mid-term reduction is on or commitment is 1 month', () => {
@@ -56,9 +77,12 @@ describe('judgeQuantityChange', () => {
   });
 
   it('requires quantityChangeReason when increasing an active K2 subscription and returns it', () => {
-    expect(() => judgeQuantityChange({ ...base, requestedQuantity: 12, quantityChangeReason: undefined })).toThrow(
-      SubscriptionQuantityReasonRequiredError,
-    );
+    expect(
+      expectSubCode(
+        () => judgeQuantityChange({ ...base, requestedQuantity: 12, quantityChangeReason: undefined }),
+        'SUBSCRIPTION.QUANTITY_REASON_REQUIRED',
+      ),
+    ).toBeInstanceOf(SubscriptionQuantityReasonRequiredError);
     expect(judgeQuantityChange({ ...base, requestedQuantity: 12, quantityChangeReason: 'New team members' })).toBe(
       'New team members',
     );

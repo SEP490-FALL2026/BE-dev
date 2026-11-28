@@ -363,10 +363,48 @@ export interface HeadPeriodOfEmployee {
   validTo: BusinessDate | null;
 }
 
+export interface ActingItAdminsResult {
+  inCharge: string | null;
+  substitute: string | null;
+  defaultAssignee: string | null;
+  actors: string[];
+}
+
+export interface ItAdminLoad {
+  employeeId: string;
+  inChargeCount: number;
+  substituteCount: number;
+  overLimit: boolean;
+}
+
 export interface HeadHandoverInput {
   organizationId: string;
   departmentId: string;
   outgoingEmployeeId: string;
   effectiveOn: BusinessDate;
   successorEmployeeId: string | null;
+}
+
+export type UnplacedWorkKind = 'PROVISIONING_TASK' | 'OFFBOARDING_CASE' | 'DEVICE_RETURN_TASK' | 'DEVICE';
+
+export type UnplacedWorkDesignationEndCause = 'REMOVED' | 'WORK_CLOSED';
+
+export interface UnplacedWorkRef {
+  workKind: UnplacedWorkKind;
+  workId: string;
+  employeeId: string;
+}
+
+export interface ActiveUnplacedWorkDesignation {
+  id: string;
+  organizationId: string;
+  workKind: UnplacedWorkKind;
+  workId: string;
+  employeeId: string;
+  designeeEmployeeId: string;
+  designeeStatus: EmployeeStatus;
+}
+
+export function unplacedWorkKey(workKind: UnplacedWorkKind, workId: string): string {
+  return `${workKind}:${workId}`;
 }

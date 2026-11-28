@@ -12,6 +12,9 @@ duy nhất được phép). Được dùng bởi: budgets, catalog, installation
 
 ## Public API (`public/`)
 
+- `AuthHousekeepingApi` ([public/auth-housekeeping.api.ts](public/auth-housekeeping.api.ts)) — facade riêng của worker
+  cho job dọn đêm. Xóa refresh token trước phiên đã chết, xóa token thao tác quá hạn lưu 30 ngày và giữ lời mời mới nhất.
+  Cửa sổ đăng nhập giữ ít nhất một ngày và được dọn sau khi hết chặn.
 - `IdentityAccessApi` ([public/identity-access.api.ts](public/identity-access.api.ts)):
   - `prepareCredential` — kiểm chính sách và băm mật khẩu; gọi trước khi mở transaction.
   - `createBootstrapSuperAdmin` — chỉ cho lệnh cài đặt (FR-9.8).
@@ -87,6 +90,10 @@ Không vòng (`pnpm arch:capabilities --module identity-access`, gate `capabilit
 - `approval-roles/` — chỉ còn `approval-role-facts.service.ts` (dữ kiện vai của grant cho kiểm tra khi cấp); không controller,
   `GET`/`PUT /approval-roles` trả 404 (QĐ-93c). `request-party/` — `request-party.policy.ts` (thuần) và
   `request-party-eligibility.service.ts`; service tiêm `accounts/`, không tiêm `IdentityAccessApi`. `recovery/` — các bước của `pnpm ops:recover` (không có controller).
+- `it-coverage/` — `ItCoverageSweeper` (`it-coverage.job.ts`, mỗi giờ trong các ngày trong tuần, lượt đầu sau 5 phút) →
+  `ItCoverageSweepService`, `ItCoverageNotifier`: kiểm tra các phòng đang hoạt động (trừ phòng khởi tạo) không có acting IT Admin
+  ⟹ báo `DEPARTMENT_IT_COVERAGE_MISSING` tới Super Admin một lần mỗi ngày, và kiểm tra các chỉ định việc chưa xếp phòng có người
+  được chỉ định không còn là IT Admin dùng được ⟹ báo `UNPLACED_WORK_WAITING` tới Super Admin một lần mỗi ngày.
 - Nest: `identity-access.module.ts` (API: controller, JWT), `identity-access-facade.module.ts` (facade, mọi graph),
   `identity-access-recovery-cli.module.ts`, `identity-access-inspection-facade.module.ts`, `identity-access-local-seed-facade.module.ts`.
 

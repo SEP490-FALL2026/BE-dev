@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
@@ -25,6 +26,7 @@ export class NeedDecisionEffects {
     private readonly audit: AuditApi,
     private readonly renewals: RenewalApplyService,
     private readonly outcomes: RequestOutcomeService,
+    private readonly identity: IdentityAccessApi,
   ) {}
 
   async follow(
@@ -48,8 +50,8 @@ export class NeedDecisionEffects {
   }
 
   /**
-   * The software is not in the catalog: the IT Admin in charge of the department of the sender assesses it next (`US-05-06` AC-2);
-   * with none who still works the step waits and any IT Admin may take it.
+   * The software is not in the catalog: the acting IT Admin of the request’s department assesses it next;
+   * when none can act, the step waits until an acting IT Admin is appointed.
    */
   private async requestAssessment(
     tx: DbTx,
@@ -57,13 +59,17 @@ export class NeedDecisionEffects {
     request: AccessRequestRecord,
     decidedAt: Date,
   ): Promise<void> {
-    const inCharge = await this.organizationReads.getItAdminInCharge(
-      request.requesterEmployeeId,
-      await this.organizationReads.businessToday(decidedAt, tx),
-    );
+    const acting = (
+      await this.organizationReads.itAdminsActingFor(
+        [request.departmentId],
+        (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
+        tx,
+      )
+    ).get(request.departmentId);
+    const assigneeEmployeeId = acting?.defaultAssignee ?? null;
     await this.steps.add(tx, {
       requestId: request.id,
-      assigneeEmployeeId: inCharge?.itAdminEmployeeId ?? null,
+      assigneeEmployeeId,
       slaWorkingDays: request.policy.slaWorkingDays,
       now: decidedAt,
     });
@@ -75,7 +81,7 @@ export class NeedDecisionEffects {
         'ACCESS_REQUEST.ASSESSMENT_REQUESTED',
         'ACCESS_REQUEST',
         request.id,
-        { requestId: request.id, itAdminEmployeeId: inCharge?.itAdminEmployeeId ?? null },
+        { requestId: request.id, itAdminEmployeeId: assigneeEmployeeId },
       ),
     );
   }

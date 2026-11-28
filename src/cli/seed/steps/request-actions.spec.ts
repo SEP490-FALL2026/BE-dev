@@ -174,6 +174,74 @@ describe('finding the request of a scenario whose requester can no longer sign i
     expect(signedIn).toEqual(['cuong.le@saoviet.example']);
   });
 
+  it('creates a REQUEST license lot and imports a key before completing a K4 grant with purchase (W3-28)', async () => {
+    const writes: Array<{ method: string; path: string; body: unknown }> = [];
+    const call = jest.fn((_email: string, method: string, path: string, body?: unknown) => {
+      if (method === 'GET' && path.startsWith('/provisioning-tasks?')) {
+        return Promise.resolve({
+          items: [{ id: 'task-k4', kind: 'GRANT', status: 'IN_PROGRESS', requestId: 'req-k4' }],
+          pagination: { totalPages: 1 },
+        });
+      }
+      if (method === 'GET' && path.startsWith('/license-lots?')) {
+        return Promise.resolve({ items: [], pagination: { totalPages: 1 } });
+      }
+      if (method === 'GET' && path.startsWith('/license-keys?')) {
+        const hasImported = writes.some((entry) => entry.path === '/license-lots/lot-req-1/keys');
+        return Promise.resolve({
+          items: hasImported ? [{ id: 'key-req-1' }] : [],
+          pagination: { totalPages: 1 },
+        });
+      }
+      writes.push({ method, path, body });
+      if (method === 'POST' && path === '/license-lots') return Promise.resolve({ id: 'lot-req-1' });
+      return Promise.resolve({});
+    });
+    const ctx = ctxOf({
+      api: { call, signIn: jest.fn().mockResolvedValue(undefined) },
+      ids: {
+        plans: new Map([['jetbrains-datagrip', 'plan-datagrip']]),
+        lots: new Map(),
+      },
+    });
+    const req = { id: 'req-k4', state: 'EXECUTING', department: { code: 'ITO' } } as unknown as RequestWire;
+    await perform(
+      ctx,
+      scenarioOf({ key: 'R62', plan: 'jetbrains-datagrip', grant: 'PURCHASE', target: 'COMPLETED' }),
+      req,
+      'COMPLETE_TASK',
+    );
+
+    expect(writes).toEqual([
+      {
+        method: 'POST',
+        path: '/license-lots',
+        body: {
+          planId: 'plan-datagrip',
+          purchasedOn: '2026-11-17',
+          licenseCount: 1,
+          unitPrice: { amount: '3000000', currency: 'VND' },
+          purpose: 'REQUEST',
+          requestId: 'req-k4',
+        },
+      },
+      {
+        method: 'POST',
+        path: '/license-lots/lot-req-1/keys',
+        body: { keys: ['REQ-R62-7Q2K-X9M4-0001'] },
+      },
+      {
+        method: 'POST',
+        path: '/provisioning-tasks/task-k4/complete',
+        body: {
+          evidence: '[SV-R62] Đã cấp quyền cho người dùng.',
+          licenseKeyId: 'key-req-1',
+        },
+      },
+    ]);
+    expect(ctx.ids.lots.get('request:R62')).toBe('lot-req-1');
+  });
+
   it('signs nobody in when the requester has sent nothing yet', async () => {
     const signIn = jest.fn();
     const call = jest.fn().mockResolvedValue({ items: [], pagination: { totalPages: 1 } });

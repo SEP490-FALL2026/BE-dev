@@ -5,13 +5,15 @@ import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 
 /** The most files that come with one purchase invoice (`D9`). */
 export const PURCHASE_INVOICE_DOCUMENTS_MAX = 20;
-/** The most marks laid on one invoice: over what was approved, outside the term. */
-export const PURCHASE_INVOICE_FLAGS_MAX = 2;
+/** The most subscription lines covered by one split period invoice. */
+export const PURCHASE_INVOICE_LINES_MAX = 20;
+/** The most marks laid on one invoice: over what was approved, outside the term, or missing expected pool amount. */
+export const PURCHASE_INVOICE_FLAGS_MAX = 3;
 
-const label = z.enum(['NEW_PURCHASE', 'PERIOD', 'RENEWAL']);
+const label = z.enum(['NEW_PURCHASE', 'PERIOD', 'RENEWAL', 'SEAT_PURCHASE']);
 const state = z.enum(['SUBMITTED', 'CONFIRMED', 'RETURNED']);
 const matchResult = z.enum(['MATCHED', 'PRICE_QUANTITY_EXCEPTION']);
-const flag = z.enum(['OVER_APPROVED', 'OUTSIDE_TERM']);
+const flag = z.enum(['OVER_APPROVED', 'OUTSIDE_TERM', 'NO_EXPECTED_AMOUNT']);
 const paymentSource = z.enum(['COMPANY_CARD', 'IT_ADVANCE']);
 
 /** An amount in dong, as typed: what the card took out of the company, fees and exchange loss included. */
@@ -33,13 +35,37 @@ const link = z
     subscriptionId: z
       .uuid()
       .optional()
-      .meta({ description: 'The subscription the invoice renews; instead of a request.' }),
+      .meta({ description: 'The subscription the invoice renews; instead of a request or a license lot.' }),
+    licenseLotId: z
+      .uuid()
+      .optional()
+      .meta({ description: 'The license lot the invoice pays for; instead of a request or a subscription.' }),
+    seatPurchaseId: z
+      .uuid()
+      .optional()
+      .meta({ description: 'The seat purchase recorded on this subscription; only with a subscription.' }),
+    subscriptionLineIds: z
+      .array(z.uuid())
+      .min(1)
+      .max(PURCHASE_INVOICE_LINES_MAX)
+      .refine((ids) => new Set(ids).size === ids.length, { message: 'Each subscription line may appear only once.' })
+      .meta({
+        uniqueItems: true,
+        description: 'Selected subscription lines covered by a split period invoice; only with a subscription.',
+      })
+      .optional(),
   })
   .refine(
     (value) =>
-      (value.requestId !== undefined) !== (value.subscriptionId !== undefined) &&
-      (value.provisioningTaskId === undefined || value.requestId !== undefined),
-    { message: 'Name a request (with its task if there is one) or a subscription, not both.' },
+      [value.requestId, value.subscriptionId, value.licenseLotId].filter((v) => v !== undefined).length === 1 &&
+      (value.provisioningTaskId === undefined || value.requestId !== undefined) &&
+      (value.seatPurchaseId === undefined || value.subscriptionId !== undefined) &&
+      (value.subscriptionLineIds === undefined || value.subscriptionId !== undefined) &&
+      !(value.seatPurchaseId !== undefined && value.subscriptionLineIds !== undefined),
+    {
+      message:
+        'Name exactly one of a request (with optional task), a subscription (with optional seatPurchaseId or subscriptionLineIds), or a license lot.',
+    },
   );
 
 /** What the invoice says and how it was paid, the same for a preview, a submission and a new submission of a returned one. */
@@ -117,7 +143,7 @@ const personRef = z.strictObject({ employeeId: z.uuid() });
 const summarySchema = planView.extend({
   id: z.uuid(),
   state,
-  linkKind: z.enum(['REQUEST', 'SUBSCRIPTION']),
+  linkKind: z.enum(['REQUEST', 'SUBSCRIPTION', 'LICENSE_LOT']),
   requestId: z.uuid().nullable(),
   subscriptionId: z.uuid().nullable(),
   vendorId: z.uuid(),
@@ -134,6 +160,8 @@ const summarySchema = planView.extend({
 /** One purchase invoice with everything it says and what became of it. */
 const detailSchema = summarySchema.extend({
   provisioningTaskId: z.uuid().nullable(),
+  seatPurchaseId: z.uuid().nullable(),
+  licenseLotId: z.uuid().nullable(),
   unitPriceOriginal: moneyView,
   deductibleTax: moneyView,
   nonDeductibleTax: moneyView,
@@ -146,6 +174,13 @@ const detailSchema = summarySchema.extend({
   resubmissionOfId: z.uuid().nullable(),
   resubmittedAsId: z.uuid().nullable(),
   invoiceId: z.uuid().nullable().meta({ description: 'The invoice written when Finance signed; null before.' }),
+  poolExpected: moneyView.nullable().meta({
+    description: 'The expected amount in dong for a pooled-quota seat invoice; null when absent or not applicable.',
+  }),
+  poolVariance: moneyView.nullable().meta({
+    description:
+      'Actual cost minus expected amount in dong for a pooled-quota seat invoice; equals actual cost when expected is null, and null before confirmation or when not applicable.',
+  }),
   documents: z
     .array(
       z.strictObject({ documentId: z.uuid(), position: z.number().int().min(1).max(PURCHASE_INVOICE_DOCUMENTS_MAX) }),

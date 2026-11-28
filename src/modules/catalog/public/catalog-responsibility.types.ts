@@ -1,7 +1,9 @@
-/** What one IT Admin answers for in the catalog: the subscriptions and the applications that name them responsible. */
+/** What one IT Admin answers for in the catalog: subscriptions, applications, workspaces, and license lots that name them responsible. */
 export interface ResponsibilityCounts {
   subscriptions: number;
   applications: number;
+  workspaces: number;
+  licenseLots: number;
 }
 
 /**
@@ -15,10 +17,28 @@ export interface VendorAdminRole {
   applicationName: string;
   role: 'OWNER' | 'ADMIN';
   othersWorking: number;
+  /** The workspace the role is held in: one entry for each workspace; the plan above is the one it is known by. */
+  workspaceId?: string;
+  workspaceName?: string;
+  vendorId?: string;
+  responsibleItAdminEmployeeId?: string | null;
 }
 
 /** What a handing over moved, by id: every subscription and application that named the IT Admin who gave them up (`QĐ-111g`). */
 export interface ResponsibilitiesTransferred {
   subscriptionIds: string[];
   applicationIds: string[];
+  /** The workspaces the IT Admin answered for (`QĐ-116o`); they change hands in the same transaction. */
+  workspaceIds: string[];
+  /** The lots of licenses the IT Admin answered for; they change hands in the same transaction, after the subscriptions. */
+  licenseLotIds: string[];
+}
+
+/** A workspace with administrators who are no longer working as IT Admins, for the hourly alert sweep. */
+export interface WorkspaceNotWorkingAdmins {
+  workspaceId: string;
+  organizationId: string;
+  responsibleItAdminEmployeeId: string | null;
+  workingAdminCount: number;
+  notWorkingAdminEmployeeIds: string[];
 }

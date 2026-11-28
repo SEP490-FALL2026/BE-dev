@@ -1,14 +1,19 @@
+import { Prisma } from '../../../../generated/prisma/client';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { LockedPlan } from '../../plan/plan-facts.service';
+import type { SubscriptionPeriodLinesService } from '../../subscription-line/subscription-period-lines.service';
 import { SubscriptionChangeService } from '../subscription-change.service';
 import {
-  SubscriptionMidTermReductionNotAllowedError,
-  SubscriptionQuantityReasonRequiredError,
+  SubscriptionPriceOnLinesError,
+  SubscriptionPrimaryRetiredError,
+  SubscriptionStillDraftError,
   SubscriptionUpdateEmptyError,
-  SubscriptionVersionRequiredError,
 } from '../subscription.errors';
+import { toSubscriptionApiException } from '../subscription.http-errors';
+import { SEAT_LEDGER_ROUTES } from '../subscription.policy';
 import type { SubscriptionRecord, SubscriptionView } from '../subscription.types';
+import type { UpdateSubscriptionInput } from '../subscription.service';
 
 const actor = {
   accountId: 'acc-1',
@@ -36,6 +41,7 @@ const makeRecord = (overrides: Partial<SubscriptionRecord> = {}): SubscriptionRe
   status: 'ACTIVE',
   purchasedQuantity: 10,
   unitPrice: { amountMinor: 200_000n, currency: 'VND', recordedOn: '2026-01-01' },
+  monthlyUnitPriceMinor: 16_667n,
   priceSnapshot: {
     rate: 1n,
     rateDate: '2026-01-01',
@@ -58,6 +64,10 @@ const makeRecord = (overrides: Partial<SubscriptionRecord> = {}): SubscriptionRe
   vendorMinimumSeats: null,
   isPrimaryForPlan: true,
   renewedFromId: null,
+  workspace: null,
+  seatCounting: 'FIXED',
+  minimumSeatsTotal: null,
+  invoicedLater: false,
   createdAt: baseDate,
   updatedAt: baseDate,
   ...overrides,
@@ -72,8 +82,10 @@ const lockedPlan: LockedPlan = {
   applicationStatus: 'APPROVED',
   pricingModel: 'PER_SEAT',
   provisioningType: 'K2',
+  keyBinding: null,
   sharingPolicy: null,
   hasAdminConsole: true,
+  referenceCommitmentMonths: null,
 };
 
 interface RecordedAuditEvent {
@@ -118,6 +130,13 @@ function makeSut(stored: SubscriptionRecord = makeRecord()) {
     assertNotBelowOccupied: jest.fn().mockResolvedValue(undefined),
     judgePool: jest.fn().mockResolvedValue(undefined),
     tellSeatIncrease: jest.fn().mockResolvedValue(undefined),
+    tellSeatReduction: jest.fn().mockResolvedValue(undefined),
+  };
+
+  const periodLines = {
+    activatePeriod: jest.fn().mockResolvedValue(undefined),
+    syncDraftUpdate: jest.fn().mockResolvedValue(undefined),
+    hasLines: jest.fn().mockResolvedValue(false),
   };
 
   const service = new SubscriptionChangeService(
@@ -128,67 +147,64 @@ function makeSut(stored: SubscriptionRecord = makeRecord()) {
     audit as never,
     runner as never,
     guard as never,
+    periodLines as unknown as SubscriptionPeriodLinesService,
   );
 
-  return { service, subscriptions, plans, recordAudit, runner, guard };
+  return { service, subscriptions, plans, pricing, periodLines, recordAudit, runner, guard };
 }
 
 describe('SubscriptionChangeService', () => {
   it('refuses an update that only sends quantityChangeReason with SubscriptionUpdateEmptyError', async () => {
     const { service, runner } = makeSut();
 
-    await expect(service.update(actor, 'sub-1', { quantityChangeReason: 'Only reason' })).rejects.toThrow(
-      SubscriptionUpdateEmptyError,
-    );
+    const err = await service.update(actor, 'sub-1', { quantityChangeReason: 'Only reason' }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(SubscriptionUpdateEmptyError);
+    expect((toSubscriptionApiException(err) as { getResponse?: () => unknown }).getResponse?.()).toMatchObject({
+      code: 'SUBSCRIPTION.UPDATE_EMPTY',
+    });
     expect(runner.run).not.toHaveBeenCalled();
   });
 
-  it('refuses changing purchasedQuantity without expectedUpdatedAt before entering a transaction', async () => {
+  it.each<[string, UpdateSubscriptionInput, Date | undefined]>([
+    ['without the version', { purchasedQuantity: 12 }, undefined],
+    [
+      'reducing a 12-month subscription whose flags the body tries to change',
+      { purchasedQuantity: 8, commitmentTermMonths: 1, allowsMidTermReduction: true },
+      baseDate,
+    ],
+    ['increasing, without a reason', { purchasedQuantity: 12 }, baseDate],
+    ['increasing, with a reason', { purchasedQuantity: 12, quantityChangeReason: 'New engineering hires' }, baseDate],
+    ['reducing by one', { purchasedQuantity: 11 }, baseDate],
+  ])(
+    'refuses an edit of the seats (%s) with the routes that change them, before a transaction opens and with nothing written (W3-27)',
+    async (_name, input, version) => {
+      const { service, runner, recordAudit, guard } = makeSut();
+
+      const err = await service.update(actor, 'sub-1', input, version).catch((e: unknown) => e);
+      expect(err).toMatchObject({
+        name: 'SubscriptionSeatCountViaLedgerError',
+        routes: SEAT_LEDGER_ROUTES,
+      });
+      expect((toSubscriptionApiException(err) as { getResponse?: () => unknown }).getResponse?.()).toMatchObject({
+        code: 'SUBSCRIPTION.SEAT_COUNT_VIA_LEDGER',
+      });
+      expect(runner.run).not.toHaveBeenCalled();
+      expect(recordAudit).not.toHaveBeenCalled();
+      expect(guard.tellSeatIncrease).not.toHaveBeenCalled();
+      expect(guard.tellSeatReduction).not.toHaveBeenCalled();
+    },
+  );
+
+  it('refuses to mark a subscription as the one that prices its plan, and lets the mark be taken off', async () => {
     const { service, runner } = makeSut();
 
-    await expect(service.update(actor, 'sub-1', { purchasedQuantity: 12 })).rejects.toThrow(
-      SubscriptionVersionRequiredError,
-    );
+    const err = await service.update(actor, 'sub-1', { isPrimaryForPlan: true }, baseDate).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(SubscriptionPrimaryRetiredError);
+    expect((toSubscriptionApiException(err) as { getResponse?: () => unknown }).getResponse?.()).toMatchObject({
+      code: 'SUBSCRIPTION.PRIMARY_RETIRED',
+    });
     expect(runner.run).not.toHaveBeenCalled();
-  });
-
-  it('blocks reducing a 12-month active K2 subscription using stored flags even when PATCH tries to change them', async () => {
-    const { service, guard } = makeSut();
-
-    await expect(
-      service.update(
-        actor,
-        'sub-1',
-        { purchasedQuantity: 8, commitmentTermMonths: 1, allowsMidTermReduction: true },
-        baseDate,
-      ),
-    ).rejects.toThrow(SubscriptionMidTermReductionNotAllowedError);
-    expect(guard.assertNotBelowOccupied).not.toHaveBeenCalled();
-  });
-
-  it('refuses increasing an active K2 subscription without quantityChangeReason', async () => {
-    const { service, recordAudit } = makeSut();
-
-    await expect(service.update(actor, 'sub-1', { purchasedQuantity: 12 }, baseDate)).rejects.toThrow(
-      SubscriptionQuantityReasonRequiredError,
-    );
-    expect(recordAudit).not.toHaveBeenCalled();
-  });
-
-  it('records quantityChangeReason in the audit after snapshot when increasing an active K2 subscription', async () => {
-    const { service, recordAudit } = makeSut();
-
-    await service.update(
-      actor,
-      'sub-1',
-      { purchasedQuantity: 12, quantityChangeReason: 'New engineering hires' },
-      baseDate,
-    );
-
-    expect(recordAudit).toHaveBeenCalledTimes(1);
-    const event = recordAudit.mock.calls[0][1];
-    expect(event.action).toBe('SUBSCRIPTION.UPDATED');
-    expect(event.after).toMatchObject({ quantity: 12, quantityChangeReason: 'New engineering hires' });
+    await expect(service.update(actor, 'sub-1', { isPrimaryForPlan: false }, baseDate)).resolves.toBeDefined();
   });
 
   it('ignores quantityChangeReason and omits it from audit when not increasing purchasedQuantity', async () => {
@@ -199,5 +215,61 @@ describe('SubscriptionChangeService', () => {
     expect(recordAudit).toHaveBeenCalledTimes(1);
     const event = recordAudit.mock.calls[0][1];
     expect(event.after).not.toHaveProperty('quantityChangeReason');
+  });
+
+  it('maps subscriptions_active_term_monthly_price CHECK violation to SubscriptionStillDraftError (422)', async () => {
+    const { service, subscriptions } = makeSut();
+    subscriptions.update.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError('check failed', {
+        code: 'P2004',
+        clientVersion: 'test',
+        meta: {
+          driverAdapterError: {
+            cause: { originalCode: '23514', constraint: 'subscriptions_active_term_monthly_price' },
+          },
+        },
+      }),
+    );
+
+    const err = await service.update(actor, 'sub-1', { endDate: '2027-01-31' }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(SubscriptionStillDraftError);
+    expect((err as SubscriptionStillDraftError).missing).toEqual(['UNIT_PRICE']);
+    expect((toSubscriptionApiException(err) as { getResponse?: () => unknown }).getResponse?.()).toMatchObject({
+      code: 'SUBSCRIPTION.STILL_DRAFT',
+    });
+  });
+
+  it('refuses unitPrice or monthlyUnitPrice on a period that has lines with 409 SUBSCRIPTION.PRICE_ON_LINES, while allowing non-price edits and unlined price edits', async () => {
+    const { service, periodLines, pricing, subscriptions } = makeSut();
+    pricing.read.mockImplementation((money: { amount?: string; currency?: string }) =>
+      Promise.resolve({ amountMinor: BigInt(money.amount ?? '300000'), currency: money.currency ?? 'VND' }),
+    );
+    periodLines.hasLines.mockResolvedValue(true);
+
+    for (const body of [
+      { monthlyUnitPrice: { amount: '300000', currency: 'VND' } },
+      { unitPrice: { amount: '3600000', currency: 'VND' } },
+    ] satisfies UpdateSubscriptionInput[]) {
+      const err = await service.update(actor, 'sub-1', body, baseDate).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(SubscriptionPriceOnLinesError);
+      expect((toSubscriptionApiException(err) as { getStatus: () => number }).getStatus()).toBe(409);
+      expect((toSubscriptionApiException(err) as { getResponse?: () => unknown }).getResponse?.()).toMatchObject({
+        code: 'SUBSCRIPTION.PRICE_ON_LINES',
+      });
+    }
+    expect(subscriptions.update).not.toHaveBeenCalled();
+
+    // Non-price update on a lined period succeeds.
+    await expect(service.update(actor, 'sub-1', { endDate: '2027-01-31' }, baseDate)).resolves.toBeDefined();
+
+    // Unlined period allows price update.
+    periodLines.hasLines.mockResolvedValue(false);
+    pricing.priceToday.mockResolvedValue({
+      unitPrice: makeRecord().unitPrice,
+      priceSnapshot: makeRecord().priceSnapshot,
+    });
+    await expect(
+      service.update(actor, 'sub-1', { monthlyUnitPrice: { amount: '300000', currency: 'VND' } }, baseDate),
+    ).resolves.toBeDefined();
   });
 });

@@ -21,3 +21,11 @@ export class DeviceStopRequestOpenRaceError extends Error {
     this.name = 'DeviceStopRequestOpenRaceError';
   }
 }
+
+/** The caller is not an acting IT Admin of the holder department. */
+export class DeviceStopRequestNotInChargeError extends Error {
+  constructor() {
+    super('Only the acting IT Admin of the department may complete this request to stop collection.');
+    this.name = 'DeviceStopRequestNotInChargeError';
+  }
+}

@@ -23,8 +23,8 @@ export interface BlockMoment {
  * What the system does at the moment the access of a person who is leaving is blocked (`QĐ-110b`, `QĐ-110d`, SPEC MF2-E), in the transaction
  * of the case: the machines the person registered end (`DEPARTURE_BLOCKED`, the same cause a cancellation after the block takes back), every
  * open request of the person is closed by the system (`ALL_OPEN`: the ones whose grant is being carried out are left to the IT Admin, who is
- * told), the log of the case and the audit trail say it, and the Super Admin and the IT Admin are told (and every IT Admin, when the person
- * still answers for subscriptions or applications: the hand-over, `R-26`). Nothing is revoked and no task is
+ * told), the log of the case and the audit trail say it, and the Super Admin and the acting IT Admins are told (and the Super Admin is told
+ * when the person still answers for subscriptions or applications: the hand-over, `R-26`). Nothing is revoked and no task is
  * opened: taking the rights away is the IT Admin's, by the deadline of the case.
  */
 @Injectable()
@@ -79,7 +79,7 @@ export class BlockMomentEffects {
       markLeft: superAdminToMarkLeft(departure.state),
       accountLocked: departure.accountLocked,
     });
-    // An IT Admin who leaves and still answers for something in the catalog: every IT Admin is told, the case is not held back (`R-26`).
+    // An IT Admin who leaves and still answers for something in the catalog: the Super Admin is told, the case is not held back (`R-26`).
     await this.handovers.reached(tx, {
       organizationId: departure.organizationId,
       source: { kind: 'OFFBOARDING_CASE', id: departure.id },

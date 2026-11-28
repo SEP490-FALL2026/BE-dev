@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
 import type { LicenseKeyStatus } from '../../../generated/prisma/client';
@@ -7,45 +6,53 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditApi } from '../../audit/public/audit.api';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import {
-  LicenseKeyNotFoundError,
-  LicenseKeyPlanNotK4Error,
-  LicenseKeyRevealLimitError,
-  SeatTargetNotFoundError,
-} from '../public/licensing.errors';
+import { LicenseKeyNotFoundError, LicenseKeyRevealLimitError } from '../public/licensing.errors';
 import { licensingAuditEvent } from '../licensing-audit-event.mapper';
 import { LicenseKeyCipher } from './license-key-cipher.service';
-import { LicenseKeyApplicationRetiredError, LicenseKeyStateError } from './license-key.errors';
+import { LicenseLotKeyImportService, type ImportResult } from './license-lot-key-import.service';
+import { LicenseKeyStaleError, LicenseKeyStateError } from './license-key.errors';
 import {
+  activationsUsedOf,
+  assertMaxActivationsRaised,
   assertWithdrawable,
-  capacityOf,
-  judgeBatch,
-  maskKey,
-  warningOf,
-  type BatchErrorCode,
-  type CapacityWarning,
+  capReachedOf,
+  vaultSummaryOf,
+  type VaultSummary,
 } from './license-key.policy';
 import { LicenseKeyRevealQuotaRepo } from './license-key-reveal-quota.repo';
-import { LicenseKeyRepo, type LicenseKeyListed } from './license-key.repo';
+import { LicenseKeyRepo, type LicenseKeyActivationCounts, type LicenseKeyListed } from './license-key.repo';
 
-export interface VaultSummary {
-  purchased: number | null;
-  usableKeys: number;
-  capacity: number;
-  warning: CapacityWarning | null;
+/** A key as the routes answer it: the row of the vault and what its activations say. */
+export interface LicenseKeyView extends LicenseKeyListed {
+  /** The activations the key has used: those it had when it was entered and every operation on it since, closed or not. Never goes down. */
+  activationsUsed: number;
+  /** The activations open now, of every origin. */
+  openActivations: number;
+  /** Whether the key has used all the activations it allows. */
+  capReached: boolean;
 }
 
-export interface ImportResult {
-  imported: number;
-  errors: { line: number; code: BatchErrorCode | 'ALREADY_IN_STORE' }[];
-  summary: VaultSummary;
-}
+const NO_COUNTS: LicenseKeyActivationCounts = { operations: 0, open: 0 };
+
+const viewOf = (key: LicenseKeyListed, counts: LicenseKeyActivationCounts = NO_COUNTS): LicenseKeyView => {
+  const activationsUsed = activationsUsedOf(key.initialActivationsUsed, counts.operations);
+
+  return {
+    ...key,
+    activationsUsed,
+    openActivations: counts.open,
+    capReached: capReachedOf(activationsUsed, key.maxActivations),
+  };
+};
 
 /**
  * The vault of the license keys of K4 purchases (`US-04-12`, `QĐ-54b`). A key is judged, sealed with the cipher and kept
  * only as ciphertext and a fingerprint; a list shows it masked; a reveal opens it for the IT Admin and writes an audit
  * event in the same transaction, every time. The key, its fingerprint and the secrets never reach the audit trail, a
  * message or a list.
+ *
+ * Lock order of the routes that write: an import that tells the activations already used holds the state of the seat baseline first (tier 0b),
+ * then the purchase `FOR UPDATE` (tier 6) and its plan `FOR SHARE`; a withdrawal or a raise of the cap takes the purchase, then the key (tier 7b).
  */
 @Injectable()
 export class LicenseKeyService {
@@ -56,105 +63,40 @@ export class LicenseKeyService {
     private readonly quota: LicenseKeyRevealQuotaRepo,
     private readonly cipher: LicenseKeyCipher,
     private readonly catalog: CatalogApi,
+    private readonly lotKeys: LicenseLotKeyImportService,
     private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
 
   /**
-   * Keeps every valid key of the batch and reports each line that was not kept; a wrong line never spoils the others.
-   * Throws SeatTargetNotFoundError (no such purchase), LicenseKeyPlanNotK4Error and LicenseKeyApplicationRetiredError; nothing
-   * is kept then.
+   * Keeps every valid key of the batch in the lot born from this legacy subscription and reports each line that was not kept.
+   * Only the IT Admin who answers for the lot may import into it, and only lots with `legacySubscriptionId === input.subscriptionId`
+   * are accepted on this legacy route. Throws LicenseKeyLotNotFoundError, LicenseKeyLotNotResponsibleError, and the errors of
+   * `LicenseLotKeyImportService.import`.
    */
-  async import(
+  import(
     actor: AuthenticatedPrincipal,
-    input: { subscriptionId: string; keys: readonly string[] },
+    input: {
+      subscriptionId: string;
+      keys: readonly string[];
+      maxActivations?: number;
+      initialActivationsUsed?: number;
+    },
   ): Promise<ImportResult> {
-    const target = await this.requireK4Purchase(input.subscriptionId);
-    const organization = await this.organizationReads.getOrganization();
-    if (!organization) throw new Error('A license key was imported before installation');
-    const { rows, errors } = judgeBatch(input.keys);
-    const lines: ImportResult['errors'] = [...errors];
-
-    // Fingerprint order is the order of the locks the unique index takes, so two batches with the same keys never wait
-    // for each other in a circle.
-    const sealed = rows
-      .map((row) => {
-        const id = randomUUID();
-
-        return { line: row.line, id, fingerprint: this.cipher.fingerprint(row.key), key: row.key };
-      })
-      .sort((a, b) => a.fingerprint.localeCompare(b.fingerprint));
-
-    const stored = await this.runner.run(async (tx) => {
-      // The purchase is held for the transaction that keeps its keys: the subscription FOR UPDATE and its plan
-      // FOR SHARE, so a change of the plan's kind waits for the keys or the keys wait for it, and the kind is read again
-      // under the lock. The check before the transaction only answers early.
-      const held = await this.catalog.lockSeatTarget(tx, { subscriptionId: input.subscriptionId });
-      if (!held) throw new SeatTargetNotFoundError('SUBSCRIPTION');
-      if (held.provisioningType !== 'K4') throw new LicenseKeyPlanNotK4Error(held.provisioningType);
-      if (held.applicationStatus === 'RETIRED') throw new LicenseKeyApplicationRetiredError();
-
-      // One statement for the whole batch (a thousand round trips outlasted the transaction on a busy server).
-      const keptIds = await this.repo.insertManyIfNew(
-        tx,
-        sealed.map((row) => {
-          const { keyId, ciphertext } = this.cipher.encrypt(row.id, row.key);
-
-          return {
-            id: row.id,
-            organizationId: organization.id,
-            subscriptionId: input.subscriptionId,
-            fingerprint: row.fingerprint,
-            masked: maskKey(row.key),
-            ciphertext,
-            cipherKeyId: keyId,
-            importedByAppUserId: actor.appUserId,
-          };
-        }),
-      );
-      let kept = 0;
-      for (const row of sealed) {
-        if (keptIds.has(row.id)) kept += 1;
-        else lines.push({ line: row.line, code: 'ALREADY_IN_STORE' });
-      }
-      await this.audit.record(
-        tx,
-        licensingAuditEvent(
-          actor,
-          organization.id,
-          'LICENSE_KEY.IMPORTED',
-          'Subscription',
-          input.subscriptionId,
-          null,
-          {
-            subscriptionId: input.subscriptionId,
-            imported: kept,
-            rejected: lines.length,
-          },
-        ),
-      );
-
-      return { kept, usable: await this.repo.countUsable(input.subscriptionId, tx) };
-    });
-
-    return {
-      imported: stored.kept,
-      errors: lines.sort((a, b) => a.line - b.line),
-      summary: this.summary(target.purchasedQuantity, stored.usable),
-    };
+    return this.lotKeys.import(actor, input.subscriptionId, input, { responsibleOnly: true, legacyOnly: true });
   }
 
-  /** The keys of a purchase, masked, with the capacity they give. Throws SeatTargetNotFoundError. */
+  /** The keys of a purchase, masked, with the capacity they give and what their activations say. Throws SeatTargetNotFoundError. */
   async list(input: {
     subscriptionId: string;
     status?: LicenseKeyStatus;
     withdrawn?: boolean;
     page: number;
     pageSize: number;
-  }): Promise<Page<LicenseKeyListed> & { summary: VaultSummary }> {
-    const target = await this.requireSubscription(input.subscriptionId);
-    const { items, total, usable } = await this.repo.page({
+  }): Promise<Page<LicenseKeyView> & { summary: VaultSummary }> {
+    const target = await this.lotKeys.purchaseOf(input.subscriptionId);
+    const { items, total, usable, assigned, deviceOccupied, counts } = await this.repo.page({
       subscriptionId: input.subscriptionId,
       ...(input.status ? { status: input.status } : {}),
       ...(input.withdrawn === undefined ? {} : { withdrawn: input.withdrawn }),
@@ -163,8 +105,19 @@ export class LicenseKeyService {
     });
 
     return {
-      ...pageOf(items, total, input.page, input.pageSize),
-      summary: this.summary(target.purchasedQuantity, usable),
+      ...pageOf(
+        items.map((item) => viewOf(item, counts.get(item.id))),
+        total,
+        input.page,
+        input.pageSize,
+      ),
+      summary: vaultSummaryOf({
+        purchased: target.purchased,
+        usableKeys: usable,
+        keyBinding: target.keyBinding,
+        assignedKeys: assigned,
+        deviceOccupied,
+      }),
     };
   }
 
@@ -203,14 +156,14 @@ export class LicenseKeyService {
    * that would give the same key are served one after the other. Throws LicenseKeyNotFoundError and LicenseKeyStateError (`ASSIGNED`,
    * `ALREADY_WITHDRAWN`).
    */
-  async withdraw(actor: AuthenticatedPrincipal, id: string, input: { reason: string }): Promise<LicenseKeyListed> {
+  async withdraw(actor: AuthenticatedPrincipal, id: string, input: { reason: string }): Promise<LicenseKeyView> {
     const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('A license key was withdrawn before installation');
 
     return this.runner.run(async (tx) => {
       const subscriptionId = await this.repo.subscriptionOf(tx, id);
       if (subscriptionId === null) throw new LicenseKeyNotFoundError();
-      await this.catalog.lockSeatTarget(tx, { subscriptionId });
+      await this.lotKeys.lockPurchase(tx, subscriptionId);
       const key = await this.repo.lock(tx, id);
       if (!key) throw new LicenseKeyNotFoundError();
       assertWithdrawable(key);
@@ -229,7 +182,47 @@ export class LicenseKeyService {
         }),
       );
 
-      return listed;
+      return viewOf(listed, (await this.repo.activationCountsOf([id], tx)).get(id));
+    });
+  }
+
+  /**
+   * Raises the cap of activations of a key (`KHOA-08`): the cap only goes up, and the caller names the version of the key it read, so a raise
+   * made on a stale picture is refused. The purchase is locked first and the key after it (tier 6, then 7b), as a withdrawal does. One event of
+   * the audit trail says the old and the new cap and why. Throws LicenseKeyNotFoundError, LicenseKeyStaleError and
+   * LicenseKeyMaxActivationsNotRaisedError.
+   */
+  async raiseMaxActivations(
+    actor: AuthenticatedPrincipal,
+    id: string,
+    input: { maxActivations: number; note: string; expectedUpdatedAt: Date },
+  ): Promise<LicenseKeyView> {
+    const organization = await this.organizationReads.getOrganization();
+    if (!organization) throw new Error('A license key was changed before installation');
+
+    return this.runner.run(async (tx) => {
+      const subscriptionId = await this.repo.subscriptionOf(tx, id);
+      if (subscriptionId === null) throw new LicenseKeyNotFoundError();
+      await this.lotKeys.lockPurchase(tx, subscriptionId);
+      const key = await this.repo.lock(tx, id);
+      if (!key) throw new LicenseKeyNotFoundError();
+      if (key.updatedAt.getTime() !== input.expectedUpdatedAt.getTime()) throw new LicenseKeyStaleError(key.updatedAt);
+      assertMaxActivationsRaised(key.maxActivations, input.maxActivations);
+      const listed = await this.repo.raiseMaxActivations(tx, id, input.maxActivations);
+      await this.audit.record(
+        tx,
+        licensingAuditEvent(
+          actor,
+          organization.id,
+          'LICENSE_KEY.MAX_ACTIVATIONS_RAISED',
+          'LicenseKey',
+          id,
+          { maxActivations: key.maxActivations },
+          { maxActivations: input.maxActivations, note: input.note.trim() },
+        ),
+      );
+
+      return viewOf(listed, (await this.repo.activationCountsOf([id], tx)).get(id));
     });
   }
 
@@ -249,29 +242,5 @@ export class LicenseKeyService {
       }
     }
     await this.quota.forgetOlderThan(tx, new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000));
-  }
-
-  private summary(purchased: number | null, usableKeys: number): VaultSummary {
-    return {
-      purchased,
-      usableKeys,
-      capacity: capacityOf({ purchased, usableKeys }),
-      warning: warningOf({ purchased, usableKeys }),
-    };
-  }
-
-  private async requireSubscription(subscriptionId: string) {
-    const target = await this.catalog.findSeatTarget({ subscriptionId });
-    if (!target) throw new SeatTargetNotFoundError('SUBSCRIPTION');
-
-    return target;
-  }
-
-  private async requireK4Purchase(subscriptionId: string) {
-    const target = await this.requireSubscription(subscriptionId);
-    if (target.provisioningType !== 'K4') throw new LicenseKeyPlanNotK4Error(target.provisioningType);
-    if (target.applicationStatus === 'RETIRED') throw new LicenseKeyApplicationRetiredError();
-
-    return target;
   }
 }

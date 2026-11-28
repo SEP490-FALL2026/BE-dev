@@ -168,19 +168,45 @@ export API_IMAGE="$IMAGE"
 candidate() { CADDYFILE_PATH="$RELEASE_DIR/Caddyfile" docker compose --project-directory "$APP_DIR" -f "$RELEASE_DIR/docker-compose.prod.yml" "$@"; }
 live() { CADDYFILE_PATH="$APP_DIR/Caddyfile" timeout 120 docker compose --project-directory "$APP_DIR" -f "$APP_DIR/docker-compose.prod.yml" "$@"; }
 
+# Earlier release files can still be deployed and restored before Redis is introduced.
+compose_has_redis() { grep -Eq '^  redis:[[:space:]]*($|#)' "$1"; }
+
 echo "🔎 Validating candidate $RELEASE with the live .env and .env.app..."
 candidate config --quiet ||
-  fail 'the candidate does not validate with .env/.env.app (missing POSTGRES_PASSWORD, DATABASE_DEPLOY_PASSWORD or DATABASE_RUNTIME_PASSWORD?).'
+  fail 'the candidate does not validate with .env/.env.app (check the PostgreSQL role passwords and REDIS_PASSWORD).'
 
 echo "🔎 Validating the candidate Caddyfile with Caddy..."
 candidate run --rm --no-deps -T caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile > /dev/null 2>&1 ||
   fail "the candidate Caddyfile does not validate; nothing was changed. See why with: CADDYFILE_PATH=$RELEASE_DIR/Caddyfile docker compose --project-directory $APP_DIR -f $RELEASE_DIR/docker-compose.prod.yml run --rm --no-deps -T caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile"
 
+REDIS_RELEASE=0
+if compose_has_redis "$RELEASE_DIR/docker-compose.prod.yml"; then
+  REDIS_RELEASE=1
+  # Redis hardening (runbook "Before the first rollout"): a container named slm-redis that this project does not own is an
+  # orphan of an earlier deploy. Compose cannot adopt it and it may run without a password, so it must be removed first.
+  orphan_id="$(docker inspect --format '{{.Id}}' slm-redis 2> /dev/null)" || orphan_id=''
+  if [ -n "$orphan_id" ]; then
+    owned_id="$(candidate ps -a -q redis 2> /dev/null)" || owned_id=''
+    [ "$owned_id" = "$orphan_id" ] ||
+      fail 'a container named slm-redis exists that does not belong to this Compose project (an orphan of an earlier deploy). Check it with: docker inspect slm-redis. After confirming it is disposable, stop and remove that exact container by hand (docs/guides/containers.md, Before the first rollout), then deploy again. Nothing was changed.'
+  fi
+  echo '📦 Starting PostgreSQL and Redis without recreating existing containers...'
+  candidate up -d --no-recreate postgres redis || fail 'cannot start PostgreSQL and Redis; the application was not changed.'
+  redis_id="$(candidate ps -a -q redis 2> /dev/null)" || redis_id=''
+  redis_command="$([ -n "$redis_id" ] && docker inspect --format '{{json .Config.Cmd}}' "$redis_id" 2> /dev/null)" || redis_command=''
+  case "$redis_command" in
+    *'"--requirepass"'*) ;;
+    *) fail 'the running Redis service has no --requirepass in its command (created by an earlier release?). Stop and remove that Redis container (keep its volume), then deploy again so Compose recreates it with REDIS_PASSWORD. Nothing was changed.' ;;
+  esac
+fi
+
 echo "🚀 Pulling $API_IMAGE..."
 candidate pull api worker || fail "cannot pull $API_IMAGE; nothing was changed."
 
-echo "📦 Starting the database if it is not running (an existing container is not recreated)..."
-candidate up -d --no-recreate postgres || fail 'cannot start the database; nothing was changed.'
+if [ "$REDIS_RELEASE" -eq 0 ]; then
+  echo "📦 Starting the database if it is not running (an existing container is not recreated)..."
+  candidate up -d --no-recreate postgres || fail 'cannot start the database; nothing was changed.'
+fi
 
 echo "⏳ Waiting for PostgreSQL..."
 READY=0
@@ -454,14 +480,17 @@ start_release() {
 # containers, never restarted and still ready, at every look of a STABILITY_WINDOW-second window (at least two looks). A
 # crash-looping worker restarts within that window. Returns 1, saying why, otherwise.
 check_release() {
-  local expected="$1" what="$2" deadline first now
+  local expected="$1" what="$2" deadline first now services="api worker caddy"
+  if compose_has_redis "$APP_DIR/docker-compose.prod.yml"; then
+    services="api worker caddy redis"
+  fi
   # API-only readiness and the first full ready look share one startup budget, rather than silently doubling it.
   if [ "$RELEASE_READY_DEADLINE" -gt 0 ]; then
     deadline="$RELEASE_READY_DEADLINE"
   else
     deadline=$((SECONDS + READY_TIMEOUT))
   fi
-  until first="$(look "$expected")"; do
+  until first="$(look "$expected" "$services")"; do
     if [ "$SECONDS" -ge "$deadline" ]; then
       echo "❌ $what is not ready after $READY_TIMEOUT s: $first" >&2
       return 1
@@ -477,7 +506,7 @@ check_release() {
   deadline=$((SECONDS + STABILITY_WINDOW))
   while :; do
     sleep "$POLL_INTERVAL"
-    if ! now="$(look "$expected")"; then
+    if ! now="$(look "$expected" "$services")"; then
       echo "❌ $what did not stay ready: $now" >&2
       return 1
     fi

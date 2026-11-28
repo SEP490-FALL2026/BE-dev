@@ -14,7 +14,9 @@ interface RegistrationWire {
   endCause: string | null;
   acknowledgedFrom: string | null;
   collectionStoppedAt: string | null;
+  collectorInstalled: boolean;
   signatureRecorded: boolean;
+  signatureMissing: boolean;
   lastAcceptedAt: string | null;
 }
 interface RegistrationPageWire {
@@ -71,10 +73,16 @@ describe('the holders of a machine and the collection column of the register (in
         endCause: null,
         acknowledgedFrom: null,
         collectionStoppedAt: null,
+        collectorInstalled: true,
         signatureRecorded: false,
+        signatureMissing: true,
         lastAcceptedAt: null,
       });
-      expect(page.items[1]).toMatchObject({ validUntil: h.today(), endCause: 'HOLDER_CHANGED' });
+      expect(page.items[1]).toMatchObject({
+        validUntil: h.today(),
+        endCause: 'HOLDER_CHANGED',
+        signatureMissing: false,
+      });
       expect(page.items[1].endedAt).not.toBeNull();
       expect(page.items[2]).toMatchObject({ holder: { id: e1 }, endCause: 'HOLDER_CHANGED' });
       expect(page.items[0].id).toBe(h.dataOf<DeviceWire>(await h.getDevice(device.id).expect(200)).registrationId);
@@ -93,7 +101,9 @@ describe('the holders of a machine and the collection column of the register (in
       expect(page.items[0]).toMatchObject({
         holder: { id: account.employeeId },
         endCause: 'DEVICE_RETIRED',
+        collectorInstalled: true,
         signatureRecorded: true,
+        signatureMissing: false,
       });
       expect(page.items[0].acknowledgedFrom).not.toBeNull();
     });

@@ -1,11 +1,14 @@
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { DepartmentSoftwareNotInCatalogError } from '../public/licensing.errors';
 import { DepartmentSoftwareProposalService } from './department-software-proposal.service';
 import {
+  DepartmentSoftwareNotInChargeError,
   DepartmentSoftwareOwnProposalError,
   DepartmentSoftwareProposalNotFoundError,
 } from './department-software.errors';
+import { toDepartmentSoftwareApiException } from './department-software.http-errors';
 import type { SoftwareEntry, SoftwareProposal } from './department-software.types';
 
 const TX = { marker: 'tx' } as unknown as DbTx;
@@ -68,7 +71,7 @@ function build() {
   };
   const access = {
     headedDepartment: jest.fn().mockResolvedValue(DEPARTMENT),
-    itAdminScope: jest.fn().mockResolvedValue(new Set([DEPARTMENT])),
+    assertMayDecideProposal: jest.fn().mockResolvedValue({ bySubstitute: false }),
   };
   const changes = { ensureEntry: jest.fn().mockResolvedValue({ entry, created: true }) };
   const view = {
@@ -99,7 +102,7 @@ function build() {
     audit as never,
   );
 
-  return { service, repo, view, inTransaction, organizationReads, access, notice, audit, runner };
+  return { service, repo, view, inTransaction, organizationReads, access, changes, notice, audit, runner };
 }
 
 describe('DepartmentSoftwareProposalService: the catalog is read in the transaction that writes (DS-R3)', () => {
@@ -174,7 +177,7 @@ describe('DepartmentSoftwareProposalService: nobody decides the proposal they ma
     'still answers that the proposal is not found to an IT Admin who is not in charge of its department, the proposer or not (%s)',
     async (action) => {
       const { service, access } = build();
-      access.itAdminScope.mockResolvedValue(new Set());
+      access.assertMayDecideProposal.mockRejectedValue(new DepartmentSoftwareProposalNotFoundError());
 
       await expect(
         action === 'accept' ? service.accept(proposer, proposal.id) : service.reject(proposer, proposal.id, 'No'),
@@ -188,5 +191,104 @@ describe('DepartmentSoftwareProposalService: nobody decides the proposal they ma
     await service.accept(IT_ADMIN, proposal.id);
 
     expect(repo.decide).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('DepartmentSoftwareProposalService: acting scope and substitute audit', () => {
+  it.each(['accept', 'reject'] as const)(
+    'refuses %s with 403 DEPARTMENT_SOFTWARE.NOT_IN_CHARGE when in read scope but outside acting scope',
+    async (action) => {
+      const { service, access, runner, repo, notice, audit } = build();
+      access.assertMayDecideProposal.mockRejectedValue(new DepartmentSoftwareNotInChargeError());
+
+      const caught = await (
+        action === 'accept' ? service.accept(IT_ADMIN, proposal.id) : service.reject(IT_ADMIN, proposal.id, 'No')
+      ).catch((error: unknown) => error);
+
+      expect(caught).toBeInstanceOf(DepartmentSoftwareNotInChargeError);
+      const apiEx = toDepartmentSoftwareApiException(caught) as ApiException;
+      expect(apiEx.getStatus()).toBe(403);
+      expect(apiEx.getResponse()).toMatchObject({ code: 'DEPARTMENT_SOFTWARE.NOT_IN_CHARGE' });
+      expect(runner.run).not.toHaveBeenCalled();
+      expect(repo.decide).not.toHaveBeenCalled();
+      expect(notice.decided).not.toHaveBeenCalled();
+      expect(audit.record).not.toHaveBeenCalled();
+    },
+  );
+
+  it('re-checks acting scope inside tx after locking the department and audits bySubstitute on accept', async () => {
+    const { service, access, changes, organizationReads, audit } = build();
+    access.assertMayDecideProposal.mockResolvedValue({ bySubstitute: true });
+
+    await service.accept(IT_ADMIN, proposal.id);
+
+    expect(access.assertMayDecideProposal).toHaveBeenNthCalledWith(1, IT_ADMIN, DEPARTMENT);
+    expect(access.assertMayDecideProposal).toHaveBeenNthCalledWith(2, IT_ADMIN, DEPARTMENT, TX);
+    expect(organizationReads.lockDepartmentShared.mock.invocationCallOrder[0]).toBeLessThan(
+      access.assertMayDecideProposal.mock.invocationCallOrder[1],
+    );
+    expect(changes.ensureEntry).toHaveBeenCalledWith(
+      TX,
+      IT_ADMIN,
+      ORGANIZATION,
+      DEPARTMENT,
+      { applicationId: APPLICATION, planId: PLAN },
+      null,
+      { bySubstitute: true },
+    );
+    expect(audit.record).toHaveBeenCalledWith(
+      TX,
+      expect.objectContaining({
+        action: 'DEPARTMENT_SOFTWARE.PROPOSAL_ACCEPTED',
+        after: {
+          state: 'ACCEPTED',
+          departmentId: DEPARTMENT,
+          applicationId: APPLICATION,
+          planId: PLAN,
+          bySubstitute: true,
+        },
+      }),
+    );
+  });
+
+  it('re-checks acting scope inside tx after locking the department and audits bySubstitute on reject', async () => {
+    const { service, access, organizationReads, audit } = build();
+    access.assertMayDecideProposal.mockResolvedValue({ bySubstitute: true });
+
+    await service.reject(IT_ADMIN, proposal.id, 'Not needed');
+
+    expect(access.assertMayDecideProposal).toHaveBeenNthCalledWith(2, IT_ADMIN, DEPARTMENT, TX);
+    expect(organizationReads.lockDepartmentShared.mock.invocationCallOrder[0]).toBeLessThan(
+      access.assertMayDecideProposal.mock.invocationCallOrder[1],
+    );
+    expect(audit.record).toHaveBeenCalledWith(
+      TX,
+      expect.objectContaining({
+        action: 'DEPARTMENT_SOFTWARE.PROPOSAL_REJECTED',
+        after: {
+          state: 'REJECTED',
+          departmentId: DEPARTMENT,
+          applicationId: APPLICATION,
+          planId: PLAN,
+          bySubstitute: true,
+        },
+      }),
+    );
+  });
+
+  it('omits bySubstitute from decision audit when the in-charge IT Admin decides', async () => {
+    const { service, audit } = build();
+
+    await service.reject(IT_ADMIN, proposal.id, 'Not needed');
+
+    const calls = audit.record.mock.calls as [unknown, { after: Record<string, unknown> }][];
+    const recorded = calls[0][1];
+    expect(recorded.after).toEqual({
+      state: 'REJECTED',
+      departmentId: DEPARTMENT,
+      applicationId: APPLICATION,
+      planId: PLAN,
+    });
+    expect(recorded.after).not.toHaveProperty('bySubstitute');
   });
 });

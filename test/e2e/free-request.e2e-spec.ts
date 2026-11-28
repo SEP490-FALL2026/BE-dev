@@ -22,6 +22,7 @@ describe('an internal request with no fee, straight to its grant (e2e)', () => {
   beforeAll(async () => {
     await h.start();
     design = await h.departmentWithUnit('P-DES');
+    await h.setItAdminInCharge(design, { employeeId: h.it1.employeeId, account: h.it1 });
     head = await h.staff(design, 'DES-H1');
     await h.makeHead(design, head);
     member = await h.staff(design, 'DES-E1');

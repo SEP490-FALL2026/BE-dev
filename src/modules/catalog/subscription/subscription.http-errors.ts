@@ -1,4 +1,5 @@
 import { HttpStatus } from '@nestjs/common';
+import { formatAmount } from '../../../core/money/money';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { toMoneyApiException } from '../../../infrastructure/http/errors/money-errors';
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
@@ -10,16 +11,39 @@ import {
 } from '../../../core/money/money.errors';
 import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import {
+  WorkspaceNotFoundError,
+  WorkspaceRequiredError,
+  WorkspaceVendorMismatchError,
+} from '../workspace/workspace.errors';
+import {
+  SubscriptionLineLiveTakenError,
+  SubscriptionLinePeriodStillDraftError,
+  SubscriptionLinePlanNotK2Error,
+  SubscriptionLinePlanTakenError,
+  SubscriptionLinePriceNotVndError,
+  SubscriptionLinesLimitError,
+} from '../subscription-line/subscription-line.errors';
+import {
   SubscriptionApplicationRetiredError,
+  SubscriptionPriceMismatchError,
   SubscriptionPriceNotVndError,
+  SubscriptionPriceOnLinesError,
   SubscriptionBillingCycleUnsupportedError,
   SubscriptionBillingLongerThanCommitmentError,
   SubscriptionCommitmentTermNotAllowedError,
   SubscriptionCommitmentTermRequiredError,
+  SubscriptionK1HasNoSubscriptionError,
   SubscriptionK1MonthlyOnlyError,
+  SubscriptionMembersMonthlyOnlyError,
+  SubscriptionMembersPaymentDayRequiredError,
+  SubscriptionSeatCountingFixedError,
   SubscriptionK4PerpetualOnlyError,
   SubscriptionMidTermReductionNotAllowedError,
+  SubscriptionPerpetualIsLicenseLotError,
   SubscriptionPrimaryConflictError,
+  SubscriptionPrimaryRetiredError,
+  SubscriptionLinesXorPlanError,
+  SubscriptionSeatCountViaLedgerError,
   SubscriptionQuantityReasonRequiredError,
   SubscriptionStaleError,
   SubscriptionPrimaryNotEligibleError,
@@ -37,6 +61,7 @@ import {
   SubscriptionQuantityBelowOccupiedError,
   SubscriptionStillDraftError,
   SubscriptionUpdateEmptyError,
+  SubscriptionWorkspaceNotFoundError,
 } from './subscription.errors';
 
 const refuse = (status: HttpStatus, code: string, message: string, details?: Record<string, unknown>): ApiException =>
@@ -46,6 +71,62 @@ const UNPROCESSABLE = HttpStatus.UNPROCESSABLE_ENTITY;
 
 /** Maps the errors of the subscription routes to their HTTP answers; money errors come from the shared mapper. */
 export function toSubscriptionApiException(error: unknown): unknown {
+  if (error instanceof WorkspaceRequiredError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.WORKSPACE_REQUIRED', error.message, {
+      workspaceIds: error.workspaceIds,
+    });
+  }
+  if (error instanceof WorkspaceVendorMismatchError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.WORKSPACE_VENDOR_MISMATCH', error.message);
+  }
+  if (error instanceof WorkspaceNotFoundError || error instanceof SubscriptionWorkspaceNotFoundError)
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.WORKSPACE_NOT_FOUND', new SubscriptionWorkspaceNotFoundError().message);
+  if (error instanceof SubscriptionMembersMonthlyOnlyError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.MEMBERS_MONTHLY_ONLY', error.message);
+  }
+  if (error instanceof SubscriptionMembersPaymentDayRequiredError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.MEMBERS_PAYMENT_DAY_REQUIRED', error.message);
+  }
+  if (error instanceof SubscriptionSeatCountingFixedError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.SEAT_COUNTING_FIXED', error.message);
+  }
+  if (error instanceof SubscriptionSeatCountViaLedgerError) {
+    return refuse(HttpStatus.CONFLICT, 'SUBSCRIPTION.SEAT_COUNT_VIA_LEDGER', error.message, { routes: error.routes });
+  }
+  if (error instanceof SubscriptionPrimaryRetiredError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.PRIMARY_RETIRED', error.message);
+  }
+  if (error instanceof SubscriptionPriceOnLinesError) {
+    return refuse(
+      HttpStatus.CONFLICT,
+      'SUBSCRIPTION.PRICE_ON_LINES',
+      'This subscription period is priced per line: change the price via PATCH /subscription-lines/{id}.',
+    );
+  }
+  if (error instanceof SubscriptionK1HasNoSubscriptionError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.K1_HAS_NO_SUBSCRIPTION', error.message);
+  }
+  if (error instanceof SubscriptionPerpetualIsLicenseLotError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.PERPETUAL_IS_LICENSE_LOT', error.message);
+  }
+  if (error instanceof SubscriptionLinesXorPlanError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.LINES_XOR_PLAN', error.message);
+  }
+  if (error instanceof SubscriptionLinePlanNotK2Error) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION_LINE.PLAN_NOT_K2', error.message);
+  }
+  if (error instanceof SubscriptionLinePriceNotVndError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION_LINE.PRICE_NOT_VND', error.message, { currency: error.currency });
+  }
+  if (error instanceof SubscriptionLineLiveTakenError) {
+    return refuse(HttpStatus.CONFLICT, 'SUBSCRIPTION.DUPLICATE_PLAN', error.message);
+  }
+  if (error instanceof SubscriptionLinePlanTakenError) {
+    return refuse(HttpStatus.CONFLICT, 'SUBSCRIPTION.DUPLICATE_PLAN', error.message);
+  }
+  if (error instanceof SubscriptionLinesLimitError) {
+    return refuse(HttpStatus.CONFLICT, 'SUBSCRIPTION.LINES_LIMIT', error.message, { limit: error.limit });
+  }
   if (error instanceof ApiException) return error;
 
   if (error instanceof SubscriptionNotFoundError) {
@@ -55,7 +136,12 @@ export function toSubscriptionApiException(error: unknown): unknown {
     return refuse(UNPROCESSABLE, 'SUBSCRIPTION.PLAN_NOT_FOUND', error.message);
   }
   if (error instanceof SubscriptionApplicationRetiredError) {
-    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.APPLICATION_RETIRED', error.message);
+    return refuse(
+      UNPROCESSABLE,
+      'SUBSCRIPTION.APPLICATION_RETIRED',
+      error.message,
+      error.planId === undefined ? undefined : { planId: error.planId },
+    );
   }
   if (error instanceof SubscriptionPlanHasNoSubscriptionError) {
     return refuse(UNPROCESSABLE, 'SUBSCRIPTION.PLAN_HAS_NO_SUBSCRIPTION', error.message);
@@ -78,11 +164,19 @@ export function toSubscriptionApiException(error: unknown): unknown {
       requested: error.requested,
     });
   }
-  if (error instanceof SubscriptionStillDraftError) {
+  if (error instanceof SubscriptionStillDraftError || error instanceof SubscriptionLinePeriodStillDraftError) {
     return refuse(UNPROCESSABLE, 'SUBSCRIPTION.STILL_DRAFT', error.message, { missing: error.missing });
   }
   if (error instanceof SubscriptionPriceNotVndError) {
     return refuse(UNPROCESSABLE, 'SUBSCRIPTION.PRICE_NOT_VND', error.message, { currency: error.currency });
+  }
+  if (error instanceof SubscriptionPriceMismatchError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.PRICE_MISMATCH', error.message, {
+      expectedUnitPrice: {
+        amount: formatAmount(error.expectedUnitPriceMinor, 0),
+        currency: error.currency,
+      },
+    });
   }
 
   // The pool of a K2 or K4 plan is one: a second live subscription is refused once the seat baseline is closed (`QĐ-104k`(3)).
@@ -169,6 +263,8 @@ export const SUBSCRIPTION_ERROR_EXAMPLES = {
   QUANTITY_BELOW_OCCUPIED: example(new SubscriptionQuantityBelowOccupiedError(3, 2)),
   STILL_DRAFT: example(new SubscriptionStillDraftError(['UNIT_PRICE'])),
   PRICE_NOT_VND: example(new SubscriptionPriceNotVndError('USD')),
+  PRICE_ON_LINES: example(new SubscriptionPriceOnLinesError()),
+  PRICE_MISMATCH: example(new SubscriptionPriceMismatchError(6_000_000n)),
   COMMITMENT_TERM_REQUIRED: example(new SubscriptionCommitmentTermRequiredError()),
   COMMITMENT_TERM_NOT_ALLOWED: example(new SubscriptionCommitmentTermNotAllowedError()),
   K1_MONTHLY_ONLY: example(new SubscriptionK1MonthlyOnlyError()),
@@ -185,6 +281,19 @@ export const SUBSCRIPTION_ERROR_EXAMPLES = {
   MID_TERM_REDUCTION_NOT_ALLOWED: example(new SubscriptionMidTermReductionNotAllowedError()),
   QUANTITY_REASON_REQUIRED: example(new SubscriptionQuantityReasonRequiredError()),
   DUPLICATE_PLAN: example(new SubscriptionDuplicatePlanError(['<subscription-id>'])),
+  WORKSPACE_REQUIRED: example(new WorkspaceRequiredError(['<workspace-id>', '<other-workspace-id>'])),
+  WORKSPACE_VENDOR_MISMATCH: example(new WorkspaceVendorMismatchError()),
+  WORKSPACE_NOT_FOUND: example(new SubscriptionWorkspaceNotFoundError()),
+  MEMBERS_MONTHLY_ONLY: example(new SubscriptionMembersMonthlyOnlyError()),
+  MEMBERS_PAYMENT_DAY_REQUIRED: example(new SubscriptionMembersPaymentDayRequiredError()),
+  SEAT_COUNTING_FIXED: example(new SubscriptionSeatCountingFixedError()),
+  SEAT_COUNT_VIA_LEDGER: example(new SubscriptionSeatCountViaLedgerError(['subscriptionLineSeatPurchase'])),
+  PRIMARY_RETIRED: example(new SubscriptionPrimaryRetiredError()),
+  K1_HAS_NO_SUBSCRIPTION: example(new SubscriptionK1HasNoSubscriptionError()),
+  PERPETUAL_IS_LICENSE_LOT: example(new SubscriptionPerpetualIsLicenseLotError()),
+  LINES_XOR_PLAN: example(new SubscriptionLinesXorPlanError()),
+  LINES_LIMIT: example(new SubscriptionLinesLimitError()),
+  LINE_PLAN_NOT_K2: example(new SubscriptionLinePlanNotK2Error()),
   MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(2, 'unitPrice')),
   MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError('unitPrice')),
   CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('XYZ', 'originalPrice')),

@@ -164,13 +164,18 @@ export class BoardController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    forbidden('an IT Admin'),
+    {
+      status: HttpStatus.FORBIDDEN,
+      description:
+        'Only an acting IT Admin of the holder’s department may reclaim this recommendation (GHOST_SEAT.NOT_IN_CHARGE).',
+      examples: [FORBIDDEN_EXAMPLE, EXAMPLES.NOT_IN_CHARGE],
+    },
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The recommendation is not an open G2 (GHOST_SEAT.NOT_RECLAIMABLE) or the gate of the revocation refused the seat (GHOST_SEAT.SEAT_NOT_REVOCABLE).',
-      examples: [EXAMPLES.NOT_RECLAIMABLE, EXAMPLES.SEAT_NOT_REVOCABLE],
+        'The recommendation is not an open G2 (GHOST_SEAT.NOT_RECLAIMABLE), the gate of the revocation refused the seat (GHOST_SEAT.SEAT_NOT_REVOCABLE), or the holder has not started working in a department yet (EMPLOYEE.NOT_STARTED).',
+      examples: [EXAMPLES.NOT_RECLAIMABLE, EXAMPLES.SEAT_NOT_REVOCABLE, EXAMPLES.EMPLOYEE_NOT_STARTED],
     },
     QUERY_INVALID,
   )

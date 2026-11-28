@@ -1,13 +1,14 @@
 import { emptyIds, type DemoRunContext } from '../demo-run.types';
 import { SHARED_DEMO_V4 as fixture } from '../fixture/shared-demo-v4';
 import { CATALOG_EXTRA_STEPS } from './catalog-extra.steps';
+import { subscriptionHasPlan } from './catalog.steps';
 
 describe('the retired Skype application', () => {
   it('has neither a subscription nor a seat', () => {
     expect(fixture.retiredApplications).toEqual(['skype']);
     for (const key of fixture.retiredApplications) {
       const plans = fixture.applications.find((row) => row.key === key)!.plans.map((row) => row.key);
-      const subscriptions = fixture.subscriptions.filter((row) => plans.includes(row.plan));
+      const subscriptions = fixture.subscriptions.filter((row) => plans.some((p) => subscriptionHasPlan(row, p)));
       expect(subscriptions).toHaveLength(0);
       expect(
         fixture.seats.filter((row) => subscriptions.some((subscription) => subscription.key === row.subscription)),

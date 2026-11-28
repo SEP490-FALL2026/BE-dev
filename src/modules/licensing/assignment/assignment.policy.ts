@@ -90,12 +90,16 @@ export function replacedByGrant(
   >,
   grant: {
     employeeId: string;
-    target: { planId: string; subscriptionId: string | null };
+    target: { planId: string; subscriptionId: string | null; provisioningType?: string };
     today: BusinessDate;
     revocationUnderWay: boolean;
   },
 ): boolean {
   const open = old.validUntil === null && old.failedAt === null && old.cancelledAt === null;
+  const sameSource =
+    grant.target.provisioningType === 'K1'
+      ? old.planId === grant.target.planId
+      : (old.subscriptionId ?? old.planId) === (grant.target.subscriptionId ?? grant.target.planId);
 
   return (
     old.kind === 'PERSONAL' &&
@@ -104,7 +108,7 @@ export function replacedByGrant(
     open &&
     old.effectiveFrom < grant.today &&
     !grant.revocationUnderWay &&
-    (old.subscriptionId ?? old.planId) === (grant.target.subscriptionId ?? grant.target.planId)
+    sameSource
   );
 }
 

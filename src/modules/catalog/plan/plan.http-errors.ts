@@ -3,6 +3,7 @@ import { ApiException } from '../../../infrastructure/http/errors/api.exception'
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
 import { toMoneyApiException } from '../../../infrastructure/http/errors/money-errors';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
+import { WorkspaceNotResponsibleError, WorkspaceStaleError } from '../workspace/workspace.errors';
 import {
   PlanNameInvalidError,
   PlanNoteInvalidError,
@@ -12,6 +13,7 @@ import {
   PlanApplicationRetiredError,
   PlanProvisioningTypeNotSupportedError,
   PlanProvisioningTypeMismatchError,
+  PlanReferenceCommitmentNotApplicableError,
   PlanReferencePriceNotApplicableError,
   PlanReferencePriceNotPositiveError,
   PlanReferencePriceNotVndError,
@@ -21,6 +23,7 @@ import {
   PlanControlLevelRequiredError,
   PlanDataLossNoteRequiredError,
   PlanInUseBlocksChangeError,
+  PlanKeyBindingNotApplicableError,
   PlanTermsBlockTypeChangeError,
   PlanUpdateEmptyError,
   PlanAdminConsoleNotApplicableError,
@@ -31,6 +34,8 @@ import {
   PlanWorkspaceMemberDuplicateError,
   PlanWorkspaceLimitExceededError,
   PlanWorkspaceTextInvalidError,
+  PlanWorkspaceAmbiguousError,
+  PlanWorkspaceVendorRequiredError,
   PlanWorkspaceProfileBlocksTypeChangeError,
 } from './plan.errors';
 
@@ -86,6 +91,10 @@ export function toPlanApiException(error: unknown): unknown {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.UPDATE_EMPTY', error.message);
   if (error instanceof PlanAdminConsoleNotApplicableError)
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.ADMIN_CONSOLE_NOT_APPLICABLE', error.message);
+  if (error instanceof PlanKeyBindingNotApplicableError)
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.KEY_BINDING_NOT_APPLICABLE', error.message);
+  if (error instanceof PlanReferenceCommitmentNotApplicableError)
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.REFERENCE_COMMITMENT_NOT_APPLICABLE', error.message);
   if (error instanceof PlanVendorAdminsInvalidError)
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.VENDOR_ADMINS_INVALID', error.message, {
       given: error.given,
@@ -111,6 +120,20 @@ export function toPlanApiException(error: unknown): unknown {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.WORKSPACE_TEXT_INVALID', error.message);
   if (error instanceof PlanTermsBlockTypeChangeError) {
     return refuse(HttpStatus.CONFLICT, 'PLAN.TERMS_BLOCK_TYPE_CHANGE', error.message);
+  }
+  if (error instanceof PlanWorkspaceAmbiguousError) {
+    return refuse(HttpStatus.CONFLICT, 'PLAN.WORKSPACE_AMBIGUOUS', error.message, { workspaceIds: error.workspaceIds });
+  }
+  if (error instanceof PlanWorkspaceVendorRequiredError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.WORKSPACE_VENDOR_REQUIRED', error.message);
+  }
+  if (error instanceof WorkspaceNotResponsibleError) {
+    return refuse(HttpStatus.FORBIDDEN, 'WORKSPACE.NOT_RESPONSIBLE', error.message);
+  }
+  if (error instanceof WorkspaceStaleError) {
+    return refuse(HttpStatus.CONFLICT, 'WORKSPACE.STALE', error.message, {
+      currentUpdatedAt: error.currentUpdatedAt.toISOString(),
+    });
   }
   if (error instanceof PlanWorkspaceProfileBlocksTypeChangeError)
     return refuse(HttpStatus.CONFLICT, 'PLAN.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE', error.message);
@@ -142,14 +165,20 @@ export const PLAN_ERROR_EXAMPLES = {
   REFERENCE_PRICE_NOT_VND: example(new PlanReferencePriceNotVndError('USD')),
   REFERENCE_PRICE_NOT_POSITIVE: example(new PlanReferencePriceNotPositiveError()),
   REFERENCE_PRICE_NOT_APPLICABLE: example(new PlanReferencePriceNotApplicableError()),
+  REFERENCE_COMMITMENT_NOT_APPLICABLE: example(new PlanReferenceCommitmentNotApplicableError()),
   CONTROL_LEVEL_REQUIRED: example(new PlanControlLevelRequiredError()),
   DATA_LOSS_NOTE_REQUIRED: example(new PlanDataLossNoteRequiredError()),
   UPDATE_EMPTY: example(new PlanUpdateEmptyError()),
   ADMIN_CONSOLE_NOT_APPLICABLE: example(new PlanAdminConsoleNotApplicableError()),
+  KEY_BINDING_NOT_APPLICABLE: example(new PlanKeyBindingNotApplicableError()),
   VENDOR_ADMINS_INVALID: example(new PlanVendorAdminsInvalidError(1, 2)),
   WORKSPACE_PROFILE_NOT_APPLICABLE: example(new PlanWorkspaceProfileNotApplicableError()),
   WORKSPACE_PERSON_INVALID: example(new PlanWorkspacePersonInvalidError('<employee-id>')),
   PRIMARY_OWNER_NOT_LISTED: example(new PlanPrimaryOwnerNotListedError()),
+  WORKSPACE_AMBIGUOUS: example(new PlanWorkspaceAmbiguousError(['<workspace-id>', '<other-workspace-id>'])),
+  WORKSPACE_VENDOR_REQUIRED: example(new PlanWorkspaceVendorRequiredError()),
+  WORKSPACE_NOT_RESPONSIBLE: example(new WorkspaceNotResponsibleError()),
+  WORKSPACE_STALE: example(new WorkspaceStaleError(new Date('2026-01-01T00:00:00.000Z'))),
   WORKSPACE_MEMBER_DUPLICATE: example(new PlanWorkspaceMemberDuplicateError('<employee-id>')),
   WORKSPACE_LIMIT_EXCEEDED: example(new PlanWorkspaceLimitExceededError('OWNER')),
   WORKSPACE_TEXT_INVALID: example(new PlanWorkspaceTextInvalidError()),

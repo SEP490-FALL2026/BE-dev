@@ -97,7 +97,9 @@ export class RequestPreviewService {
       priceSource: pricing.status === 'PRICED' ? (pricing.priceSource ?? null) : null,
       cost: await this.pricing.costView(
         pricing,
-        pricing.budgetYear === null ? null : costTermOf(assessed.term, pricing.budgetYear, pricing.amountMonths),
+        pricing.budgetYear === null
+          ? null
+          : costTermOf(assessed.term, pricing.budgetYear, pricing.amountMonths, target.provisioningType),
       ),
       costEstimate,
       spendSubmission: spendSubmissionOf(policy, pricing.status),
@@ -112,6 +114,7 @@ export class RequestPreviewService {
     const annual = annualVendorAmountOf({
       kind: pricing.kind,
       unitPrice: pricing.unitPrice,
+      monthlyPriceMinor: pricing.monthlyPriceMinor,
       billingCycle: pricing.billingCycle,
     });
 

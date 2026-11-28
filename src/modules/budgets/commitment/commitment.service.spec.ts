@@ -2,7 +2,8 @@ import type { AuditApi } from '../../audit/public/audit.api';
 import type { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { BudgetFactsService } from '../budget/budget-facts.service';
 import type { CommitmentRepo } from '../budget/commitment.repo';
-import type { InvoiceFigures, InvoiceRepo } from '../budget/invoice.repo';
+import type { InvoiceFigures } from '../budget/invoice.repo';
+import type { CommitmentMonthService } from './month/commitment-month.service';
 import {
   CommitmentReleaseGuardHook,
   CommitmentRequestFactsHook,
@@ -56,7 +57,7 @@ function build(
   requestFacts.bind({ factsOf });
   const service = new CommitmentService(
     {} as TransactionRunner,
-    { page } as unknown as CommitmentRepo,
+    { page, invoiceFiguresOf: figuresOf } as unknown as CommitmentRepo,
     {
       costCenters: jest
         .fn()
@@ -66,7 +67,7 @@ function build(
     {} as AuditApi,
     new CommitmentReleaseGuardHook(),
     requestFacts,
-    { figuresOf } as unknown as InvoiceRepo,
+    {} as CommitmentMonthService,
     {} as ThresholdAlertService,
   );
 

@@ -27,6 +27,20 @@ export class AccessRequestApplicationRetiredError extends Error {
   }
 }
 
+/** True when a K4 plan is bound to a device (`DEVICE_KEY` or `DEVICE_BUNDLED`) and cannot be requested in MF-1 (`W2-18`). */
+export const isDeviceBoundKeyBinding = (keyBinding: string | null | undefined): boolean =>
+  keyBinding === 'DEVICE_KEY' || keyBinding === 'DEVICE_BUNDLED';
+
+/** A device-bound plan (`DEVICE_KEY` or `DEVICE_BUNDLED`) is activated on a device, not requested through MF-1 (`W2-18`). */
+export class AccessRequestPlanBoundToDeviceError extends Error {
+  constructor() {
+    super(
+      'A device-bound plan cannot be requested through an access request; record its activation on a device instead.',
+    );
+    this.name = 'AccessRequestPlanBoundToDeviceError';
+  }
+}
+
 /** The person sending belongs to no department on the day: a request is charged to the Unit of a department (`INV-20`). */
 export class AccessRequestNoDepartmentError extends Error {
   constructor() {
@@ -94,6 +108,8 @@ const TERM_MESSAGES: Readonly<Record<TermRefusal, string>> = {
   TERM_LONG_TERM_NOT_ALLOWED:
     'A contractor, a freelancer or an intern gets access for a term: give the months, not a right with no end.',
   TERM_CONTRACT_ENDED: 'The contract of the person ended before the time of use begins: no access is given beyond it.',
+  K1_ANNUAL_TERM_FIXED: 'This K1 annual-commitment plan requires a fixed term of 12 months.',
+  K1_ANNUAL_CONTRACT_TOO_SHORT: 'The person’s contract ends before the 12-month K1 annual commitment completes.',
 };
 
 /**

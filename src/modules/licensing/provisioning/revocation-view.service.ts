@@ -149,12 +149,16 @@ export class RevocationViewService {
     const found: RightChain[] = [];
     for (const assignmentId of assignmentIds) {
       const grant = await this.chains.grantOfChain(tx, assignmentId);
+      const k1Terms = await this.chains.k1TermsOf(tx, assignmentId);
       found.push({
         assignmentId,
         grantRequestId: grant?.requestId ?? null,
         grantedStartDate: grant?.startDate ?? null,
         grantedEndDate: grant?.endDate ?? null,
         chainAssignmentIds: await this.chains.chainOf(tx, assignmentId),
+        k1RootAssignmentId: await this.chains.k1RootOf(tx, assignmentId),
+        personalCommitmentMonths: k1Terms?.personalCommitmentMonths ?? null,
+        billingAnchorOn: k1Terms?.billingAnchorOn ?? null,
       });
     }
 

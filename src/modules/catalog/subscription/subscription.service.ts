@@ -2,30 +2,42 @@ import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
 import type { BusinessDate } from '../../../core/business-date';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
+import { isCheckViolation } from '../../../infrastructure/database/unique-violation';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { EmptyState } from '../public/catalog.types';
 import { catalogAuditEvent } from '../catalog-audit-event.mapper';
 import { PlanFactsService, type LockedPlan } from '../plan/plan-facts.service';
+import { SubscriptionMultiLineService } from './lines/subscription-lines.service';
 import {
   SubscriptionApplicationRetiredError,
+  SubscriptionLinesXorPlanError,
   SubscriptionNotFoundError,
   SubscriptionPlanNotFoundError,
   SubscriptionStillDraftError,
+  SubscriptionWorkspaceMovedError,
 } from './subscription.errors';
-import { assertSubscriptionShape, declaredStateOf, missingData, subscriptionStatusOf } from './subscription.policy';
+import {
+  assertDeclarable,
+  assertSubscriptionShape,
+  declaredStateOf,
+  missingData,
+  resolveSubscriptionPrices,
+  subscriptionStatusOf,
+} from './subscription.policy';
 import { assertDeclarableCycle } from './pool/subscription-pool.policy';
 import { SubscriptionRepo } from './subscription.repo';
 import { snapshotOf, stateOf } from './subscription.mapper';
-import { SubscriptionPoolService } from './pool/subscription-pool.service';
+import { SubscriptionPoolService, retryOnWorkspaceMove } from './pool/subscription-pool.service';
 import { isPricedInDong } from './price/subscription-price.policy';
 import { SubscriptionPricingService } from './subscription-pricing.service';
 import { SubscriptionViewService } from './subscription-view.service';
 import type {
   BillingCycle,
   CommitmentTermMonths,
+  DeclareSubscriptionInput,
   OriginalPriceRecord,
+  SeatCounting,
   SubscriptionRecord,
   SubscriptionKind,
   SubscriptionListFilter,
@@ -35,31 +47,11 @@ import type {
   SubscriptionView,
 } from './subscription.types';
 
-export interface DeclareSubscriptionInput {
-  planId: string;
-  kind: SubscriptionKind;
-  purchasedQuantity?: number;
-  /** The unit price in dong (`QĐ-111an`); another currency is refused with SubscriptionPriceNotVndError. */
-  unitPrice?: { amount: string; currency: string };
-  /** The price the vendor quoted in another currency, only kept beside the price in dong (R-44). */
-  originalPrice?: { amount: string; currency: string };
-  billingCycle?: BillingCycle;
-  commitmentTermMonths?: CommitmentTermMonths;
-  startDate?: BusinessDate;
-  endDate?: BusinessDate;
-  renewalDate?: BusinessDate;
-  noticeDeadline?: BusinessDate;
-  noticePeriodDays?: number;
-  autoRenew?: boolean;
-  allowsMidTermReduction?: boolean;
-  responsibleItAdminEmployeeId?: string;
-  vendorMinimumSeats?: number;
-}
-
 /** The change of a subscription: the plan and the kind are not fields; only the four dates and the notice period clear. */
 export interface UpdateSubscriptionInput {
   purchasedQuantity?: number;
   unitPrice?: { amount: string; currency: string };
+  monthlyUnitPrice?: { amount: string; currency: string };
   /** `null` takes the recorded original price away. */
   originalPrice?: { amount: string; currency: string } | null;
   billingCycle?: BillingCycle;
@@ -71,10 +63,14 @@ export interface UpdateSubscriptionInput {
   noticePeriodDays?: number | null;
   autoRenew?: boolean;
   allowsMidTermReduction?: boolean;
-  responsibleItAdminEmployeeId?: string;
   vendorMinimumSeats?: number | null;
   isPrimaryForPlan?: boolean;
   quantityChangeReason?: string;
+  /** Moves the subscription to another workspace of the same vendor. */
+  workspaceId?: string;
+  seatCounting?: SeatCounting;
+  minimumSeatsTotal?: number | null;
+  invoicedLater?: boolean;
 }
 
 /**
@@ -91,7 +87,7 @@ export class SubscriptionService {
     private readonly plans: PlanFactsService,
     private readonly pricing: SubscriptionPricingService,
     private readonly views: SubscriptionViewService,
-    private readonly organizationReads: OrganizationReadApi,
+    private readonly multiLine: SubscriptionMultiLineService,
     private readonly poolRules: SubscriptionPoolService,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
@@ -106,6 +102,7 @@ export class SubscriptionService {
     query: {
       applicationId?: string;
       planId?: string;
+      workspaceId?: string;
       status?: SubscriptionStatus;
       kind?: SubscriptionKind;
       warning?: 'NO_ALERT_ANCHOR';
@@ -119,6 +116,7 @@ export class SubscriptionService {
     const scope: SubscriptionListScope = {
       ...(query.applicationId ? { applicationId: query.applicationId } : {}),
       ...(query.planId ? { planId: query.planId } : {}),
+      ...(query.workspaceId ? { workspaceId: query.workspaceId } : {}),
       ...(query.status ? { status: query.status } : {}),
       ...(query.kind ? { kind: query.kind } : {}),
       ...(query.warning ? { withoutAlertAnchor: true } : {}),
@@ -164,14 +162,47 @@ export class SubscriptionService {
    * finance facade for the unit price and the original price.
    */
   async declare(actor: AuthenticatedPrincipal, input: DeclareSubscriptionInput): Promise<SubscriptionView> {
+    const hasLines = input.lines !== undefined;
+    const hasPlanId = input.planId !== undefined;
+    if (hasLines === hasPlanId) throw new SubscriptionLinesXorPlanError();
+    assertDeclarable(input.kind);
     assertDeclarableCycle(input.billingCycle);
-    const money = input.unitPrice ? await this.pricing.read(input.unitPrice) : null;
+
+    if (input.lines) {
+      const created = await this.multiLine.declare(actor, input, input.lines);
+
+      return (await this.views.viewAll([created]))[0];
+    }
+
+    const planId = input.planId!;
+    const sentUnit = input.unitPrice ? await this.pricing.read(input.unitPrice, 'unitPrice') : undefined;
+    const sentMonthly = input.monthlyUnitPrice
+      ? await this.pricing.read(input.monthlyUnitPrice, 'monthlyUnitPrice')
+      : undefined;
+    const resolvedPrice = resolveSubscriptionPrices({
+      kind: input.kind,
+      billingCycle: input.billingCycle ?? null,
+      cycleChanged: false,
+      sentMonthly,
+      sentUnit,
+    });
     const originalPrice = input.originalPrice ? await this.pricing.readOriginal(input.originalPrice) : null;
     const organizationId = await this.requireOrganizationId();
-    if (input.responsibleItAdminEmployeeId) await this.poolRules.requireItAdmin(input.responsibleItAdminEmployeeId);
+    // The IT Admin who declares answers for the subscription, so they must work as one now.
+    await this.poolRules.requireItAdmin(actor.employeeId);
 
     const record = await this.runner.run((tx) =>
-      this.declareIn(tx, actor, input, { money, originalPrice, organizationId }),
+      this.declareIn(
+        tx,
+        actor,
+        { ...input, planId },
+        {
+          money: resolvedPrice.unitMoney,
+          monthlyUnitPriceMinor: resolvedPrice.monthlyUnitPriceMinor,
+          originalPrice,
+          organizationId,
+        },
+      ),
     );
 
     return (await this.views.viewAll([record]))[0];
@@ -180,43 +211,111 @@ export class SubscriptionService {
   private async declareIn(
     tx: DbTx,
     actor: AuthenticatedPrincipal,
-    input: DeclareSubscriptionInput,
+    input: DeclareSubscriptionInput & { planId: string },
     ctx: {
       money: { amountMinor: bigint; currency: string } | null;
+      monthlyUnitPriceMinor: bigint | null;
       originalPrice: OriginalPriceRecord | null;
       organizationId: string;
     },
   ): Promise<SubscriptionRecord> {
-    const { money, originalPrice, organizationId } = ctx;
+    const { originalPrice, organizationId } = ctx;
+    // The workspace is locked `FOR UPDATE` first (tier 5b), so two declarations into one workspace take turns; its vendor is read from the plan
+    // without a lock, as it never changes.
+    const [unlocked] = await this.plans.lookups([input.planId], tx);
+    if (!unlocked) throw new SubscriptionPlanNotFoundError();
+    assertDeclarable(input.kind, unlocked.provisioningType);
+    const workspaceId = await this.poolRules.workspaceFor(tx, actor, organizationId, unlocked, input.workspaceId);
     // The plan is locked `FOR UPDATE` before anything else: no row of this subscription exists yet to lock, so the plan is what two
     // declarations of the same K2 or K4 plan take turns on (R-E02); every other writer locks a subscription first, then its plan.
     const plan = await this.plans.lockExclusive(tx, input.planId);
     if (!plan) throw new SubscriptionPlanNotFoundError();
-    if (plan.applicationStatus === 'RETIRED') throw new SubscriptionApplicationRetiredError();
-    await this.poolRules.assertNoLiveDuplicate(tx, plan, null, organizationId);
+    if (plan.applicationStatus === 'RETIRED') throw new SubscriptionApplicationRetiredError(plan.id);
+    await this.poolRules.assertNoLiveDuplicate(tx, plan, null, workspaceId);
+    const commitmentTermMonths =
+      input.commitmentTermMonths ?? (input.kind === 'TERM' ? (plan.referenceCommitmentMonths ?? undefined) : undefined);
     const state = {
-      ...declaredStateOf(input),
-      // QĐ-111g: a declaration that names nobody takes the IT Admin responsible for the application, when they still work as one.
-      responsibleItAdminEmployeeId: await this.poolRules.responsibleOfDeclaration(
-        tx,
-        plan.id,
-        input.responsibleItAdminEmployeeId,
-      ),
+      ...declaredStateOf({ ...input, commitmentTermMonths }),
+      // The IT Admin who declares answers for the subscription; only a Super Admin moves it to another.
+      responsibleItAdminEmployeeId: actor.employeeId,
     };
     this.assertShape(plan, input.kind, state);
 
-    const priced = await this.pricing.priceToday(tx, money);
+    const { priced, monthlyUnitPriceMinor: monthlyMinor } = await this.pricedFor(tx, plan, input.kind, ctx);
     const complete = subscriptionStatusOf(plan, input.kind, { ...state, ...priced });
     this.poolRules.assert(plan, input.kind, state, complete === 'ACTIVE');
-    if (complete === 'ACTIVE') await this.poolRules.assertVendorAdmins(tx, plan, organizationId);
+    if (complete === 'ACTIVE') await this.poolRules.assertVendorAdmins(tx, plan, organizationId, workspaceId);
+
+    return this.persistDeclaredSubscription(tx, actor, {
+      plan,
+      kind: input.kind,
+      state,
+      priced,
+      monthlyUnitPriceMinor: monthlyMinor,
+      originalPrice,
+      status: complete,
+      organizationId,
+      workspaceId,
+    });
+  }
+
+  /** The price a declaration records today: a monthly price of zero on a K2 term is no price, as on a line, so the subscription stays a draft until one is given. */
+  private async pricedFor(
+    tx: DbTx,
+    plan: LockedPlan,
+    kind: SubscriptionKind,
+    ctx: { money: { amountMinor: bigint; currency: string } | null; monthlyUnitPriceMinor: bigint | null },
+  ) {
+    const noPrice =
+      plan.provisioningType === 'K2' && kind === 'TERM' && ctx.money !== null && ctx.money.amountMinor <= 0n;
+
+    return {
+      priced: await this.pricing.priceToday(tx, noPrice ? null : ctx.money),
+      monthlyUnitPriceMinor: noPrice ? null : ctx.monthlyUnitPriceMinor,
+    };
+  }
+
+  private async persistDeclaredSubscription(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    params: {
+      plan: LockedPlan;
+      kind: SubscriptionKind;
+      state: ReturnType<typeof declaredStateOf<BillingCycle, CommitmentTermMonths>> & {
+        responsibleItAdminEmployeeId: string | null;
+      };
+      priced: Awaited<ReturnType<SubscriptionPricingService['priceToday']>>;
+      monthlyUnitPriceMinor: bigint | null;
+      originalPrice: OriginalPriceRecord | null;
+      status: 'DRAFT' | 'ACTIVE';
+      organizationId: string;
+      workspaceId: string | null;
+    },
+  ): Promise<SubscriptionRecord> {
+    const { plan, kind, state, priced, monthlyUnitPriceMinor, originalPrice, status, organizationId, workspaceId } =
+      params;
     const created = await this.subscriptions.insert(tx, {
       organizationId,
       planId: plan.id,
-      kind: input.kind,
+      kind,
       ...state,
       ...priced,
+      monthlyUnitPriceMinor,
       originalPrice,
-      status: complete,
+      status,
+      workspaceId,
+    });
+    await this.createK2TermLineIfNeeded({
+      tx,
+      actor,
+      plan,
+      kind,
+      state,
+      status,
+      subscriptionId: created.id,
+      monthlyUnitPriceMinor,
+      organizationId,
+      workspaceId,
     });
     await this.audit.record(
       tx,
@@ -242,16 +341,33 @@ export class SubscriptionService {
   async complete(actor: AuthenticatedPrincipal, id: string): Promise<SubscriptionView> {
     const organizationId = await this.requireOrganizationId();
 
-    const record = await this.runner.run(async (tx) => {
-      const current = await this.lockForComplete(tx, id);
+    const record = await retryOnWorkspaceMove(() =>
+      this.runner.run((tx) => this.completeIn(tx, actor, id, organizationId)),
+    );
+
+    return (await this.views.viewAll([record]))[0];
+  }
+
+  private async completeIn(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    id: string,
+    organizationId: string,
+  ): Promise<SubscriptionRecord> {
+    {
+      const { current, workspaceId } = await this.lockWorkspaceThenPeriod(tx, actor, id, organizationId);
       if (current.status === 'ACTIVE') return current;
       // The subscription candidates are locked first, then the plan `FOR UPDATE`: a draft that becomes live takes its turn against the other writes of the plan.
       const plan = await this.plans.lockExclusive(tx, current.planId);
       if (!plan) throw new SubscriptionPlanNotFoundError();
 
-      const state = stateOf(current);
+      const state = { ...stateOf(current), workspaceId: workspaceId ?? current.workspace?.id ?? null };
       const missing = this.missingOf(plan, current.kind, state);
-      if (missing.length > 0) throw new SubscriptionStillDraftError(missing);
+      const effectiveMissing =
+        missing.includes('UNIT_PRICE') && (await this.multiLine.hasPricedLines(id, tx))
+          ? missing.filter((item) => item !== 'UNIT_PRICE')
+          : missing;
+      if (effectiveMissing.length > 0) throw new SubscriptionStillDraftError(effectiveMissing);
       await this.poolRules.assertActivation(
         tx,
         plan,
@@ -260,15 +376,24 @@ export class SubscriptionService {
         current.renewedFromId !== null,
         organizationId,
       );
-      await this.poolRules.assertNoLiveDuplicate(tx, plan, id, organizationId);
+      await this.poolRules.assertNoLiveDuplicate(tx, plan, id, state.workspaceId);
 
       // A draft renewal period takes the flag that prices the plan from the period it continues, now that it is active (F-012).
       const takesPrimary = await this.poolRules.takePrimaryFromPrevious(tx, actor, organizationId, current);
-      const completed = await this.subscriptions.update(tx, id, {
-        ...state,
-        status: 'ACTIVE',
-        isPrimaryForPlan: takesPrimary || state.isPrimaryForPlan,
-      });
+      let completed: SubscriptionRecord;
+      try {
+        completed = await this.subscriptions.update(tx, id, {
+          ...state,
+          status: 'ACTIVE',
+          isPrimaryForPlan: takesPrimary || state.isPrimaryForPlan,
+        });
+      } catch (error) {
+        if (isCheckViolation(error, 'subscriptions_active_term_monthly_price')) {
+          throw new SubscriptionStillDraftError(['UNIT_PRICE']);
+        }
+        throw error;
+      }
+      await this.multiLine.activatePeriod(tx, completed, actor.employeeId);
       await this.audit.record(
         tx,
         catalogAuditEvent(
@@ -283,9 +408,29 @@ export class SubscriptionService {
       );
 
       return completed;
-    });
+    }
+  }
 
-    return (await this.views.viewAll([record]))[0];
+  /**
+   * The locks of a completion in the order of the lock table: the workspace first (tier 5b), read without a lock, locked, and read again once the
+   * period is locked (N5); then the period. A draft of a plan that needs a workspace and has none takes the default of its vendor. Throws
+   * SubscriptionNotFoundError, SubscriptionPlanNotFoundError and SubscriptionWorkspaceMovedError.
+   */
+  private async lockWorkspaceThenPeriod(tx: DbTx, actor: AuthenticatedPrincipal, id: string, organizationId: string) {
+    const probe = await this.subscriptions.find(id, tx);
+    if (!probe) throw new SubscriptionNotFoundError();
+    const [unlocked] = await this.plans.lookups([probe.planId], tx);
+    if (!unlocked) throw new SubscriptionPlanNotFoundError();
+    const workspaceId =
+      probe.status === 'ACTIVE'
+        ? null
+        : await this.poolRules.workspaceFor(tx, actor, organizationId, unlocked, probe.workspace?.id);
+    const current = await this.lockForComplete(tx, id);
+    if ((current.workspace?.id ?? null) !== (probe.workspace?.id ?? null)) {
+      throw new SubscriptionWorkspaceMovedError(current.updatedAt);
+    }
+
+    return { current, workspaceId };
   }
 
   /**
@@ -327,6 +472,7 @@ export class SubscriptionService {
       kind,
       applicationKind: plan.applicationKind,
       planProvisioningType: plan.provisioningType,
+      planKeyBinding: plan.keyBinding,
       ...state,
     });
   }
@@ -342,10 +488,48 @@ export class SubscriptionService {
     });
   }
 
-  private async requireOrganizationId(): Promise<string> {
-    const organization = await this.organizationReads.getOrganization();
-    if (!organization) throw new Error('Subscriptions were used before installation');
+  private async createK2TermLineIfNeeded(params: {
+    tx: DbTx;
+    actor: AuthenticatedPrincipal;
+    plan: LockedPlan;
+    kind: SubscriptionKind;
+    state: ReturnType<typeof declaredStateOf<BillingCycle, CommitmentTermMonths>>;
+    status: 'DRAFT' | 'ACTIVE';
+    subscriptionId: string;
+    monthlyUnitPriceMinor: bigint | null;
+    organizationId: string;
+    workspaceId: string | null;
+  }): Promise<void> {
+    const { tx, actor, plan, kind, state, status, subscriptionId, monthlyUnitPriceMinor, organizationId, workspaceId } =
+      params;
+    if (
+      plan.provisioningType !== 'K2' ||
+      kind !== 'TERM' ||
+      !workspaceId ||
+      monthlyUnitPriceMinor === null ||
+      monthlyUnitPriceMinor <= 0n
+    ) {
+      return;
+    }
+    await this.multiLine.createForPeriod(tx, {
+      organizationId,
+      subscriptionId,
+      workspaceId,
+      startDate: state.startDate,
+      status,
+      recordedByEmployeeId: actor.employeeId,
+      lines: [
+        {
+          planId: plan.id,
+          monthlyUnitPriceMinor,
+          minimumSeats: state.vendorMinimumSeats ?? null,
+          quantity: state.purchasedQuantity,
+        },
+      ],
+    });
+  }
 
-    return organization.id;
+  private requireOrganizationId(): Promise<string> {
+    return this.multiLine.requireOrganizationId();
   }
 }

@@ -35,12 +35,13 @@ const SUBMIT_ERRORS = [
   {
     status: HttpStatus.CONFLICT,
     description:
-      'The seat cannot be renewed (RENEWAL_REQUEST.ASSIGNMENT_NOT_RENEWABLE, with the reason in details: it is a service account, another record follows it, it has ended, it has no end date, its grant is not done, or it is being revoked), it already has a renewal waiting (RENEWAL_REQUEST.ALREADY_REQUESTED), the application is retired (ACCESS_REQUEST.APPLICATION_RETIRED) or, after the end, the person holds another seat of the tool (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS). After the end the ask is a request for new access, so GH-1 judges it too (ACCESS_REQUEST.OPEN_REQUEST_EXISTS). Nothing is written.',
+      'The seat cannot be renewed (RENEWAL_REQUEST.ASSIGNMENT_NOT_RENEWABLE, with the reason in details: it is a service account, another record follows it, it has ended, it has no end date, its grant is not done, or it is being revoked), it already has a renewal waiting (RENEWAL_REQUEST.ALREADY_REQUESTED), the application is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the holder has not started working in a department yet (EMPLOYEE.NOT_STARTED) or, after the end, the person holds another seat of the tool (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS). After the end the ask is a request for new access, so GH-1 judges it too (ACCESS_REQUEST.OPEN_REQUEST_EXISTS). Nothing is written.',
     examples: [
       RENEWAL_ERROR_EXAMPLES.ASSIGNMENT_NOT_RENEWABLE,
       RENEWAL_ERROR_EXAMPLES.ALREADY_REQUESTED,
       RENEWAL_ERROR_EXAMPLES.APPLICATION_RETIRED,
       RENEWAL_ERROR_EXAMPLES.ALREADY_HOLDS_ACCESS,
+      RENEWAL_ERROR_EXAMPLES.EMPLOYEE_NOT_STARTED,
       RENEWAL_ERROR_EXAMPLES.NO_DEPARTMENT,
       RENEWAL_ERROR_EXAMPLES.FINANCE_SETUP_INCOMPLETE,
       RENEWAL_ERROR_EXAMPLES.OPEN_REQUEST_EXISTS,

@@ -30,8 +30,18 @@ const tierRules = TIERS.flatMap((tier, index) => {
   return rules;
 });
 
+const redisPackages = '(?:bullmq|ioredis|@nestjs/bullmq|@nest-lab/throttler-storage-redis|@bull-board/[^/]+)';
+const redisPackagePath = `(?:^|/node_modules/)${redisPackages}(?:/|$)`;
+
 module.exports = {
   forbidden: [
+    {
+      name: 'no-redis-in-modules',
+      comment: 'Redis and queue libraries belong in infrastructure and process wiring',
+      severity: 'error',
+      from: { path: '^src/modules/' },
+      to: { path: redisPackagePath },
+    },
     {
       name: 'no-circular',
       comment: 'A file cycle hides the reading order; break it with a type file or an extension point',
@@ -133,7 +143,7 @@ module.exports = {
   options: {
     doNotFollow: { path: 'node_modules' },
     exclude: { path: '^src/generated/' },
-    includeOnly: '^src/',
+    includeOnly: `^src/|${redisPackagePath}`,
     tsPreCompilationDeps: true,
     tsConfig: { fileName: 'tsconfig.json' },
     enhancedResolveOptions: { exportsFields: ['exports'], conditionNames: ['import', 'require', 'node', 'default'] },

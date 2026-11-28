@@ -1,4 +1,4 @@
-import type { Type } from '@nestjs/common';
+import { Module, type Type } from '@nestjs/common';
 import { AppModule } from '../../src/app/app.module';
 import { AiPurgeCliModule } from '../../src/cli/ai-purge/ai-purge-cli.module';
 import { CostCenterDirectionRootCliModule } from '../../src/cli/cost-center-direction/cost-center-direction-cli.module';
@@ -10,6 +10,9 @@ import { InstallationModule } from '../../src/modules/installation/installation.
 import { MigrationPreflightCliModule } from '../../src/modules/installation/migration-preflight/migration-preflight-cli.module';
 import { WorkerModule } from '../../src/worker/worker.module';
 
+@Module({ imports: [WorkerModule.forTransport('bullmq')] })
+export class BullmqWorkerGraph {}
+
 /**
  * Every Nest graph a process boots: the API, the worker and each out-of-HTTP command (`db-roles` has none). The gates that read the
  * graph (`extension-wiring`, `module-graph` R10) judge all of them. A spec that imports this file mocks `@nestjs/config` first (the real
@@ -18,6 +21,8 @@ import { WorkerModule } from '../../src/worker/worker.module';
 export const PROCESS_GRAPHS: readonly (readonly [string, Type<unknown>])[] = [
   ['AppModule', AppModule],
   ['WorkerModule', WorkerModule],
+  // Both transports have the same business imports and worker wiring exceptions.
+  ['WorkerModule', BullmqWorkerGraph],
   ['InstallationModule', InstallationModule],
   ['RecoveryCliModule', RecoveryCliModule],
   ['RecordSuperAdminEventCliModule', RecordSuperAdminEventCliModule],

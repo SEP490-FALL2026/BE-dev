@@ -1,6 +1,8 @@
+import { pretendBusinessToday } from '../../support/pretend-today';
 import { Department, Person, RequestHarness } from '../../support/request-harness';
 
 const h = new RequestHarness();
+const TODAY = '2026-06-01';
 
 describe('requests over HTTP: the amount of a request (integration, real PostgreSQL)', () => {
   let design: Department;
@@ -11,6 +13,8 @@ describe('requests over HTTP: the amount of a request (integration, real Postgre
 
   beforeAll(async () => {
     await h.start();
+    pretendBusinessToday(h.ctx.app, TODAY);
+    jest.spyOn(h, 'today').mockReturnValue(TODAY);
     design = await h.departmentWithUnit('P-DES');
     designer = await h.staff(design, 'DES-E1');
     const head = await h.staff(design, 'DES-H1');
@@ -21,12 +25,13 @@ describe('requests over HTTP: the amount of a request (integration, real Postgre
   }, 240000);
 
   afterAll(async () => {
+    jest.restoreAllMocks();
     await h.stop();
   });
 
-  const year = Number(h.today().slice(0, 4));
+  const year = Number(TODAY.slice(0, 4));
   /** The months left of the calendar year of today, the month of today counted whole (`BR-MF1-06a`). */
-  const monthsLeft = 12 - Number(h.today().slice(5, 7)) + 1;
+  const monthsLeft = 12 - Number(TODAY.slice(5, 7)) + 1;
 
   describe('paid software that has a price (US-05-02 AC-1, BR-MF1-06)', () => {
     it('BR-MF1-06a: with no end date is the monthly price of its plan for the months left of the year, as one amount', async () => {

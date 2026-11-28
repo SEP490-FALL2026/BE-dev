@@ -92,6 +92,10 @@ export const TARGET_BY_CODE: Readonly<Partial<Record<InAppNotificationCode, Rout
   IT_ADMIN_HANDOVER_RECEIVED: null, // the catalogue names two lists (subscriptions, applications)
   // SBF-20: the result of an adjustment is read as the renewal case; the other notices of a subscription open the subscription (its subject).
   SUBSCRIPTION_RENEWAL_OUTCOME_RECORDED: route('subscriptionRenewalGet', { id: 'renewalId' }),
+  SUBSCRIPTION_SEATS_BOUGHT: route('subscriptionGet', { id: 'subscriptionId' }),
+  SEAT_PURCHASE_INVOICE_OVERDUE: route('subscriptionGet', { id: 'subscriptionId' }),
+  SEAT_LEDGER_VENDOR_RECORDED: route('subscriptionGet', { id: 'subscriptionId' }),
+  SUBSCRIPTION_PRICE_REVIEW: route('subscriptionGet', { id: 'subscriptionId' }),
   // The incident is also told to the person who decides spending, who may not read a subscription: the list of deadline events is open to all three recipients.
   SUBSCRIPTION_AUTO_RENEWAL_INCIDENT: route('subscriptionDeadlineEventList'),
   // Operations round: a list for the notices whose subject is not one record the recipient can read.
@@ -99,6 +103,15 @@ export const TARGET_BY_CODE: Readonly<Partial<Record<InAppNotificationCode, Rout
   VENDOR_ACCOUNT_DISCREPANCY_OPENED: route('vendorAccountDiscrepancyList'),
   DEVICE_STOP_REQUESTED: route('deviceStopRequestList'),
   DEVICE_STOP_REQUEST_OVERDUE: route('deviceStopRequestList'),
+  SAAS_ISSUE_AWAITING_ASSIGNEE: route('saasIssueList'),
+  DEPARTMENT_IT_SUBSTITUTE_APPOINTED: route('departmentItSubstituteList'),
+  DEPARTMENT_IT_SUBSTITUTE_ENDED: route('departmentItSubstituteList'),
+  DEPARTMENT_IT_COVERAGE_MISSING: route('departmentGet', { id: 'departmentId' }),
+  DEVICE_RETURN_OVERDUE: route('deviceReturnTaskList'),
+  DEVICE_RETURN_WAITING: route('deviceReturnTaskList'),
+  UNPLACED_WORK_WAITING: route('unplacedWorkDesignationList'),
+  UNPLACED_WORK_DESIGNATED: route('unplacedWorkDesignationList'),
+  WORKSPACE_ADMIN_NOT_WORKING: route('workspaceGet', { id: 'workspaceId' }),
 };
 
 /**
@@ -118,14 +131,17 @@ export const ROUTE_READERS: Readonly<Record<string, readonly string[]>> = {
   budgetTable: ['FINANCE', 'SPENDING_APPROVER'],
   budgetVersionGet: ['FINANCE', 'SPENDING_APPROVER'], // service: only Finance and the spending approver read a version
   departmentGet: ['SUPER_ADMIN', 'IT_ADMIN', 'MANAGER'],
+  departmentItSubstituteList: ['SUPER_ADMIN', 'IT_ADMIN'],
   departmentSoftwareProposalList: ['IT_ADMIN', 'MANAGER'],
   departmentTransferGet: ['SUPER_ADMIN', 'IT_ADMIN'],
   departmentWarningList: ['SUPER_ADMIN', 'IT_ADMIN'],
+  deviceReturnTaskList: ['IT_ADMIN', 'SUPER_ADMIN'],
   deviceStopRequestList: ['IT_ADMIN'],
   employeeGet: ['SUPER_ADMIN'],
   ghostSeatExemptionList: ['MANAGER', 'IT_ADMIN'],
   ghostSeatQueueList: ['MANAGER'],
   ghostSeatRecommendationGet: ['IT_ADMIN', 'MANAGER'],
+  licenseLotGet: ['IT_ADMIN', 'FINANCE', 'SUPER_ADMIN'],
   longLeaveGet: ['SUPER_ADMIN', 'IT_ADMIN'],
   offboardingCaseGet: ['SUPER_ADMIN', 'IT_ADMIN'],
   personnelNoticeGet: ['SUPER_ADMIN', 'IT_ADMIN', 'MANAGER'],
@@ -136,8 +152,10 @@ export const ROUTE_READERS: Readonly<Record<string, readonly string[]>> = {
   subscriptionDeadlineEventList: ['IT_ADMIN', 'FINANCE', 'SPENDING_APPROVER', 'SUPER_ADMIN'],
   subscriptionGet: ['IT_ADMIN', 'FINANCE'],
   subscriptionRenewalGet: ['IT_ADMIN', 'FINANCE', 'MANAGER'], // service: the IT Admin, Finance and the head of the owning department
+  unplacedWorkDesignationList: ['SUPER_ADMIN', 'IT_ADMIN'],
   usageSourceList: ['IT_ADMIN'],
   vendorAccountDiscrepancyList: ['IT_ADMIN'],
+  workspaceGet: ['IT_ADMIN', 'FINANCE', 'SUPER_ADMIN'],
 };
 
 /** Where a reader who may not read a route goes instead, tried in order; `selfOnly` is for a notice about the reader (their own record). */
@@ -159,7 +177,7 @@ export const ALTERNATIVES: Readonly<
 /**
  * By `subject.type` (canonical), tried when the code has no route of its own: one line for each type of the catalogue that has a route
  * to read one record. Not here, for want of such a route: `APPLICATION`, `BUDGET_ADJUSTMENT`, `COST_CENTER`,
- * `DEPARTMENT_SOFTWARE_PROPOSAL`, `DEVICE_STOP_REQUEST`, `HANDOVER_DUTY`, `LICENSE_ASSIGNMENT`, `OUT_OF_PROCESS_CASE`, `TRANSFER_REVIEW`.
+ * `DEPARTMENT_SOFTWARE_PROPOSAL`, `DEVICE_RETURN_TASK`, `DEVICE_STOP_REQUEST`, `HANDOVER_DUTY`, `LICENSE_ASSIGNMENT`, `OUT_OF_PROCESS_CASE`, `TRANSFER_REVIEW`.
  */
 export const TARGET_BY_SUBJECT_TYPE: Readonly<Record<string, RouteRef>> = {
   ACCESS_REQUEST: route('accessRequestGet', { id: 'subject' }),
@@ -172,6 +190,7 @@ export const TARGET_BY_SUBJECT_TYPE: Readonly<Record<string, RouteRef>> = {
   EMPLOYEE: route('employeeGet', { id: 'subject' }),
   EMPLOYEE_LEAVE: route('longLeaveGet', { id: 'subject' }),
   GHOST_SEAT_RECOMMENDATION: route('ghostSeatRecommendationGet', { id: 'subject' }),
+  LICENSE_LOT: route('licenseLotGet', { id: 'subject' }),
   OFFBOARDING_CASE: route('offboardingCaseGet', { id: 'subject' }),
   PERSONNEL_NOTICE: route('personnelNoticeGet', { id: 'subject' }),
   PLAN: route('planGet', { id: 'subject' }),
@@ -183,6 +202,7 @@ export const TARGET_BY_SUBJECT_TYPE: Readonly<Record<string, RouteRef>> = {
   SPEND_BATCH: route('spendBatchGet', { id: 'subject' }),
   SUBSCRIPTION: route('subscriptionGet', { id: 'subject' }),
   SUBSCRIPTION_RENEWAL: route('subscriptionRenewalGet', { id: 'subject' }),
+  WORKSPACE: route('workspaceGet', { id: 'subject' }),
 };
 
 /** The spellings that were written before `subject.type` became `UPPER_SNAKE`; hold rows and old notices still carry them. */

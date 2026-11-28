@@ -89,14 +89,28 @@ describe('license key vault routes (e2e, no database)', () => {
     expect(JSON.stringify(response.body)).not.toContain(KEY);
   });
 
-  it('has no route that deletes, rewrites or exports a key, or reads one with a GET', async () => {
+  it('has no route that deletes or exports a key, or reads one with a GET', async () => {
     const server = app.getHttpServer();
     const as = (req: request.Test) => req.set('Authorization', bearer(principal(['IT_ADMIN'])));
 
     await as(request(server).delete(`${KEYS}/${ID}`)).expect(404);
-    await as(request(server).patch(`${KEYS}/${ID}`).send({})).expect(404);
     await as(request(server).get(`${KEYS}/${ID}`)).expect(404);
     await as(request(server).get(`${KEYS}/${ID}/reveal`)).expect(404);
     await as(request(server).get(`${KEYS}/export`)).expect(404);
+  });
+
+  it('turns away a PATCH that names the key or names nothing with 422, since the only field it changes is the number of activations', async () => {
+    const server = app.getHttpServer();
+
+    for (const body of [{ key: KEY }, {}, { expectedUpdatedAt: '2026-01-01T00:00:00.000Z', key: KEY }]) {
+      const response = await request(server)
+        .patch(`${KEYS}/${ID}`)
+        .set('Authorization', bearer(principal(['IT_ADMIN'])))
+        .send(body)
+        .expect(422);
+
+      expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
+      expect(JSON.stringify(response.body)).not.toContain(KEY);
+    }
   });
 });

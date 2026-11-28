@@ -1,9 +1,7 @@
 # Containers and migrations
 
-`docker compose up -d --wait` starts local PostgreSQL only; that is all the API and the worker need. Redis and MinIO are
-optional and start only under their named profiles (`--profile queue`, `--profile storage`), for trying the queue and
-object storage the API mounts for contract files. The queue is standby infrastructure with no consumer yet (kept by the Owner,
-OD-R5; not mounted, E2 = A, H6.4). Ports bind to loopback.
+`docker compose up -d --wait` starts local PostgreSQL and Redis. Add `--profile storage` to start MinIO for contract files.
+Ports bind to loopback. Local Redis runs without a password and uses the `noeviction` policy.
 Check for port conflicts before starting; do not stop unrelated services.
 Create the configured MinIO bucket before using storage. The API refuses the public default credentials of MinIO
 (`minioadmin`) in every environment but `NODE_ENV=test` (SEC-04): set your own `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD`
@@ -30,8 +28,8 @@ from the `production-dependencies` stage (`pnpm install --prod --frozen-lockfile
 holds the production dependencies only: no `jest`, `eslint`, `ts-jest`, `@nestjs/cli`, `prettier` or `@types/*`. What the image
 runs stays in `dependencies`: `prisma` (the CLI behind `node node_modules/prisma/build/index.js migrate deploy`, which the
 `migrate` service of `docker-compose.prod.yml` runs in this same image; its `prisma.config.ts` needs `dotenv` and
-`prisma/config`), `@prisma/client`, `@prisma/adapter-pg`, `@node-rs/argon2`, and `bullmq` with `@nestjs/bullmq` (standby
-queue infrastructure kept by the Owner, OD-R5). Install scripts are not disabled in that stage: pnpm 11 runs only the build
+`prisma/config`), `@prisma/client`, `@prisma/adapter-pg`, `@node-rs/argon2`, `bullmq`, `ioredis` and the
+`@bull-board/api` and `@bull-board/express` dashboard packages. pnpm 11 runs only the build
 scripts `allowBuilds` in `pnpm-workspace.yaml` allows (`@prisma/engines`, which downloads the schema engine that
 `migrate deploy` needs, and `prisma`). `typescript` stays under `node_modules/.pnpm` only as a peer of `prisma` (not
 resolvable from the application). Measured on 30/10/2026 (`docker build --target runtime`): `node_modules` 909 MB to 427 MB
@@ -47,9 +45,9 @@ docker build -t slm-api:foundation .
 docker build --target migrate -t slm-migrate:foundation .
 ```
 
-The runtime defaults to production. Supply DATABASE_URL and HTTPS CORS_ORIGINS.
-Redis is not required today: the queue is standby infrastructure with no consumer yet, and it validates Redis only when a future
-module mounts it. Object storage is mounted by the API (ADR-0014) and so needs an HTTPS
+The runtime defaults to production. Supply `DATABASE_URL`, HTTPS `CORS_ORIGINS`, `TRUST_PROXY_HOPS` of at least 1 and
+the Redis host and password when using Redis. Production Compose reads `REDIS_PASSWORD` from the VPS `.env` and reaches
+Redis on the private Compose network. Object storage is mounted by the API (ADR-0014) and so needs an HTTPS
 OBJECT_STORAGE_ENDPOINT with OBJECT_STORAGE_BUCKET and the access key (the variables marked
 `@production-required-when-mounted` in `.env.example`); the worker and the commands do not read them. The endpoint is
 the one the browser uploads to and the one signed links open: its host is written into every link, so it must be
@@ -116,13 +114,21 @@ refuses to read it from arguments, the environment or a pipe. The one exception 
 an argument or an environment variable. The consolidated
 [G0/G1 review](../reviews/g0-g1-remediation-2026-10-15/README.md) records the Linux PTY verification
 through the remediation revision; manual interactive PowerShell verification is still pending.
-The worker uses the same runtime image with command `node dist/worker.js` and runs the PostgreSQL
-outbox polling loop for SMTP delivery. It mounts no queue and registers no BullMQ processor; the production Compose
-file has no Redis service. A host that ran an earlier deploy keeps its `slm-redis` container (Compose only warns about
-an orphan; the deploy never removes an orphan, H7-OPS-RV-03) and its volume: the Owner removes them by hand when no longer
-wanted, by exact name (`docker stop slm-redis`, `docker rm slm-redis`, then `docker volume rm` with the volume name that
-`docker inspect slm-redis` listed). Compose has no SMTP sink;
-configure a reachable SMTP service separately. SMTP TLS/provider delivery remains unverified.
+The worker uses the same runtime image with command `node dist/worker.js` and has 40 seconds to stop. Set
+`BACKGROUND_JOBS_TRANSPORT=poll` and restart the worker to switch email delivery back to PostgreSQL polling.
+The worker in either mode needs a reachable SMTP service. API rate limiting and Bull Board have separate switches.
+Keep `QUEUE_BOARD_ENABLED=false` unless operators need the dashboard. To enable it, set `QUEUE_BOARD_USERNAME`
+and `QUEUE_BOARD_PASSWORD` and open `/ops/queues` through HTTPS. The production password must be at least
+20 characters and differ from the username.
+
+Before the first rollout that includes Redis, set `REDIS_PASSWORD` in the VPS `.env` and clear any old Redis
+container. This is **required**: run `docker inspect slm-redis`. If a container named `slm-redis` exists that is not the
+Redis of this Compose project (an orphan of an earlier deploy, possibly without `--requirepass`), stop it and remove it
+by exact name (`docker stop slm-redis && docker rm slm-redis`), and remove its old volume by exact name once the Owner
+confirms it is disposable. `scripts/ops/deploy-release.sh` enforces this: it stops, before pulling or changing anything,
+when such an orphan exists, and again when the Redis service of the project runs without `--requirepass` in its command.
+It never deletes anything itself. To reset rate-limit counters, scan only `<REDIS_KEY_PREFIX>:rl:*` in batches and delete those
+matching keys. The namespace `<REDIS_KEY_PREFIX>:bull:*` holds jobs and schedules.
 
 Request size: the API refuses a JSON or URL-encoded body over **100 KiB** with 413 `HTTP_PAYLOAD_TOO_LARGE` (one limit in
 code, [API contract](../rules/api-contract.md#errors)); the two import uploads take a multipart file of at most 2 MiB. A

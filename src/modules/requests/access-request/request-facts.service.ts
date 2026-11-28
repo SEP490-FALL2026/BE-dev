@@ -8,12 +8,21 @@ import { CatalogApi } from '../../catalog/public/catalog.api';
 import { LicensingApi } from '../../licensing/public/licensing.api';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { EmployeeNotStartedError } from '../../organization/public/organization.errors';
 import {
   AccessRequestApplicationRetiredError,
   AccessRequestNoDepartmentError,
+  AccessRequestPlanBoundToDeviceError,
   AccessRequestPlanNotFoundError,
+  isDeviceBoundKeyBinding,
 } from './access-request.errors';
-import { hasSpendStep, policyFor, proposalPolicy, type RequestPolicy } from './access-request.policy';
+import {
+  hasSpendStep,
+  k1TransferReplacementPeriod,
+  policyFor,
+  proposalPolicy,
+  type RequestPolicy,
+} from './access-request.policy';
 import type { PricingRecord } from './access-request.types';
 import { pricingRecordFor, type RequestPriceInput } from './pricing.policy';
 import { RoutingFactsService, type GatheredRouting } from './routing-facts.service';
@@ -127,6 +136,28 @@ export class RequestFactsService {
     };
   }
 
+  private async requireStartedOwningUnit(
+    tx: DbTx,
+    employeeId: string,
+    today: BusinessDate,
+    requesterEmployeeId?: string,
+  ) {
+    const found = (await this.organizationReads.getOwningUnits([employeeId], today, tx)).get(employeeId);
+    if (!found) {
+      if ((await this.organizationReads.notStartedAmong([employeeId], today, tx)).has(employeeId)) {
+        throw new EmployeeNotStartedError(employeeId);
+      }
+      throw new AccessRequestNoDepartmentError();
+    }
+    if (requesterEmployeeId && requesterEmployeeId !== employeeId) {
+      if ((await this.organizationReads.notStartedAmong([requesterEmployeeId], today, tx)).has(requesterEmployeeId)) {
+        throw new EmployeeNotStartedError(requesterEmployeeId);
+      }
+    }
+
+    return found;
+  }
+
   /**
    * Throws AccessRequestNoDepartmentError, AccessRequestPlanNotFoundError, AccessRequestApplicationRetiredError,
    * FinanceSetupIncompleteError (a request that costs money, or ends in a service seat, and the department has no Cost Center yet:
@@ -134,12 +165,12 @@ export class RequestFactsService {
    */
   async assess(tx: DbTx, input: AssessmentInput): Promise<Assessment> {
     const today = await this.organizationReads.businessToday(input.now, tx);
-    const found = (await this.organizationReads.getOwningUnits([input.employeeId], today, tx)).get(input.employeeId);
-    if (!found) throw new AccessRequestNoDepartmentError();
+    const found = await this.requireStartedOwningUnit(tx, input.employeeId, today, input.requesterEmployeeId);
 
     const [target] = await this.catalog.findPlanSeatTargets([input.planId], tx);
     if (!target) throw new AccessRequestPlanNotFoundError();
     if (target.applicationStatus === 'RETIRED') throw new AccessRequestApplicationRetiredError();
+    if (isDeviceBoundKeyBinding(target.keyBinding)) throw new AccessRequestPlanBoundToDeviceError();
 
     const policy = policyFor(target.applicationKind, input.settings.slaWorkingDays);
     // What the request is charged to is known only now that the branch is: no Cost Center, no charge, and no gate for what is free.
@@ -149,32 +180,19 @@ export class RequestFactsService {
         : this.organizationReads.requireUnitCostCenter(found);
     if (input.lockDepartment) await this.organizationReads.lockDepartmentShared(tx, unit.departmentId);
 
-    const employee = await this.organizationReads.getEmployee(input.employeeId, tx);
-    const renewing = input.termStart !== undefined;
-    const judged = this.termOf({
-      today: input.termStart ?? today,
-      kind: target.provisioningType,
-      termMonths: input.termMonths,
-      employee,
-      renewing,
-    });
-    const pricing = await this.priceFor(tx, {
-      planId: input.planId,
-      free: policy.branch === 'INTERNAL_FREE',
-      beneficiaries: 1,
-      checkDate: today,
-      endDate: judged.term.end,
-      endIsDerived: !renewing,
-      from: input.termStart,
-    });
+    const { heldAccess, graceHold, judged, term, pricing } = await this.assessTermAndPrice(
+      tx,
+      target,
+      policy.branch === 'INTERNAL_FREE',
+      input,
+      today,
+    );
     const gathered = await this.routing.gather(tx, {
       requesterEmployeeId: input.requesterEmployeeId ?? input.employeeId,
       departmentId: unit.departmentId,
       today,
       chainHasSpendStep: hasSpendStep(policy),
     });
-
-    const heldAccess = await this.heldAccess(tx, input.employeeId, input.planId);
 
     return {
       today,
@@ -188,9 +206,65 @@ export class RequestFactsService {
       pricing,
       routing: { ...gathered, decision: routeNeedStep(gathered.facts) },
       heldAccess,
-      graceHold: heldAccess ? await this.graceHoldOf(tx, input.employeeId, heldAccess, today) : null,
-      ...judged,
+      graceHold,
+      termRefusal: judged.termRefusal,
+      term,
+      contractEndDate: judged.contractEndDate,
     };
+  }
+
+  private async assessTermAndPrice(
+    tx: DbTx,
+    target: SeatTarget,
+    free: boolean,
+    input: AssessmentInput,
+    today: BusinessDate,
+  ) {
+    const employee = await this.organizationReads.getEmployee(input.employeeId, tx);
+    const renewing = input.termStart !== undefined;
+    const { heldAccess, graceHold, k1Transfer } = await this.resolveTransferContext(
+      tx,
+      input.employeeId,
+      target,
+      today,
+      renewing,
+    );
+    const termMonths = this.effectiveTermMonths(target, renewing, input.termMonths);
+    const judged = this.termOf({
+      today: input.termStart ?? today,
+      kind: target.provisioningType,
+      referenceCommitmentMonths: target.referenceCommitmentMonths,
+      termMonths,
+      employee,
+      renewing,
+      requiredEndDate: k1Transfer?.paidThroughOn,
+    });
+    const term =
+      k1Transfer !== null && judged.termRefusal === null
+        ? { ...judged.term, end: k1Transfer.chargeThrough }
+        : judged.term;
+    const pricing = await this.priceFor(tx, {
+      planId: input.planId,
+      free,
+      provisioningType: target.provisioningType,
+      beneficiaries: 1,
+      checkDate: today,
+      endDate: k1Transfer?.chargeThrough ?? term.end,
+      endIsDerived: !renewing,
+      from: k1Transfer?.chargeFrom ?? input.termStart,
+    });
+
+    return { heldAccess, graceHold, judged, term, pricing };
+  }
+
+  private effectiveTermMonths(target: SeatTarget, renewing: boolean, termMonths: number | null | undefined) {
+    const isK1AnnualDefault =
+      renewing &&
+      target.provisioningType === 'K1' &&
+      target.referenceCommitmentMonths === 12 &&
+      termMonths === undefined;
+
+    return isK1AnnualDefault ? 12 : termMonths;
   }
 
   /**
@@ -203,8 +277,7 @@ export class RequestFactsService {
     input: Pick<AssessmentInput, 'employeeId' | 'termMonths' | 'now' | 'settings' | 'lockDepartment'>,
   ): Promise<ProposalAssessment> {
     const today = await this.organizationReads.businessToday(input.now, tx);
-    const found = (await this.organizationReads.getOwningUnits([input.employeeId], today, tx)).get(input.employeeId);
-    if (!found) throw new AccessRequestNoDepartmentError();
+    const found = await this.requireStartedOwningUnit(tx, input.employeeId, today);
     const unit = this.organizationReads.requireUnitCostCenter(found);
     if (input.lockDepartment) await this.organizationReads.lockDepartmentShared(tx, unit.departmentId);
 
@@ -247,21 +320,25 @@ export class RequestFactsService {
   termOf(facts: {
     today: BusinessDate;
     kind: TermKind;
+    referenceCommitmentMonths?: number | null;
     termMonths: number | null | undefined;
     employee: { employmentType: string; contractEndDate?: BusinessDate | null } | null;
     /** The time of use is the one of a request to go on using a right: a plan bought once has no end to move, so it is never renewed (`QĐ-111l`). */
     renewing?: boolean;
+    requiredEndDate?: BusinessDate;
   }): Pick<Assessment, 'termRefusal' | 'term' | 'contractEndDate'> {
     const fixedTermPerson = (facts.employee?.employmentType ?? 'STAFF') !== 'STAFF';
     const contractEndDate = facts.employee?.contractEndDate ?? null;
     const termRefusal = checkTermMonths({
       kind: facts.kind,
+      referenceCommitmentMonths: facts.referenceCommitmentMonths,
       termMonths: facts.termMonths,
       fixedTermPerson,
       contractEndKnown: contractEndDate !== null,
       renewing: facts.renewing === true,
       contractEndDate,
       termStart: facts.today,
+      requiredEndDate: facts.requiredEndDate,
     });
     const months = termRefusal === null && typeof facts.termMonths === 'number' ? facts.termMonths : null;
 
@@ -298,11 +375,46 @@ export class RequestFactsService {
    * The seat the person holds of the plan today, if any. Read in the caller's transaction so the check and the decision see
    * the same snapshot; the grant itself still refuses an overlapping seat (`LICENSE_ASSIGNMENT.OVERLAP`).
    */
-  private async heldAccess(tx: DbTx, employeeId: string, planId: string): Promise<HeldAccess | null> {
+  private async resolveTransferContext(
+    tx: DbTx,
+    employeeId: string,
+    target: SeatTarget,
+    today: BusinessDate,
+    renewing: boolean,
+  ) {
+    const heldRecord = await this.heldAccessRecord(tx, employeeId, target.planId);
+    const heldAccess = heldRecord?.held ?? null;
+    const graceHold = heldAccess ? await this.graceHoldOf(tx, employeeId, heldAccess, today) : null;
+    const k1Transfer =
+      !renewing && graceHold !== null && target.provisioningType === 'K1' && target.referenceCommitmentMonths === 12
+        ? k1TransferReplacementPeriod({
+            billingAnchorOn: heldRecord?.billingAnchorOn ?? null,
+            personalCommitmentMonths: heldRecord?.personalCommitmentMonths ?? null,
+            today,
+          })
+        : null;
+
+    return { heldAccess, graceHold, k1Transfer };
+  }
+
+  private async heldAccessRecord(
+    tx: DbTx,
+    employeeId: string,
+    planId: string,
+  ): Promise<{
+    held: HeldAccess;
+    personalCommitmentMonths: 1 | 12 | null;
+    billingAnchorOn: BusinessDate | null;
+  } | null> {
     const { items } = await this.licensing.getSeatsHeldInPlans(employeeId, [planId], { skip: 0, take: 1 }, tx);
     const [seat] = items;
+    if (!seat) return null;
 
-    return seat ? { assignmentId: seat.id, effectiveFrom: seat.effectiveFrom, validUntil: seat.validUntil } : null;
+    return {
+      held: { assignmentId: seat.id, effectiveFrom: seat.effectiveFrom, validUntil: seat.validUntil },
+      personalCommitmentMonths: seat.personalCommitmentMonths ?? null,
+      billingAnchorOn: seat.billingAnchorOn ?? null,
+    };
   }
 
   /**

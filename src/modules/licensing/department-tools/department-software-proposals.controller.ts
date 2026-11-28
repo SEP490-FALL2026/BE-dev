@@ -131,7 +131,7 @@ export class DepartmentSoftwareProposalsController {
   @ApiSuccessResponse(DepartmentSoftwareAcceptanceResponseDto, {
     message: 'DEPARTMENT_SOFTWARE.PROPOSAL_ACCEPTED',
     description:
-      'Only an IT Admin in charge of the proposal’s department accepts. The place is added to the list at once and the head who proposed is told; entryId is the entry in the list (the one that was already there when an IT Admin had added the place meanwhile). The person who made the proposal does not accept it. A proposal is decided once.',
+      'Only an acting IT Admin (in charge or appointed substitute) of the proposal’s department accepts. The place is added to the list at once and the head who proposed is told; entryId is the entry in the list (the one that was already there when an IT Admin had added the place meanwhile). The person who made the proposal does not accept it. A proposal is decided once.',
   })
   @ApiErrorResponses(
     UNAUTHENTICATED_RESPONSE,
@@ -139,13 +139,13 @@ export class DepartmentSoftwareProposalsController {
     {
       status: HttpStatus.FORBIDDEN,
       description:
-        'Not an IT Admin (AUTHORIZATION.FORBIDDEN), or the IT Admin made the proposal themselves, as the head of the department before (DEPARTMENT_SOFTWARE.OWN_PROPOSAL): another IT Admin in charge decides it.',
-      examples: [FORBIDDEN_EXAMPLE, EXAMPLES.OWN_PROPOSAL],
+        'Not an IT Admin (AUTHORIZATION.FORBIDDEN), not an acting IT Admin (in charge or appointed substitute) of the department (DEPARTMENT_SOFTWARE.NOT_IN_CHARGE), or the IT Admin made the proposal themselves, as the head of the department before (DEPARTMENT_SOFTWARE.OWN_PROPOSAL): another acting IT Admin decides it.',
+      examples: [FORBIDDEN_EXAMPLE, EXAMPLES.NOT_IN_CHARGE, EXAMPLES.OWN_PROPOSAL],
     },
     {
       status: HttpStatus.NOT_FOUND,
       description:
-        'The proposal does not exist, or its department is not one the IT Admin is in charge of (DEPARTMENT_SOFTWARE.PROPOSAL_NOT_FOUND).',
+        'The proposal does not exist, or its department is outside the IT Admin’s read scope (DEPARTMENT_SOFTWARE.PROPOSAL_NOT_FOUND).',
       examples: [EXAMPLES.PROPOSAL_NOT_FOUND],
     },
     {
@@ -177,7 +177,7 @@ export class DepartmentSoftwareProposalsController {
   @ApiSuccessResponse(DepartmentSoftwareProposalResponseDto, {
     message: 'DEPARTMENT_SOFTWARE.PROPOSAL_REJECTED',
     description:
-      'Only an IT Admin in charge of the proposal’s department rejects, and the reason is required: the head who proposed reads it in their notice. Nothing is added to the list. The person who made the proposal does not reject it. A proposal is decided once, and the place can be proposed again.',
+      'Only an acting IT Admin (in charge or appointed substitute) of the proposal’s department rejects, and the reason is required: the head who proposed reads it in their notice. Nothing is added to the list. The person who made the proposal does not reject it. A proposal is decided once, and the place can be proposed again.',
   })
   @ApiErrorResponses(
     UNAUTHENTICATED_RESPONSE,
@@ -185,13 +185,13 @@ export class DepartmentSoftwareProposalsController {
     {
       status: HttpStatus.FORBIDDEN,
       description:
-        'Not an IT Admin (AUTHORIZATION.FORBIDDEN), or the IT Admin made the proposal themselves, as the head of the department before (DEPARTMENT_SOFTWARE.OWN_PROPOSAL): another IT Admin in charge decides it.',
-      examples: [FORBIDDEN_EXAMPLE, EXAMPLES.OWN_PROPOSAL],
+        'Not an IT Admin (AUTHORIZATION.FORBIDDEN), not an acting IT Admin (in charge or appointed substitute) of the department (DEPARTMENT_SOFTWARE.NOT_IN_CHARGE), or the IT Admin made the proposal themselves, as the head of the department before (DEPARTMENT_SOFTWARE.OWN_PROPOSAL): another acting IT Admin decides it.',
+      examples: [FORBIDDEN_EXAMPLE, EXAMPLES.NOT_IN_CHARGE, EXAMPLES.OWN_PROPOSAL],
     },
     {
       status: HttpStatus.NOT_FOUND,
       description:
-        'The proposal does not exist, or its department is not one the IT Admin is in charge of (DEPARTMENT_SOFTWARE.PROPOSAL_NOT_FOUND).',
+        'The proposal does not exist, or its department is outside the IT Admin’s read scope (DEPARTMENT_SOFTWARE.PROPOSAL_NOT_FOUND).',
       examples: [EXAMPLES.PROPOSAL_NOT_FOUND],
     },
     {

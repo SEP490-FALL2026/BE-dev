@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { pageOf, type Page } from '../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { ControlledWaitRepo } from './controlled-wait.repo';
 import type { ControlledWaitWire } from './controlled-wait.dto';
@@ -16,6 +17,7 @@ export class ControlledWaitQueryService {
   constructor(
     private readonly waits: ControlledWaitRepo,
     private readonly organizationReads: OrganizationReadApi,
+    private readonly identity: IdentityAccessApi,
   ) {}
 
   async page(
@@ -24,7 +26,9 @@ export class ControlledWaitQueryService {
   ): Promise<Page<ControlledWaitWire>> {
     const departmentIds = actor.roles.includes('SUPER_ADMIN')
       ? null
-      : await this.organizationReads.getDepartmentIdsInChargeOf(actor.employeeId);
+      : await this.organizationReads.getItAdminActingScope(actor.employeeId, (ids) =>
+          this.identity.findUsableItAdminEmployeeIds(ids),
+        );
     if (departmentIds !== null && departmentIds.length === 0) return pageOf([], 0, query.page, query.pageSize);
 
     const { rows, total } = await this.waits.page(departmentIds, (query.page - 1) * query.pageSize, query.pageSize);

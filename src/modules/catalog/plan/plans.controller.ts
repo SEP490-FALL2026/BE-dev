@@ -40,7 +40,7 @@ const READERS = {
   examples: [FORBIDDEN_EXAMPLE],
 } as const;
 const INVALID_DESCRIPTION =
-  'The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.APPLICATION_NOT_FOUND, APPLICATION_RETIRED, NAME_INVALID, NOTE_INVALID, PROVISIONING_TYPE_NOT_SUPPORTED, PROVISIONING_TYPE_MISMATCH, PRICING_MODEL_REQUIRED, PRICING_MODEL_NOT_APPLICABLE, PRICING_MODEL_NOT_DERIVED (the pricing model follows the kind of provisioning: leave it out or send the implied one; details.expected), CONTROL_LEVEL_REQUIRED, DATA_LOSS_NOTE_REQUIRED, ADMIN_CONSOLE_NOT_APPLICABLE (the flag hasAdminConsole belongs to a K4 plan alone), REFERENCE_PRICE_NOT_VND (the reference price is in dong), REFERENCE_PRICE_NOT_APPLICABLE (only a K1, K2 or K4 plan has one), REFERENCE_PRICE_NOT_POSITIVE (zero or less is no price), MONEY_SCALE_EXCEEDED or MONEY_OUT_OF_RANGE (a too large amount) or UPDATE_EMPTY.';
+  'The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.APPLICATION_NOT_FOUND, APPLICATION_RETIRED, NAME_INVALID, NOTE_INVALID, PROVISIONING_TYPE_NOT_SUPPORTED, PROVISIONING_TYPE_MISMATCH, PRICING_MODEL_REQUIRED, PRICING_MODEL_NOT_APPLICABLE, PRICING_MODEL_NOT_DERIVED (the pricing model follows the kind of provisioning: leave it out or send the implied one; details.expected), CONTROL_LEVEL_REQUIRED, DATA_LOSS_NOTE_REQUIRED, ADMIN_CONSOLE_NOT_APPLICABLE (the flag hasAdminConsole belongs to a K4 plan alone, and not to one bundled with the machine), REFERENCE_PRICE_NOT_VND (the reference price is in dong), KEY_BINDING_NOT_APPLICABLE (only a K4 plan has a keyBinding), REFERENCE_PRICE_NOT_APPLICABLE (only a K1, K2 or K4 plan has one, and a K4 plan bundled with the machine has none), REFERENCE_COMMITMENT_NOT_APPLICABLE (only a K1 or K2 plan has a reference commitment term), REFERENCE_PRICE_NOT_POSITIVE (zero or less is no price), MONEY_SCALE_EXCEEDED or MONEY_OUT_OF_RANGE (a too large amount) or UPDATE_EMPTY.';
 /** The rule refusals of the shape of a plan, met by a declaration and by a change alike. */
 const SHAPE_EXAMPLES = [
   EXAMPLES.NAME_INVALID,
@@ -53,8 +53,10 @@ const SHAPE_EXAMPLES = [
   EXAMPLES.CONTROL_LEVEL_REQUIRED,
   EXAMPLES.DATA_LOSS_NOTE_REQUIRED,
   EXAMPLES.ADMIN_CONSOLE_NOT_APPLICABLE,
+  EXAMPLES.KEY_BINDING_NOT_APPLICABLE,
   EXAMPLES.REFERENCE_PRICE_NOT_VND,
   EXAMPLES.REFERENCE_PRICE_NOT_APPLICABLE,
+  EXAMPLES.REFERENCE_COMMITMENT_NOT_APPLICABLE,
   EXAMPLES.REFERENCE_PRICE_NOT_POSITIVE,
 ] as const;
 const DECLARE_INVALID = {
@@ -68,7 +70,7 @@ const UPDATE_INVALID = {
   examples: [VALIDATION_EXAMPLE, ...SHAPE_EXAMPLES, EXAMPLES.UPDATE_EMPTY],
 } as const;
 const CONFLICT_DESCRIPTION =
-  'The application already has a plan of this name (PLAN.NAME_TAKEN) or the plan still has a workspace profile or a numeric install limit the new kind cannot keep (PLAN.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE, PLAN.TERMS_BLOCK_TYPE_CHANGE), or a subscription or license key of the plan would no longer fit the new pricing model or kind (PLAN.IN_USE_BLOCKS_CHANGE, `details.reason`: ACTIVE_SUBSCRIPTION_WITHOUT_QUANTITY, LICENSE_KEYS, PERPETUAL_SUBSCRIPTIONS (a perpetual purchase of an application that is not licensed hangs on the K4 plan), TERM_SUBSCRIPTIONS (a subscription over a term hangs on a plan that would become K4, which is bought once), CONTRACT_LINKS (a subscription of the plan rests on a contract, which only a plan of a shared stock, K2 or K4, has) or SUBSCRIPTIONS).';
+  'The application already has a plan of this name (PLAN.NAME_TAKEN) or the plan still has a workspace profile or a numeric install limit the new kind cannot keep (PLAN.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE, PLAN.TERMS_BLOCK_TYPE_CHANGE), or a subscription or license key of the plan would no longer fit the new pricing model or kind (PLAN.IN_USE_BLOCKS_CHANGE, `details.reason`: ACTIVE_SUBSCRIPTION_WITHOUT_QUANTITY, LICENSE_KEYS, LICENSE_LOTS, PERPETUAL_SUBSCRIPTIONS (a perpetual purchase of an application that is not licensed hangs on the K4 plan), TERM_SUBSCRIPTIONS (a subscription over a term hangs on a plan that would become K4, which is bought once), CONTRACT_LINKS (a subscription of the plan rests on a contract, which only a plan of a shared stock, K2 or K4, has), KEY_BINDING_PURCHASES (a perpetual purchase hangs on the plan, so its keyBinding cannot change), KEY_BINDING_ASSIGNMENTS (a person holds a seat of the plan), DEVICE_ACTIVATIONS (a machine holds an activation of the plan) or SUBSCRIPTIONS).';
 const DECLARE_CONFLICT = {
   status: HttpStatus.CONFLICT,
   description: CONFLICT_DESCRIPTION,
@@ -113,7 +115,7 @@ export class PlansController {
   @ApiSuccessResponse(PlanPageResponseDto, {
     message: 'PLAN.LISTED',
     description:
-      'A page of plans by application then plan name, optionally for one application, one kind of provisioning, the functional group or the catalog status of the application, or a search over the plan and application names.',
+      'A page of plans by application then plan name, optionally for one application, one kind of provisioning, one key binding of a K4 plan, the functional group or the catalog status of the application, or a search over the plan and application names.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, READERS, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -198,21 +200,38 @@ export class PlansController {
     description:
       'The workspace profile replaces the previous one as a whole; it names the owners, the admins and the emergency account, the email of the company account that owns the plan at the vendor (optional) and a free note, and takes no password. Only a plan that needs admins at the vendor has one: a K2 plan, or a K4 plan with an admin console. The owners and admins are at least two different IT Admins who work now.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, NOT_FOUND, {
-    status: HttpStatus.UNPROCESSABLE_ENTITY,
-    description:
-      'The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.WORKSPACE_PROFILE_NOT_APPLICABLE, WORKSPACE_PERSON_INVALID, PRIMARY_OWNER_NOT_LISTED, WORKSPACE_MEMBER_DUPLICATE, WORKSPACE_LIMIT_EXCEEDED (details.role is OWNER when there are more owners than ownerLimit, ADMIN when more admins than adminLimit), WORKSPACE_TEXT_INVALID or VENDOR_ADMINS_INVALID (fewer than two different IT Admins).',
-    examples: [
-      VALIDATION_EXAMPLE,
-      EXAMPLES.WORKSPACE_PROFILE_NOT_APPLICABLE,
-      EXAMPLES.WORKSPACE_PERSON_INVALID,
-      EXAMPLES.PRIMARY_OWNER_NOT_LISTED,
-      EXAMPLES.WORKSPACE_MEMBER_DUPLICATE,
-      EXAMPLES.WORKSPACE_LIMIT_EXCEEDED,
-      EXAMPLES.WORKSPACE_TEXT_INVALID,
-      EXAMPLES.VENDOR_ADMINS_INVALID,
-    ],
-  })
+  @ApiErrorResponses(
+    ...AUTH_ERRORS,
+    {
+      status: HttpStatus.FORBIDDEN,
+      description:
+        'Only an IT Admin records the workspace profile, and only the one who answers for the workspace (WORKSPACE.NOT_RESPONSIBLE).',
+      examples: [FORBIDDEN_EXAMPLE, EXAMPLES.WORKSPACE_NOT_RESPONSIBLE],
+    },
+    NOT_FOUND,
+    {
+      status: HttpStatus.CONFLICT,
+      description:
+        'The vendor holds several workspaces (PLAN.WORKSPACE_AMBIGUOUS, details.workspaceIds) or the workspace changed since it was read (WORKSPACE.STALE).',
+      examples: [EXAMPLES.WORKSPACE_AMBIGUOUS, EXAMPLES.WORKSPACE_STALE],
+    },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description:
+        'The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.WORKSPACE_PROFILE_NOT_APPLICABLE, WORKSPACE_VENDOR_REQUIRED, WORKSPACE_PERSON_INVALID, PRIMARY_OWNER_NOT_LISTED, WORKSPACE_MEMBER_DUPLICATE, WORKSPACE_LIMIT_EXCEEDED (details.role is OWNER when there are more owners than ownerLimit, ADMIN when more admins than adminLimit), WORKSPACE_TEXT_INVALID or VENDOR_ADMINS_INVALID (fewer than two different IT Admins).',
+      examples: [
+        VALIDATION_EXAMPLE,
+        EXAMPLES.WORKSPACE_PROFILE_NOT_APPLICABLE,
+        EXAMPLES.WORKSPACE_VENDOR_REQUIRED,
+        EXAMPLES.WORKSPACE_PERSON_INVALID,
+        EXAMPLES.PRIMARY_OWNER_NOT_LISTED,
+        EXAMPLES.WORKSPACE_MEMBER_DUPLICATE,
+        EXAMPLES.WORKSPACE_LIMIT_EXCEEDED,
+        EXAMPLES.WORKSPACE_TEXT_INVALID,
+        EXAMPLES.VENDOR_ADMINS_INVALID,
+      ],
+    },
+  )
   async setWorkspaceProfile(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: PlanIdParamDto,

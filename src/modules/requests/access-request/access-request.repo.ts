@@ -431,4 +431,14 @@ export class AccessRequestRepo {
 
     return row ? toRecord(row) : null;
   }
+
+  async findByIds(ids: readonly string[], tx?: DbTx): Promise<AccessRequestRecord[]> {
+    if (ids.length === 0) return [];
+    const rows = await (tx ?? this.prisma).accessRequest.findMany({
+      where: { id: { in: [...ids] }, state: { not: 'DRAFT' } },
+      select: SELECT_REQUEST,
+    });
+
+    return rows.map(toRecord);
+  }
 }

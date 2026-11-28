@@ -1,10 +1,11 @@
 import type { KeyCounts, SeatOccupancy, StockBlock, StockPlanFacts } from './stock-summary.types';
 
-/** What is read of the subscriptions of a page of plans: the seats taken, the keys held and the rights held, by subscription. */
+/** What is read of the subscriptions (and, for a K4 plan, the lots) of a page of plans: the seats taken and the keys held, by subscription or lot. */
 export interface StockCounts {
   seats: ReadonlyMap<string, SeatOccupancy>;
   keys: ReadonlyMap<string, KeyCounts>;
-  holders: ReadonlyMap<string, number>;
+  /** The licenses of each K4 lot held on machines (the open activations and the closed ones whose license was lost with the machine). */
+  deviceOccupied: ReadonlyMap<string, number>;
 }
 
 const sum = (values: Iterable<number>): number => {
@@ -41,22 +42,43 @@ function seatsOf(plan: StockPlanFacts, seats: StockCounts['seats']): StockBlock 
 }
 
 /**
- * What a plan holds, counted by what it gives out and never by its subscription records (`QĐ-111n`, `QĐ-103d`): seats for a K2 plan, keys
- * for a K4 plan and the people who hold the account for a K1 plan, which has no free seat to count. Pure: the counts are read by the caller.
+ * The licenses of a K4 plan whose key goes on a machine: the licenses bought, those held on machines and the free ones. One key can be on many
+ * machines, so the keys are not counted. Each purchase frees what it bought less what it holds, never below zero, so one that holds more than it
+ * bought lends nothing to another. A purchase with no quantity makes the licenses bought and free unknown; what is held is still counted.
+ */
+function licensesOf(plan: StockPlanFacts, deviceOccupied: StockCounts['deviceOccupied']): StockBlock {
+  const unknown = plan.subscriptions.some((subscription) => subscription.purchasedQuantity === null);
+  const held = (subscriptionId: string): number => deviceOccupied.get(subscriptionId) ?? 0;
+
+  return {
+    kind: 'LICENSES',
+    purchased: unknown ? null : sum(plan.subscriptions.map((subscription) => subscription.purchasedQuantity ?? 0)),
+    occupied: sum(plan.subscriptions.map((subscription) => held(subscription.subscriptionId))),
+    free: unknown
+      ? null
+      : sum(
+          plan.subscriptions.map((subscription) =>
+            Math.max(0, (subscription.purchasedQuantity ?? 0) - held(subscription.subscriptionId)),
+          ),
+        ),
+  };
+}
+
+/**
+ * What a plan holds, counted by what it gives out and never by its subscription records (`QĐ-111n`, `QĐ-103d`): seats for a K2 plan, and keys or
+ * licenses for a K4 plan (counted over its lots). A K1 plan has no subscription and no row. Pure: the counts are read by the caller.
  */
 export function stockOfPlan(plan: StockPlanFacts, counts: StockCounts): StockBlock {
   const ids = plan.subscriptions.map((subscription) => subscription.subscriptionId);
   if (plan.provisioningType === 'K2') return seatsOf(plan, counts.seats);
-  if (plan.provisioningType === 'K4') {
-    const keys = ids.map((id) => counts.keys.get(id) ?? { inStore: 0, assigned: 0, withdrawn: 0 });
+  if (plan.provisioningType === 'K4' && plan.keyBinding === 'DEVICE_KEY')
+    return licensesOf(plan, counts.deviceOccupied);
+  const keys = ids.map((id) => counts.keys.get(id) ?? { inStore: 0, assigned: 0, withdrawn: 0 });
 
-    return {
-      kind: 'KEYS',
-      inStore: sum(keys.map((key) => key.inStore)),
-      assigned: sum(keys.map((key) => key.assigned)),
-      withdrawn: sum(keys.map((key) => key.withdrawn)),
-    };
-  }
-
-  return { kind: 'HOLDERS', holders: sum(ids.map((id) => counts.holders.get(id) ?? 0)) };
+  return {
+    kind: 'KEYS',
+    inStore: sum(keys.map((key) => key.inStore)),
+    assigned: sum(keys.map((key) => key.assigned)),
+    withdrawn: sum(keys.map((key) => key.withdrawn)),
+  };
 }

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/business-date';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import type { DeviceCondition } from '../devices-custody.policy';
 import type { DeviceRegistrationEndCause } from '../public/devices.types';
 
 export interface DeviceRecord {
@@ -10,8 +11,12 @@ export interface DeviceRecord {
   assetCode: string;
   hostname: string;
   os: string;
+  condition: DeviceCondition;
+  conditionNote: string | null;
   retiredAt: Date | null;
   retirementReason: string | null;
+  retirementKind: 'DISPOSED' | 'LOST' | null;
+  voidedAt: Date | null;
 }
 
 export interface RegistrationRecord {
@@ -23,6 +28,7 @@ export interface RegistrationRecord {
   validUntil: BusinessDate | null;
   endedAt: Date | null;
   endCause: DeviceRegistrationEndCause | null;
+  collectorInstalled: boolean;
   acknowledgedFrom: Date | null;
   collectionStoppedAt: Date | null;
 }
@@ -41,8 +47,12 @@ const DEVICE_SELECT = {
   assetCode: true,
   hostname: true,
   os: true,
+  condition: true,
+  conditionNote: true,
   retiredAt: true,
   retirementReason: true,
+  retirementKind: true,
+  voidedAt: true,
 } as const;
 
 interface RegistrationRow extends Omit<RegistrationRecord, 'validFrom' | 'validUntil'> {
@@ -60,6 +70,7 @@ export function toRegistrationRecord(row: RegistrationRow): RegistrationRecord {
     validUntil: row.validUntil ? fromDateColumn(row.validUntil) : null,
     endedAt: row.endedAt,
     endCause: row.endCause,
+    collectorInstalled: row.collectorInstalled,
     acknowledgedFrom: row.acknowledgedFrom,
     collectionStoppedAt: row.collectionStoppedAt,
   };
@@ -86,6 +97,16 @@ export class RegistryRepo {
     return locked.length === 0 ? null : this.findDevice(id, tx);
   }
 
+  /** Locks multiple machines in one ascending `id` statement `FOR UPDATE`. */
+  async lockDevices(tx: DbTx, ids: readonly string[]): Promise<DeviceRecord[]> {
+    const uniqueIds = [...new Set(ids)].sort();
+    if (uniqueIds.length === 0) return [];
+    await tx.$queryRaw`
+      SELECT id FROM managed_devices WHERE id = ANY(${uniqueIds}::uuid[]) ORDER BY id ASC FOR UPDATE`;
+
+    return tx.managedDevice.findMany({ where: { id: { in: uniqueIds } }, select: DEVICE_SELECT });
+  }
+
   async deviceIdByAssetCode(tx: DbTx, organizationId: string, normalizedAssetCode: string): Promise<string | null> {
     const row = await tx.managedDevice.findUnique({
       where: { organizationId_normalizedAssetCode: { organizationId, normalizedAssetCode } },
@@ -101,6 +122,10 @@ export class RegistryRepo {
       organizationId: string;
       assetCode: string;
       normalizedAssetCode: string;
+      assetCodeOrigin: 'GENERATED' | 'LEGACY';
+      deviceType: 'LAP' | 'PC' | 'OTH';
+      serialNumber: string | null;
+      normalizedSerialNumber: string | null;
       hostname: string;
       os: string;
       createdByAppUserId: string;
@@ -109,12 +134,80 @@ export class RegistryRepo {
     return tx.managedDevice.create({ data: input, select: DEVICE_SELECT });
   }
 
-  async retireDevice(tx: DbTx, id: string, retiredAt: Date, reason: string): Promise<void> {
-    await tx.managedDevice.update({ where: { id }, data: { retiredAt, retirementReason: reason } });
+  async retireDevice(
+    tx: DbTx,
+    id: string,
+    retiredAt: Date,
+    reason: string,
+    kind: 'DISPOSED' | 'LOST' = 'DISPOSED',
+  ): Promise<void> {
+    await tx.managedDevice.update({
+      where: { id },
+      data: { retiredAt, retirementReason: reason, retirementKind: kind },
+    });
+  }
+
+  /** Updates void metadata when an untouched machine record is voided. */
+  async voidDevice(
+    tx: DbTx,
+    id: string,
+    input: { voidedAt: Date; voidReason: string; voidedByAppUserId: string },
+  ): Promise<void> {
+    await tx.managedDevice.update({
+      where: { id },
+      data: {
+        voidedAt: input.voidedAt,
+        voidReason: input.voidReason,
+        voidedByAppUserId: input.voidedByAppUserId,
+      },
+    });
+  }
+
+  /** Checks whether a machine has any signature record or issued credential preventing voiding. */
+  async readVoidHistory(tx: DbTx, deviceId: string): Promise<{ hasSignatureRecord: boolean; hasCredential: boolean }> {
+    const sigCount = await tx.deviceSignatureRecord.count({ where: { registration: { deviceId } }, take: 1 });
+    const credCount = await tx.deviceCredential.count({ where: { deviceId }, take: 1 });
+
+    return { hasSignatureRecord: sigCount > 0, hasCredential: credCount > 0 };
+  }
+
+  async hasOpenReturnTask(tx: DbTx, deviceId: string): Promise<boolean> {
+    return (await tx.deviceReturnTask.count({ where: { deviceId, state: 'OPEN' }, take: 1 })) > 0;
+  }
+
+  async findOpenReturnTaskDepartmentId(
+    tx: DbTx,
+    deviceId: string,
+  ): Promise<{ found: boolean; id?: string | null; departmentId: string | null; employeeId?: string | null }> {
+    const task = await tx.deviceReturnTask.findFirst({
+      where: { deviceId, state: 'OPEN' },
+      select: { id: true, departmentId: true, employeeId: true },
+    });
+
+    return {
+      found: task !== null,
+      id: task?.id ?? null,
+      departmentId: task?.departmentId ?? null,
+      employeeId: task?.employeeId ?? null,
+    };
+  }
+
+  async updateCondition(tx: DbTx, id: string, condition: DeviceCondition, conditionNote: string | null): Promise<void> {
+    await tx.managedDevice.update({
+      where: { id },
+      data: { condition, conditionNote },
+    });
   }
 
   async findRegistration(id: string, tx?: DbTx): Promise<RegistrationRecord | null> {
     const row = await (tx ?? this.prisma).deviceRegistration.findUnique({ where: { id } });
+
+    return row ? toRegistrationRecord(row) : null;
+  }
+
+  /** Unlocked lookup of the open registration of a machine so Tier 1 holder locks can precede Tier 2b device locks. */
+  async findOpenRegistration(deviceId: string, tx?: DbTx): Promise<RegistrationRecord | null> {
+    const row = await (tx ?? this.prisma).deviceRegistration.findFirst({ where: { deviceId, endedAt: null } });
 
     return row ? toRegistrationRecord(row) : null;
   }
@@ -168,6 +261,7 @@ export class RegistryRepo {
       deviceId: string;
       holderEmployeeId: string;
       validFrom: BusinessDate;
+      collectorInstalled: boolean;
       createdByAppUserId: string;
     },
   ): Promise<RegistrationRecord> {
@@ -179,11 +273,30 @@ export class RegistryRepo {
   async endRegistration(
     tx: DbTx,
     id: string,
-    end: { endedAt: Date; validUntil: BusinessDate; cause: DeviceRegistrationEndCause },
+    end: {
+      endedAt: Date;
+      validUntil: BusinessDate;
+      cause: DeviceRegistrationEndCause;
+      softwareRemoval?: { outcome: 'REMOVED' | 'NOT_REMOVABLE'; note: string | null };
+    },
   ): Promise<void> {
     await tx.deviceRegistration.update({
       where: { id },
-      data: { endedAt: end.endedAt, validUntil: toDateColumn(end.validUntil), endCause: end.cause },
+      data: {
+        endedAt: end.endedAt,
+        validUntil: toDateColumn(end.validUntil),
+        endCause: end.cause,
+        ...(end.softwareRemoval
+          ? { softwareRemoval: end.softwareRemoval.outcome, softwareRemovalNote: end.softwareRemoval.note }
+          : {}),
+      },
+    });
+  }
+
+  async enableCollector(tx: DbTx, id: string): Promise<void> {
+    await tx.deviceRegistration.update({
+      where: { id },
+      data: { collectorInstalled: true },
     });
   }
 

@@ -2,6 +2,8 @@ import { CatalogApi } from '../catalog/public/catalog.api';
 import type { CatalogOnboardingFacts } from '../catalog/public/catalog.types';
 import { DataImportApi } from '../data-import/public/data-import.api';
 import { LatestEmployeeImport } from '../data-import/public/data-import.types';
+import { DevicesApi } from '../devices/public/devices.api';
+import type { DeviceInitialRecordProgress } from '../devices/public/devices.types';
 import { IdentityAccessApi } from '../identity-access/public/identity-access.api';
 import { LicensingSeatBaselineApi } from '../licensing/public/licensing-seat-baseline.api';
 import type { BaselineProgress } from '../licensing/public/licensing.types';
@@ -31,6 +33,11 @@ const progress = (overrides: Partial<BaselineProgress> = {}): BaselineProgress =
   assignments: 0,
   ...overrides,
 });
+const deviceProgress = (overrides: Partial<DeviceInitialRecordProgress> = {}): DeviceInitialRecordProgress => ({
+  initialRecords: 0,
+  signaturesMissing: 0,
+  ...overrides,
+});
 
 /** The service with in-memory collaborators; `checklist` is asked as an IT Admin unless the case names the roles. */
 function serviceWith(
@@ -39,6 +46,7 @@ function serviceWith(
   usableItAdmins: string[] = [],
   catalog: CatalogOnboardingFacts = catalogFacts(),
   baseline: BaselineProgress = progress(),
+  devices: DeviceInitialRecordProgress = deviceProgress(),
 ) {
   const reads: string[] = [];
   const service = new OnboardingService(
@@ -55,6 +63,7 @@ function serviceWith(
     { latestEmployeeImport: () => Promise.resolve(latest) } as unknown as DataImportApi,
     { getOnboardingFacts: () => Promise.resolve(catalog) } as unknown as CatalogApi,
     { getBaselineProgress: () => Promise.resolve(baseline) } as unknown as LicensingSeatBaselineApi,
+    { initialRecordProgress: () => Promise.resolve(devices) } as unknown as DevicesApi,
   );
 
   return { reads, checklist: (roles: readonly string[] = ['IT_ADMIN']) => service.checklist({ roles }) };
@@ -71,7 +80,7 @@ describe('onboarding checklist (US-02-04)', () => {
     it.each([['SUPER_ADMIN'], ['IT_ADMIN']])('lets the %s read it', async (role) => {
       const { steps } = await serviceWith(facts(), null).checklist([role]);
 
-      expect(steps).toHaveLength(5);
+      expect(steps).toHaveLength(6);
     });
 
     it.each([['FINANCE'], ['MANAGER'], ['EMPLOYEE'], ['SPENDING_APPROVER']])(
@@ -272,10 +281,53 @@ describe('onboarding checklist (US-02-04)', () => {
     expect(steps[4]).toEqual({ step: 5, key: 'USAGE', status: 'NOT_AVAILABLE', reasons: ['NOT_BUILT_YET'] });
   });
 
-  it('has five steps and nothing else: the standard toolset is not suggested any more (QĐ-87h)', async () => {
+  it('has six steps and nothing else: the standard toolset is not suggested any more (QĐ-87h, W2-13)', async () => {
     const checklist = await serviceWith(facts(), null).checklist();
 
     expect(Object.keys(checklist)).toEqual(['steps']);
-    expect(checklist.steps).toHaveLength(5);
+    expect(checklist.steps).toHaveLength(6);
+  });
+
+  describe('step 6, initial device records (W2-13, QĐ-116n)', () => {
+    it.each([
+      ['no initial device yet', { initialRecords: 0, signaturesMissing: 0 }, 'INCOMPLETE', ['NO_INITIAL_DEVICE']],
+      [
+        'initial devices recorded but open registrations missing BM-06 signature',
+        { initialRecords: 2, signaturesMissing: 1 },
+        'INCOMPLETE',
+        ['SIGNATURES_MISSING'],
+      ],
+      [
+        'no initial device and missing signatures',
+        { initialRecords: 0, signaturesMissing: 1 },
+        'INCOMPLETE',
+        ['NO_INITIAL_DEVICE', 'SIGNATURES_MISSING'],
+      ],
+      [
+        'at least one initial device and all open registrations signed',
+        { initialRecords: 1, signaturesMissing: 0 },
+        'DONE',
+        [],
+      ],
+    ])('is %s -> %s', async (_label, over, expectedStatus, expectedReasons) => {
+      const { steps } = await serviceWith(
+        facts(),
+        null,
+        [],
+        catalogFacts(),
+        progress(),
+        deviceProgress(over),
+      ).checklist();
+
+      expect(steps[5]).toEqual({
+        step: 6,
+        key: 'DEVICE_INITIAL_RECORDS',
+        status: expectedStatus,
+        reasons: expectedReasons,
+        facts: over,
+      });
+      // Step 4 SEAT_BASELINE stays unblocked by step 6 even when step 6 is incomplete.
+      expect(steps[3]).toMatchObject({ step: 4, key: 'SEAT_BASELINE', status: 'INCOMPLETE', reasons: [] });
+    });
   });
 });

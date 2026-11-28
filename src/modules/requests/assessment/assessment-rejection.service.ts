@@ -41,7 +41,7 @@ export class AssessmentRejectionService {
   ): Promise<AccessRequestRecord> {
     return this.runner.run(async (tx) => {
       const request = await this.gate.lockProposal(tx, requestId);
-      this.gate.requireAssessor(actor, request);
+      const { bySubstitute } = await this.gate.requireAssessor(tx, actor, request);
       if (
         body.alternativePlanId !== undefined &&
         (await this.catalog.getPlanSummaries([body.alternativePlanId], tx)).length === 0
@@ -79,6 +79,7 @@ export class AssessmentRejectionService {
             alternativePlanId: body.alternativePlanId ?? null,
             withAlternative: body.alternativePlanId !== undefined || body.alternativeNote !== undefined,
             actingForAssignee: standsIn,
+            ...(bySubstitute ? { bySubstitute: true } : {}),
           },
         ),
       );

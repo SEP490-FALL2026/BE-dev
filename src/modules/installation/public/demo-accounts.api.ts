@@ -73,6 +73,18 @@ export class DemoAccountsApi {
     });
   }
 
+  /** Seeds idempotent `seat_month_runs` marks for closed months `1..upToMonth` before seeded requests run spend checks. */
+  async markClosedSeatMonths(
+    organizationId: string,
+    year: number,
+    upToMonth: number,
+    subscriptionIds: readonly string[],
+  ): Promise<number> {
+    return this.runner.run((tx) =>
+      this.budgetCycles.markClosedSeatMonths(tx, organizationId, year, upToMonth, subscriptionIds),
+    );
+  }
+
   /**
    * Holds the apply lock of a fixture on this database for as long as the run writes: a second `apply` of the same
    * fixture on the same database is refused while one runs (null). Released by `release()`, or by the server when the

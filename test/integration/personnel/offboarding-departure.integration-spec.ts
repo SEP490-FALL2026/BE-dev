@@ -267,9 +267,10 @@ describe('the departure of a person, the revocations and the closing (integratio
         [k4Seat, h.seed.organizationId, await h.planOf(k4), k4, person.employeeId, randomUUID()],
       );
       // BR-MF1-09 / QĐ-103d: K4 is revocable now (its key goes back to the store); K3 is the kind left with no revocation.
-      await h.ctx.sql.query(`UPDATE plans SET provisioning_type = 'K3', pricing_model = NULL WHERE id = $1`, [
-        await h.planOf(k4),
-      ]);
+      await h.ctx.sql.query(
+        `UPDATE plans SET provisioning_type = 'K3', pricing_model = NULL, key_binding = NULL WHERE id = $1`,
+        [await h.planOf(k4)],
+      );
       seats.push(k4Seat);
       const wire = await h.recordedCase(person);
       await h.leaveOnLastDay(wire.id).expect(200);

@@ -109,10 +109,10 @@ export class SubscriptionHttpHarness {
     await this.ctx.sql.query(
       `INSERT INTO subscriptions (id, organization_id, plan_id, kind, status, purchased_quantity,
          unit_price_minor, unit_price_currency, price_recorded_on, price_rate, price_rate_date, price_rate_source,
-         price_reporting_minor, price_reporting_currency, billing_cycle, commitment_term_months, start_date, end_date,
-         responsible_it_admin_employee_id)
-       VALUES ($1, $2, $3, 'TERM', 'DRAFT', 5, 250000, 'VND', $4, 1, $4, 'SAME_CURRENCY', 250000, 'VND', 'ANNUAL', 12, $4,
-         '2027-03-14', $5)`,
+         price_reporting_minor, price_reporting_currency, monthly_unit_price_minor, billing_cycle, commitment_term_months,
+         start_date, end_date, responsible_it_admin_employee_id)
+       VALUES ($1, $2, $3, 'TERM', 'DRAFT', 5, 250000, 'VND', $4, 1, $4, 'SAME_CURRENCY', 250000, 'VND', 20833,
+         'ANNUAL', 12, $4, '2027-03-14', $5)`,
       [
         id,
         this.seed.organizationId,
@@ -168,7 +168,7 @@ export class SubscriptionHttpHarness {
   create = (body: object, account: ApiAccount = this.it1) => {
     const { kind, billingCycle } = body as { kind?: string; billingCycle?: string };
     // A subscription that becomes active names the months it commits to and the IT Admin who answers for it (QĐ-103e, QĐ-103v(4)):
-    // the commitment follows the cycle the body names, and the IT Admin of the harness answers unless the body says otherwise.
+    // the commitment follows the cycle the body names, and the IT Admin who declares answers for it.
     const commitment =
       kind === 'PERPETUAL' || billingCycle === undefined
         ? {}
@@ -177,11 +177,7 @@ export class SubscriptionHttpHarness {
     return request(this.server())
       .post('/api/v1/subscriptions')
       .set(this.as(account))
-      .send({
-        responsibleItAdminEmployeeId: this.it1.employeeId,
-        ...commitment,
-        ...body,
-      });
+      .send({ ...commitment, ...body });
   };
 
   patch = (id: string, body: object, account: ApiAccount = this.it1) =>

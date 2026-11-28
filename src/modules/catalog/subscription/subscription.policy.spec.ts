@@ -1,9 +1,25 @@
+import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import {
   SubscriptionDatesInvalidError,
   SubscriptionPerpetualHasNoTermError,
   SubscriptionPerpetualNeedsLicensedApplicationError,
   SubscriptionPlanHasNoSubscriptionError,
 } from './subscription.errors';
+import { toSubscriptionApiException } from './subscription.http-errors';
+
+function expectSubCode(fn: () => unknown, ErrorClass: new (...args: never[]) => Error, code: string): unknown {
+  let caught: unknown;
+  try {
+    fn();
+  } catch (error) {
+    caught = error;
+  }
+  expect(caught).toBeInstanceOf(ErrorClass);
+  const mapped = toSubscriptionApiException(caught);
+  expect(mapped).toBeInstanceOf(ApiException);
+  expect((mapped as ApiException).getResponse()).toMatchObject({ code });
+  return caught;
+}
 import {
   alertDates,
   assertSubscriptionShape,
@@ -189,14 +205,20 @@ describe('assertSubscriptionShape', () => {
   });
 
   it('gives a K5 plan of an internal application no subscription', () => {
-    expect(() => assertSubscriptionShape({ ...term, applicationKind: 'INTERNAL', planProvisioningType: 'K5' })).toThrow(
+    expectSubCode(
+      () => assertSubscriptionShape({ ...term, applicationKind: 'INTERNAL', planProvisioningType: 'K5' }),
       SubscriptionPlanHasNoSubscriptionError,
+      'SUBSCRIPTION.PLAN_HAS_NO_SUBSCRIPTION',
     );
   });
 
   it('keeps a perpetual purchase to licensed software or to a K4 plan, the plan bought once (B-5)', () => {
     const saas = { ...perpetual, applicationKind: 'SAAS' as const };
-    expect(() => assertSubscriptionShape(saas)).toThrow(SubscriptionPerpetualNeedsLicensedApplicationError);
+    expectSubCode(
+      () => assertSubscriptionShape(saas),
+      SubscriptionPerpetualNeedsLicensedApplicationError,
+      'SUBSCRIPTION.PERPETUAL_NEEDS_LICENSED_APPLICATION',
+    );
     expect(() => assertSubscriptionShape({ ...saas, planProvisioningType: 'K4' })).not.toThrow();
   });
 
@@ -209,22 +231,21 @@ describe('assertSubscriptionShape', () => {
     ['autoRenew', { autoRenew: true }],
     ['allowsMidTermReduction', { allowsMidTermReduction: true }],
   ])('AC-8: refuses %s on a perpetual purchase, naming it', (field, extra) => {
-    try {
-      assertSubscriptionShape({ ...perpetual, ...extra });
-      throw new Error('was accepted');
-    } catch (error) {
-      expect(error).toBeInstanceOf(SubscriptionPerpetualHasNoTermError);
-      expect((error as SubscriptionPerpetualHasNoTermError).fields).toEqual([field]);
-    }
+    const err = expectSubCode(
+      () => assertSubscriptionShape({ ...perpetual, ...extra }),
+      SubscriptionPerpetualHasNoTermError,
+      'SUBSCRIPTION.PERPETUAL_HAS_NO_TERM',
+    );
+    expect((err as SubscriptionPerpetualHasNoTermError).fields).toEqual([field]);
   });
 
   it('names every term field a perpetual purchase carries at once', () => {
-    try {
-      assertSubscriptionShape({ ...perpetual, endDate: '2027-01-01', autoRenew: true });
-      throw new Error('was accepted');
-    } catch (error) {
-      expect((error as SubscriptionPerpetualHasNoTermError).fields).toEqual(['endDate', 'autoRenew']);
-    }
+    const err = expectSubCode(
+      () => assertSubscriptionShape({ ...perpetual, endDate: '2027-01-01', autoRenew: true }),
+      SubscriptionPerpetualHasNoTermError,
+      'SUBSCRIPTION.PERPETUAL_HAS_NO_TERM',
+    );
+    expect((err as SubscriptionPerpetualHasNoTermError).fields).toEqual(['endDate', 'autoRenew']);
   });
 
   it.each([
@@ -232,13 +253,12 @@ describe('assertSubscriptionShape', () => {
     ['RENEWAL_AFTER_END_PLUS_ONE', { endDate: '2026-12-31', renewalDate: '2027-01-02' }],
     ['NOTICE_AFTER_RENEWAL', { renewalDate: '2026-12-01', noticeDeadline: '2026-12-31' }],
   ])('refuses dates out of order: %s', (reason, extra) => {
-    try {
-      assertSubscriptionShape({ ...term, ...extra });
-      throw new Error('was accepted');
-    } catch (error) {
-      expect(error).toBeInstanceOf(SubscriptionDatesInvalidError);
-      expect((error as SubscriptionDatesInvalidError).reason).toBe(reason);
-    }
+    const err = expectSubCode(
+      () => assertSubscriptionShape({ ...term, ...extra }),
+      SubscriptionDatesInvalidError,
+      'SUBSCRIPTION.DATES_INVALID',
+    );
+    expect((err as SubscriptionDatesInvalidError).reason).toBe(reason);
   });
 
   it('accepts the day after the end for the renewal, and equal dates', () => {
@@ -267,28 +287,13 @@ describe('what an update of a subscription makes of its state, and when it is a 
     isPrimaryForPlan: false,
   };
 
-  it('keeps what the update does not give', () => {
+  it('keeps what the update does not give, and who answers for the subscription whatever it says', () => {
     expect(nextStateOf(current, {})).toEqual(current);
+    expect(nextStateOf(current, { responsibleItAdminEmployeeId: 'it-2' } as never)).toEqual(current);
   });
 
   it('takes what the update gives, and clears the four dates and the notice period when it says null', () => {
-    expect(
-      nextStateOf(current, {
-        purchasedQuantity: 12,
-        billingCycle: 'MONTHLY',
-        startDate: '2026-02-01',
-        endDate: null,
-        renewalDate: null,
-        noticeDeadline: null,
-        noticePeriodDays: null,
-        autoRenew: true,
-        allowsMidTermReduction: false,
-        commitmentTermMonths: 1,
-        responsibleItAdminEmployeeId: 'it-2',
-        vendorMinimumSeats: null,
-        isPrimaryForPlan: true,
-      }),
-    ).toEqual({
+    const next = {
       purchasedQuantity: 12,
       billingCycle: 'MONTHLY',
       startDate: '2026-02-01',
@@ -299,10 +304,10 @@ describe('what an update of a subscription makes of its state, and when it is a 
       autoRenew: true,
       allowsMidTermReduction: false,
       commitmentTermMonths: 1,
-      responsibleItAdminEmployeeId: 'it-2',
       vendorMinimumSeats: null,
       isPrimaryForPlan: true,
-    });
+    };
+    expect(nextStateOf(current, next)).toEqual({ ...next, responsibleItAdminEmployeeId: 'it-1' });
   });
 
   it('is the same price when no price is given, or the amount and the currency are those recorded', () => {
@@ -362,22 +367,7 @@ describe('what a declared subscription starts as (US-04-03)', () => {
   });
 
   it('keeps what the declaration gives', () => {
-    expect(
-      declaredStateOf({
-        purchasedQuantity: 5,
-        billingCycle: 'ANNUAL',
-        startDate: '2026-01-01',
-        endDate: '2026-12-31',
-        renewalDate: '2026-12-31',
-        noticeDeadline: '2026-11-01',
-        noticePeriodDays: 60,
-        autoRenew: true,
-        allowsMidTermReduction: true,
-        commitmentTermMonths: 12,
-        responsibleItAdminEmployeeId: 'it-1',
-        vendorMinimumSeats: 3,
-      }),
-    ).toEqual({
+    const given = {
       purchasedQuantity: 5,
       billingCycle: 'ANNUAL',
       commitmentTermMonths: 12,
@@ -390,8 +380,8 @@ describe('what a declared subscription starts as (US-04-03)', () => {
       allowsMidTermReduction: true,
       responsibleItAdminEmployeeId: 'it-1',
       vendorMinimumSeats: 3,
-      isPrimaryForPlan: false,
-    });
+    };
+    expect(declaredStateOf(given)).toEqual({ ...given, isPrimaryForPlan: false });
   });
 });
 

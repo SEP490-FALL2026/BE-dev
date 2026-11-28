@@ -50,7 +50,7 @@ export class OffboardingRevocationService {
 
   /** Opens the revocations the IT Admin chose. Throws OffboardingRefusedError. */
   openRevocations(actor: AuthenticatedPrincipal, id: string, input: OpenRevocationsInput): Promise<RevocationsOpened> {
-    return this.frame.runTechnical(actor, id, {}, async (tx, { held, today }) => {
+    return this.frame.runTechnical(actor, id, {}, async (tx, { held, today, bySubstitute }) => {
       const blocked = isBlocked(
         held,
         ownBlock(await this.identity.findDepartureBlock(held.employeeId, tx), held.id),
@@ -74,7 +74,7 @@ export class OffboardingRevocationService {
       if (refusal) throw new OffboardingRefusedError(refusal.code, refusal.details);
 
       // The lock of the company account goes first, or with the revocations, in the same transaction (`QĐ-77i`).
-      if (input.accountLock) await this.left.writeAccountLock(tx, actor, held, input.accountLock);
+      if (input.accountLock) await this.left.writeAccountLock(tx, actor, held, input.accountLock, { bySubstitute });
       const note = input.note?.trim();
       const reason = note ? `${DEPARTURE_REVOCATION}: ${note}` : DEPARTURE_REVOCATION;
       let created = 0;
@@ -100,6 +100,7 @@ export class OffboardingRevocationService {
         reasonAdded,
         reason,
         source: this.sourceOf(held),
+        ...(bySubstitute ? { bySubstitute: true } : {}),
       });
 
       return { record: (await this.repo.find(held.id, tx)) ?? held, created, reasonAdded };

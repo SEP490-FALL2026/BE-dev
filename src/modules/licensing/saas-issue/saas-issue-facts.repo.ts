@@ -25,9 +25,9 @@ export class SaasIssueFactsRepo {
   constructor(private readonly prisma: PrismaService) {}
 
   /** The plan of each of these assignments, in one statement. */
-  async planIdsOf(assignmentIds: readonly string[]): Promise<Map<string, string>> {
+  async planIdsOf(assignmentIds: readonly string[], tx?: DbTx): Promise<Map<string, string>> {
     if (assignmentIds.length === 0) return new Map();
-    const rows = await this.prisma.licenseAssignment.findMany({
+    const rows = await (tx ?? this.prisma).licenseAssignment.findMany({
       where: { id: { in: [...assignmentIds] } },
       select: { id: true, planId: true },
     });

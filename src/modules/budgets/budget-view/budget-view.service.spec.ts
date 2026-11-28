@@ -1,10 +1,21 @@
+import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import type { CatalogPricingApi } from '../../catalog/public/catalog-pricing.api';
+import type { LicensingSeatMonthApi } from '../../licensing/public/licensing-seat-month.api';
+import type { BudgetFactsRepo } from '../budget/budget-facts.repo';
 import type { BudgetFactsService } from '../budget/budget-facts.service';
+import type { CommitmentRepo } from '../budget/commitment.repo';
+import type { InvoiceRepo } from '../budget/invoice.repo';
 import type { ReferenceFigures } from '../budget/version.repo';
-import { SeatMonthPoolService } from '../seat-month/seat-month-pool.service';
+import type { CycleRepo } from '../cycle/cycle.repo';
+import type { PendingSpendContributions } from '../public/budgets.extension-points';
+import { RunningUncommittedFactsService } from '../running-uncommitted/running-uncommitted-facts.service';
+import type { RunningUncommittedRepo } from '../running-uncommitted/running-uncommitted.repo';
+import { SharedPoolLineFactsService } from '../shared-pool-line/shared-pool-line-facts.service';
+import type { SharedPoolLineRepo } from '../shared-pool-line/shared-pool-line.repo';
 import { SeatMonthRepo } from '../seat-month/seat-month.repo';
 import { BudgetTableViewService } from './budget-table-view.service';
+import { BudgetViewNumbersService } from './budget-view-numbers.service';
 import type { BudgetViewRepo } from './budget-view.repo';
-import type { BudgetViewNumbersService } from './budget-view-numbers.service';
 
 const CC_A = 'cc-a';
 const CC_B = 'cc-b';
@@ -40,6 +51,8 @@ function serviceOver(
                 committed: held.get(key)?.held ?? 0n,
                 spent: held.get(key)?.spent ?? 0n,
                 pendingSpend: 0n,
+                runningUncommitted: 0n,
+                noPriceRightCount: 0,
                 priorPeriodAdjustment: 0n,
               },
             ];
@@ -55,7 +68,16 @@ function serviceOver(
     {
       yearTotals: jest.fn().mockResolvedValue({ companyMinor: 0n, withoutCostCenterMinor: 0n }),
     } as unknown as SeatMonthRepo,
-    { yearLineMinor: jest.fn().mockResolvedValue(0n) } as unknown as SeatMonthPoolService,
+    {
+      yearFigures: jest.fn().mockResolvedValue({
+        idleCostMinor: 0n,
+        invoiceVarianceMinor: 0n,
+        invoiceVarianceInReviewMinor: 0n,
+        deviceLotPurchasesMinor: 0n,
+        replacementKeysMinor: 0n,
+        unallocatedMinor: 0n,
+      }),
+    } as unknown as SharedPoolLineFactsService,
   );
 }
 
@@ -89,11 +111,13 @@ describe('BR-MF4-05 BudgetTableViewService.summary', () => {
       spent: { amount: '350', currency: 'VND' },
       remaining: { amount: '450', currency: 'VND' },
       pendingSpend: { amount: '0', currency: 'VND' },
+      runningUncommitted: { amount: '0', currency: 'VND' },
       remainingBase: { amount: '300', currency: 'VND' },
       remainingWithReserve: { amount: '450', currency: 'VND' },
       costCenterCount: 2,
       // A: 1000 - 300 - 200 = 500; B: 500 - 400 - 150 = -50.
       overBudgetCount: 1,
+      noPriceRightCount: 0,
     });
   });
 
@@ -144,5 +168,181 @@ describe('BR-MF4-05 BudgetTableViewService.summary', () => {
     const { totals } = await serviceOver([], new Map()).summary(2031);
 
     expect(totals).toEqual({});
+  });
+
+  it('deducts runningUncommitted from summary remaining figures and overBudgetCount', async () => {
+    const repo = {
+      rows: jest.fn().mockResolvedValue([{ ...figures(CC_A, 'VND', 900n, 100n), versionId: 'version', number: 1 }]),
+    } as unknown as BudgetViewRepo;
+    const numbers = {
+      adjustmentOf: jest.fn().mockResolvedValue(0n),
+      totals: jest.fn().mockResolvedValue(
+        new Map([
+          [
+            `${CC_A}:2027`,
+            {
+              committed: 300n,
+              spent: 200n,
+              pendingSpend: 0n,
+              runningUncommitted: 550n,
+              noPriceRightCount: 0,
+              priorPeriodAdjustment: 0n,
+            },
+          ],
+        ]),
+      ),
+      cycle: jest.fn().mockResolvedValue(null),
+      lastInvoice: jest.fn().mockResolvedValue(null),
+    } as unknown as BudgetViewNumbersService;
+    const service = new BudgetTableViewService(
+      repo,
+      numbers,
+      {
+        formatter: (currency: string) => Promise.resolve((minor: bigint) => ({ amount: minor.toString(), currency })),
+      } as unknown as BudgetFactsService,
+      {
+        yearTotals: jest.fn().mockResolvedValue({ companyMinor: 0n, withoutCostCenterMinor: 0n }),
+      } as unknown as SeatMonthRepo,
+      {
+        yearFigures: jest.fn().mockResolvedValue({
+          idleCostMinor: 0n,
+          invoiceVarianceMinor: 0n,
+          invoiceVarianceInReviewMinor: 0n,
+          deviceLotPurchasesMinor: 0n,
+          replacementKeysMinor: 0n,
+          unallocatedMinor: 0n,
+        }),
+      } as unknown as SharedPoolLineFactsService,
+    );
+
+    const { totals } = await service.summary(2027);
+
+    expect(totals.VND.runningUncommitted).toEqual({ amount: '550', currency: 'VND' });
+    expect(totals.VND.remainingBase).toEqual({ amount: '-150', currency: 'VND' });
+    expect(totals.VND.remainingWithReserve).toEqual({ amount: '-50', currency: 'VND' });
+    expect(totals.VND.remaining).toEqual({ amount: '-50', currency: 'VND' });
+    expect(totals.VND.overBudgetCount).toBe(1);
+  });
+
+  it('exposes noPriceRightCount in budgetTable rows and sums it in budgetSummary when unrequested K1 rights lack reference price (D-17)', async () => {
+    const licensing = {
+      getSeatsInForceOn: jest.fn().mockResolvedValue([]),
+      getUnrequestedK1SeatsInForceOn: jest.fn().mockResolvedValue([
+        {
+          assignmentId: 'k1-a-1',
+          planId: 'plan-no-price',
+          employeeId: 'emp-a',
+          kind: 'PERSONAL',
+          owningDepartmentId: null,
+          heldFrom: '2027-01-01',
+          heldUntil: null,
+          billingAnchorOn: '2027-01-01',
+          referenceMonthlyPriceMinor: null,
+        },
+        {
+          assignmentId: 'k1-a-2',
+          planId: 'plan-no-price',
+          employeeId: 'emp-a',
+          kind: 'PERSONAL',
+          owningDepartmentId: null,
+          heldFrom: '2027-01-01',
+          heldUntil: null,
+          billingAnchorOn: '2027-01-01',
+          referenceMonthlyPriceMinor: null,
+        },
+        {
+          assignmentId: 'k1-b-1',
+          planId: 'plan-no-price',
+          employeeId: 'emp-b',
+          kind: 'PERSONAL',
+          owningDepartmentId: null,
+          heldFrom: '2027-01-01',
+          heldUntil: null,
+          billingAnchorOn: '2027-01-01',
+          referenceMonthlyPriceMinor: null,
+        },
+      ]),
+    } as unknown as LicensingSeatMonthApi;
+
+    const organization = {
+      getOrganization: jest.fn().mockResolvedValue({
+        id: 'org-1',
+        name: 'Acme',
+        timeZone: 'Asia/Ho_Chi_Minh',
+        reportingCurrency: 'VND',
+      }),
+      businessToday: jest.fn().mockResolvedValue('2027-07-08'),
+      getOwningUnits: jest.fn().mockResolvedValue(
+        new Map([
+          ['emp-a', { costCenter: { id: CC_A } }],
+          ['emp-b', { costCenter: { id: CC_B } }],
+        ]),
+      ),
+      getUnitCostCenterIds: jest.fn().mockResolvedValue(new Map()),
+    } as unknown as OrganizationReadApi;
+
+    const runningUncommitted = new RunningUncommittedFactsService(
+      licensing,
+      {} as CatalogPricingApi,
+      organization,
+      {} as RunningUncommittedRepo,
+      {} as SharedPoolLineRepo,
+    );
+
+    const numbers = new BudgetViewNumbersService(
+      { totals: jest.fn().mockResolvedValue(new Map()) } as unknown as CommitmentRepo,
+      { totals: jest.fn().mockResolvedValue(new Map()) } as unknown as PendingSpendContributions,
+      {
+        priorPeriodAdjustments: jest.fn().mockResolvedValue(new Map()),
+        lastRecordedAt: jest.fn().mockResolvedValue(null),
+      } as unknown as InvoiceRepo,
+      { findByYear: jest.fn().mockResolvedValue(null) } as unknown as CycleRepo,
+      organization,
+      {} as BudgetFactsRepo,
+      runningUncommitted,
+    );
+
+    const viewRows = [
+      { ...figures(CC_A, 'VND', 900n, 100n), versionId: 'ver-a', number: 1, adjustmentMinor: 0n },
+      { ...figures(CC_B, 'VND', 450n, 50n), versionId: 'ver-b', number: 1, adjustmentMinor: 0n },
+    ];
+    const repo = {
+      page: jest.fn().mockResolvedValue({ items: viewRows, total: 2 }),
+      rows: jest.fn().mockResolvedValue(viewRows),
+    } as unknown as BudgetViewRepo;
+
+    const service = new BudgetTableViewService(
+      repo,
+      numbers,
+      {
+        costCenters: jest.fn().mockResolvedValue(
+          new Map([
+            [CC_A, { id: CC_A, code: 'CCA', name: 'Cost Center A' }],
+            [CC_B, { id: CC_B, code: 'CCB', name: 'Cost Center B' }],
+          ]),
+        ),
+        formatter: (currency: string) => Promise.resolve((minor: bigint) => ({ amount: minor.toString(), currency })),
+      } as unknown as BudgetFactsService,
+      {
+        yearTotals: jest.fn().mockResolvedValue({ companyMinor: 0n, withoutCostCenterMinor: 0n }),
+      } as unknown as SeatMonthRepo,
+      {
+        yearFigures: jest.fn().mockResolvedValue({
+          idleCostMinor: 0n,
+          invoiceVarianceMinor: 0n,
+          invoiceVarianceInReviewMinor: 0n,
+          deviceLotPurchasesMinor: 0n,
+          replacementKeysMinor: 0n,
+          unallocatedMinor: 0n,
+        }),
+      } as unknown as SharedPoolLineFactsService,
+    );
+
+    const table = await service.table({ year: 2027, page: 1, pageSize: 20 });
+    expect(table.items[0]).toMatchObject({ costCenter: { id: CC_A }, noPriceRightCount: 2 });
+    expect(table.items[1]).toMatchObject({ costCenter: { id: CC_B }, noPriceRightCount: 1 });
+
+    const summary = await service.summary(2027);
+    expect(summary.totals.VND).toMatchObject({ noPriceRightCount: 3 });
   });
 });

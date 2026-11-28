@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../../audit/public/audit.api';
+import { OrganizationApi } from '../../../organization/public/organization.api';
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { licensingAuditEvent } from '../../licensing-audit-event.mapper';
 import { RevocationListeners } from '../../public/licensing.extension-points';
@@ -28,6 +29,7 @@ export class RevocationWithdrawalService {
   constructor(
     private readonly tasks: ProvisioningTaskRepo,
     private readonly reasons: ProvisioningTaskReasonRepo,
+    private readonly organization: OrganizationApi,
     private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly revocation: RevocationListeners,
@@ -55,8 +57,15 @@ export class RevocationWithdrawalService {
       cancelInProgressClaimedBy: input.cancelInProgressClaimedBy,
     });
     const cancelled = outcome === 'CANCELLED';
-    if (cancelled) await this.tasks.markCancelled(tx, task.id, actor.appUserId, NO_LONGER_APPLIES, now);
-    else await this.tasks.markTiming(tx, task.id, effectiveTiming(remaining));
+    if (cancelled) {
+      await this.tasks.markCancelled(tx, task.id, actor.appUserId, NO_LONGER_APPLIES, now);
+      await this.organization.endUnplacedWorkDesignations(tx, {
+        workKind: 'PROVISIONING_TASK',
+        workId: task.id,
+        endedByAppUserId: actor.appUserId,
+        endedAt: now,
+      });
+    } else await this.tasks.markTiming(tx, task.id, effectiveTiming(remaining));
 
     await this.record(tx, actor, { task, reason, input, remaining: remaining.length, outcome });
     await this.revocation.emit(tx, {

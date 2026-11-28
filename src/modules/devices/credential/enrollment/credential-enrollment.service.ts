@@ -6,6 +6,7 @@ import { AuditApi } from '../../../audit/public/audit.api';
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { byUser, devicesEvent } from '../../devices-audit-event.mapper';
 import {
+  CredentialCollectorNotInstalledError,
   CredentialRegistrationEndedError,
   CredentialRegistrationNotFoundError,
   CredentialSignatureRecordMissingError,
@@ -62,6 +63,7 @@ export class CredentialEnrollmentService {
       const registration = await this.repo.lockRegistrationForCode(tx, registrationId);
       if (!registration) throw new CredentialRegistrationNotFoundError();
       if (registration.endedAt) throw new CredentialRegistrationEndedError();
+      if (!registration.collectorInstalled) throw new CredentialCollectorNotInstalledError();
       if (!registration.signatureRecorded) throw new CredentialSignatureRecordMissingError();
       await this.repo.insertCode(tx, {
         organizationId: registration.organizationId,

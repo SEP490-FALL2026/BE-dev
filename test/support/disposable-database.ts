@@ -1,5 +1,6 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { Client } from 'pg';
+import { installLegacyPerpetualLotBridge } from './legacy-perpetual-lot-bridge';
 import { MIGRATE_TIMEOUT_MS, deployMigrations, migrationFailure, recordCopy, recordTimings } from './migration-deploy';
 
 export const MARKER_TABLE = 'disposable_test_run';
@@ -294,6 +295,7 @@ export async function migrateDisposableDatabase(
   );
   recordTimings(database.name, phases);
   if (phases.outcome !== 'applied') throw new DisposableDatabaseError(migrationFailure(phases));
+  await installLegacyPerpetualLotBridge(database.url);
 }
 
 /** The migrated template of this Jest run, named in the environment by `prepareMigratedTemplate` (globalSetup). */

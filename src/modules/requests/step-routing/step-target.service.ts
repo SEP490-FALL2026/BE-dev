@@ -31,9 +31,16 @@ export class StepTargetService {
     private readonly routing: RoutingFactsService,
   ) {}
 
-  async assessmentTarget(tx: DbTx, requesterEmployeeId: string, now: Date): Promise<string | null> {
-    const today = await this.organizationReads.businessToday(now, tx);
-    return (await this.organizationReads.getItAdminInCharge(requesterEmployeeId, today, tx))?.itAdminEmployeeId ?? null;
+  async assessmentTarget(tx: DbTx, departmentId: string): Promise<string | null> {
+    const acting = (
+      await this.organizationReads.itAdminsActingFor(
+        [departmentId],
+        (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
+        tx,
+      )
+    ).get(departmentId);
+
+    return acting?.defaultAssignee ?? null;
   }
 
   /**
@@ -122,10 +129,16 @@ export class StepTargetService {
           : { assigneeEmployeeId: null, reason: assignment.reason };
       }
       case 'IT_ASSESSMENT': {
-        const inCharge = await this.organizationReads.getItAdminInCharge(request.requesterEmployeeId, facts.today, tx);
+        const acting = (
+          await this.organizationReads.itAdminsActingFor(
+            [request.departmentId],
+            (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
+            tx,
+          )
+        ).get(request.departmentId);
 
-        return inCharge?.itAdminEmployeeId
-          ? { assigneeEmployeeId: inCharge.itAdminEmployeeId, routingRow: null }
+        return acting?.defaultAssignee
+          ? { assigneeEmployeeId: acting.defaultAssignee, routingRow: null }
           : { assigneeEmployeeId: null, reason: 'NO_IT_ADMIN_IN_CHARGE' };
       }
     }

@@ -8,7 +8,7 @@ import {
   OBJECT_STORAGE_ENVIRONMENT_KEYS,
   validateObjectStorageEnvironment,
 } from '../object-storage/object-storage.config';
-import { QUEUE_ENVIRONMENT_KEYS, validateQueueEnvironment } from '../queue/queue.config';
+import { REDIS_ENVIRONMENT_KEYS, validateRedisEnvironment } from '../redis/redis.config';
 import { EnvironmentValidationError, validateEnvironment } from './env-schema';
 
 /**
@@ -35,7 +35,7 @@ const COMPOSE_ONLY = new Set([
 ]);
 
 /** Owned by modules the API and the worker do not mount today (the Owner keeps them on standby); validated when a later slice mounts them. */
-const NOT_MOUNTED: ReadonlySet<string> = new Set([...OBJECT_STORAGE_ENVIRONMENT_KEYS, ...QUEUE_ENVIRONMENT_KEYS]);
+const NOT_MOUNTED: ReadonlySet<string> = new Set(OBJECT_STORAGE_ENVIRONMENT_KEYS);
 
 /**
  * Owned and checked by one module when it is mounted, and read by nothing else: the AI service of `ai-assist`.
@@ -127,7 +127,7 @@ describe('.env.example', () => {
     ).toEqual([]);
   });
 
-  it('marks exactly what object storage and the queue require in production once their module is mounted (ADR-0014, E2 = A)', () => {
+  it('marks exactly what object storage requires in production once its module is mounted', () => {
     const required = (validate: () => unknown): string[] => {
       try {
         validate();
@@ -141,17 +141,11 @@ describe('.env.example', () => {
     };
     const marked = entries.filter((entry) => entry.productionRequiredWhenMounted).map((entry) => entry.name);
 
-    expect(marked.sort()).toEqual(
-      [
-        ...required(() => validateObjectStorageEnvironment({ NODE_ENV: 'production' })),
-        ...required(() => validateQueueEnvironment({ NODE_ENV: 'production' })),
-        // Not a Joi requirement but a production rule of the queue: an unauthenticated Redis is refused.
-        'REDIS_PASSWORD',
-      ].sort(),
-    );
-    expect(() => validateQueueEnvironment({ NODE_ENV: 'production', REDIS_HOST: 'redis.internal' })).toThrow(
-      'REDIS_PASSWORD',
-    );
+    expect(marked.sort()).toEqual(required(() => validateObjectStorageEnvironment({ NODE_ENV: 'production' })).sort());
+    expect(REDIS_ENVIRONMENT_KEYS.filter((key) => !schemaNames().includes(key))).toEqual([]);
+    const missingPassword = () => validateRedisEnvironment({ NODE_ENV: 'production', REDIS_HOST: 'redis.internal' });
+    expect(missingPassword).toThrow(EnvironmentValidationError);
+    expect(missingPassword).toThrow('REDIS_PASSWORD');
   });
 
   it('never lists a removed variable', () => {
@@ -171,7 +165,8 @@ describe('.env.example', () => {
   it('marks exactly the variables the production validator requires', () => {
     const marked = entries.filter((entry) => entry.productionRequired).map((entry) => entry.name);
 
-    expect(marked.sort()).toEqual(requiredNames('production').sort());
+    // Redis requires authentication after Joi has reported all missing variables.
+    expect(marked.sort()).toEqual([...requiredNames('production'), 'REDIS_PASSWORD'].sort());
   });
 
   it('marks exactly the variables development must supply itself, the secrets with no fallback outside test (E3 = C)', () => {

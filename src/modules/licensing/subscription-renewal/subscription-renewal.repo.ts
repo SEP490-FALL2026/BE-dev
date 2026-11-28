@@ -23,7 +23,12 @@ type EventRow = Prisma.SubscriptionDeadlineEventGetPayload<object>;
 
 /** The role stored with a decision; the ones of before the one-write renewal are kept for the cases already decided. */
 function deciderRoleOf(stored: string | null): DeciderRole {
-  if (stored === 'OWNER_DEPARTMENT_HEAD' || stored === 'CONFLICT_SUBSTITUTE' || stored === 'IT_ADMIN_IN_CHARGE') {
+  if (
+    stored === 'OWNER_DEPARTMENT_HEAD' ||
+    stored === 'CONFLICT_SUBSTITUTE' ||
+    stored === 'IT_ADMIN_IN_CHARGE' ||
+    stored === 'SYSTEM'
+  ) {
     return stored;
   }
 
@@ -344,5 +349,19 @@ export class SubscriptionRenewalRepo {
     ]);
 
     return { items: rows.map(toEvent), total };
+  }
+
+  /** Line targets recorded for `renewalId`, ordered by line id; empty when none. */
+  async lineTargetsOfRenewal(
+    renewalId: string,
+    tx?: DbTx,
+  ): Promise<{ subscriptionLineId: string; recordedQuantity: number | null; target: number; seatsNeeded: number }[]> {
+    const rows = await (tx ?? this.prisma).subscriptionLineTarget.findMany({
+      where: { renewalId },
+      select: { subscriptionLineId: true, recordedQuantity: true, target: true, seatsNeeded: true },
+      orderBy: { subscriptionLineId: 'asc' },
+    });
+
+    return rows;
   }
 }

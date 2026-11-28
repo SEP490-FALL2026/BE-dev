@@ -23,7 +23,7 @@ export interface SaasIssueRecord {
   description: string;
   occurredAt: Date;
   state: SaasIssueState;
-  assignedItAdminEmployeeId: string;
+  assignedItAdminEmployeeId: string | null;
   assignedByFallback: boolean;
   responseDueOn: BusinessDate;
   responseOverdueNoticedAt: Date | null;
@@ -62,7 +62,7 @@ export interface NewSaasIssue {
   impact: SaasIssueImpact;
   description: string;
   occurredAt: Date;
-  assignedItAdminEmployeeId: string;
+  assignedItAdminEmployeeId: string | null;
   assignedByFallback: boolean;
   responseDueOn: BusinessDate;
 }
@@ -231,6 +231,23 @@ export class SaasIssueRepo {
     return toRecord(row);
   }
 
+  /** Assigns an unassigned report to an IT Admin (allowed once by the database trigger while in NEW). */
+  async assignUnassigned(
+    tx: DbTx,
+    id: string,
+    assignee: { employeeId: string; byFallback: boolean },
+  ): Promise<SaasIssueRecord> {
+    const row = await tx.saasIssue.update({
+      where: { id },
+      data: {
+        assignedItAdminEmployeeId: assignee.employeeId,
+        assignedByFallback: assignee.byFallback,
+      },
+    });
+
+    return toRecord(row);
+  }
+
   async insertEntry(tx: DbTx, input: NewEntry): Promise<EntryRecord> {
     const row = await tx.saasIssueEntry.create({ data: { id: randomUUID(), ...input } });
 
@@ -284,6 +301,25 @@ export class SaasIssueRepo {
     );
   }
 
+  /** The new reports that have no IT Admin assigned yet, oldest first. */
+  async listUnassigned(limit: number, after?: { createdAt: Date; id: string } | null): Promise<SaasIssueRecord[]> {
+    const rows = await this.prisma.saasIssue.findMany({
+      where: {
+        state: 'NEW',
+        assignedItAdminEmployeeId: null,
+        ...(after
+          ? {
+              OR: [{ createdAt: { gt: after.createdAt } }, { createdAt: after.createdAt, id: { gt: after.id } }],
+            }
+          : {}),
+      },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      take: limit,
+    });
+
+    return rows.map(toRecord);
+  }
+
   /** The resolved reports whose last day to reopen has passed, the oldest first. */
   async listLapsed(today: BusinessDate, limit: number): Promise<SaasIssueRecord[]> {
     const rows = await this.prisma.saasIssue.findMany({
@@ -314,5 +350,40 @@ export class SaasIssueRepo {
        RETURNING id`;
 
     return rows.length > 0;
+  }
+
+  /**
+   * The first `take` unclosed SaaS issue reports belonging to the department (either via the assignment's owning department or
+   * via a reporter currently placed in the department), ordered by id, and how many there are in all.
+   */
+  async openOfDepartment(
+    departmentId: string,
+    reporterEmployeeIds: readonly string[],
+    take: number,
+    tx?: DbTx,
+  ): Promise<{ items: { id: string; code: string }[]; total: number }> {
+    const db = tx ?? this.prisma;
+    const departmentMatch: Prisma.SaasIssueWhereInput =
+      reporterEmployeeIds.length > 0
+        ? {
+            OR: [
+              { assignment: { owningDepartmentId: departmentId } },
+              { reporterEmployeeId: { in: [...reporterEmployeeIds] } },
+            ],
+          }
+        : { assignment: { owningDepartmentId: departmentId } };
+    const where: Prisma.SaasIssueWhereInput = {
+      state: { notIn: ['CLOSED', 'DUPLICATE'] },
+      ...departmentMatch,
+    };
+    const rows = await db.saasIssue.findMany({
+      where,
+      select: { id: true, code: true },
+      orderBy: { id: 'asc' },
+      take: Math.max(0, take),
+    });
+    const total = await db.saasIssue.count({ where });
+
+    return { items: rows, total };
   }
 }

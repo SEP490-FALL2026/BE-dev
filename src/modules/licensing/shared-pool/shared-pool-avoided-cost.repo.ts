@@ -6,6 +6,48 @@ import type { AvoidedCost } from './shared-pool.policy';
 /** The one writer of `pool_grant_avoided_costs`: one row for each task that granted from the pool, never changed (`QĐ-106e`). */
 @Injectable()
 export class SharedPoolAvoidedCostRepo {
+  /** Records the pre-computed avoided cost of a pool grant task (idempotent per task). */
+  async recordForTask(
+    tx: DbTx,
+    taskId: string,
+    amount: { amountMinor: bigint; currency: string },
+    completedOn: BusinessDate,
+  ): Promise<void> {
+    const task = await tx.provisioningTask.findUnique({
+      where: { id: taskId },
+      select: {
+        id: true,
+        organizationId: true,
+        assignmentId: true,
+        requestId: true,
+        assignment: {
+          select: {
+            planId: true,
+            plan: { select: { provisioningType: true } },
+          },
+        },
+      },
+    });
+    const kind = task?.assignment.plan.provisioningType;
+    if (!task || task.requestId === null || (kind !== 'K2' && kind !== 'K4')) return;
+
+    await this.record(tx, {
+      organizationId: task.organizationId,
+      provisioningTaskId: task.id,
+      assignmentId: task.assignmentId,
+      requestId: task.requestId,
+      planId: task.assignment.planId,
+      recordedOn: completedOn,
+      cost: {
+        provisioningType: kind,
+        months: null,
+        unitMinor: amount.amountMinor,
+        amountMinor: amount.amountMinor,
+        currency: amount.currency,
+      },
+    });
+  }
+
   /** Records the cost avoided by the task; a task already recorded is left as it is, so completing it twice adds nothing. */
   async record(
     tx: DbTx,

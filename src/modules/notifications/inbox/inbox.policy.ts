@@ -118,6 +118,8 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   BUDGET_REVIEW_DUE: ['year', 'month'],
   BUDGET_REVIEW_SUMMARY: ['periodId', 'year', 'month', 'kind', 'greenCount', 'yellowCount', 'redCount', 'underCount'],
   BUDGET_SHARED_POOL_OVER_RESERVE: ['year', 'month'],
+  IDLE_SEAT_COST_RATIO_HIGH: ['subscriptionId', 'month', 'ratioPercent'],
+  LICENSE_LOT_IDLE_COST_HIGH: ['lotId', 'month', 'ratioPercent'],
   // The use of the budget of a Cost Center reached 80 or 100 percent of its base (`QĐ-111af`, RV-2): the Cost Center, the year and the threshold, never a figure.
   BUDGET_THRESHOLD_REACHED: ['costCenterId', 'year', 'threshold'],
   // The head of a department is reminded to explain a Cost Center of a quarterly review (`QĐ-111ah`, B-7): on the due day and every Monday until they explain or Finance signs.
@@ -198,7 +200,8 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   USAGE_SOURCE_STALE: ['applicationId', 'source', 'coverageTo', 'freshnessDays'],
   // MF-2 (`QĐ-110b`–`QĐ-110e`): the people and the days of a departure, how many rights wait. `DEPARTURE_ACCESS_BLOCKED` is told at the block moment, once for
   // each `audience`: `SUPER_ADMIN` to mark the person as left; `IT_ADMIN` to **block** the company account (item 1a of `BM-08`: reset the password of the
-  // mailbox and sign out every session; the mailbox is not locked yet, that is item 1b) and to open the revocation by `revocationDueOn`. `blockedOn` is the
+  // mailbox and sign out every session; the mailbox is not locked yet, that is item 1b) and to open the revocation by `revocationDueOn`;
+  // `SUPER_ADMIN_AND_IT_ADMIN` is the one notice of a Super Admin who must do both (no IT Admin of the department can act). `blockedOn` is the
   // first day the person is refused. `ACCOUNT_LOCK_OVERDUE` says item 1a of a departure blocked now was still not recorded at the end of the day `blockedOn`.
   REVOCATION_OVERDUE: ['caseId', 'employeeId', 'dueOn', 'rightCount'],
   DEPARTURE_ACCESS_BLOCKED: ['caseId', 'employeeId', 'departmentId', 'blockedOn', 'revocationDueOn', 'audience'],
@@ -220,12 +223,40 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   DEPARTMENT_SOFTWARE_PROPOSAL_DECIDED: ['proposalId', 'departmentId', 'applicationId', 'planId', 'decision', 'reason'],
   // The admins a plan keeps at the vendor (`QĐ-110k`): how many are left; and a subscription that gained seats (`QĐ-110v`).
   VENDOR_ADMINS_BELOW_MINIMUM: ['planId', 'applicationId', 'adminCount'],
+  WORKSPACE_ADMIN_NOT_WORKING: ['workspaceId', 'employeeId', 'workingAdminCount'],
   DEPARTMENT_WITHOUT_HEAD: ['departmentId', 'waitingCount'],
   SUBSCRIPTION_SEATS_INCREASED: ['subscriptionId', 'fromQuantity', 'toQuantity', 'requestId', 'changedByEmployeeId'],
+  SUBSCRIPTION_SEATS_REDUCED: ['subscriptionId', 'fromQuantity', 'toQuantity', 'changedByEmployeeId'],
+  SUBSCRIPTION_SEATS_BOUGHT: [
+    'subscriptionId',
+    'subscriptionLineId',
+    'seatPurchaseId',
+    'quantity',
+    'recordedByEmployeeId',
+  ],
+  SEAT_PURCHASE_INVOICE_OVERDUE: ['seatPurchaseId', 'subscriptionId', 'dueOn'],
+  SEAT_LEDGER_VENDOR_RECORDED: [
+    'subscriptionId',
+    'subscriptionLineId',
+    'seatChangeId',
+    'delta',
+    'effectiveOn',
+    'recordedByEmployeeId',
+    'outOfProcess',
+  ],
+  SUBSCRIPTION_PRICE_REVIEW: ['subscriptionId', 'purchaseInvoiceId'],
   // What an IT Admin who leaves still answers for, once the day has come and the handover is not done (`QĐ-110j`, `R-26`).
   IT_ADMIN_HANDOVER_PENDING: ['sourceKind', 'sourceId', 'employeeId', 'dueOn'],
-  // The same, told to the IT Admin who took it all: from whom, and how many of each (`QĐ-110j`, SPEC P5).
-  IT_ADMIN_HANDOVER_RECEIVED: ['sourceKind', 'sourceId', 'fromEmployeeId', 'subscriptions', 'applications'],
+  // The same, told to the IT Admin who took it all: from whom, and how many of each: subscriptions, applications, workspaces and license lots.
+  IT_ADMIN_HANDOVER_RECEIVED: [
+    'sourceKind',
+    'sourceId',
+    'fromEmployeeId',
+    'subscriptions',
+    'applications',
+    'workspaces',
+    'licenseLots',
+  ],
   // A departure cancelled after the last working day: how many revocation tasks in progress the IT Admin closes by hand (`QĐ-110c`).
   DEPARTURE_REVOCATION_IT_CLOSE: ['caseId', 'employeeId', 'taskCount'],
   // A new version of a policy: which policy, which version, and whether the reader is asked to acknowledge it (`QĐ-111bi`).
@@ -234,6 +265,7 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   SPEND_BATCH_SUBMITTED: ['batchId', 'departmentId', 'sentCount'],
   // The reports of errors in SaaS rights (`FR-2.15`): ids, the code of the report and the words of its kind and states. Never what the reporter or the IT Admin wrote, because the head of the department does not read it.
   SAAS_ISSUE_SUBMITTED: ['issueId', 'issueCode', 'category', 'impact', 'applicationId'],
+  SAAS_ISSUE_AWAITING_ASSIGNEE: ['issueId', 'issueCode', 'category', 'impact', 'applicationId', 'departmentId'],
   SAAS_ISSUE_RESPONSE_OVERDUE: ['issueId', 'issueCode', 'responseDueOn'],
   SAAS_ISSUE_STATE_CHANGED: ['issueId', 'issueCode', 'fromState', 'toState', 'trigger'],
   // A case outside the process closed as a report only, and a difference with a vendor opened (`SBF-07a`, `SBF-08`): ids and the source, never the account's identifier or what it did.
@@ -242,6 +274,16 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   // A holder asked to stop the collection of a machine (`US-09-04`, E1): ids, the deadline and its day in the time of the company; never what the machine collected.
   DEVICE_STOP_REQUESTED: ['stopRequestId', 'registrationId', 'deviceId', 'holderEmployeeId', 'dueAt', 'dueOn'],
   DEVICE_STOP_REQUEST_OVERDUE: ['stopRequestId', 'registrationId', 'deviceId', 'holderEmployeeId', 'dueAt', 'dueOn'],
+  // Temporary department IT Admin substitute appointments and daily missing coverage alerts.
+  DEPARTMENT_IT_SUBSTITUTE_APPOINTED: ['substituteId', 'departmentId', 'substituteEmployeeId', 'replacedEmployeeId'],
+  DEPARTMENT_IT_SUBSTITUTE_ENDED: ['substituteId', 'departmentId', 'substituteEmployeeId', 'endCause'],
+  DEPARTMENT_IT_COVERAGE_MISSING: ['departmentId', 'departmentName', 'inChargeEmployeeId', 'reason'],
+  // Offboarding device return task reminders and unassigned alerts.
+  DEVICE_RETURN_OVERDUE: ['taskId', 'deviceId', 'assetCode', 'employeeId', 'dueOn'],
+  DEVICE_RETURN_WAITING: ['taskId', 'deviceId', 'assetCode', 'employeeId', 'departmentId', 'dueOn'],
+  // Unplaced-work IT Admin designations: waiting work for Super Admin and appointed notice for designee.
+  UNPLACED_WORK_WAITING: ['workKind', 'workId', 'employeeId'],
+  UNPLACED_WORK_DESIGNATED: ['designationId', 'workKind', 'workId', 'employeeId'],
 };
 
 /** Whether the code is one of the closed table. */

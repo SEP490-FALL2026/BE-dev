@@ -1,6 +1,12 @@
-import { dayOffset, daysBetween } from '../demo-dates';
+import { addMonths, dayOffset, daysBetween } from '../demo-dates';
 import type { DemoFixture, DemoRequestScenario, DemoSubscription } from '../fixture/demo-fixture.types';
 import { grantedOnOf } from './baseline.steps';
+import {
+  subscriptionHasPlan,
+  subscriptionMonthlyPriceOf,
+  subscriptionPrimaryPlan,
+  subscriptionStartDate,
+} from './catalog.steps';
 
 /**
  * The base of the budget of a department, counted from the day of the seed (SPEC S24 item 1, Q-C): the light a head or Finance sees at the close
@@ -32,6 +38,8 @@ export interface Expected {
   month: number;
   /** What the seats of the pool cost the department through that month, by the days each was held. */
   spentThrough: number;
+  /** Calendar months still open in the year after the last closed `seat_month_runs` month for baseline seats held on `today` (`running-uncommitted.policy.ts`). */
+  runningUncommitted: number;
   /** What the decided requests of the department hold for the year. */
   committed: number;
   /** What its requests wait for a decision with. */
@@ -41,11 +49,9 @@ export interface Expected {
 const planOf = (fixture: Basis, key: string) =>
   fixture.applications.flatMap((application) => application.plans).find((plan) => plan.key === key);
 
-/** The price of a seat for a month: a monthly plan its price, an annual one its price over twelve, rounded up as the catalog does. */
-function monthlyPriceOf(subscription: DemoSubscription): number {
-  const amount = Number(subscription.unitPrice.amount);
-
-  return subscription.billingCycle === 'ANNUAL' ? Math.ceil(amount / 12) : amount;
+/** The price of a seat for a month on `planKey`, reading `lines[]` first and falling back to `unitPrice`. */
+function monthlyPriceOf(subscription: DemoSubscription, planKey?: string): number {
+  return subscriptionMonthlyPriceOf(subscription, planKey);
 }
 
 const daysInMonth = (year: number, month: number): number => new Date(Date.UTC(year, month, 0)).getUTCDate();
@@ -68,7 +74,8 @@ function spentThrough(fixture: Basis, today: Day, department: string, month: num
   for (const seat of fixture.seats) {
     const holder = fixture.people.find((person) => person.code === seat.holder);
     const subscription = fixture.subscriptions.find((candidate) => candidate.key === seat.subscription);
-    const plan = subscription ? planOf(fixture, subscription.plan) : undefined;
+    const planKey = subscription ? subscriptionPrimaryPlan(subscription) : undefined;
+    const plan = planKey ? planOf(fixture, planKey) : undefined;
     if (holder?.department !== department || !subscription || plan?.provisioningType !== 'K2') continue;
     // A seat costs a department only on the days its holder is placed in it (`seat-month.policy.ts`), and a person the seed creates is placed from the
     // day of the seed, never earlier (`employee-first-placement.policy.ts`; `POST /employees` places them that day): the days before cost nobody anything.
@@ -78,10 +85,63 @@ function spentThrough(fixture: Basis, today: Day, department: string, month: num
       until: seat.endInDays === undefined ? null : dayOffset(today, seat.endInDays),
     };
     for (let current = 1; current <= month; current++)
-      total += seatMonthCost(monthlyPriceOf(subscription), held, year, current);
+      total += seatMonthCost(monthlyPriceOf(subscription, plan.key), held, year, current);
   }
 
   return total;
+}
+
+function k2SeatInfo(
+  fixture: Basis,
+  department: string,
+  seat: Basis['seats'][number],
+): { subscription: DemoSubscription; planKey: string } | null {
+  const holder = fixture.people.find((person) => person.code === seat.holder);
+  if (holder?.department !== department) return null;
+  const subscription = fixture.subscriptions.find((candidate) => candidate.key === seat.subscription);
+  if (!subscription) return null;
+  const planKey = subscriptionPrimaryPlan(subscription);
+  const plan = planOf(fixture, planKey);
+
+  return plan?.provisioningType === 'K2' ? { subscription, planKey } : null;
+}
+
+function seatRunningUncommitted(
+  fixture: Basis,
+  today: Day,
+  closedMonth: number,
+  yearStart: Day,
+  yearEnd: Day,
+  department: string,
+  seat: Basis['seats'][number],
+): number {
+  const info = k2SeatInfo(fixture, department, seat);
+  if (!info) return 0;
+  const heldFrom = grantedOnOf({ fixture: fixture as DemoFixture, today }, seat);
+  const lastHeld = seat.endInDays === undefined ? yearEnd : dayOffset(today, seat.endInDays - 1);
+  if (heldFrom > today || lastHeld < today) return 0;
+  const periodStart = info.subscription.withoutDates ? heldFrom : subscriptionStartDate({ today }, info.subscription);
+  const effectiveStart = [heldFrom, periodStart, yearStart].reduce((latest, day) => (day > latest ? day : latest));
+  if (effectiveStart > yearEnd || lastHeld < effectiveStart) return 0;
+  const capped = lastHeld < yearEnd ? lastHeld : yearEnd;
+  const fromMonth = Math.max(Number(effectiveStart.slice(5, 7)), closedMonth + 1);
+  const toMonth = Number(capped.slice(5, 7));
+  const months = toMonth - fromMonth + 1;
+
+  return months > 0 ? monthlyPriceOf(info.subscription, info.planKey) * months : 0;
+}
+
+/** Remaining un-run calendar months in `year` (excluding months `<= lastClosedMonth(today)` already closed in `seat_month_runs`) of each open baseline K2 seat (`W3-08`). */
+function runningUncommittedOf(fixture: Basis, today: Day, department: string): number {
+  const year = Number(today.slice(0, 4));
+  const closedMonth = lastClosedMonth(today);
+  const yearStart = `${year}-01-01`;
+  const yearEnd = `${year}-12-31`;
+
+  return fixture.seats.reduce(
+    (total, seat) => total + seatRunningUncommitted(fixture, today, closedMonth, yearStart, yearEnd, department, seat),
+    0,
+  );
 }
 
 /** The states of a request that hold its cost for the year, and those that wait for the decision on it. */
@@ -92,17 +152,59 @@ const WAITING_TARGETS: ReadonlySet<string> = new Set([
   'RESERVE_UNCONFIRMED',
 ]);
 
-/** What a request costs for the year: the price of a month times the people times the months left in the year it covers (a key bought for a seat costs its price once). */
+function planPricingOf(fixture: Basis, planKey: string, referencePrice?: string) {
+  const subscription = fixture.subscriptions.find((candidate) => subscriptionHasPlan(candidate, planKey));
+  if (subscription) {
+    const monthly = monthlyPriceOf(subscription, planKey);
+    const purchase = subscription.unitPrice
+      ? Number(subscription.unitPrice.amount)
+      : monthly * (subscription.billingCycle === 'ANNUAL' ? 12 : 1);
+
+    return { monthly, purchase };
+  }
+
+  return referencePrice ? { monthly: Number(referencePrice), purchase: Number(referencePrice) } : null;
+}
+
+function termEndFor(fixture: Basis, today: Day, request: DemoRequestScenario): Day | null {
+  if (request.termMonths === null || request.termMonths === undefined) return null;
+  const raw = dayOffset(addMonths(today, request.termMonths), -1);
+  const requester = fixture.people.find((person) => person.code === request.requester);
+  if (requester?.contractEndInDays === undefined) return raw;
+  const contractEnd = dayOffset(today, requester.contractEndInDays);
+  if (contractEnd >= raw) return raw;
+
+  return contractEnd < today ? today : contractEnd;
+}
+
+function calendarMonthsInYear(start: Day, lastHeldOn: Day | null, year: number): number {
+  const from = start > `${year}-01-01` ? start : `${year}-01-01`;
+  const yearEnd = `${year}-12-31`;
+  const to = lastHeldOn !== null && lastHeldOn < yearEnd ? lastHeldOn : yearEnd;
+  if (from > to) return 0;
+
+  return Number(to.slice(5, 7)) - Number(from.slice(5, 7)) + 1;
+}
+
+function monthsBeginningInYear(start: Day, end: Day | null, year: number): number {
+  let count = 0;
+  for (let i = 0; ; i++) {
+    const anchor = addMonths(start, i);
+    if (end !== null && anchor > end) break;
+    const anchorYear = Number(anchor.slice(0, 4));
+    if (anchorYear > year) break;
+    if (anchorYear === year) count++;
+  }
+
+  return count;
+}
+
+/** What a request costs for the year (`W3-02` calendar months for K2, billing-anchor months for K1, purchase for K4). */
 function requestCost(fixture: Basis, today: Day, request: DemoRequestScenario): number {
-  const subscription = fixture.subscriptions.find((candidate) => candidate.plan === request.plan);
   const plan = request.plan ? planOf(fixture, request.plan) : undefined;
   if (!plan) return 0;
-  // A plan with no subscription is priced by its reference price (`QĐ-113a`): a K1/K2 plan one seat a month, a K4 plan one purchase.
-  const price = subscription
-    ? { monthly: monthlyPriceOf(subscription), purchase: Number(subscription.unitPrice.amount) }
-    : plan.referencePrice
-      ? { monthly: Number(plan.referencePrice), purchase: Number(plan.referencePrice) }
-      : null;
+  // A plan with no subscription is priced by its reference price: a K1/K2 plan one seat a month, a K4 plan one purchase.
+  const price = planPricingOf(fixture, plan.key, plan.referencePrice);
   if (!price) return 0;
   // The people the spending approver refuses hold nothing: they are never granted (R49).
   const people = (request.beneficiaries ?? [request.requester]).filter(
@@ -110,13 +212,15 @@ function requestCost(fixture: Basis, today: Day, request: DemoRequestScenario): 
   ).length;
   if (plan.provisioningType === 'K4') return request.grant === 'KEY' ? 0 : price.purchase * people;
   if (plan.provisioningType === 'K5') return 0;
-  const monthsLeft = 12 - Number(today.slice(5, 7)) + 1;
-  const months = Math.min(request.termMonths ?? monthsLeft, monthsLeft);
+  const year = Number(today.slice(0, 4));
+  const end = termEndFor(fixture, today, request);
+  const months =
+    plan.provisioningType === 'K1' ? monthsBeginningInYear(today, end, year) : calendarMonthsInYear(today, end, year);
 
   return price.monthly * people * months;
 }
 
-/** What a department is expected to have spent through the latest closed month, to hold and to have waiting, from the seats and the requests of the fixture. */
+/** What a department is expected to have spent through the latest closed month, running uncommitted, held, and waiting. */
 export function expectedOf(fixture: Basis, department: string, today: Day): Expected {
   const month = lastClosedMonth(today);
   let committed = 0;
@@ -130,6 +234,7 @@ export function expectedOf(fixture: Basis, department: string, today: Day): Expe
   return {
     month: Math.max(0, month),
     spentThrough: month < 1 ? 0 : spentThrough(fixture, today, department, month),
+    runningUncommitted: runningUncommittedOf(fixture, today, department),
     committed,
     pending,
   };
@@ -250,7 +355,7 @@ export function baseFor(fixture: Basis, department: string, today: Day): BaseCho
   const entry = fixture.budgets.find((budget) => budget.department === department);
   if (!entry?.light) return null;
   const expected = expectedOf(fixture, department, today);
-  const forecast = expected.spentThrough + expected.committed + expected.pending;
+  const forecast = expected.spentThrough + expected.runningUncommitted + expected.committed + expected.pending;
   const reservePercent = entry.reserve?.percent ?? DEFAULT_RESERVE_PERCENT;
   // A department meant to sit under asks at least what its BM-10 lines add up to (the fixture's base), never a figure counted from its few requests.
   const floor = entry.light === 'UNDER' ? Number(entry.base) : 0;
@@ -262,4 +367,23 @@ export function baseFor(fixture: Basis, department: string, today: Day): BaseCho
       : chooseBase(entry.light, { expected, forecast, reservePercent, floor });
 
   return { ...chosen, reservePercent, wanted: entry.light, reachable: chosen.light === entry.light, expected };
+}
+
+/**
+ * Tight reserve base (`base < forecast <= base * (1 + reserve%)`) for reserve-exercising departments (`MKT`, `DES`) whose
+ * 1-month request cost spans 2 calendar months later in the year or shares the Cost Center with baseline seats.
+ */
+export function tightBaseFor(fixture: Basis, department: string, today: Day): number | null {
+  if (department !== 'MKT' && department !== 'DES') return null;
+  const entry = fixture.budgets.find((budget) => budget.department === department);
+  if (!entry || entry.light) return null;
+  const expected = expectedOf(fixture, department, today);
+  const forecast = expected.spentThrough + expected.runningUncommitted + expected.committed + expected.pending;
+  if (forecast <= 0) return Number(entry.base);
+  const reservePercent = entry.reserve?.percent ?? DEFAULT_RESERVE_PERCENT;
+  const factor = 1 + reservePercent / 100;
+  const raw = Math.max(MIN_BASE, roundUpTo(Math.ceil(forecast / (1 + reservePercent / 200)), 10_000));
+  if (raw < forecast && forecast <= raw * factor) return raw;
+
+  return Math.max(MIN_BASE, Math.floor(forecast - 1));
 }

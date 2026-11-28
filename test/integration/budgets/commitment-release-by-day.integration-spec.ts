@@ -337,24 +337,31 @@ describe('the money held for a seat goes back by the day (RV-07, M-06, M-10; int
   });
 
   it('the same right taken back in the middle of its term gives back the months that had not begun and the days of the month it is taken back in, not the whole commitment', async () => {
-    const id = await approvedWithTerm(await unit(), 3);
-    await setSeatMonthly(id, MONTHLY);
-    const task = revocationOf(id, {
-      grantedStartDate: `${h.year}-03-15`,
-      grantedEndDate: `${h.year}-06-14`,
-      endedOn: `${h.year}-04-20`,
-    });
+    const clockSpy = pretendBusinessToday(h.ctx.app, `${h.year}-03-15`);
+    const todaySpy = jest.spyOn(h, 'today').mockReturnValue(`${h.year}-03-15`);
+    try {
+      const id = await approvedWithTerm(await unit(), 3);
+      await setSeatMonthly(id, MONTHLY);
+      const task = revocationOf(id, {
+        grantedStartDate: `${h.year}-03-15`,
+        grantedEndDate: `${h.year}-06-14`,
+        endedOn: `${h.year}-04-20`,
+      });
 
-    await runAfterRevocation(task);
+      await runAfterRevocation(task);
 
-    // The three months are the ones that began on 15/03, 15/04 and 15/05: March, April and May. Taken back on 20/04 it gives back May and the
-    // 11 days of April not used (the 19 before 20/04 were).
-    const expected = MONTHLY * 2n - usedBefore(MONTHLY, `${h.year}-04-20`);
-    const after = await commitmentOf(id);
-    expect(after).toMatchObject({ state: 'HELD', released_minor: expected.toString() });
-    expect(await ledger(after.id)).toEqual([
-      { amount_minor: expected.toString(), reason: 'REVOKED', reason_text: `revocationTask:${task.id}` },
-    ]);
+      // The three months are the ones that began on 15/03, 15/04 and 15/05: March, April and May. Taken back on 20/04 it gives back May and the
+      // 11 days of April not used (the 19 before 20/04 were).
+      const expected = MONTHLY * 2n - usedBefore(MONTHLY, `${h.year}-04-20`);
+      const after = await commitmentOf(id);
+      expect(after).toMatchObject({ state: 'HELD', released_minor: expected.toString() });
+      expect(await ledger(after.id)).toEqual([
+        { amount_minor: expected.toString(), reason: 'REVOKED', reason_text: `revocationTask:${task.id}` },
+      ]);
+    } finally {
+      todaySpy.mockRestore();
+      clockSpy.mockRestore();
+    }
   });
 
   it('the same right taken back on the last day paid, or after it, gives back nothing: the share has no step where the term ends', async () => {
@@ -369,13 +376,20 @@ describe('the money held for a seat goes back by the day (RV-07, M-06, M-10; int
   });
 
   it('B-C1: a long-term request (no months of use) keeps counting to December, whatever end its seat has', async () => {
-    const id = await approved(await unit(), 12);
-    await setSeatMonthly(id, MONTHLY);
+    const clockSpy = pretendBusinessToday(h.ctx.app, `${h.year}-01-15`);
+    const todaySpy = jest.spyOn(h, 'today').mockReturnValue(`${h.year}-01-15`);
+    try {
+      const id = await approved(await unit(), 12);
+      await setSeatMonthly(id, MONTHLY);
 
-    await runAfterRevocation(revocationOf(id, { grantedEndDate: `${h.year}-06-14`, endedOn: `${h.year}-04-20` }));
+      await runAfterRevocation(revocationOf(id, { grantedEndDate: `${h.year}-06-14`, endedOn: `${h.year}-04-20` }));
 
-    const expected = MONTHLY * 9n - usedBefore(MONTHLY, `${h.year}-04-20`);
-    expect((await commitmentOf(id)).released_minor).toBe(expected.toString());
+      const expected = MONTHLY * 9n - usedBefore(MONTHLY, `${h.year}-04-20`);
+      expect((await commitmentOf(id)).released_minor).toBe(expected.toString());
+    } finally {
+      todaySpy.mockRestore();
+      clockSpy.mockRestore();
+    }
   });
 
   /** The end the seat of an assignment has, read from the table. */

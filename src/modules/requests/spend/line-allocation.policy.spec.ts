@@ -154,6 +154,32 @@ describe('what each person of a group costs this year and the year after, each f
   it('is nothing when the price cannot be counted by the month', () => {
     expect(lineAmountsOf({ ...monthly(1_000n), billingCycle: 'OTHER', ends: [null] })).toBeNull();
   });
+
+  it('uses calendar months for K2 and stored monthlyPriceMinor instead of ceilDiv on ANNUAL unitPrice', () => {
+    // 2027-11-15 -> 2028-02-10: K2 counts 2 calendar months in 2027 (11-12) and 2 calendar months in 2028 (1-2).
+    expect(
+      lineAmountsOf({
+        provisioningType: 'K2',
+        unitPrice: { amountMinor: 500_000n, currency: 'VND' },
+        monthlyPriceMinor: 500_000n,
+        billingCycle: 'MONTHLY',
+        checkDate: '2027-11-15',
+        ends: ['2028-02-10'],
+      }),
+    ).toEqual([{ current: 1_000_000n, next: 1_000_000n }]);
+
+    // ANNUAL 1,000,001 with stored monthlyPriceMinor = 83,333 (not ceilDiv 83,334).
+    expect(
+      lineAmountsOf({
+        provisioningType: 'K2',
+        unitPrice: { amountMinor: 1_000_001n, currency: 'VND' },
+        monthlyPriceMinor: 83_333n,
+        billingCycle: 'ANNUAL',
+        checkDate: '2027-11-15',
+        ends: ['2028-02-10'],
+      }),
+    ).toEqual([{ current: 166_666n, next: 166_666n }]);
+  });
 });
 
 describe('what a request for a group costs once only the people approved are left (US-05-17 AC-9, US-06-01 AC-15)', () => {

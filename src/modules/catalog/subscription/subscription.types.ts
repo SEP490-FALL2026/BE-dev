@@ -14,6 +14,8 @@ export type SubscriptionWarning = 'NO_ALERT_ANCHOR' | 'RESPONSIBLE_MISSING' | 'B
 export type PlanPricingModel = 'PER_SEAT' | 'FLAT_RATE' | 'CONCURRENT' | 'CONSUMPTION' | 'PER_HOST';
 export type ApplicationKind = 'SAAS' | 'LICENSED' | 'INTERNAL';
 export type ProvisioningType = 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
+/** How a K4 plan is bound once bought (a copy of the plan capability's type, which this one does not import). */
+export type PlanKeyBinding = 'ACCOUNT' | 'DEVICE_KEY' | 'DEVICE_BUNDLED';
 
 /** The conversion snapshot of the unit price, frozen when the price was recorded (ADR-0007). */
 export interface PriceSnapshotRecord {
@@ -37,6 +39,9 @@ export interface OriginalPriceRecord {
   currency: string;
 }
 
+/** How the seats of a subscription are counted (QĐ-115g): a number bought, or the members the vendor counts (one-month commitment only). */
+export type SeatCounting = 'FIXED' | 'MEMBERS';
+
 export interface SubscriptionRecord {
   id: string;
   planId: string;
@@ -55,6 +60,7 @@ export interface SubscriptionRecord {
   status: SubscriptionStatus;
   purchasedQuantity: number | null;
   unitPrice: UnitPriceRecord | null;
+  monthlyUnitPriceMinor: bigint | null;
   priceSnapshot: PriceSnapshotRecord | null;
   originalPrice: OriginalPriceRecord | null;
   billingCycle: BillingCycle | null;
@@ -74,6 +80,12 @@ export interface SubscriptionRecord {
   isPrimaryForPlan: boolean;
   /** The period this one continues (`QĐ-16`); null for a first period. */
   renewedFromId: string | null;
+  /** The workspace the subscription is held in; null only for data older than the rule. */
+  workspace: { id: string; name: string } | null;
+  seatCounting: SeatCounting;
+  minimumSeatsTotal: number | null;
+  /** The vendor invoices after the period. */
+  invoicedLater: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -85,6 +97,7 @@ export interface NewSubscription {
   status: SubscriptionStatus;
   purchasedQuantity: number | null;
   unitPrice: UnitPriceRecord | null;
+  monthlyUnitPriceMinor?: bigint | null;
   priceSnapshot: PriceSnapshotRecord | null;
   originalPrice: OriginalPriceRecord | null;
   billingCycle: BillingCycle | null;
@@ -101,6 +114,11 @@ export interface NewSubscription {
   isPrimaryForPlan: boolean;
   /** Only the period a renewal records names the one it continues; set at insert and never changed. */
   renewedFromId?: string | null;
+  /** The workspace and how the seats are counted: left out, a write leaves them as they are (an insert takes the column defaults). */
+  workspaceId?: string | null;
+  seatCounting?: SeatCounting;
+  minimumSeatsTotal?: number | null;
+  invoicedLater?: boolean;
 }
 
 /** What a write stores: the whole mutable state of the subscription, as computed. */
@@ -108,6 +126,8 @@ export type SubscriptionState = Omit<NewSubscription, 'organizationId' | 'planId
 
 export interface SubscriptionListFilter {
   applicationId?: string;
+  /** Only the subscriptions held in this workspace. */
+  workspaceId?: string;
   planId?: string;
   status?: SubscriptionStatus;
   kind?: SubscriptionKind;
@@ -144,6 +164,18 @@ export interface VendorAdminView {
 }
 
 /** A subscription as it is answered: the stored data and everything derived from it when it is read. */
+export interface SubscriptionLineSummaryView {
+  id: string;
+  plan: { id: string; name: string };
+  monthlyUnitPrice: { amount: string; currency: string };
+  minimumSeats: number | null;
+  seatsToday: number;
+  assignedToday: number;
+  freeToday: number;
+  closedOn: BusinessDate | null;
+  closedReason: 'RENEWED' | 'ENDED' | 'REMOVED' | null;
+}
+
 export interface SubscriptionView {
   id: string;
   planId: string;
@@ -158,6 +190,7 @@ export interface SubscriptionView {
   missing: MissingItem[];
   purchasedQuantity: number | null;
   unitPrice: { amount: string; currency: string } | null;
+  monthlyUnitPrice: { amount: string; currency: string } | null;
   /** The price a vendor quoted in another currency, when one is recorded (`QĐ-111an`): beside the price in dong, never converted again. */
   originalPrice: { amount: string; currency: string } | null;
   billingCycle: BillingCycle | null;
@@ -172,6 +205,10 @@ export interface SubscriptionView {
   /** Who answers for the subscription, by name; null when none is named. */
   responsibleItAdmin: { employeeId: string; employeeCode: string; fullName: string } | null;
   vendorMinimumSeats: number | null;
+  workspace: { id: string; name: string } | null;
+  seatCounting: SeatCounting;
+  minimumSeatsTotal: number | null;
+  invoicedLater: boolean;
   isPrimaryForPlan: boolean;
   /** Near (SOON) or past (EXPIRED) the point of adjustment today (`QĐ-111o`); null before it, for a purchase made once and with no date to count from. */
   expiry: ExpiryState | null;
@@ -185,6 +222,9 @@ export interface SubscriptionView {
   warnings: SubscriptionWarning[];
   /** The other live subscriptions of the same K2 or K4 plan: set with the warning `SHOULD_MERGE`, empty otherwise (`QĐ-104k`(3)). */
   mergeCandidateIds: string[];
+  lines?: SubscriptionLineSummaryView[];
+  lineCount?: number;
+  seatsToday?: number;
   /** Who administers the plan at the vendor (`QĐ-110k`, `QĐ-110u`): empty for a plan that needs no admins; `working` says whether the person is an IT Admin who works now. */
   vendorAdmins: VendorAdminView[];
   ownerAccountEmail: string | null;
@@ -202,3 +242,37 @@ export type DeadlineKind = 'PAYMENT_DATE' | 'NOTICE_DEADLINE' | 'RENEWAL_DATE' |
 
 /** Near (SOON) or past (EXPIRED) the point of adjustment today. */
 export type ExpiryState = 'SOON' | 'EXPIRED';
+
+export interface DeclareSubscriptionLineInput {
+  planId: string;
+  monthlyUnitPrice: { amount: string; currency: string };
+  quantity: number;
+  minimumSeats?: number;
+}
+
+export interface DeclareSubscriptionInput {
+  planId?: string;
+  lines?: DeclareSubscriptionLineInput[];
+  kind: SubscriptionKind;
+  purchasedQuantity?: number;
+  /** The unit price in dong (`QĐ-111an`); another currency is refused with SubscriptionPriceNotVndError. */
+  unitPrice?: { amount: string; currency: string };
+  monthlyUnitPrice?: { amount: string; currency: string };
+  /** The price the vendor quoted in another currency, only kept beside the price in dong (R-44). */
+  originalPrice?: { amount: string; currency: string };
+  billingCycle?: BillingCycle;
+  commitmentTermMonths?: CommitmentTermMonths;
+  startDate?: BusinessDate;
+  endDate?: BusinessDate;
+  renewalDate?: BusinessDate;
+  noticeDeadline?: BusinessDate;
+  noticePeriodDays?: number;
+  autoRenew?: boolean;
+  allowsMidTermReduction?: boolean;
+  vendorMinimumSeats?: number;
+  /** The workspace the subscription is held in; left out, the default of the vendor for a plan the company administers there. */
+  workspaceId?: string;
+  seatCounting?: SeatCounting;
+  minimumSeatsTotal?: number;
+  invoicedLater?: boolean;
+}

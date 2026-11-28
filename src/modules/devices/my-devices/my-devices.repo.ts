@@ -10,6 +10,7 @@ export interface MyDeviceRow {
   os: string;
   validFrom: Date;
   endedAt: Date | null;
+  collectorInstalled: boolean;
   acknowledgedFrom: Date | null;
   collectionStoppedAt: Date | null;
   signatureRecorded: boolean;
@@ -31,8 +32,8 @@ export class MyDevicesRepo {
       async (tx) => {
         const rows = await tx.$queryRaw<MyDeviceRow[]>`
           SELECT r.id AS "registrationId", d.id AS "deviceId", d.asset_code AS "assetCode", d.hostname, d.os,
-                 r.valid_from AS "validFrom", r.ended_at AS "endedAt", r.acknowledged_from AS "acknowledgedFrom",
-                 r.collection_stopped_at AS "collectionStoppedAt",
+                 r.valid_from AS "validFrom", r.ended_at AS "endedAt", r.collector_installed AS "collectorInstalled",
+                 r.acknowledged_from AS "acknowledgedFrom", r.collection_stopped_at AS "collectionStoppedAt",
                  EXISTS (SELECT 1 FROM device_signature_records s WHERE s.registration_id = r.id) AS "signatureRecorded",
                  EXISTS (SELECT 1 FROM device_stop_requests q
                           WHERE q.registration_id = r.id AND q.state = 'OPEN'::"DeviceStopRequestState") AS "stopRequestPending",

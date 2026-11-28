@@ -39,6 +39,7 @@ describe('operating parameter definitions (US-01-04)', () => {
     expect(definitionOf('BUDGET_PERIOD_KIND')).toBeUndefined();
     expect(keys.filter((key) => /BUDGET_PERIOD|HIGH_VALUE|THRESHOLD_PERCENT/.test(key))).toEqual([
       'FORECAST_ERROR_THRESHOLD_PERCENT',
+      'K2_INVOICE_VARIANCE_THRESHOLD_PERCENT',
     ]);
     expect(keys).toEqual(expect.arrayContaining(['SPEND_SUBMISSION_WAIT_WORKING_DAYS']));
     expect(definitionOf('FISCAL_YEAR_START_MONTH')).toBeUndefined();
@@ -147,6 +148,7 @@ const EXPECTED_KEYS = [
   'RENEWAL_WINDOW_DAYS',
   'FORECAST_ERROR_THRESHOLD_PERCENT',
   'BUDGET_RESERVE_DEFAULT_PERCENT',
+  'K2_INVOICE_VARIANCE_THRESHOLD_PERCENT',
   'PERSONNEL_NOTICE_REVIEW_WORKING_DAYS',
   'DEPARTURE_REVOCATION_WORKING_DAYS',
   'TRANSFER_GRACE_WORKING_DAYS',
@@ -160,6 +162,8 @@ const EXPECTED_KEYS = [
   'SUBSCRIPTION_ADJUSTMENT_DAYS_MONTHLY',
   'SUBSCRIPTION_ADJUSTMENT_DAYS_ANNUAL',
   'SUBSCRIPTION_RED_ALERT_DAYS_ANNUAL',
+  'SEAT_PURCHASE_INVOICE_DUE_WORKING_DAYS',
+  'SEAT_PURCHASE_LATE_INVOICE_DAYS',
   'ACTIVITY_WINDOW_MINUTES',
   'DETECTION_THRESHOLD_DAYS',
   'GHOST_SEAT_NEW_ASSIGNMENT_GRACE_DAYS',
@@ -173,7 +177,7 @@ const EXPECTED_KEYS = [
 ];
 
 describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
-  it('pins the thirty keys, ordered by group and, inside a group, as the spec table lists them', () => {
+  it('pins the thirty-three keys, ordered by group and, inside a group, as the spec table lists them', () => {
     expect(PARAMETER_DEFINITIONS.map((definition) => definition.key)).toEqual(EXPECTED_KEYS);
   });
 
@@ -221,93 +225,42 @@ describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
   });
 
   it('gives the label, group and unit label the spec table fixes to each parameter', () => {
-    const table = PARAMETER_DEFINITIONS.map((definition) => [
-      definition.key,
-      definition.label,
-      definition.group,
-      definition.unit,
-      definition.unitLabel,
-    ]);
+    const table = PARAMETER_DEFINITIONS.map((d) => `${d.key} | ${d.label} | ${d.group} | ${d.unit} | ${d.unitLabel}`);
 
     expect(table).toEqual([
-      ['APPROVAL_SLA_WORKING_DAYS', 'Hạn xử lý một bước phê duyệt', 'WORKFLOW', 'working days', 'ngày làm việc'],
-      ['BACKLOG_ALERT_THRESHOLD', 'Ngưỡng tồn đọng bước phê duyệt', 'WORKFLOW', 'steps', 'bước'],
-      ['SPEND_SUBMISSION_WAIT_WORKING_DAYS', 'Hạn chờ trình duyệt chi', 'WORKFLOW', 'working days', 'ngày làm việc'],
-      ['REQUEST_OPEN_NEW_LIMIT', 'Số Request cấp mới tối đa mỗi tuần của một người', 'WORKFLOW', 'requests', 'Request'],
-      ['RENEWAL_WINDOW_DAYS', 'Cửa sổ gửi Request tiếp tục trước ngày kết thúc', 'WORKFLOW', 'days', 'ngày'],
-      ['FORECAST_ERROR_THRESHOLD_PERCENT', 'Ngưỡng sai số dự báo chi phí', 'BUDGET', 'percent', '%'],
-      ['BUDGET_RESERVE_DEFAULT_PERCENT', 'Tỷ lệ dự phòng mặc định của ngân sách năm', 'BUDGET', 'percent', '%'],
-      [
-        'PERSONNEL_NOTICE_REVIEW_WORKING_DAYS',
-        'Hạn xử lý thông báo biến động nhân sự',
-        'PERSONNEL',
-        'working days',
-        'ngày làm việc',
-      ],
-      [
-        'DEPARTURE_REVOCATION_WORKING_DAYS',
-        'Hạn thu hồi quyền sau khi chặn người nghỉ việc',
-        'PERSONNEL',
-        'working days',
-        'ngày làm việc',
-      ],
-      [
-        'TRANSFER_GRACE_WORKING_DAYS',
-        'Thời gian ân hạn quyền cũ sau điều chuyển',
-        'PERSONNEL',
-        'working days',
-        'ngày làm việc',
-      ],
-      [
-        'TRANSFER_GRACE_REMINDER_WORKING_DAYS',
-        'Nhắc người chuyển trước khi hết ân hạn',
-        'PERSONNEL',
-        'working days',
-        'ngày làm việc',
-      ],
-      ['PROVISIONING_RETRY_COUNT', 'Số lần thử lại cấp/thu hồi', 'PROVISIONING', 'attempts', 'lần'],
-      [
-        'SAAS_ISSUE_RESPONSE_WORKING_DAYS',
-        'Hạn tiếp nhận báo lỗi SaaS',
-        'PROVISIONING',
-        'working days',
-        'ngày làm việc',
-      ],
-      ['SAAS_ISSUE_REOPEN_WORKING_DAYS', 'Hạn mở lại báo lỗi SaaS', 'PROVISIONING', 'working days', 'ngày làm việc'],
-      ['INVITATION_REMINDER_DAYS', 'Nhắc lời mời chưa kích hoạt sau', 'ACCOUNT', 'days', 'ngày'],
-      ['INVITATION_WITHDRAW_DAYS', 'Thu hồi lời mời chưa kích hoạt sau', 'ACCOUNT', 'days', 'ngày'],
-      ['DOCUMENT_MAX_SIZE_MB', 'Dung lượng tối đa của tệp tài liệu', 'DOCUMENT', 'MB', 'MB'],
-      [
-        'SUBSCRIPTION_ADJUSTMENT_DAYS_MONTHLY',
-        'Mở điểm điều chỉnh gói tháng trước ngày thanh toán',
-        'SUBSCRIPTION',
-        'days',
-        'ngày',
-      ],
-      [
-        'SUBSCRIPTION_ADJUSTMENT_DAYS_ANNUAL',
-        'Mở điểm điều chỉnh gói năm trước hạn báo hủy',
-        'SUBSCRIPTION',
-        'days',
-        'ngày',
-      ],
-      ['SUBSCRIPTION_RED_ALERT_DAYS_ANNUAL', 'Cảnh báo đỏ gói năm trước hạn báo hủy', 'SUBSCRIPTION', 'days', 'ngày'],
-      ['ACTIVITY_WINDOW_MINUTES', 'Số phút tính là một ngày có hoạt động', 'USAGE', 'minutes per day', 'phút mỗi ngày'],
-      ['DETECTION_THRESHOLD_DAYS', 'Ngưỡng ngày không dùng của ghế', 'USAGE', 'days', 'ngày'],
-      ['GHOST_SEAT_NEW_ASSIGNMENT_GRACE_DAYS', 'Ân hạn cho ghế mới cấp', 'USAGE', 'days', 'ngày'],
-      [
-        'GHOST_SEAT_DECISION_WORKING_DAYS',
-        'Hạn trưởng phòng quyết định ghost seat',
-        'USAGE',
-        'working days',
-        'ngày làm việc',
-      ],
-      ['GHOST_SEAT_REVOCATION_GRACE_DAYS', 'Ân hạn trước khi gỡ ghost seat', 'USAGE', 'calendar days', 'ngày lịch'],
-      ['RULE_SCHEDULE_G1_G2', 'Lịch chạy luật lãng phí (dữ liệu nội bộ)', 'USAGE', 'schedule', 'lịch'],
-      ['RULE_SCHEDULE_G3_G4', 'Lịch chạy luật lãng phí (dữ liệu usage)', 'USAGE', 'schedule', 'lịch'],
-      ['AI_ENABLED', 'Công tắc tổng của các tính năng AI', 'AI', 'switch', 'công tắc'],
-      ['AI_ACCESS_REQUEST_SUMMARY_ENABLED', 'Tóm tắt hàng chờ duyệt bằng AI', 'AI', 'switch', 'công tắc'],
-      ['AI_PROVIDER_MODE', 'Nguồn trả lời của AI', 'AI', 'mode', 'chế độ'],
+      'APPROVAL_SLA_WORKING_DAYS | Hạn xử lý một bước phê duyệt | WORKFLOW | working days | ngày làm việc',
+      'BACKLOG_ALERT_THRESHOLD | Ngưỡng tồn đọng bước phê duyệt | WORKFLOW | steps | bước',
+      'SPEND_SUBMISSION_WAIT_WORKING_DAYS | Hạn chờ trình duyệt chi | WORKFLOW | working days | ngày làm việc',
+      'REQUEST_OPEN_NEW_LIMIT | Số Request cấp mới tối đa mỗi tuần của một người | WORKFLOW | requests | Request',
+      'RENEWAL_WINDOW_DAYS | Cửa sổ gửi Request tiếp tục trước ngày kết thúc | WORKFLOW | days | ngày',
+      'FORECAST_ERROR_THRESHOLD_PERCENT | Ngưỡng sai số dự báo chi phí | BUDGET | percent | %',
+      'BUDGET_RESERVE_DEFAULT_PERCENT | Tỷ lệ dự phòng mặc định của ngân sách năm | BUDGET | percent | %',
+      'K2_INVOICE_VARIANCE_THRESHOLD_PERCENT | Ngưỡng lệch hóa đơn kho | BUDGET | percent | %',
+      'PERSONNEL_NOTICE_REVIEW_WORKING_DAYS | Hạn xử lý thông báo biến động nhân sự | PERSONNEL | working days | ngày làm việc',
+      'DEPARTURE_REVOCATION_WORKING_DAYS | Hạn thu hồi quyền sau khi chặn người nghỉ việc | PERSONNEL | working days | ngày làm việc',
+      'TRANSFER_GRACE_WORKING_DAYS | Thời gian ân hạn quyền cũ sau điều chuyển | PERSONNEL | working days | ngày làm việc',
+      'TRANSFER_GRACE_REMINDER_WORKING_DAYS | Nhắc người chuyển trước khi hết ân hạn | PERSONNEL | working days | ngày làm việc',
+      'PROVISIONING_RETRY_COUNT | Số lần thử lại cấp/thu hồi | PROVISIONING | attempts | lần',
+      'SAAS_ISSUE_RESPONSE_WORKING_DAYS | Hạn tiếp nhận báo lỗi SaaS | PROVISIONING | working days | ngày làm việc',
+      'SAAS_ISSUE_REOPEN_WORKING_DAYS | Hạn mở lại báo lỗi SaaS | PROVISIONING | working days | ngày làm việc',
+      'INVITATION_REMINDER_DAYS | Nhắc lời mời chưa kích hoạt sau | ACCOUNT | days | ngày',
+      'INVITATION_WITHDRAW_DAYS | Thu hồi lời mời chưa kích hoạt sau | ACCOUNT | days | ngày',
+      'DOCUMENT_MAX_SIZE_MB | Dung lượng tối đa của tệp tài liệu | DOCUMENT | MB | MB',
+      'SUBSCRIPTION_ADJUSTMENT_DAYS_MONTHLY | Mở điểm điều chỉnh gói tháng trước ngày thanh toán | SUBSCRIPTION | days | ngày',
+      'SUBSCRIPTION_ADJUSTMENT_DAYS_ANNUAL | Mở điểm điều chỉnh gói năm trước hạn báo hủy | SUBSCRIPTION | days | ngày',
+      'SUBSCRIPTION_RED_ALERT_DAYS_ANNUAL | Cảnh báo đỏ gói năm trước hạn báo hủy | SUBSCRIPTION | days | ngày',
+      'SEAT_PURCHASE_INVOICE_DUE_WORKING_DAYS | Hạn nộp hóa đơn mua thêm seat | SUBSCRIPTION | working days | ngày làm việc',
+      'SEAT_PURCHASE_LATE_INVOICE_DAYS | Hạn nộp hóa đơn mua thêm seat xuất sau | SUBSCRIPTION | days | ngày',
+      'ACTIVITY_WINDOW_MINUTES | Số phút tính là một ngày có hoạt động | USAGE | minutes per day | phút mỗi ngày',
+      'DETECTION_THRESHOLD_DAYS | Ngưỡng ngày không dùng của ghế | USAGE | days | ngày',
+      'GHOST_SEAT_NEW_ASSIGNMENT_GRACE_DAYS | Ân hạn cho ghế mới cấp | USAGE | days | ngày',
+      'GHOST_SEAT_DECISION_WORKING_DAYS | Hạn trưởng phòng quyết định ghost seat | USAGE | working days | ngày làm việc',
+      'GHOST_SEAT_REVOCATION_GRACE_DAYS | Ân hạn trước khi gỡ ghost seat | USAGE | calendar days | ngày lịch',
+      'RULE_SCHEDULE_G1_G2 | Lịch chạy luật lãng phí (dữ liệu nội bộ) | USAGE | schedule | lịch',
+      'RULE_SCHEDULE_G3_G4 | Lịch chạy luật lãng phí (dữ liệu usage) | USAGE | schedule | lịch',
+      'AI_ENABLED | Công tắc tổng của các tính năng AI | AI | switch | công tắc',
+      'AI_ACCESS_REQUEST_SUMMARY_ENABLED | Tóm tắt hàng chờ duyệt bằng AI | AI | switch | công tắc',
+      'AI_PROVIDER_MODE | Nguồn trả lời của AI | AI | mode | chế độ',
     ]);
   });
 

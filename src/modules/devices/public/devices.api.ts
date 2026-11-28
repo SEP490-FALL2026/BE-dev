@@ -1,19 +1,33 @@
 import { Injectable } from '@nestjs/common';
+import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { CredentialSessionService } from '../credential/session/credential-session.service';
+import { InitialRecordQueryService } from '../initial-record/initial-record-query.service';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { RegistrationEndService } from '../registry/registration-end.service';
 import { RegistryQueryRepo } from '../registry/registry-query.repo';
 import { RegistryRepo } from '../registry/registry.repo';
+import { returnDueOn as computeReturnDueOn } from '../return-task/device-return-task.policy';
+import { DeviceReturnTaskRepo } from '../return-task/device-return-task.repo';
+import { DeviceReturnTaskService } from '../return-task/device-return-task.service';
 import type {
+  CancelReturnTasksOfCaseInput,
   DeviceCollectionState,
+  DeviceInitialRecordProgress,
   DeviceIntakeContext,
   EndedRegistrations,
   EndRegistrationsOfHolderInput,
+  MoveReturnTaskDueInput,
+  OpenReturnTasksForDepartureInput,
+  ReturnDueFacts,
+  ReturnTaskCounts,
+  ReturnTaskCountScope,
 } from './devices.types';
 
 /**
- * What other modules ask of the register of company machines: end the registrations of a person who left, and read whether a
- * machine is in the register and who held it. Nothing of how the register keeps it.
+ * What other modules ask of the register of company machines: end the registrations of a person who left, manage
+ * offboarding return tasks, and read whether a machine is in the register and who held it. Nothing of how the
+ * register keeps it.
  */
 @Injectable()
 export class DevicesApi {
@@ -22,7 +36,43 @@ export class DevicesApi {
     private readonly repo: RegistryRepo,
     private readonly sessions: CredentialSessionService,
     private readonly queries: RegistryQueryRepo,
+    private readonly returnTasks: DeviceReturnTaskService,
+    private readonly returnTaskRepo: DeviceReturnTaskRepo,
+    private readonly initialRecordQueries: InitialRecordQueryService,
+    private readonly organizationReads: OrganizationReadApi,
   ) {}
+
+  initialRecordProgress(tx?: DbTx): Promise<DeviceInitialRecordProgress> {
+    return this.initialRecordQueries.progress(tx);
+  }
+
+  returnDueOn(facts: ReturnDueFacts): BusinessDate {
+    return computeReturnDueOn(facts);
+  }
+
+  openReturnTasksForDeparture(tx: DbTx, input: OpenReturnTasksForDepartureInput): Promise<{ taskIds: string[] }> {
+    return this.returnTasks.openForDeparture(tx, input);
+  }
+
+  moveReturnTaskDue(tx: DbTx, input: MoveReturnTaskDueInput): Promise<{ updatedIds: string[] }> {
+    return this.returnTasks.moveDue(tx, input);
+  }
+
+  cancelReturnTasksOfCase(tx: DbTx, input: CancelReturnTasksOfCaseInput): Promise<{ cancelledIds: string[] }> {
+    return this.returnTasks.cancelOfCase(tx, input);
+  }
+
+  async countReturnTasks(scope: ReturnTaskCountScope, today: BusinessDate, tx?: DbTx): Promise<ReturnTaskCounts> {
+    const includeTaskIds =
+      scope.includeTaskIds ??
+      (await this.organizationReads.findActiveUnplacedWorkIdsForDesignee(
+        scope.excludeEmployeeId,
+        'DEVICE_RETURN_TASK',
+        tx,
+      ));
+
+    return this.returnTaskRepo.countForScope({ ...scope, includeTaskIds }, today, tx);
+  }
 
   /**
    * Ends every open registration of a person in the transaction of the caller, as the system; asking again changes nothing

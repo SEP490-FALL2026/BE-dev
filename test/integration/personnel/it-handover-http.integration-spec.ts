@@ -1,5 +1,6 @@
 import request from 'supertest';
 import { BlockAnnouncementService } from '../../../src/modules/personnel/departure-deadline/block-announcement.service';
+import { declareApplication, declarePlan } from '../../support/builders/catalog.builder';
 import { OffboardingHarness } from '../../support/offboarding-harness';
 import type { Person } from '../../support/request-harness';
 import type { Unit } from '../../support/spend-harness';
@@ -378,6 +379,115 @@ describe('the hand-over of an IT Admin who leaves, over HTTP (integration, real 
         409,
         'IT_HANDOVER.SOURCE_CANCELLED',
       ]);
+    });
+  });
+
+  describe('workspaces and license lots only (T-3)', () => {
+    it('creates a handover item and transfers both workspace and license lot when the leaving IT Admin answers for 1 workspace and 1 lot only', async () => {
+      const u = await unit();
+      counter += 1;
+      const leaver = await h.worker(u.department, `IH-WL${counter}`, ['IT_ADMIN']);
+      const appId = await declareApplication(h.ctx, h.it1.accessToken, {
+        name: h.unique('IH-WL-App'),
+        kind: 'SAAS',
+        vendorName: h.unique('IH-WL-Vendor'),
+        dataSensitivity: 'LOW',
+        communication: { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false },
+      });
+      const vendorId = (
+        await h.ctx.sql.query<{ vendor_id: string }>('SELECT vendor_id FROM applications WHERE id = $1', [appId])
+      ).rows[0].vendor_id;
+      const wsId = h.dataOf<{ id: string }>(
+        await request(h.server())
+          .post('/api/v1/workspaces')
+          .set(h.as(leaver.account))
+          .send({ vendorId, name: h.unique('IH-WL-WS') })
+          .expect(201),
+      ).id;
+      const planId = await declarePlan(h.ctx, h.it1.accessToken, {
+        applicationId: appId,
+        name: h.unique('IH-WL-Plan'),
+        provisioningType: 'K4',
+        keyBinding: 'ACCOUNT',
+        controlLevel: 'FULL',
+        hasAdminConsole: false,
+      });
+      const lotId = h.dataOf<{ id: string }>(
+        await request(h.server())
+          .post('/api/v1/license-lots')
+          .set(h.as(leaver.account))
+          .send({
+            planId,
+            workspaceId: wsId,
+            purchasedOn: h.today(),
+            licenseCount: 2,
+            unitPrice: { amount: '1000000', currency: 'VND' },
+            purpose: 'REPLACEMENT',
+          })
+          .expect(201),
+      ).id;
+
+      const recorded = await h.recordedCase(leaver);
+
+      expect(await itHandoverOf(recorded.id)).toEqual({
+        state: 'PENDING',
+        subscriptions: 0,
+        applications: 0,
+        handedOver: null,
+      });
+      const storedItem = await h.ctx.sql.query<{
+        subscriptions_at_record: number;
+        applications_at_record: number;
+        workspaces_at_record: number;
+        license_lots_at_record: number;
+      }>(
+        `SELECT subscriptions_at_record, applications_at_record, workspaces_at_record, license_lots_at_record
+           FROM it_admin_handovers WHERE offboarding_case_id = $1`,
+        [recorded.id],
+      );
+      expect(storedItem.rows[0]).toEqual({
+        subscriptions_at_record: 0,
+        applications_at_record: 0,
+        workspaces_at_record: 1,
+        license_lots_at_record: 1,
+      });
+
+      await handOver('offboarding-cases', recorded.id, target.employeeId, h.sa).expect(200);
+
+      expect(await itHandoverOf(recorded.id)).toMatchObject({ state: 'DONE', subscriptions: 0, applications: 0 });
+      const wsOwner = await h.ctx.sql.query<{ responsible: string | null }>(
+        'SELECT responsible_it_admin_employee_id AS responsible FROM workspaces WHERE id = $1',
+        [wsId],
+      );
+      const lotOwner = await h.ctx.sql.query<{ responsible: string | null }>(
+        'SELECT responsible_it_admin_employee_id AS responsible FROM license_lots WHERE id = $1',
+        [lotId],
+      );
+      expect(wsOwner.rows[0].responsible).toBe(target.employeeId);
+      expect(lotOwner.rows[0].responsible).toBe(target.employeeId);
+      const movedActions = (
+        await h.ctx.sql.query<{ action: string }>(
+          `SELECT action FROM audit_events WHERE action IN ('WORKSPACE.RESPONSIBLE_TRANSFERRED', 'LICENSE_LOT.RESPONSIBLE_TRANSFERRED')
+              AND after ->> 'sourceId' = $1 ORDER BY action`,
+          [recorded.id],
+        )
+      ).rows.map((row) => row.action);
+      expect(movedActions).toEqual(['LICENSE_LOT.RESPONSIBLE_TRANSFERRED', 'WORKSPACE.RESPONSIBLE_TRANSFERRED']);
+    });
+
+    it('H-5: database CHECK rejects an empty handover row with 0/0/0/0 responsibilities', async () => {
+      const u = await unit();
+      counter += 1;
+      const plain = await h.worker(u.department, `IH-ZERO${counter}`, ['IT_ADMIN']);
+      const recorded = await h.recordedCase(plain);
+
+      await expect(
+        h.ctx.sql.query(
+          `INSERT INTO it_admin_handovers (id, organization_id, offboarding_case_id, subscriptions_at_record, applications_at_record, workspaces_at_record, license_lots_at_record)
+           VALUES (gen_random_uuid(), $1, $2, 0, 0, 0, 0)`,
+          [h.seed.organizationId, recorded.id],
+        ),
+      ).rejects.toMatchObject({ code: '23514', constraint: 'it_admin_handovers_counts' });
     });
   });
 });

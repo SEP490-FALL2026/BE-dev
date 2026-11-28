@@ -9,6 +9,7 @@ import { OPENAPI_DOCUMENT_BUDGET_MS } from '../../support/openapi-document-budge
 
 const ID = '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11';
 const DEVICES = '/api/v1/devices';
+const INITIAL_RECORDS = '/api/v1/device-initial-records';
 const REGISTRATIONS = '/api/v1/device-registrations';
 const ME = '/api/v1/me';
 const NOTICES = '/api/v1/monitoring-notice-versions';
@@ -38,16 +39,38 @@ describe('company machine routes (http contract, no database)', () => {
   });
 
   const routes = [
-    ['post', DEVICES, { assetCode: 'AS-1', hostname: 'h', os: 'Windows 11', holderEmployeeId: ID }],
+    ['post', DEVICES, { deviceType: 'LAP', hostname: 'h', os: 'Windows 11' }],
+    ['post', INITIAL_RECORDS, { deviceType: 'LAP', hostname: 'h', os: 'Windows 11', assetCode: 'IT-OLD-0042' }],
     ['get', DEVICES, undefined],
     ['get', `${DEVICES}/${ID}`, undefined],
+    ['patch', `${DEVICES}/${ID}`, { expectedUpdatedAt: '2026-11-24T00:00:00.000Z', hostname: 'h2' }],
     ['get', `${DEVICES}/${ID}/registrations`, undefined],
-    ['post', `${DEVICES}/${ID}/holder-changes`, { holderEmployeeId: ID }],
+    ['post', `${DEVICES}/${ID}/holder-changes`, { holderEmployeeId: ID, collectorInstalled: true }],
+    [
+      'post',
+      `${DEVICES}/${ID}/replacements`,
+      {
+        replacementDeviceId: ID,
+        condition: 'USABLE',
+        softwareRemoval: { outcome: 'REMOVED' },
+        collectorInstalled: true,
+      },
+    ],
+    ['post', `${DEVICES}/${ID}/returns`, { condition: 'USABLE', softwareRemoval: { outcome: 'REMOVED' } }],
+    ['post', `${DEVICES}/${ID}/condition-changes`, { condition: 'IN_REPAIR' }],
     ['post', `${DEVICES}/${ID}/retirements`, { reason: 'broken' }],
+    ['post', `${DEVICES}/${ID}/voids`, { reason: 'entered twice' }],
+    ['post', `${DEVICES}/${ID}/activations`, { planId: ID }],
+    ['get', `${DEVICES}/${ID}/holder-software`, undefined],
+    ['get', '/api/v1/device-activations', undefined],
+    ['post', `/api/v1/device-activations/${ID}/deactivation`, {}],
+    ['post', `/api/v1/device-activations/${ID}/moves`, { targetDeviceId: ID }],
     ['post', `${REGISTRATIONS}/${ID}/signature-records`, { documentId: ID, noticeVersionId: ID }],
+    ['post', `${REGISTRATIONS}/${ID}/collector-installation`, undefined],
     ['post', NOTICES, NOTICE],
     ['get', '/api/v1/monitoring-notices/current', undefined],
     ['get', `${ME}/devices`, undefined],
+    ['get', `${ME}/device-software`, undefined],
     ['post', `${ME}/device-registrations/${ID}/acknowledgements`, { noticeVersionId: ID }],
     ['post', `${REGISTRATIONS}/${ID}/enrollment-codes`, { collectorKind: 'AI_COLLECTOR' }],
     ['get', `${REGISTRATIONS}/${ID}/credentials`, undefined],
@@ -71,14 +94,47 @@ describe('company machine routes (http contract, no database)', () => {
 
     for (const response of [
       await as(request(server).post(DEVICES).send(routes[0][2])),
+      await as(request(server).post(INITIAL_RECORDS).send(routes[1][2])),
       await as(request(server).get(DEVICES)),
       await as(request(server).get(`${DEVICES}/${ID}`)),
+      await as(
+        request(server)
+          .patch(`${DEVICES}/${ID}`)
+          .send({ expectedUpdatedAt: '2026-11-24T00:00:00.000Z', hostname: 'h2' }),
+      ),
       await as(request(server).get(`${DEVICES}/${ID}/registrations`)),
-      await as(request(server).post(`${DEVICES}/${ID}/holder-changes`).send({ holderEmployeeId: ID })),
+      await as(
+        request(server)
+          .post(`${DEVICES}/${ID}/holder-changes`)
+          .send({ holderEmployeeId: ID, collectorInstalled: true }),
+      ),
+      await as(
+        request(server)
+          .post(`${DEVICES}/${ID}/replacements`)
+          .send({
+            replacementDeviceId: ID,
+            condition: 'USABLE',
+            softwareRemoval: { outcome: 'REMOVED' },
+            collectorInstalled: true,
+          }),
+      ),
+      await as(
+        request(server)
+          .post(`${DEVICES}/${ID}/returns`)
+          .send({ condition: 'USABLE', softwareRemoval: { outcome: 'REMOVED' } }),
+      ),
+      await as(request(server).post(`${DEVICES}/${ID}/condition-changes`).send({ condition: 'IN_REPAIR' })),
       await as(request(server).post(`${DEVICES}/${ID}/retirements`).send({ reason: 'x' })),
+      await as(request(server).post(`${DEVICES}/${ID}/voids`).send({ reason: 'x' })),
+      await as(request(server).post(`${DEVICES}/${ID}/activations`).send({ planId: ID })),
+      await as(request(server).get(`${DEVICES}/${ID}/holder-software`)),
+      await as(request(server).get('/api/v1/device-activations')),
+      await as(request(server).post(`/api/v1/device-activations/${ID}/deactivation`).send({})),
+      await as(request(server).post(`/api/v1/device-activations/${ID}/moves`).send({ targetDeviceId: ID })),
       await as(
         request(server).post(`${REGISTRATIONS}/${ID}/signature-records`).send({ documentId: ID, noticeVersionId: ID }),
       ),
+      await as(request(server).post(`${REGISTRATIONS}/${ID}/collector-installation`)),
     ]) {
       expect(response.status).toBe(403);
       expect(bodyOf(response).error.code).toBe('AUTHORIZATION.FORBIDDEN');
@@ -178,9 +234,47 @@ describe('company machine routes (http contract, no database)', () => {
       DEVICES,
       { ...(routes[0][2] as object), organizationId: ID },
     ],
-    ['a machine with no holder', 'post', DEVICES, { assetCode: 'AS-1', hostname: 'h', os: 'Windows 11' }],
-    ['a handover day that is not a date', 'post', DEVICES, { ...(routes[0][2] as object), handedOverOn: '2026-02-30' }],
-    ['a blank asset code', 'post', DEVICES, { ...(routes[0][2] as object), assetCode: '   ' }],
+    [
+      'a hand-typed asset code (generated only)',
+      'post',
+      DEVICES,
+      { ...(routes[0][2] as object), assetCode: 'LAP-26-0001' },
+    ],
+    [
+      'an initial record with blank assetCode',
+      'post',
+      INITIAL_RECORDS,
+      { ...(routes[0][2] as object), assetCode: '   ' },
+    ],
+    [
+      'an initial record with duplicate keyActivations',
+      'post',
+      INITIAL_RECORDS,
+      { ...(routes[0][2] as object), keyActivations: [{ licenseKeyId: ID }, { licenseKeyId: ID }] },
+    ],
+    [
+      'an initial record with an unknown field',
+      'post',
+      INITIAL_RECORDS,
+      { ...(routes[0][2] as object), organizationId: ID },
+    ],
+    [
+      'a handover day that is not a date',
+      'post',
+      DEVICES,
+      { ...(routes[0][2] as object), holderEmployeeId: ID, handedOverOn: '2026-02-30' },
+    ],
+    ['a duplicate bundled plan id', 'post', DEVICES, { ...(routes[0][2] as object), bundledPlanIds: [ID, ID] }],
+    ['a blank hostname', 'post', DEVICES, { ...(routes[0][2] as object), hostname: '   ' }],
+    ['an unknown deviceType', 'post', DEVICES, { deviceType: 'TABLET', hostname: 'h', os: 'Android' }],
+    [
+      'an update on non-UUID id',
+      'patch',
+      `${DEVICES}/not-a-uuid`,
+      { expectedUpdatedAt: '2026-11-24T00:00:00.000Z', hostname: 'x' },
+    ],
+    ['an update with missing expectedUpdatedAt', 'patch', `${DEVICES}/${ID}`, { hostname: 'x' }],
+    ['an invalid custody filter', 'get', `${DEVICES}?custody=VOIDED`, undefined],
     ['a page size over 100', 'get', `${DEVICES}?pageSize=101`, undefined],
     ['a state that does not exist', 'get', `${DEVICES}?state=BROKEN`, undefined],
     ['an id that is not a UUID', 'get', `${DEVICES}/not-a-uuid`, undefined],
@@ -197,10 +291,94 @@ describe('company machine routes (http contract, no database)', () => {
       'a holder change that names the registration',
       'post',
       `${DEVICES}/${ID}/holder-changes`,
-      { holderEmployeeId: ID, registrationId: ID },
+      { holderEmployeeId: ID, collectorInstalled: true, registrationId: ID },
+    ],
+    ['a holder change missing collectorInstalled', 'post', `${DEVICES}/${ID}/holder-changes`, { holderEmployeeId: ID }],
+    [
+      'a device return with an invalid condition',
+      'post',
+      `${DEVICES}/${ID}/returns`,
+      { condition: 'DAMAGED', softwareRemoval: { outcome: 'REMOVED' } },
+    ],
+    [
+      'a device return with an unknown field',
+      'post',
+      `${DEVICES}/${ID}/returns`,
+      { condition: 'USABLE', softwareRemoval: { outcome: 'REMOVED' }, extra: 1 },
+    ],
+    [
+      'a condition change with an invalid condition',
+      'post',
+      `${DEVICES}/${ID}/condition-changes`,
+      { condition: 'LOST' },
     ],
     ['a retirement with no reason', 'post', `${DEVICES}/${ID}/retirements`, {}],
+    [
+      'a retirement with invalid retirementKind',
+      'post',
+      `${DEVICES}/${ID}/retirements`,
+      { reason: 'broken', retirementKind: 'SOLD' },
+    ],
+    [
+      'a retirement with duplicate activationIds',
+      'post',
+      `${DEVICES}/${ID}/retirements`,
+      {
+        reason: 'broken',
+        activationDecisions: [
+          { activationId: ID, licenseRelease: 'RETURN_TO_LOT' },
+          { activationId: ID, licenseRelease: 'LOST_WITH_DEVICE' },
+        ],
+      },
+    ],
+    [
+      'a replacement missing collectorInstalled',
+      'post',
+      `${DEVICES}/${ID}/replacements`,
+      { replacementDeviceId: ID, condition: 'USABLE', softwareRemoval: { outcome: 'REMOVED' } },
+    ],
+    [
+      'a replacement with duplicate activationIds',
+      'post',
+      `${DEVICES}/${ID}/replacements`,
+      {
+        replacementDeviceId: ID,
+        condition: 'USABLE',
+        softwareRemoval: { outcome: 'REMOVED' },
+        collectorInstalled: true,
+        activations: [
+          { activationId: ID, action: 'MOVE' },
+          { activationId: ID, action: 'STAY' },
+        ],
+      },
+    ],
+    ['a void with blank reason', 'post', `${DEVICES}/${ID}/voids`, { reason: '   ' }],
+    ['an activation with no planId', 'post', `${DEVICES}/${ID}/activations`, {}],
+    [
+      'an activation with non-UUID licenseKeyId',
+      'post',
+      `${DEVICES}/${ID}/activations`,
+      { planId: ID, licenseKeyId: 'bad' },
+    ],
+    ['an activation list with invalid state', 'get', '/api/v1/device-activations?state=BAD', undefined],
+    ['an activation list with pageSize over 100', 'get', '/api/v1/device-activations?pageSize=101', undefined],
+    ['holder software for non-UUID device id', 'get', `${DEVICES}/not-a-uuid/holder-software`, undefined],
+    ['holder software with pageSize over 50', 'get', `${DEVICES}/${ID}/holder-software?pageSize=51`, undefined],
+    ['holder software with an unknown query param', 'get', `${DEVICES}/${ID}/holder-software?extra=1`, undefined],
+    [
+      'a deactivation with invalid licenseRelease',
+      'post',
+      `/api/v1/device-activations/${ID}/deactivation`,
+      { licenseRelease: 'OTHER' },
+    ],
+    ['a move missing targetDeviceId', 'post', `/api/v1/device-activations/${ID}/moves`, {}],
     ['a signed record with no version', 'post', `${REGISTRATIONS}/${ID}/signature-records`, { documentId: ID }],
+    [
+      'a collector enable on non-UUID registration id',
+      'post',
+      `${REGISTRATIONS}/not-a-uuid/collector-installation`,
+      undefined,
+    ],
   ] as const)('refuses %s with 422', async (_name, method, path, body) => {
     const call = request(app.getHttpServer())
       [method](path)
@@ -245,6 +423,19 @@ describe('company machine routes (http contract, no database)', () => {
       .expect(422);
   });
 
+  it.each([
+    ['pageSize over 50', `${ME}/device-software?pageSize=51`],
+    ['page 0', `${ME}/device-software?page=0`],
+    ['an unknown query param', `${ME}/device-software?extra=1`],
+  ])('refuses /me/device-software with %s with 422', async (_name, path) => {
+    const response = await request(app.getHttpServer())
+      .get(path)
+      .set('Authorization', bearer(principal(['EMPLOYEE'])))
+      .expect(422);
+
+    expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
+  });
+
   /** The wire promises: the fields a request takes and a response shows are exactly these (a field added without the spec fails here). */
   describe('the fields the document promises', () => {
     type Schema = { properties?: Record<string, unknown>; required?: string[]; additionalProperties?: unknown };
@@ -260,11 +451,61 @@ describe('company machine routes (http contract, no database)', () => {
     it.each([
       [
         'DeviceCreateBodyDto',
-        ['assetCode', 'hostname', 'os', 'holderEmployeeId', 'handedOverOn'],
-        ['assetCode', 'hostname', 'os', 'holderEmployeeId'],
+        [
+          'deviceType',
+          'hostname',
+          'os',
+          'serialNumber',
+          'bundledPlanIds',
+          'holderEmployeeId',
+          'handedOverOn',
+          'collectorInstalled',
+        ],
+        ['deviceType', 'hostname', 'os'],
       ],
-      ['HolderChangeBodyDto', ['holderEmployeeId'], ['holderEmployeeId']],
-      ['RetirementBodyDto', ['reason'], ['reason']],
+      [
+        'DeviceInitialRecordBodyDto',
+        [
+          'deviceType',
+          'hostname',
+          'os',
+          'serialNumber',
+          'bundledPlanIds',
+          'holderEmployeeId',
+          'handedOverOn',
+          'collectorInstalled',
+          'assetCode',
+          'keyActivations',
+        ],
+        ['deviceType', 'hostname', 'os'],
+      ],
+      [
+        'DeviceAttributesBodyDto',
+        ['expectedUpdatedAt', 'hostname', 'os', 'serialNumber', 'deviceType'],
+        ['expectedUpdatedAt'],
+      ],
+      [
+        'HolderChangeBodyDto',
+        ['holderEmployeeId', 'collectorInstalled', 'softwareRemoval'],
+        ['holderEmployeeId', 'collectorInstalled'],
+      ],
+      ['DeviceReturnBodyDto', ['condition', 'conditionNote', 'softwareRemoval'], ['condition', 'softwareRemoval']],
+      ['ConditionChangeBodyDto', ['condition', 'note'], ['condition']],
+      ['RetirementBodyDto', ['retirementKind', 'reason', 'activationDecisions'], ['reason']],
+      [
+        'DeviceReplacementBodyDto',
+        ['replacementDeviceId', 'condition', 'conditionNote', 'softwareRemoval', 'collectorInstalled', 'activations'],
+        ['replacementDeviceId', 'condition', 'softwareRemoval', 'collectorInstalled'],
+      ],
+      ['DeviceVoidBodyDto', ['reason'], ['reason']],
+      [
+        'DeviceReturnTaskCompleteBodyDto',
+        ['outcome', 'condition', 'conditionNote', 'softwareRemoval', 'reason', 'activationDecisions'],
+        ['outcome'],
+      ],
+      ['OpenDeviceActivationBodyDto', ['planId', 'licenseKeyId'], ['planId']],
+      ['DeactivateDeviceActivationBodyDto', ['licenseRelease'], []],
+      ['MoveDeviceActivationBodyDto', ['targetDeviceId'], ['targetDeviceId']],
       ['SignatureRecordBodyDto', ['documentId', 'noticeVersionId'], ['documentId', 'noticeVersionId']],
       [
         'NoticeVersionBodyDto',
@@ -302,6 +543,8 @@ describe('company machine routes (http contract, no database)', () => {
         bodyOf_('DeviceDetailResponseDto'),
         bodyOf_('MyDevicePageResponseDto'),
         bodyOf_('DeviceRegistrationPageResponseDto'),
+        bodyOf_('DeviceHolderSoftwarePageResponseDto'),
+        bodyOf_('MeDeviceSoftwarePageResponseDto'),
       ]);
 
       expect(text).not.toMatch(/"(?:ip|address|ipAddress|token|credential|url|link)[A-Za-z]*"/i);
@@ -316,6 +559,46 @@ describe('company machine routes (http contract, no database)', () => {
 
       expect(registrations?.operationId).toBe('deviceRegistrationList');
       expect(parameters.sort()).toEqual(['id', 'page', 'pageSize']);
+    });
+
+    it('answers the correction of a machine with the detail of the machine, like the other commands on it, and lists 403 for the activations', () => {
+      const update = document.paths?.[`/api/v1/devices/{id}`]?.patch;
+      const ok = JSON.stringify(update?.responses?.['200'] ?? null);
+      const activations = document.paths?.['/api/v1/device-activations']?.get;
+
+      expect(update?.operationId).toBe('deviceUpdate');
+      expect(ok).toContain('#/components/schemas/DeviceDetailResponseDto');
+      expect(Object.keys(update?.responses ?? {})).toEqual(expect.arrayContaining(['403', '404', '409', '422']));
+      expect(Object.keys(activations?.responses ?? {})).toContain('403');
+    });
+  });
+
+  describe('device return task routes', () => {
+    it('enforces authentication and role guards for list and completion endpoints', async () => {
+      const server = app.getHttpServer();
+      await request(server).get('/api/v1/device-return-tasks').expect(401);
+      await request(server).post(`/api/v1/device-return-tasks/${ID}/completion`).send({}).expect(401);
+
+      for (const roles of [['EMPLOYEE'], ['MANAGER'], ['FINANCE']]) {
+        const res = await request(server)
+          .get('/api/v1/device-return-tasks')
+          .set('Authorization', bearer(principal(roles)))
+          .expect(403);
+        expect(bodyOf(res).error.code).toBe('AUTHORIZATION.FORBIDDEN');
+      }
+
+      const saComplete = await request(server)
+        .post(`/api/v1/device-return-tasks/${ID}/completion`)
+        .set('Authorization', bearer(principal(['SUPER_ADMIN'])))
+        .send({ outcome: 'NOT_RECOVERED', reason: 'Lost' })
+        .expect(403);
+      expect(bodyOf(saComplete).error.code).toBe('AUTHORIZATION.FORBIDDEN');
+
+      const badQuery = await request(server)
+        .get('/api/v1/device-return-tasks?scope=GENERAL')
+        .set('Authorization', bearer(principal(['IT_ADMIN'])))
+        .expect(422);
+      expect(bodyOf(badQuery).error.code).toBe('VALIDATION_ERROR');
     });
   });
 });

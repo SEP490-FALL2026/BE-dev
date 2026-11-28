@@ -70,6 +70,17 @@ chậm; hành vi SQL không đổi. CI làm tương tự trong `.github/actions/
 suite CLI biên dịch mã nguồn bằng ts-node mỗi lần gọi (luôn đúng code đang sửa, nhưng chậm); đặt `dist` thì phải
 `pnpm build` trước.
 
+Các integration test Redis dùng container riêng với tiền tố khóa riêng cho từng fixture:
+
+```powershell
+docker run --name slm-test-redis -d -p 127.0.0.1:56379:6379 redis:8-alpine --maxmemory-policy noeviction
+docker exec slm-test-redis redis-cli ping
+$env:TEST_REDIS_URL = 'redis://127.0.0.1:56379'
+pnpm test:integration --runInBand test/integration/platform/redis-harness.integration-spec.ts
+```
+
+Trên CI, thiếu `TEST_REDIS_URL` làm các test Redis báo lỗi. Fixture chỉ xóa khóa theo tiền tố của chính nó.
+
 - Lượt chạy migrate **một lần** vào database mẫu; mỗi file sao một database riêng từ mẫu, nên các file chạy song song
   được. File đụng tài nguyên chung của cả cluster (tạo role H7, dùng superuser) nằm ở `test/integration/_serial/`.
 - File mà kết quả phụ thuộc giới hạn thời gian ngắn (một lời gọi kết thúc trong timeout đã cấu hình, vài giây) đặt cạnh

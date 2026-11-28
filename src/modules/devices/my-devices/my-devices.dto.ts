@@ -16,13 +16,19 @@ const myDeviceSchema = z.strictObject({
   os: z.string(),
   validFrom: responseBusinessDate,
   endedAt: z.iso.datetime().nullable(),
-  acknowledgementState: z.enum(['UNACKNOWLEDGED', 'ACKNOWLEDGED', 'STOPPED', 'ENDED']),
+  acknowledgementState: z.enum(['UNACKNOWLEDGED', 'ACKNOWLEDGED', 'STOPPED', 'ENDED', 'NOT_REQUIRED']),
   acknowledgedVersionNumber: z.number().int().nullable(),
   signatureRecorded: z.boolean(),
   stopRequestPending: z.boolean(),
   canAcknowledge: z.boolean(),
   blockedReason: z
-    .enum(['SIGNATURE_RECORD_MISSING', 'NOTICE_NOT_PUBLISHED', 'REGISTRATION_ENDED', 'ALREADY_ACKNOWLEDGED'])
+    .enum([
+      'COLLECTOR_NOT_INSTALLED',
+      'SIGNATURE_RECORD_MISSING',
+      'NOTICE_NOT_PUBLISHED',
+      'REGISTRATION_ENDED',
+      'ALREADY_ACKNOWLEDGED',
+    ])
     .nullable(),
 });
 

@@ -22,8 +22,43 @@ const NOT_FOUND = {
   description: 'The task does not exist (PROVISIONING_TASK.NOT_FOUND).',
   examples: [EXAMPLES.TASK_NOT_FOUND],
 } as const;
-/** The role guard, and the IT Admin who is the person revoked while another can work the task. */
-const WORKER_EXAMPLES = [FORBIDDEN_EXAMPLE, EXAMPLES.ANOTHER_IT_ADMIN_NEEDED] as const;
+/** The role guard, and callers not acting in charge of the task department. */
+const WORKER_EXAMPLES = [FORBIDDEN_EXAMPLE, EXAMPLES.NOT_IN_CHARGE] as const;
+
+const COMPLETE_REVOCATION_ERRORS = [
+  ...AUTH_ERRORS,
+  {
+    status: HttpStatus.FORBIDDEN,
+    description:
+      'Only an acting IT Admin (in charge or appointed substitute) for the task department may complete this revocation (PROVISIONING.NOT_IN_CHARGE).',
+    examples: WORKER_EXAMPLES,
+  },
+  NOT_FOUND,
+  {
+    status: HttpStatus.CONFLICT,
+    description:
+      'The task is not a revocation (PROVISIONING_TASK.NOT_REVOCATION), is not in progress or is completed already (NOT_IN_PROGRESS), is not for a person (NOT_MANUAL), is still in its grace (NOT_BEFORE, details.notBefore: the first day it can be completed), the beneficiary has not started working in a department yet (EMPLOYEE.NOT_STARTED), or the assignment is no longer open (LICENSE_ASSIGNMENT.NOT_OPEN): nothing changes.',
+    examples: [EXAMPLES.NOT_REVOCATION, EXAMPLES.NOT_IN_PROGRESS, EXAMPLES.NOT_BEFORE, EXAMPLES.EMPLOYEE_NOT_STARTED],
+  },
+  {
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    description:
+      'The request is invalid (VALIDATION_ERROR), or the completion is refused and nothing is stored: REVOCATION.COMPLETION_NOT_ALLOWED (the way does not fit the kind of grant), NOTE_REQUIRED, PAID_THROUGH_REQUIRED, ACCESS_STATE_REQUIRED, ACCESS_STATE_INVALID, KEY_DISPOSITION_REQUIRED (a K4 completion without keyDisposition), WITHDRAWAL_REASON_REQUIRED (a K4 key withdrawn with no reason; keyDisposition or withdrawalReason on another kind is COMPLETION_NOT_ALLOWED), no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED), or a K1 checklist that is not valid: a step missing, not ticked or ticked with no time, or no evidence (K1_CHECKLIST_INCOMPLETE), steps ticked out of their order, a step timed earlier than the one that comes before it in the list, such as the lock of the mailbox before the sign-out of the sessions (K1_CHECKLIST_OUT_OF_ORDER), or a step the variant does not have, sent twice or sent for a kind that has no checklist (COMPLETION_NOT_ALLOWED). A refusal of the checklist of a K1 task carries details { variant, codes }: the variant the server worked out and the steps it expects of this task, in order; MAILBOX_LOCKED is among them only when no other K1 revocation of the person is still to do.',
+    examples: [
+      VALIDATION_EXAMPLE,
+      EXAMPLES.COMPLETION_NOT_ALLOWED,
+      EXAMPLES.NOTE_REQUIRED,
+      EXAMPLES.PAID_THROUGH_REQUIRED,
+      EXAMPLES.ACCESS_STATE_REQUIRED,
+      EXAMPLES.ACCESS_STATE_INVALID,
+      EXAMPLES.KEY_DISPOSITION_REQUIRED,
+      EXAMPLES.WITHDRAWAL_REASON_REQUIRED,
+      EXAMPLES.EVIDENCE_REQUIRED,
+      EXAMPLES.K1_CHECKLIST_INCOMPLETE,
+      EXAMPLES.K1_CHECKLIST_OUT_OF_ORDER,
+    ],
+  },
+] as const;
 
 /**
  * The work an IT Admin does on a revocation: completing it, which is what gives the seat back, and cutting the access of a K1
@@ -46,40 +81,7 @@ export class RevocationTasksController {
     description:
       'The only end of a revocation that gives the seat back. K2 is completed as ACCOUNT_REMOVED with evidence, or as ALREADY_GONE with a note when the person removed the account themselves; K5 as OFF_SYSTEM_REVOKED with evidence; K4 as KEY_DEACTIVATED with evidence, and the IT Admin must say where its key goes (keyDisposition, required for K4): back to the store (RETURN_TO_STORE) or back and withdrawn from it at once (WITHDRAW, with a withdrawalReason: a key that may not move to another device), with LICENSE_KEY.RETURNED_TO_STORE (and LICENSE_KEY.WITHDRAWN) in the audit trail; K1 as RENEWAL_CANCELLED with the day the paid period ends (paidThroughOn), what is known of the access (UNTIL_PAID_END, or CUT with the day accessCutOn and its accessEvidence) and the checklist of the card (k1Checklist, required: the steps of the variant the card tells, DEPARTURE or STILL_EMPLOYED, each { code, done: true, doneAt } with doneAt not falling as the steps go (the same instant is in order; a step may be timed before the task was made), and the evidence in k1Checklist.evidence, or in evidence when the checklist has none; k1Checklist is refused for any other kind of grant). The assignment ends the same day for K2, K4 and K5, and for K1 at the end of the paid period or the day the access was cut, whichever is earlier; a K1 seat whose access runs on is reported as terminating. The completion writes no saving, invoice, contract or budget.',
   })
-  @ApiErrorResponses(
-    ...AUTH_ERRORS,
-    {
-      status: HttpStatus.FORBIDDEN,
-      description:
-        'Only an IT Admin works the queue of provisioning tasks, and an IT Admin who is the person revoked waits for another usable IT Admin (PROVISIONING.ANOTHER_IT_ADMIN_NEEDED); with none left they may.',
-      examples: WORKER_EXAMPLES,
-    },
-    NOT_FOUND,
-    {
-      status: HttpStatus.CONFLICT,
-      description:
-        'The task is not a revocation (PROVISIONING_TASK.NOT_REVOCATION), is not in progress or is completed already (NOT_IN_PROGRESS), is not for a person (NOT_MANUAL), is still in its grace (NOT_BEFORE, details.notBefore: the first day it can be completed), or the assignment is no longer open (LICENSE_ASSIGNMENT.NOT_OPEN): nothing changes.',
-      examples: [EXAMPLES.NOT_REVOCATION, EXAMPLES.NOT_IN_PROGRESS, EXAMPLES.NOT_BEFORE],
-    },
-    {
-      status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description:
-        'The request is invalid (VALIDATION_ERROR), or the completion is refused and nothing is stored: REVOCATION.COMPLETION_NOT_ALLOWED (the way does not fit the kind of grant), NOTE_REQUIRED, PAID_THROUGH_REQUIRED, ACCESS_STATE_REQUIRED, ACCESS_STATE_INVALID, KEY_DISPOSITION_REQUIRED (a K4 completion without keyDisposition), WITHDRAWAL_REASON_REQUIRED (a K4 key withdrawn with no reason; keyDisposition or withdrawalReason on another kind is COMPLETION_NOT_ALLOWED), no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED), or a K1 checklist that is not valid: a step missing, not ticked or ticked with no time, or no evidence (K1_CHECKLIST_INCOMPLETE), steps ticked out of their order, a step timed earlier than the one that comes before it in the list, such as the lock of the mailbox before the sign-out of the sessions (K1_CHECKLIST_OUT_OF_ORDER), or a step the variant does not have, sent twice or sent for a kind that has no checklist (COMPLETION_NOT_ALLOWED). A refusal of the checklist of a K1 task carries details { variant, codes }: the variant the server worked out and the steps it expects of this task, in order; MAILBOX_LOCKED is among them only when no other K1 revocation of the person is still to do.',
-      examples: [
-        VALIDATION_EXAMPLE,
-        EXAMPLES.COMPLETION_NOT_ALLOWED,
-        EXAMPLES.NOTE_REQUIRED,
-        EXAMPLES.PAID_THROUGH_REQUIRED,
-        EXAMPLES.ACCESS_STATE_REQUIRED,
-        EXAMPLES.ACCESS_STATE_INVALID,
-        EXAMPLES.KEY_DISPOSITION_REQUIRED,
-        EXAMPLES.WITHDRAWAL_REASON_REQUIRED,
-        EXAMPLES.EVIDENCE_REQUIRED,
-        EXAMPLES.K1_CHECKLIST_INCOMPLETE,
-        EXAMPLES.K1_CHECKLIST_OUT_OF_ORDER,
-      ],
-    },
-  )
+  @ApiErrorResponses(...COMPLETE_REVOCATION_ERRORS)
   async completeRevocation(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: TaskIdParamDto,
@@ -107,15 +109,15 @@ export class RevocationTasksController {
     ...AUTH_ERRORS,
     {
       status: HttpStatus.FORBIDDEN,
-      description: 'Not an IT Admin, or PROVISIONING.ANOTHER_IT_ADMIN_NEEDED.',
+      description: 'Not an IT Admin, or PROVISIONING.NOT_IN_CHARGE.',
       examples: WORKER_EXAMPLES,
     },
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The task is not a revocation (PROVISIONING_TASK.NOT_REVOCATION) or its access is not running on to the end of the paid period, or was cut already (NOT_TERMINATING): nothing changes.',
-      examples: [EXAMPLES.NOT_REVOCATION, EXAMPLES.NOT_TERMINATING],
+        'The task is not a revocation (PROVISIONING_TASK.NOT_REVOCATION), its access is not running on to the end of the paid period, or was cut already (NOT_TERMINATING), or the beneficiary has not started working in a department yet (EMPLOYEE.NOT_STARTED): nothing changes.',
+      examples: [EXAMPLES.NOT_REVOCATION, EXAMPLES.NOT_TERMINATING, EXAMPLES.EMPLOYEE_NOT_STARTED],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,

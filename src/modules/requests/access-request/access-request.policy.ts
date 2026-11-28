@@ -1,3 +1,10 @@
+import { addDays, type BusinessDate } from '../../../core/business-date';
+import {
+  K1_ANNUAL_COMMITMENT_MONTHS,
+  k1PaidThroughOn,
+  k1RemainingBillingStart,
+  type TermKind,
+} from '../../../core/term-limit';
 import type { RequestRouting } from './routing.policy';
 /**
  * The branch and the chain of step kinds of a request, and the SLA of its steps, fixed when it is sent (`US-05-02`
@@ -202,3 +209,41 @@ export const viewFactsOf = (request: {
   needStepAssigneeEmployeeId: request.needStep.assigneeEmployeeId,
   needStepAssigneeEmployeeIds: request.needSteps.map((step) => step.assigneeEmployeeId),
 });
+
+/** Window for a K1 annual transfer-grace replacement (`QĐ-117c`): keeps the existing plan source and splits billing at the next cycle. */
+export interface K1TransferReplacementPeriod {
+  keepSource: true;
+  paidThroughOn: BusinessDate;
+  oldDepartmentCycleEndsOn: BusinessDate;
+  chargeFrom: BusinessDate;
+  chargeThrough: BusinessDate;
+}
+
+/**
+ * Computes the remaining charge window when re-requesting a K1 annual right inside transfer grace (`QĐ-117c`):
+ * the running rolling month stays with the old department and the new department pays from the next monthly cycle through `paidThroughOn`.
+ */
+export function k1TransferReplacementPeriod(facts: {
+  billingAnchorOn: BusinessDate | null | undefined;
+  personalCommitmentMonths: number | null | undefined;
+  today: BusinessDate;
+}): K1TransferReplacementPeriod | null {
+  if (facts.personalCommitmentMonths !== K1_ANNUAL_COMMITMENT_MONTHS || !facts.billingAnchorOn) return null;
+  const paidThroughOn = k1PaidThroughOn(facts.billingAnchorOn, facts.today, 12);
+  const chargeFrom = k1RemainingBillingStart(facts.billingAnchorOn, facts.today);
+  if (chargeFrom > paidThroughOn) return null;
+
+  return {
+    keepSource: true,
+    paidThroughOn,
+    oldDepartmentCycleEndsOn: addDays(chargeFrom, -1),
+    chargeFrom,
+    chargeThrough: paidThroughOn,
+  };
+}
+
+/** Whether a plan is a K1 annual commitment plan (`referenceCommitmentMonths === 12`). */
+export const isK1AnnualPlan = (plan: {
+  provisioningType: TermKind;
+  referenceCommitmentMonths?: number | null;
+}): boolean => plan.provisioningType === 'K1' && plan.referenceCommitmentMonths === K1_ANNUAL_COMMITMENT_MONTHS;

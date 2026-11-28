@@ -248,7 +248,10 @@ describe('the grant of a seat over HTTP (integration, real PostgreSQL)', () => {
   it('refuses K3, which is only specified, and keeps no assignment or task', async () => {
     const subscriptionId = await h.subscription(5, 'K4');
     const planId = await h.planOf(subscriptionId);
-    await h.ctx.sql.query(`UPDATE plans SET provisioning_type = 'K3', pricing_model = NULL WHERE id = $1`, [planId]);
+    await h.ctx.sql.query(
+      `UPDATE plans SET provisioning_type = 'K3', pricing_model = NULL, key_binding = NULL WHERE id = $1`,
+      [planId],
+    );
 
     const refused = await h.grant({ requestId: h.gate.grantable(e5, planId), subscriptionId }).expect(409);
 

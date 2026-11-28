@@ -78,6 +78,8 @@ export class AssignmentRenewalService {
         effectiveFrom: endsOn,
         effectiveFromBasis: 'ACTUAL',
         expectedEndDate: input.newExpectedEndDate,
+        personalCommitmentMonths: current.personalCommitmentMonths ?? null,
+        billingAnchorOn: current.billingAnchorOn ?? null,
         predecessorId: current.id,
         baselineImportId: null,
         // The record that follows a flagged seat is the same machine account: its flag and its reason go on (`R-9`).

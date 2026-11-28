@@ -70,8 +70,8 @@ export class CredentialController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The registration has ended (DEVICE_REGISTRATION.ENDED) or its signed notice is not kept yet (DEVICE_REGISTRATION.SIGNATURE_RECORD_MISSING).',
-      examples: [EXAMPLES.REGISTRATION_ENDED, EXAMPLES.SIGNATURE_RECORD_MISSING],
+        'The registration has ended (DEVICE_REGISTRATION.ENDED), does not have collector installation enabled (DEVICE_REGISTRATION.COLLECTOR_NOT_INSTALLED), or its signed notice is not kept yet (DEVICE_REGISTRATION.SIGNATURE_RECORD_MISSING).',
+      examples: [EXAMPLES.REGISTRATION_ENDED, EXAMPLES.COLLECTOR_NOT_INSTALLED, EXAMPLES.SIGNATURE_RECORD_MISSING],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,

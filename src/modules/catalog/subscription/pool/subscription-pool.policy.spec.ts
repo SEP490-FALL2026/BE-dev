@@ -7,14 +7,12 @@ import {
   SubscriptionK1MonthlyOnlyError,
   SubscriptionK4PerpetualOnlyError,
   SubscriptionResponsibleRequiredError,
-  SubscriptionVendorAdminsRequiredError,
 } from '../subscription.errors';
+import { toSubscriptionApiException } from '../subscription.http-errors';
 import {
   assertDeclarableCycle,
   assertPoolTerms,
   assertResponsibleNamed,
-  assertVendorAdminsRecorded,
-  defaultResponsibleOf,
   isLiveSubscription,
   isPooledPlan,
   liveIdsByPlan,
@@ -22,12 +20,23 @@ import {
   orderBySourcePreference,
   pickPriceSource,
   poolWarnings,
-  vendorAdminFlags,
   withoutPeriodsAhead,
-  withoutVendorAdminDetail,
   type LivenessFacts,
   type PriceSource,
 } from './subscription-pool.policy';
+
+const expectSubError = (run: () => unknown, ErrorClass: new (...args: never[]) => Error, code: string) => {
+  let caught: unknown;
+  try {
+    run();
+  } catch (error) {
+    caught = error;
+  }
+  expect(caught).toBeInstanceOf(ErrorClass);
+  expect((toSubscriptionApiException(caught) as { getResponse?: () => unknown }).getResponse?.()).toMatchObject({
+    code,
+  });
+};
 
 describe('the rules of the shared pool on a write (QĐ-103e, QĐ-104d(3), R-E01, R-G01)', () => {
   const term = {
@@ -39,8 +48,10 @@ describe('the rules of the shared pool on a write (QĐ-103e, QĐ-104d(3), R-E01,
   };
 
   it('R-G01: refuses a term that becomes active with no commitment, and accepts one with a month or a year', () => {
-    expect(() => assertPoolTerms({ ...term, commitmentTermMonths: null, activating: true })).toThrow(
+    expectSubError(
+      () => assertPoolTerms({ ...term, commitmentTermMonths: null, activating: true }),
       SubscriptionCommitmentTermRequiredError,
+      'SUBSCRIPTION.COMMITMENT_TERM_REQUIRED',
     );
     expect(() => assertPoolTerms({ ...term, commitmentTermMonths: null })).not.toThrow();
     expect(() => assertPoolTerms({ ...term, activating: true })).not.toThrow();
@@ -50,15 +61,19 @@ describe('the rules of the shared pool on a write (QĐ-103e, QĐ-104d(3), R-E01,
   });
 
   it('R-G01: a commitment of one month is not paid by the year, and a commitment of a year may be paid by the month', () => {
-    expect(() => assertPoolTerms({ ...term, commitmentTermMonths: 1 })).toThrow(
+    expectSubError(
+      () => assertPoolTerms({ ...term, commitmentTermMonths: 1 }),
       SubscriptionBillingLongerThanCommitmentError,
+      'SUBSCRIPTION.BILLING_LONGER_THAN_COMMITMENT',
     );
     expect(() => assertPoolTerms({ ...term, billingCycle: 'MONTHLY', commitmentTermMonths: 12 })).not.toThrow();
   });
 
   it('R-G01: a perpetual purchase commits to no term', () => {
-    expect(() => assertPoolTerms({ ...term, kind: 'PERPETUAL', billingCycle: null, commitmentTermMonths: 12 })).toThrow(
+    expectSubError(
+      () => assertPoolTerms({ ...term, kind: 'PERPETUAL', billingCycle: null, commitmentTermMonths: 12 }),
       SubscriptionCommitmentTermNotAllowedError,
+      'SUBSCRIPTION.COMMITMENT_TERM_NOT_ALLOWED',
     );
     expect(() =>
       assertPoolTerms({ ...term, kind: 'PERPETUAL', billingCycle: null, commitmentTermMonths: null, activating: true }),
@@ -68,11 +83,15 @@ describe('the rules of the shared pool on a write (QĐ-103e, QĐ-104d(3), R-E01,
   it('R-E01: a K1 plan is for one month and paid by the month', () => {
     const k1 = { ...term, planProvisioningType: 'K1' as const };
 
-    expect(() => assertPoolTerms({ ...k1, billingCycle: 'MONTHLY', commitmentTermMonths: 12 })).toThrow(
+    expectSubError(
+      () => assertPoolTerms({ ...k1, billingCycle: 'MONTHLY', commitmentTermMonths: 12 }),
       SubscriptionK1MonthlyOnlyError,
+      'SUBSCRIPTION.K1_MONTHLY_ONLY',
     );
-    expect(() => assertPoolTerms({ ...k1, billingCycle: 'ANNUAL', commitmentTermMonths: null })).toThrow(
+    expectSubError(
+      () => assertPoolTerms({ ...k1, billingCycle: 'ANNUAL', commitmentTermMonths: null }),
       SubscriptionK1MonthlyOnlyError,
+      'SUBSCRIPTION.K1_MONTHLY_ONLY',
     );
     expect(() =>
       assertPoolTerms({ ...k1, billingCycle: 'MONTHLY', commitmentTermMonths: 1, activating: true }),
@@ -82,9 +101,15 @@ describe('the rules of the shared pool on a write (QĐ-103e, QĐ-104d(3), R-E01,
   it('B-5: a K4 plan is bought once, so what is written for it is a perpetual purchase and never a term', () => {
     const k4 = { ...term, planProvisioningType: 'K4' as const, billingCycle: 'MONTHLY' as const };
 
-    expect(() => assertPoolTerms({ ...k4, commitmentTermMonths: 1 })).toThrow(SubscriptionK4PerpetualOnlyError);
-    expect(() => assertPoolTerms({ ...k4, commitmentTermMonths: null, activating: false })).toThrow(
+    expectSubError(
+      () => assertPoolTerms({ ...k4, commitmentTermMonths: 1 }),
       SubscriptionK4PerpetualOnlyError,
+      'SUBSCRIPTION.K4_PERPETUAL_ONLY',
+    );
+    expectSubError(
+      () => assertPoolTerms({ ...k4, commitmentTermMonths: null, activating: false }),
+      SubscriptionK4PerpetualOnlyError,
+      'SUBSCRIPTION.K4_PERPETUAL_ONLY',
     );
     expect(() =>
       assertPoolTerms({ ...k4, kind: 'PERPETUAL', billingCycle: null, commitmentTermMonths: null, activating: true }),
@@ -98,12 +123,24 @@ describe('the rules of the shared pool on a write (QĐ-103e, QĐ-104d(3), R-E01,
     expect(() => assertDeclarableCycle(undefined)).not.toThrow();
     expect(() => assertDeclarableCycle('MONTHLY')).not.toThrow();
     expect(() => assertDeclarableCycle('ANNUAL')).not.toThrow();
-    expect(() => assertDeclarableCycle('QUARTERLY')).toThrow(SubscriptionBillingCycleUnsupportedError);
-    expect(() => assertDeclarableCycle('OTHER')).toThrow(SubscriptionBillingCycleUnsupportedError);
+    expectSubError(
+      () => assertDeclarableCycle('QUARTERLY'),
+      SubscriptionBillingCycleUnsupportedError,
+      'SUBSCRIPTION.BILLING_CYCLE_UNSUPPORTED',
+    );
+    expectSubError(
+      () => assertDeclarableCycle('OTHER'),
+      SubscriptionBillingCycleUnsupportedError,
+      'SUBSCRIPTION.BILLING_CYCLE_UNSUPPORTED',
+    );
   });
 
   it('R-E03: an active subscription names the IT Admin who answers for it; a draft need not', () => {
-    expect(() => assertResponsibleNamed(null, true)).toThrow(SubscriptionResponsibleRequiredError);
+    expectSubError(
+      () => assertResponsibleNamed(null, true),
+      SubscriptionResponsibleRequiredError,
+      'SUBSCRIPTION.RESPONSIBLE_REQUIRED',
+    );
     expect(() => assertResponsibleNamed(null, false)).not.toThrow();
     expect(() => assertResponsibleNamed('it-1', true)).not.toThrow();
   });
@@ -289,112 +326,8 @@ describe('withoutPeriodsAhead: the seats of the period that runs and of the next
   it('keeps a period with no start date: nothing says it is ahead', () => {
     expect(idsOf(withoutPeriodsAhead([period('a'), period('b', 'a', null)], TODAY))).toEqual(['a', 'b']);
   });
-});
 
-describe('the IT Admin a new subscription answers to when the declaration names none (QĐ-111g, BB-3)', () => {
-  const given = (over: Partial<Parameters<typeof defaultResponsibleOf>[0]> = {}) =>
-    defaultResponsibleOf({
-      named: undefined,
-      applicationResponsible: 'it-app',
-      applicationResponsibleIsUsable: true,
-      ...over,
-    });
-
-  it('keeps the one the declaration names, whatever the application has', () => {
-    expect(given({ named: 'it-body' })).toBe('it-body');
-    expect(given({ named: 'it-body', applicationResponsible: null, applicationResponsibleIsUsable: false })).toBe(
-      'it-body',
-    );
-  });
-
-  it('takes the IT Admin responsible for the application when none is named and they are still a usable IT Admin', () => {
-    expect(given()).toBe('it-app');
-  });
-
-  it('leaves it NULL when the application names nobody, or the one it names is no longer a usable IT Admin', () => {
-    expect(given({ applicationResponsible: null, applicationResponsibleIsUsable: false })).toBeNull();
-    expect(given({ applicationResponsible: 'it-gone', applicationResponsibleIsUsable: false })).toBeNull();
-  });
-});
-
-describe('the vendor admins of a plan that needs them (QĐ-110k, QĐ-110u, R-53)', () => {
-  describe('assertVendorAdminsRecorded: a plan that needs admins is not activated without two working IT Admins', () => {
-    it.each([[0], [1]])('refuses a plan that needs them with %i recorded', (given) => {
-      expect(() => assertVendorAdminsRecorded({ needs: true, given, planId: 'p-1' })).toThrow(
-        SubscriptionVendorAdminsRequiredError,
-      );
-    });
-
-    it('lets it through with two or more', () => {
-      expect(() => assertVendorAdminsRecorded({ needs: true, given: 2, planId: 'p-1' })).not.toThrow();
-      expect(() => assertVendorAdminsRecorded({ needs: true, given: 5, planId: 'p-1' })).not.toThrow();
-    });
-
-    it('never judges a plan that needs none (K1, K5, K4 with no admin console)', () => {
-      expect(() => assertVendorAdminsRecorded({ needs: false, given: 0, planId: 'p-1' })).not.toThrow();
-    });
-  });
-
-  describe('vendorAdminFlags: what the reader sees, never a refusal (a subscription older than the rule only carries the flags)', () => {
-    const working = (n: number) =>
-      Array.from({ length: n }, (_unused, index) => ({ employeeId: `e${index}`, working: true }));
-
-    it('says below the minimum when fewer than two of the admins recorded still work', () => {
-      expect(vendorAdminFlags({ needs: true, admins: working(2), ownerAccountEmail: 'it@acme.vn' })).toEqual({
-        vendorAdminsBelowMinimum: false,
-        ownerAccountEmailMissing: false,
-      });
-      expect(
-        vendorAdminFlags({
-          needs: true,
-          admins: [...working(1), { employeeId: 'gone', working: false }],
-          ownerAccountEmail: 'it@acme.vn',
-        }),
-      ).toMatchObject({ vendorAdminsBelowMinimum: true });
-      expect(vendorAdminFlags({ needs: true, admins: [], ownerAccountEmail: null })).toEqual({
-        vendorAdminsBelowMinimum: true,
-        ownerAccountEmailMissing: true,
-      });
-    });
-
-    it('says the email of the company account is missing only when the plan needs admins and none is recorded', () => {
-      expect(vendorAdminFlags({ needs: true, admins: working(3), ownerAccountEmail: null })).toMatchObject({
-        ownerAccountEmailMissing: true,
-      });
-    });
-
-    it('is quiet for a plan that needs no admins, whatever it holds', () => {
-      expect(vendorAdminFlags({ needs: false, admins: [], ownerAccountEmail: null })).toEqual({
-        vendorAdminsBelowMinimum: false,
-        ownerAccountEmailMissing: false,
-      });
-    });
-  });
-});
-
-describe('withoutVendorAdminDetail: only an IT Admin reads who administers a plan at the vendor (SPEC P19)', () => {
-  const view = {
-    id: 's1',
-    vendorAdmins: [{ employeeId: 'a', employeeCode: 'E-A', fullName: 'A', role: 'OWNER' as const, working: true }],
-    ownerAccountEmail: 'it@acme.vn',
-    adminNote: 'a note',
-    vendorAdminsBelowMinimum: true,
-    ownerAccountEmailMissing: false,
-  };
-
-  it('empties the people, the email and the note, and keeps everything else, the two flags included', () => {
-    expect(withoutVendorAdminDetail(view)).toEqual({
-      ...view,
-      vendorAdmins: [],
-      ownerAccountEmail: null,
-      adminNote: null,
-    });
-  });
-
-  it('does not change the view it was given', () => {
-    withoutVendorAdminDetail(view);
-
-    expect(view.vendorAdmins).toHaveLength(1);
-    expect(view.ownerAccountEmail).toBe('it@acme.vn');
+  it('excludes a future period whose predecessor is in knownIds (already collected via subscription lines)', () => {
+    expect(idsOf(withoutPeriodsAhead([period('b', 'a', '2026-12-15')], TODAY, new Set(['a'])))).toEqual([]);
   });
 });

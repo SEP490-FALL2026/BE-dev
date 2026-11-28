@@ -236,3 +236,13 @@ export class DocumentPurposeMismatchError extends Error {
     this.name = 'DocumentPurposeMismatchError';
   }
 }
+
+/** A lot of keys (K4) has its own contract column: only a subscription of seats (K2) rests on a contract through a link. */
+export class ContractSubscriptionNotK2Error extends Error {
+  constructor() {
+    super(
+      'A subscription of a plan of keys (K4) does not rest on a contract: the contract of a lot is set on the lot.',
+    );
+    this.name = 'ContractSubscriptionNotK2Error';
+  }
+}

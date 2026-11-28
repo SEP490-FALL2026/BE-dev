@@ -217,4 +217,18 @@ describe('the notices a head of a department, a mover and Finance open', () => {
       pathParams: { id: ID },
     });
   });
+
+  it('opens the unplaced-work designation list for SUPER_ADMIN and IT_ADMIN only', () => {
+    const subject = { type: 'UNPLACED_WORK_DESIGNATION', id: ID };
+    const params = { workKind: 'PROVISIONING_TASK', workId: ID, employeeId: ID };
+    for (const code of ['UNPLACED_WORK_WAITING', 'UNPLACED_WORK_DESIGNATED']) {
+      for (const role of ['SUPER_ADMIN', 'IT_ADMIN']) {
+        expect(target(code, subject, params, [role])).toEqual({
+          operationId: 'unplacedWorkDesignationList',
+          pathParams: {},
+        });
+      }
+      expect(target(code, subject, params, ['EMPLOYEE'])).toBeNull();
+    }
+  });
 });

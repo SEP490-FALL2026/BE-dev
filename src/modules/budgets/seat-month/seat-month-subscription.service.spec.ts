@@ -6,6 +6,7 @@ import type { SeatOfMonth } from '../../licensing/public/licensing-seat-month.ty
 import type { OrganizationHistoryApi } from '../../organization/public/organization-history.api';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { CommitmentRepo } from '../budget/commitment.repo';
+import type { CommitmentMonthFacadeService } from '../commitment/commitment-month-facade.service';
 import type { ThresholdAlertService } from '../threshold/threshold-alert.service';
 import { SeatMonthSeatFactsService } from './seat-month-seat-facts.service';
 import type { SeatMonthRepo } from './seat-month.repo';
@@ -57,10 +58,21 @@ describe('SeatMonthSubscriptionService.charge', () => {
       marked?: boolean;
       attachedVersionId?: string | null;
       priorAttachedVersionId?: string | null;
+      slicesByCommitment?: Record<
+        string,
+        {
+          commitmentId: string;
+          month: string;
+          seatCount: number;
+          shareMinor: bigint;
+          appliedMinor: bigint;
+          releasedMinor: bigint;
+          settledAt: Date | null;
+        }[]
+      >;
     } = {},
   ) {
     const calls: string[] = [];
-    const locks: string[] = [];
     const watched: { costCenterId: string; year: number }[][] = [];
     const repo = {
       lockMonthOf: jest.fn(() => {
@@ -118,11 +130,12 @@ describe('SeatMonthSubscriptionService.charge', () => {
       applyInvoice: jest.fn(() => Promise.resolve()),
       giveBackApplied: jest.fn(() => Promise.resolve()),
     };
-    const yearLock = {
-      lock: jest.fn((_tx: unknown, costCenterId: string) => {
-        locks.push(costCenterId);
-        return Promise.resolve();
-      }),
+    const commitmentMonths = {
+      lockOfCommitment: jest.fn((_tx: unknown, commitmentId: string) =>
+        Promise.resolve(options.slicesByCommitment?.[commitmentId] ?? []),
+      ),
+      addApplied: jest.fn(() => Promise.resolve()),
+      reverseApplied: jest.fn(() => Promise.resolve()),
     };
     const thresholds = {
       watch: jest.fn((_tx: unknown, pairs: { costCenterId: string; year: number }[]) => {
@@ -148,12 +161,12 @@ describe('SeatMonthSubscriptionService.charge', () => {
         getPurchaseFacts: () => Promise.resolve([{ monthlyPriceMinor: 3_000_000n }]),
       } as unknown as SubscriptionPeriodApi,
       commitments as unknown as CommitmentRepo,
-      yearLock,
+      commitmentMonths as unknown as CommitmentMonthFacadeService,
       { record: () => Promise.resolve() } as unknown as AuditApi,
       thresholds as unknown as ThresholdAlertService,
     );
 
-    return { service, repo, licensing, calls, locks, watched };
+    return { service, repo, licensing, commitments, commitmentMonths, calls, watched };
   }
 
   it('reads the seats of the subscription in the transaction of the charge, after the lock of the month', async () => {
@@ -198,40 +211,147 @@ describe('SeatMonthSubscriptionService.charge', () => {
   });
 
   it('takes the budget year of a Cost Center whose commitment is attached to a version, and watches its threshold', async () => {
-    const { service, locks, watched } = build({ attachedVersionId: 'v-1' });
+    const { service, watched } = build({ attachedVersionId: 'v-1' });
 
     await service.charge(tx, SUBSCRIPTION, MONTH, new Date());
 
     expect(watched).toEqual([[{ costCenterId: 'cc-1', year: 2026 }]]);
-    expect(locks).toContain('cc-1');
   });
 
   it('does not take the budget year of a Cost Center whose commitment still waits for a budget, nor watch its threshold', async () => {
-    const { service, locks, watched, repo } = build({ attachedVersionId: null });
+    const { service, watched, repo } = build({ attachedVersionId: null });
 
     await service.charge(tx, SUBSCRIPTION, MONTH, new Date());
 
     expect(watched).toEqual([[]]);
-    expect(locks).toEqual([]);
     expect(repo.insertMany).toHaveBeenCalledTimes(1);
   });
 
   it('does not take the budget year of the Cost Center of a commitment it locked by id, when that one still waits for a budget, nor watch its threshold', async () => {
-    const { service, locks, watched } = build({ priorAttachedVersionId: null });
+    const { service, watched } = build({ priorAttachedVersionId: null });
 
     await service.charge(tx, SUBSCRIPTION, MONTH, new Date());
 
-    expect(locks).not.toContain('cc-2');
     expect(watched.flat().map((pair) => pair.costCenterId)).not.toContain('cc-2');
-    expect(locks).toContain('cc-1');
+    expect(watched.flat().map((pair) => pair.costCenterId)).toContain('cc-1');
   });
 
   it('takes the budget year of the Cost Center of a commitment it locked by id when that one is attached to a version', async () => {
-    const { service, locks, watched } = build({ priorAttachedVersionId: 'v-2' });
+    const { service, watched } = build({ priorAttachedVersionId: 'v-2' });
 
     await service.charge(tx, SUBSCRIPTION, MONTH, new Date());
 
-    expect(locks).toContain('cc-2');
     expect(watched.flat().map((pair) => pair.costCenterId)).toContain('cc-2');
+  });
+
+  it('W3-07 Ca E & K: caps applied at monthly slice remaining via addApplied, and reverses slice applied via reverseApplied', async () => {
+    const { service, commitments, commitmentMonths, repo } = build({
+      priorAttachedVersionId: 'v-2',
+      slicesByCommitment: {
+        'c-1': [
+          {
+            commitmentId: 'c-1',
+            month: MONTH,
+            seatCount: 1,
+            shareMinor: 500_000n,
+            appliedMinor: 0n,
+            releasedMinor: 0n,
+            settledAt: null,
+          },
+        ],
+        'c-2': [
+          {
+            commitmentId: 'c-2',
+            month: MONTH,
+            seatCount: 1,
+            shareMinor: 3_000_000n,
+            appliedMinor: 3_000_000n,
+            releasedMinor: 0n,
+            settledAt: new Date('2026-02-01T00:00:00Z'),
+          },
+        ],
+      },
+    });
+
+    await service.charge(tx, SUBSCRIPTION, MONTH, new Date('2026-02-02T00:00:00Z'));
+
+    const writtenRows = (repo.insertMany.mock.calls as unknown[][])[0][1] as unknown[];
+    expect(writtenRows[0]).toMatchObject({
+      amountMinor: 3_000_000n,
+      appliedMinor: 500_000n,
+    });
+    expect(commitmentMonths.addApplied).toHaveBeenCalledWith(tx, 'c-1', MONTH, 500_000n);
+    expect(commitments.applyInvoice).toHaveBeenCalledWith(tx, expect.objectContaining({ id: 'c-1' }), {
+      takeMinor: 500_000n,
+      stateAfter: 'HELD',
+    });
+    expect(commitmentMonths.reverseApplied).toHaveBeenCalledWith(tx, 'c-2', MONTH, 3_000_000n);
+    expect(commitments.giveBackApplied).toHaveBeenCalledWith(tx, expect.objectContaining({ id: 'c-2' }), 3_000_000n);
+  });
+
+  it('B2-R7: reads per-line monthlyUnitPriceMinor from subscription lines when lines exist instead of subscription.monthlyPriceMinor', async () => {
+    const calls: string[] = [];
+    const repo = {
+      lockMonthOf: jest.fn().mockResolvedValue(undefined),
+      isCharged: jest.fn().mockResolvedValue(false),
+      ofSubscriptionMonth: jest.fn().mockResolvedValue([]),
+      deleteRows: jest.fn().mockResolvedValue(undefined),
+      insertMany: jest.fn().mockResolvedValue(undefined),
+      insertReversals: jest.fn().mockResolvedValue(undefined),
+      markCharged: jest.fn().mockResolvedValue(undefined),
+    };
+    const licensing = {
+      getSeatsOfMonth: jest.fn().mockResolvedValue([
+        { ...seat, assignmentId: 'a-std', planId: 'plan-std', requestId: null },
+        { ...seat, assignmentId: 'a-prm', planId: 'plan-prm', employeeId: 'e-2', requestId: null },
+      ]),
+    };
+    const periods = {
+      linesOfSubscription: jest.fn().mockResolvedValue([
+        { id: 'l-1', planId: 'plan-std', monthlyUnitPriceMinor: 500_000n, closedReason: null },
+        { id: 'l-2', planId: 'plan-prm', monthlyUnitPriceMinor: 2_500_000n, closedReason: null },
+      ]),
+      getPurchaseFacts: jest.fn().mockResolvedValue([{ monthlyPriceMinor: null }]),
+    };
+    const service = new SeatMonthSubscriptionService(
+      repo as unknown as SeatMonthRepo,
+      new SeatMonthSeatFactsService(
+        licensing as unknown as LicensingSeatMonthApi,
+        {
+          getPlacementsBetween: () =>
+            Promise.resolve([
+              { employeeId: 'e-1', departmentId: 'd-1', validFrom: '2025-01-01', validTo: null },
+              { employeeId: 'e-2', departmentId: 'd-1', validFrom: '2025-01-01', validTo: null },
+            ]),
+        } as unknown as OrganizationHistoryApi,
+      ),
+      {
+        getOrganization: () => Promise.resolve({ id: 'org' }),
+        getUnitCostCenterIds: () => Promise.resolve(new Map([['d-1', 'cc-1']])),
+      } as unknown as OrganizationReadApi,
+      periods as unknown as SubscriptionPeriodApi,
+      { lockOfRequest: jest.fn().mockResolvedValue([]), lockById: jest.fn() } as unknown as CommitmentRepo,
+      { lockOfCommitment: jest.fn().mockResolvedValue([]) } as unknown as CommitmentMonthFacadeService,
+      { record: () => Promise.resolve() } as unknown as AuditApi,
+      {
+        watch: jest.fn().mockResolvedValue({}),
+        settle: jest.fn().mockResolvedValue(0),
+      } as unknown as ThresholdAlertService,
+    );
+
+    const rows = await service.charge(tx, SUBSCRIPTION, MONTH, new Date('2026-02-01T00:00:00Z'));
+    void calls;
+
+    expect(rows).toBe(2);
+    expect(periods.getPurchaseFacts).not.toHaveBeenCalled();
+    const written = (repo.insertMany.mock.calls as unknown[][])[0][1] as Array<{
+      assignmentId: string;
+      monthlyPriceMinor: bigint;
+      amountMinor: bigint;
+    }>;
+    expect(written.map((r) => [r.assignmentId, r.monthlyPriceMinor, r.amountMinor])).toEqual([
+      ['a-std', 500_000n, 500_000n],
+      ['a-prm', 2_500_000n, 2_500_000n],
+    ]);
   });
 });

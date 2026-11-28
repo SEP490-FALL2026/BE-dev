@@ -1,13 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { businessDateAt, type BusinessDate } from '../../../core/business-date';
+import { fromDateColumn, businessDateAt, type BusinessDate } from '../../../core/business-date';
 import { MoneyOutOfRangeError } from '../../../core/money/money.errors';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { BudgetsApi } from '../../budgets/public/budgets.api';
 import { CatalogApi } from '../../catalog/public/catalog.api';
-import { SubscriptionPeriodApi } from '../../catalog/public/subscription-period.api';
+import type { LicenseLotView } from '../../catalog/public/license-lot.types';
 import { FinanceApi } from '../../finance/public/finance.api';
-import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { LicensingOpenGrantsApi } from '../../licensing/public/licensing-open-grants.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import {
@@ -16,97 +15,89 @@ import {
   labelOfPurchaseInvoice,
   expenseYearOf,
 } from './labels/purchase-invoice-labels.policy';
-import { bearsByHolder, chargedCostCenterOf, holderDayOf } from './purchase-invoice-charge.policy';
+import type { PoolInvoiceExpectationSource } from './pool-expectation/purchase-invoice-pool-expectation.policy';
+import { PurchaseInvoicePoolService } from './pool-expectation/purchase-invoice-pool-expectation.service';
+import {
+  chargedCostCenterOf,
+  holderDayOf,
+  isOverApprovedInvoice,
+  takesInvoice,
+} from './purchase-invoice-charge.policy';
 import { PurchaseInvoiceRefusedError } from './purchase-invoice.errors';
-import { matchPurchaseInvoice, pooledInvoiceCeilingMinor, type OriginalPrice } from './purchase-invoice-match.policy';
+import { matchPurchaseInvoice } from './purchase-invoice-match.policy';
 import { PurchaseInvoiceRepo, type RequestPurchaseFacts } from './purchase-invoice.repo';
+import { PurchaseInvoiceSubscriptionLinkService } from './subscription-link/purchase-invoice-subscription-link.service';
 import type { PurchaseInvoiceFormInput } from './purchase-invoice.dto';
-import type { PurchaseInvoiceLink, PurchaseInvoiceMoney, PurchaseInvoicePlan } from './purchase-invoice.types';
+import type {
+  LinkFacts,
+  PoolExpectationFacts,
+  PurchaseInvoiceMoney,
+  PurchaseInvoicePlan,
+  SeatPricing,
+} from './purchase-invoice.types';
+import {
+  collectSegmentDepartments,
+  resolveK1AnnualMonthAllocations,
+} from './confirmation/k1-annual-confirmation.policy';
+import { assembleRequestLinkFacts } from './purchase-invoice-lot.policy';
+
+export type { PoolExpectationFacts };
 
 /**
- * The states of a request whose purchase has been approved to be spent (the spend decision is behind it): it waits for the IT Admin, who buys
- * before the grant, is carrying it out, or has completed it. The money may go out and the invoice come.
- */
-const PURCHASABLE_STATES: ReadonlySet<string> = new Set(['AWAITING_EXECUTION', 'EXECUTING', 'COMPLETED']);
-
-/**
- * The states of a request whose grant failed after the IT Admin bought (`QĐ-104k`(4), `QĐ-103r`): the money is already out, so the invoice still
- * comes. The commitment was let go and nobody holds the right, so the department of the user bears it as an expense with no commitment.
- */
-const FAILED_AFTER_PURCHASE_STATES: ReadonlySet<string> = new Set(['FAILED', 'AWAITING_IT_CLOSE']);
-
-const pricingOf = (facts: {
-  monthlyPriceMinor: bigint | null;
-  cycleMonths: number | null;
-  renewalDate: BusinessDate | null;
-}): SeatPricing => ({
-  monthlyMinor: facts.monthlyPriceMinor,
-  cycleMonths: facts.cycleMonths,
-  renewalDate: facts.renewalDate,
-});
-
-/** The cost follows the person who holds the right: a `K1` whose grant did not fail (nobody holds a right that failed). */
-const heldByPerson = (state: string, provisioningType: string | undefined): boolean =>
-  !FAILED_AFTER_PURCHASE_STATES.has(state) && bearsByHolder(provisioningType);
-
-const takesInvoice = (state: string): boolean =>
-  PURCHASABLE_STATES.has(state) || FAILED_AFTER_PURCHASE_STATES.has(state);
-
-/** What a seat of a subscription costs a month and when it renews: the mark of an invoice of a subscription or of the pool is read against it. */
-interface SeatPricing {
-  monthlyMinor: bigint | null;
-  cycleMonths: number | null;
-  renewalDate: BusinessDate | null;
-}
-
-/** What the link says of what was approved or bought, before the invoice is read against it. */
-interface LinkFacts {
-  organizationId: string;
-  link: PurchaseInvoiceLink;
-  vendorId: string;
-  continuation: boolean;
-  /** The first day of the month the right began; null for a subscription. */
-  startMonth: BusinessDate | null;
-  termMonths: number | null;
-  expectedQuantity: number | null;
-  expectedUnitPrice: OriginalPrice | null;
-  requestCostCenterId: string | null;
-  requestId: string | null;
-  /** The right is a person's own (`K1`): the department that bears it is the holder's. A `K4` key is the request's (`QĐ-103k`). */
-  holderBound: boolean;
-  /**
-   * The department of the user when the invoice is of a `K1` the IT Admin bought and whose grant then failed: the invoice is a line of the Cost Center not
-   * allocated, not an expense of that department (`QĐ-104k`(4)). Null for any other request.
-   */
-  failedGrantDepartmentId: string | null;
-  /**
-   * The subscription of the shared pool the invoice is a line of, for a request of a `K2` plan (`QĐ-104c`(3), `QĐ-103k`): every invoice of a `K2`
-   * pool goes to the pool, whatever it is linked to, and a department bears only the seat-months of the seats it holds. Null for any other kind.
-   */
-  poolSubscriptionId: string | null;
-  /** The price and the renewal day of the subscription the invoice is a line of (the one it names, or the pool of a `K2` request); null for a request of another kind. */
-  seatPricing: SeatPricing | null;
-  renewedAssignmentId: string | null;
-}
-
-/**
- * Reads a purchase invoice against the request or subscription it names (`PI-1`): who may name it (the IT Admin works the departments they are in
- * charge of, `D8`), the label and period of the invoice (`QĐ-111w`), whether it matches what was approved or bought (`R-44`), the department that
- * bears the month it pays for (`R-51`) and the commitment it goes into. It decides nothing about money: the marks it lays on never refuse the
- * invoice. A preview and a submission both go through here, so what the IT Admin was told is what is kept.
+ * Reads a purchase invoice against the request or subscription it names (`PI-1`), returning planning facts without mutating state.
  */
 @Injectable()
 export class PurchaseInvoicePlanService {
   constructor(
     private readonly invoices: PurchaseInvoiceRepo,
     private readonly catalog: CatalogApi,
-    private readonly periods: SubscriptionPeriodApi,
+    private readonly pool: PurchaseInvoicePoolService,
     private readonly budgets: BudgetsApi,
     private readonly grants: LicensingOpenGrantsApi,
     private readonly organizationReads: OrganizationReadApi,
-    private readonly identity: IdentityAccessApi,
     private readonly finance: FinanceApi,
+    private readonly subscriptionLink: PurchaseInvoiceSubscriptionLinkService,
   ) {}
+
+  /** Resolves license-lot allocation month & active beneficiary count when Finance confirms a lot invoice. */
+  async lotConfirmationContextOf(
+    row: { linkKind: string; licenseLotId: string | null; requestId: string | null },
+    now: Date,
+    tx: DbTx,
+  ): Promise<{ licenseLotId: string; allocationMonth: BusinessDate; lotBeneficiaryCount: number } | null> {
+    const lotId = await this.resolveConfirmationLotId(row, tx);
+    if (!lotId) return null;
+
+    // F-18: lock the lot at tier 6a BEFORE reading active beneficiary count (`m`) so confirmation and group-line withdrawal serialize.
+    const lot = await this.pool.lockLot(lotId, tx);
+    if (!lot) return null;
+
+    const tz = (await this.organizationReads.getOrganization(tx))?.timeZone ?? 'Asia/Ho_Chi_Minh';
+    const allocationMonth = firstOfMonth(businessDateAt(now, tz));
+    const lotBeneficiaryCount =
+      lot.purpose === 'REQUEST' && lot.requestId !== null
+        ? await this.invoices.activeBeneficiaryCount(lot.requestId, tx)
+        : 0;
+
+    return { licenseLotId: lot.id, allocationMonth, lotBeneficiaryCount };
+  }
+
+  private async resolveConfirmationLotId(
+    row: { linkKind: string; licenseLotId: string | null; requestId: string | null },
+    tx: DbTx,
+  ): Promise<string | null> {
+    if (row.linkKind === 'LICENSE_LOT' && row.licenseLotId) return row.licenseLotId;
+    if (row.linkKind === 'REQUEST' && row.requestId) {
+      return (await this.pool.findLotOfRequest(row.requestId, tx))?.id ?? null;
+    }
+
+    return null;
+  }
+
+  /** Who is told what became of the invoice (`QĐ-118f`): the IT Admin who answers for it now. */
+  recipientOf(row: Parameters<PurchaseInvoiceSubscriptionLinkService['recipientOf']>[0], tx: DbTx): Promise<string> {
+    return this.subscriptionLink.recipientOf(row, tx);
+  }
 
   /** Throws PurchaseInvoiceRefusedError and the money errors of `core/money`. */
   async plan(actor: AuthenticatedPrincipal, form: PurchaseInvoiceFormInput, tx?: DbTx): Promise<PurchaseInvoicePlan> {
@@ -114,18 +105,32 @@ export class PurchaseInvoicePlanService {
     return this.read(facts, form, await this.moneyOf(form, tx), tx);
   }
 
-  /** Throws PurchaseInvoiceRefusedError('LINK_NOT_FOUND' | 'REQUEST_NOT_PURCHASABLE' | 'NO_VENDOR'). */
   private async factsOf(actor: AuthenticatedPrincipal, form: PurchaseInvoiceFormInput, tx?: DbTx): Promise<LinkFacts> {
-    const scope = await this.organizationReads.getItAdminScope(
-      actor.employeeId,
-      (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
-      tx,
-    );
+    const scope = await this.subscriptionLink.actingScopeOf(actor.employeeId, tx);
     const serviceMonth = `${form.servicePeriodMonth}-01`;
+
+    if (form.link.licenseLotId !== undefined) {
+      return this.pool.buildLicenseLotLinkFacts({
+        licenseLotId: form.link.licenseLotId,
+        actorEmployeeId: actor.employeeId,
+        serviceMonth,
+        scope,
+        invoices: this.invoices,
+        catalog: this.catalog,
+        tx,
+      });
+    }
 
     return form.link.requestId !== undefined
       ? this.requestFacts(form.link.requestId, form.link.provisioningTaskId ?? null, scope, serviceMonth, tx)
-      : this.subscriptionFacts(form.link.subscriptionId as string, tx);
+      : this.subscriptionLink.factsOf(
+          form.link.subscriptionId as string,
+          actor.employeeId,
+          serviceMonth,
+          form.link.seatPurchaseId ?? null,
+          form.link.subscriptionLineIds ?? [],
+          tx,
+        );
   }
 
   private async requestFacts(
@@ -143,41 +148,58 @@ export class PurchaseInvoicePlanService {
     const vendorId = await this.catalog.getPlanVendorId(request.planId, tx);
     if (vendorId === null) throw new PurchaseInvoiceRefusedError('NO_VENDOR');
     const [target] = await this.catalog.findPlanSeatTargets([request.planId], tx);
+    await this.ensureNoK2SeatPurchase(requestId, target?.provisioningType, tx);
+    const requestLot = await this.loadUninvoicedRequestLot(requestId, tx);
     const pool = await this.poolOf(target?.provisioningType, request.planId, tx);
+    const expectedUnitPrice = await this.catalog.getPlanOriginalPrice(request.planId, tx, serviceMonth);
 
-    return {
-      organizationId: request.organizationId,
-      link: { kind: 'REQUEST', requestId, provisioningTaskId },
+    return assembleRequestLinkFacts({
+      request,
+      provisioningTaskId,
+      provisioningType: target?.provisioningType,
+      requestLot,
       vendorId,
-      continuation: request.type === 'RENEWAL',
+      expectedUnitPrice,
+      pool,
       startMonth: await this.startMonthOf(request, tx),
-      termMonths: request.termMonths,
-      expectedQuantity: request.beneficiaryCount,
-      expectedUnitPrice: await this.catalog.getPlanOriginalPrice(request.planId, tx, serviceMonth),
-      requestCostCenterId: request.costCenterId,
-      requestId,
-      holderBound: heldByPerson(request.state, target?.provisioningType),
-      failedGrantDepartmentId:
-        FAILED_AFTER_PURCHASE_STATES.has(request.state) && target?.provisioningType === 'K1'
-          ? request.departmentId
-          : null,
-      poolSubscriptionId: pool.id,
-      seatPricing: pool.pricing,
-      renewedAssignmentId: request.renewedAssignmentId,
-    };
+    });
   }
 
-  /** The pool a `K2` request's invoice is a line of, with its price and renewal day; none for any other kind of plan. */
+  private async loadUninvoicedRequestLot(requestId: string, tx?: DbTx): Promise<LicenseLotView | null> {
+    const requestLot = await this.pool.findLotOfRequest(requestId, tx);
+    if (requestLot && requestLot.invoiceActualMinor !== null) {
+      throw new PurchaseInvoiceRefusedError('LOT_ALREADY_INVOICED');
+    }
+
+    return requestLot;
+  }
+
+  private async ensureNoK2SeatPurchase(
+    requestId: string,
+    provisioningType: string | undefined,
+    tx?: DbTx,
+  ): Promise<void> {
+    if (provisioningType !== 'K2') return;
+    const seatPurchaseIds = await this.pool.topUpPurchaseIdsOfRequest(requestId, tx);
+    if (seatPurchaseIds.length > 0) {
+      throw new PurchaseInvoiceRefusedError('SEAT_PURCHASE_REQUIRED', undefined, { seatPurchaseIds });
+    }
+  }
+
   private async poolOf(
     provisioningType: string | undefined,
     planId: string,
     tx?: DbTx,
-  ): Promise<{ id: string | null; pricing: SeatPricing | null }> {
-    if (provisioningType !== 'K2') return { id: null, pricing: null };
+  ): Promise<{ id: string | null; pricing: SeatPricing | null; poolSource: PoolInvoiceExpectationSource | null }> {
+    if (provisioningType !== 'K2') return { id: null, pricing: null, poolSource: null };
     const id = await this.poolSubscriptionOfPlan(planId, tx);
-    const [facts] = await this.periods.getPurchaseFacts([id], tx);
+    const [facts] = await this.pool.getPurchaseFacts([id], tx);
 
-    return { id, pricing: facts ? pricingOf(facts) : null };
+    return {
+      id,
+      pricing: facts ? await this.pool.seatPricingOf(facts, planId, tx) : null,
+      poolSource: await this.pool.topUpSource(facts, planId, null, tx),
+    };
   }
 
   /**
@@ -204,35 +226,48 @@ export class PurchaseInvoicePlanService {
     return target?.provisioningType === 'K2' ? this.poolSubscriptionOfPlan(request.planId, tx) : null;
   }
 
-  /**
-   * The invoice of a subscription comes from any IT Admin (`QĐ-111u`: every purchase has one, `QĐ-58b`: another IT Admin works in the place of
-   * the one who answers): a subscription has no owning department, so the route's role is its whole scope.
-   */
-  private async subscriptionFacts(subscriptionId: string, tx?: DbTx): Promise<LinkFacts> {
-    const [period] = await this.periods.getPurchaseFacts([subscriptionId], tx);
-    if (!period) {
-      throw new PurchaseInvoiceRefusedError('LINK_NOT_FOUND');
+  /** Reads K2 pool expectation inputs for a submitted invoice being confirmed. */
+  async poolExpectationFactsOf(
+    link: {
+      linkKind: 'REQUEST' | 'SUBSCRIPTION' | 'LICENSE_LOT';
+      requestId: string | null;
+      subscriptionId: string | null;
+      seatPurchaseId?: string | null;
+      subscriptionLineIds?: readonly string[];
+      serviceMonth?: Date;
+    },
+    tx?: DbTx,
+  ): Promise<PoolExpectationFacts> {
+    if (link.linkKind === 'SUBSCRIPTION') {
+      return link.subscriptionId === null
+        ? { isK2: false }
+        : this.pool.subscriptionPoolExpectation(
+            link.subscriptionId,
+            link.serviceMonth ? fromDateColumn(link.serviceMonth) : '2000-01-01',
+            link.seatPurchaseId ?? null,
+            link.subscriptionLineIds ?? [],
+            tx,
+          );
     }
-    const vendorId = await this.catalog.getPlanVendorId(period.planId, tx);
-    if (vendorId === null) throw new PurchaseInvoiceRefusedError('NO_VENDOR');
-    const organization = await this.organizationReads.getOrganization(tx);
+
+    return link.requestId === null ? { isK2: false } : this.requestPoolExpectation(link.requestId, tx);
+  }
+
+  private async requestPoolExpectation(requestId: string, tx?: DbTx): Promise<PoolExpectationFacts> {
+    const request = await this.invoices.requestFacts(requestId, tx);
+    if (!request || request.planId === null) return { isK2: false };
+    const [target] = await this.catalog.findPlanSeatTargets([request.planId], tx);
+    if (target?.provisioningType !== 'K2') return { isK2: false };
+    const poolSubscriptionId = await this.poolSubscriptionOfPlan(request.planId, tx);
+    const [period] = await this.pool.getPurchaseFacts([poolSubscriptionId], tx);
+    const timeZone = await this.pool.timeZone(tx);
+    const purchaseDates = await this.pool.topUpPurchaseDatesOf(requestId, timeZone, tx);
 
     return {
-      organizationId: (organization as { id: string }).id,
-      link: { kind: 'SUBSCRIPTION', subscriptionId },
-      vendorId,
-      continuation: false,
-      startMonth: null,
-      termMonths: null,
-      expectedQuantity: period.purchasedQuantity,
-      expectedUnitPrice: await this.catalog.getSubscriptionOriginalPrice(subscriptionId, tx),
-      requestCostCenterId: null,
-      failedGrantDepartmentId: null,
-      requestId: null,
-      holderBound: false,
-      poolSubscriptionId: null,
-      seatPricing: pricingOf(period),
-      renewedAssignmentId: null,
+      isK2: true,
+      poolSubscriptionId,
+      timeZone,
+      source: await this.pool.topUpSource(period, request.planId, purchaseDates, tx),
     };
   }
 
@@ -244,21 +279,12 @@ export class PurchaseInvoicePlanService {
     return firstOfMonth(businessDateAt(request.grantCompletedAt, (organization as { timeZone: string }).timeZone));
   }
 
-  /**
-   * What the invoice says in money, in minor units: the dong taken out and the price of one in the currency it states. The net amount and the price
-   * of one are more than nothing and a tax is not less than nothing, as the table keeps them; one that is not is out of range, like every money
-   * field below zero. Throws the money errors of `core/money`.
-   */
+  /** Parses net, deductible/non-deductible tax, and original unit price (`core/money`). */
   async moneyOf(form: PurchaseInvoiceFormInput, tx?: DbTx): Promise<PurchaseInvoiceMoney> {
-    const dong = async (
-      input: { amount: string } | undefined,
-      path: string,
-      floor: 'POSITIVE' | 'NON_NEGATIVE',
-    ): Promise<bigint> => {
+    const dong = async (input: { amount: string } | undefined, path: string, floor: 'POSITIVE' | 'NON_NEGATIVE') => {
       if (!input) return 0n;
       const { amountMinor } = await this.finance.parseMoney({ amount: input.amount, currency: 'VND' }, path, tx);
       if (floor === 'POSITIVE' ? amountMinor <= 0n : amountMinor < 0n) throw new MoneyOutOfRangeError(path);
-
       return amountMinor;
     };
     const original = await this.finance.parseMoney(form.unitPriceOriginal, 'unitPriceOriginal', tx);
@@ -279,14 +305,16 @@ export class PurchaseInvoicePlanService {
     tx?: DbTx,
   ): Promise<PurchaseInvoicePlan> {
     const serviceMonth = `${form.servicePeriodMonth}-01`;
-    const earlier = await this.invoices.earlierOf(
+    const linkScope =
       facts.link.kind === 'REQUEST'
         ? { requestId: facts.link.requestId }
-        : { subscriptionId: facts.link.subscriptionId },
-      tx,
-    );
+        : facts.link.kind === 'LICENSE_LOT'
+          ? { licenseLotId: facts.link.licenseLotId }
+          : { subscriptionId: facts.link.subscriptionId };
+    const earlier = await this.invoices.earlierOf(linkScope, tx);
     const period = labelOfPurchaseInvoice({
       link: facts.link.kind,
+      hasSeatPurchase: facts.link.kind === 'SUBSCRIPTION' && facts.link.seatPurchaseId !== null,
       continuation: facts.continuation,
       hasEarlierInvoice: earlier.count > 0,
       serviceMonth,
@@ -299,16 +327,13 @@ export class PurchaseInvoicePlanService {
       expectedQuantity: facts.expectedQuantity,
       expectedUnitPrice: facts.expectedUnitPrice,
     });
-    // An invoice of a K2 pool is a line of the pool, whatever it is linked to: no Cost Center bears it and no commitment is taken down by it (`QĐ-104c`(3)).
-    const pooled = facts.poolSubscriptionId !== null;
-    // An invoice of a `K1` whose grant failed after the purchase is a line of the Cost Center not allocated: no Cost Center bears it, no commitment takes it (`QĐ-104k`(4)).
-    const unallocated =
-      facts.failedGrantDepartmentId === null
-        ? null
-        : ({ reason: 'K1_GRANT_FAILED', departmentId: facts.failedGrantDepartmentId } as const);
-    const placed = pooled || unallocated !== null;
+    const unallocated = facts.failedGrantDepartmentId
+      ? ({ reason: 'K1_GRANT_FAILED', departmentId: facts.failedGrantDepartmentId } as const)
+      : null;
+    const placed = facts.poolSubscriptionId !== null || unallocated !== null;
     const chargedCostCenterId = placed ? null : await this.chargedCostCenterOf(facts, serviceMonth, tx);
     const commitment = placed ? null : await this.commitmentOf(facts, chargedCostCenterId, serviceMonth, tx);
+    const noExpectedAmount = await this.pool.isPoolExpectedMissing(facts.poolSource, facts.requestId, tx);
 
     return {
       organizationId: facts.organizationId,
@@ -323,32 +348,15 @@ export class PurchaseInvoicePlanService {
       unallocated,
       flags: flagsOfPurchaseInvoice({
         outsideTerm: period.outsideTerm,
-        overApproved: this.overApproved(facts, serviceMonth, money, commitment),
+        overApproved: isOverApprovedInvoice({
+          netMinor: money.netMinor,
+          commitmentRemainingMinor: commitment?.remainingMinor ?? null,
+          ceilingParts: facts.ceilingParts,
+          serviceMonth,
+        }),
+        noExpectedAmount,
       }),
     };
-  }
-
-  /**
-   * An invoice of a request goes over what the commitment still holds; an invoice that is a line of a subscription or of the pool goes over the seats
-   * bought times the price of a month times the months to the renewal day (`QĐ-103w`(3), `QĐ-104c`(3), `QĐ-104d`). What nobody knows is not judged.
-   */
-  private overApproved(
-    facts: LinkFacts,
-    serviceMonth: BusinessDate,
-    money: PurchaseInvoiceMoney,
-    commitment: { remainingMinor: bigint } | null,
-  ): boolean {
-    if (commitment !== null) return money.netMinor > commitment.remainingMinor;
-    if (facts.seatPricing === null) return false;
-    const ceiling = pooledInvoiceCeilingMinor({
-      quantity: facts.expectedQuantity,
-      monthlyMinor: facts.seatPricing.monthlyMinor,
-      cycleMonths: facts.seatPricing.cycleMonths,
-      serviceMonth,
-      renewalDate: facts.seatPricing.renewalDate,
-    });
-
-    return ceiling !== null && money.netMinor > ceiling;
   }
 
   /** The department that held the right in the month the invoice pays for bears it (`R-51`); the request's own Cost Center for what is not a person's. */
@@ -395,5 +403,58 @@ export class PurchaseInvoicePlanService {
     );
 
     return found ? { id: found.id, remainingMinor: found.remainingMinor } : null;
+  }
+
+  /** Builds K1 annual 12-month allocation inputs when confirming a K1 annual (qty 1) request invoice, or null otherwise. */
+  async k1AnnualAllocationFactsOf(
+    row: {
+      linkKind: 'REQUEST' | 'SUBSCRIPTION' | 'LICENSE_LOT';
+      requestId: string | null;
+      unallocatedReason: string | null;
+      quantity: number;
+      serviceMonth: Date;
+      chargedCostCenterId: string | null;
+    },
+    tx?: DbTx,
+  ) {
+    const eligible = await this.eligibleK1AnnualRequest(row, tx);
+    if (!eligible) return null;
+
+    const timeline = await this.grants.getK1AnnualHolderTimeline(eligible.requestId, eligible.renewedAssignmentId, tx);
+    const lockSubjectKey = timeline?.rootAssignmentId ?? `req:${eligible.requestId}`;
+    const deptIds = timeline ? collectSegmentDepartments(timeline.segments) : [];
+    const costCenterByDepartment =
+      deptIds.length > 0 ? await this.organizationReads.getUnitCostCenterIds(deptIds, tx) : new Map<string, string>();
+    const monthAllocations = timeline
+      ? resolveK1AnnualMonthAllocations({
+          serviceMonth: row.serviceMonth.toISOString().slice(0, 10),
+          segments: timeline.segments,
+          costCenterByDepartment,
+          fallbackCostCenterId: row.chargedCostCenterId,
+          primaryRequestId: eligible.requestId,
+        })
+      : undefined;
+
+    return { lockSubjectKey, ...(monthAllocations ? { monthAllocations } : {}) };
+  }
+
+  private async eligibleK1AnnualRequest(
+    row: { linkKind: string; requestId: string | null; unallocatedReason: string | null; quantity: number },
+    tx?: DbTx,
+  ): Promise<{ requestId: string; renewedAssignmentId: string | null } | null> {
+    if (
+      row.linkKind !== 'REQUEST' ||
+      row.requestId === null ||
+      row.unallocatedReason === 'K1_GRANT_FAILED' ||
+      row.quantity !== 1
+    ) {
+      return null;
+    }
+    const request = await this.invoices.requestFacts(row.requestId, tx);
+    if (!request?.planId) return null;
+    const [target] = await this.catalog.findPlanSeatTargets([request.planId], tx);
+    if (target?.provisioningType !== 'K1' || target.referenceCommitmentMonths !== 12) return null;
+
+    return { requestId: row.requestId, renewedAssignmentId: request.renewedAssignmentId };
   }
 }

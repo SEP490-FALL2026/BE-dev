@@ -2,6 +2,7 @@ import { CURRENT_POLICY_VERSION, type RequestPolicy } from '../access-request/ac
 import type { AccessRequestState } from '../access-request/access-request.types';
 import type { Money } from '../../../core/money/money';
 import type { AssessmentFields, Quote } from '../access-request/assessment-record.types';
+import { roundHalfAway } from '../../../core/seat-month-cost';
 
 /**
  * The rules of the assessment the IT Admin completes for software that is not in the catalog (`US-05-06`, `BM-02`), as
@@ -106,18 +107,19 @@ export function judgeCompletion(
   return missing.length > 0 ? { kind: 'INCOMPLETE', missing } : { kind: 'OK' };
 }
 
-export type AssessorRefusal = 'OWN_REQUEST' | 'NOT_AWAITING_ASSESSMENT';
+export type AssessorRefusal = 'OWN_REQUEST' | 'NOT_AWAITING_ASSESSMENT' | 'ASSESSMENT_NOT_IN_CHARGE';
 
 /**
- * Whether the person may fill or complete the assessment of this request now. The route already limits it to IT Admins;
- * here an IT Admin may not assess a request they asked for or are given (`SoD-4`), and only while the request waits for
- * the assessment: once it is completed it is not changed (`FR-11.2`).
+ * Whether the person may fill or complete the assessment of this request now. An IT Admin may not assess a request
+ * they asked for or are given, only while the request waits for the assessment, and only when they are currently
+ * acting for the requester’s department.
  */
 export function checkAssessor(facts: {
   actorEmployeeId: string;
   requesterEmployeeId: string;
   beneficiaryEmployeeIds: readonly string[];
   requestState: AccessRequestState;
+  actingItAdminIds: readonly string[];
 }): AssessorRefusal | null {
   if (
     facts.actorEmployeeId === facts.requesterEmployeeId ||
@@ -125,8 +127,10 @@ export function checkAssessor(facts: {
   ) {
     return 'OWN_REQUEST';
   }
+  if (facts.requestState !== 'AWAITING_IT_ASSESSMENT') return 'NOT_AWAITING_ASSESSMENT';
+  if (!facts.actingItAdminIds.includes(facts.actorEmployeeId)) return 'ASSESSMENT_NOT_IN_CHARGE';
 
-  return facts.requestState === 'AWAITING_IT_ASSESSMENT' ? null : 'NOT_AWAITING_ASSESSMENT';
+  return null;
 }
 
 /**
@@ -193,17 +197,15 @@ export function registeredShapeOf(
   };
 }
 
-const QUOTE_CYCLE_MONTHS: Readonly<Record<Quote['billingCycle'], bigint>> = { MONTHLY: 1n, QUARTERLY: 3n, ANNUAL: 12n };
+const QUOTE_CYCLE_MONTHS: Readonly<Record<Exclude<Quote['billingCycle'], 'OTHER'>, bigint>> = {
+  MONTHLY: 1n,
+  QUARTERLY: 3n,
+  ANNUAL: 12n,
+};
 
-/**
- * The price of one person for one month a quote gives (`QĐ-113a`): a monthly quote as it is, a quarterly one over 3, an annual one over 12, rounded up
- * to the dong. It is the reference price a plan takes from the approved quote of a case B request.
- */
 export function monthlyPriceOfQuote(quote: Pick<Quote, 'unitPrice' | 'billingCycle'>): Money {
-  const months = QUOTE_CYCLE_MONTHS[quote.billingCycle];
-
   return {
-    amountMinor: (quote.unitPrice.amountMinor + months - 1n) / months,
+    amountMinor: roundHalfAway(quote.unitPrice.amountMinor, QUOTE_CYCLE_MONTHS[quote.billingCycle]),
     currency: quote.unitPrice.currency,
   };
 }

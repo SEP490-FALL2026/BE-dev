@@ -18,6 +18,7 @@ const subscription = (over: Partial<SeatTarget> = {}): SeatTarget => ({
   applicationName: 'Figma',
   applicationKind: 'SAAS',
   provisioningType: 'K2',
+  keyBinding: null,
   applicationStatus: 'APPROVED',
   status: 'ACTIVE',
   missing: [],
@@ -48,12 +49,24 @@ describe('toSeatTargetRef (a baseline is for one subscription or one internal pl
 });
 
 describe('assertBaselineTarget (AC-11, AC-12, INV-01)', () => {
-  it('lets a K1 or K2 subscription with its quantity known, and an internal K5 plan, through', () => {
+  it('lets a K1 or K2 subscription with its quantity known, an internal K5 plan, and a K1 plan by planId (G-7), through', () => {
     expect(() => assertBaselineTarget({ subscriptionId: 's1' }, subscription())).not.toThrow();
     expect(() =>
       assertBaselineTarget({ subscriptionId: 's1' }, subscription({ provisioningType: 'K1' })),
     ).not.toThrow();
     expect(() => assertBaselineTarget({ planId: 'p9' }, internal)).not.toThrow();
+    expect(() =>
+      assertBaselineTarget(
+        { planId: 'p-k1' },
+        subscription({
+          kind: 'PLAN',
+          subscriptionId: null,
+          provisioningType: 'K1',
+          status: null,
+          purchasedQuantity: null,
+        }),
+      ),
+    ).not.toThrow();
   });
 
   it('says which of the two does not exist', () => {

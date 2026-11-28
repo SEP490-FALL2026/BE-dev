@@ -39,10 +39,17 @@ const FORBIDDEN = {
   examples: [FORBIDDEN_EXAMPLE],
 } as const;
 
+const NOT_RESPONSIBLE = {
+  status: HttpStatus.FORBIDDEN,
+  description:
+    'The caller is not an IT Admin (FORBIDDEN), or is an IT Admin who does not answer for the subscription or the license lot (of a purpose other than a request) the invoice is linked to (PURCHASE_INVOICE.NOT_RESPONSIBLE; only the Super Admin changes who answers). The Super Admin does not submit.',
+  examples: [FORBIDDEN_EXAMPLE, EXAMPLES.NOT_RESPONSIBLE],
+} as const;
+
 const LINK_NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
   description:
-    'The request or subscription does not exist or is not one the IT Admin works (PURCHASE_INVOICE.LINK_NOT_FOUND); any IT Admin works a subscription of the shared pool.',
+    'The request (or the license lot bought for it) does not exist or is not one of a department the IT Admin works (PURCHASE_INVOICE.LINK_NOT_FOUND), or the subscription or lot does not exist.',
   examples: [EXAMPLES.LINK_NOT_FOUND],
 } as const;
 
@@ -54,20 +61,33 @@ const NO_PLACE =
   'the plan of the request has no subscription of the pool that can be taken from today, so there is nowhere to book the invoice (PURCHASE_INVOICE.NO_PLACE)';
 const NOT_PURCHASABLE_OR_NO_PLACE = {
   status: HttpStatus.CONFLICT,
-  description: `${REFUSED_STATE}, or ${NO_PLACE}.`,
-  examples: [EXAMPLES.REQUEST_NOT_PURCHASABLE, EXAMPLES.NO_PLACE],
+  description: `${REFUSED_STATE}, seat purchase already invoiced (PURCHASE_INVOICE.SEAT_PURCHASE_INVOICED), license lot already invoiced (PURCHASE_INVOICE.LOT_ALREADY_INVOICED), or ${NO_PLACE}.`,
+  examples: [
+    EXAMPLES.REQUEST_NOT_PURCHASABLE,
+    EXAMPLES.SEAT_PURCHASE_INVOICED,
+    EXAMPLES.LOT_ALREADY_INVOICED,
+    EXAMPLES.NO_PLACE,
+  ],
 } as const;
 const NOT_PURCHASABLE_TAKEN_OR_NO_PLACE = {
   status: HttpStatus.CONFLICT,
-  description: `${REFUSED_STATE}, ${TAKEN_NUMBER}, or ${NO_PLACE}.`,
-  examples: [EXAMPLES.REQUEST_NOT_PURCHASABLE, EXAMPLES.NUMBER_TAKEN, EXAMPLES.NO_PLACE],
-} as const;
-const NOT_PURCHASABLE_TAKEN_OR_NOT_RETURNED = {
-  status: HttpStatus.CONFLICT,
-  description: `${REFUSED_STATE}, ${TAKEN_NUMBER}, ${NO_PLACE}, the invoice was not returned (PURCHASE_INVOICE.NOT_RETURNED) or was already submitted again (PURCHASE_INVOICE.ALREADY_RESUBMITTED).`,
+  description: `${REFUSED_STATE}, ${TAKEN_NUMBER}, seat purchase already invoiced (PURCHASE_INVOICE.SEAT_PURCHASE_INVOICED), license lot already invoiced (PURCHASE_INVOICE.LOT_ALREADY_INVOICED), or ${NO_PLACE}.`,
   examples: [
     EXAMPLES.REQUEST_NOT_PURCHASABLE,
     EXAMPLES.NUMBER_TAKEN,
+    EXAMPLES.SEAT_PURCHASE_INVOICED,
+    EXAMPLES.LOT_ALREADY_INVOICED,
+    EXAMPLES.NO_PLACE,
+  ],
+} as const;
+const NOT_PURCHASABLE_TAKEN_OR_NOT_RETURNED = {
+  status: HttpStatus.CONFLICT,
+  description: `${REFUSED_STATE}, ${TAKEN_NUMBER}, ${NO_PLACE}, license lot already invoiced (PURCHASE_INVOICE.LOT_ALREADY_INVOICED), the invoice was not returned (PURCHASE_INVOICE.NOT_RETURNED) or was already submitted again (PURCHASE_INVOICE.ALREADY_RESUBMITTED).`,
+  examples: [
+    EXAMPLES.REQUEST_NOT_PURCHASABLE,
+    EXAMPLES.NUMBER_TAKEN,
+    EXAMPLES.SEAT_PURCHASE_INVOICED,
+    EXAMPLES.LOT_ALREADY_INVOICED,
     EXAMPLES.NO_PLACE,
     EXAMPLES.NOT_RETURNED,
     EXAMPLES.ALREADY_RESUBMITTED,
@@ -80,36 +100,51 @@ const MONEY_EXAMPLES = [EXAMPLES.MONEY_SCALE_EXCEEDED, EXAMPLES.MONEY_OUT_OF_RAN
 
 const INVALID_PREVIEW = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
-  description: `The form is invalid (VALIDATION_ERROR), ${UNREADABLE_MONEY}, or the software has no vendor (PURCHASE_INVOICE.NO_VENDOR).`,
-  examples: [VALIDATION_EXAMPLE, ...MONEY_EXAMPLES, EXAMPLES.NO_VENDOR],
+  description: `The form is invalid (VALIDATION_ERROR), ${UNREADABLE_MONEY}, a seat purchase invoice is required (PURCHASE_INVOICE.SEAT_PURCHASE_REQUIRED), selected subscription lines are invalid or already invoiced (PURCHASE_INVOICE.INVALID_LINE_SELECTION, LINE_ALREADY_INVOICED), or the software has no vendor (PURCHASE_INVOICE.NO_VENDOR).`,
+  examples: [
+    VALIDATION_EXAMPLE,
+    ...MONEY_EXAMPLES,
+    EXAMPLES.SEAT_PURCHASE_REQUIRED,
+    EXAMPLES.LINE_ALREADY_INVOICED,
+    EXAMPLES.INVALID_LINE_SELECTION,
+    EXAMPLES.NO_VENDOR,
+  ],
 } as const;
 const INVALID_SUBMISSION = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
-  description: `The form is invalid (VALIDATION_ERROR: at least one file, at most twenty), ${UNREADABLE_MONEY}, the software has no vendor (PURCHASE_INVOICE.NO_VENDOR), or a file is not a finished purchase document of the person who submits it (PURCHASE_INVOICE.DOCUMENT_INVALID, with the reason in details).`,
-  examples: [VALIDATION_EXAMPLE, ...MONEY_EXAMPLES, EXAMPLES.NO_VENDOR, EXAMPLES.DOCUMENT_INVALID],
+  description: `The form is invalid (VALIDATION_ERROR: at least one file, at most twenty), ${UNREADABLE_MONEY}, a seat purchase invoice is required (PURCHASE_INVOICE.SEAT_PURCHASE_REQUIRED), selected subscription lines are invalid or already invoiced (PURCHASE_INVOICE.INVALID_LINE_SELECTION, LINE_ALREADY_INVOICED), the software has no vendor (PURCHASE_INVOICE.NO_VENDOR), or a file is not a finished purchase document of the person who submits it (PURCHASE_INVOICE.DOCUMENT_INVALID, with the reason in details).`,
+  examples: [
+    VALIDATION_EXAMPLE,
+    ...MONEY_EXAMPLES,
+    EXAMPLES.SEAT_PURCHASE_REQUIRED,
+    EXAMPLES.LINE_ALREADY_INVOICED,
+    EXAMPLES.INVALID_LINE_SELECTION,
+    EXAMPLES.NO_VENDOR,
+    EXAMPLES.DOCUMENT_INVALID,
+  ],
 } as const;
 
 const PREVIEW_ERRORS = [
   ...AUTH_ERRORS,
-  FORBIDDEN,
+  NOT_RESPONSIBLE,
   LINK_NOT_FOUND,
   NOT_PURCHASABLE_OR_NO_PLACE,
   INVALID_PREVIEW,
 ] as const;
 const SUBMIT_ERRORS = [
   ...AUTH_ERRORS,
-  FORBIDDEN,
+  NOT_RESPONSIBLE,
   LINK_NOT_FOUND,
   NOT_PURCHASABLE_TAKEN_OR_NO_PLACE,
   INVALID_SUBMISSION,
 ] as const;
 const RESUBMIT_ERRORS = [
   ...AUTH_ERRORS,
-  FORBIDDEN,
+  NOT_RESPONSIBLE,
   {
     status: HttpStatus.NOT_FOUND,
     description:
-      'The invoice does not exist or was not submitted by the caller (PURCHASE_INVOICE.NOT_FOUND), or its request or subscription is not one the IT Admin works (PURCHASE_INVOICE.LINK_NOT_FOUND).',
+      'The invoice does not exist, or one for a request was not submitted by the caller (PURCHASE_INVOICE.NOT_FOUND), or its request is not one of a department the IT Admin works (PURCHASE_INVOICE.LINK_NOT_FOUND).',
     examples: [EXAMPLES.LINK_NOT_FOUND, EXAMPLES.NOT_FOUND],
   },
   NOT_PURCHASABLE_TAKEN_OR_NOT_RETURNED,
@@ -160,7 +195,7 @@ export class PurchaseInvoicesController {
     status: HttpStatus.CREATED,
     message: 'PURCHASE_INVOICE.SUBMITTED',
     description:
-      'The invoice is kept as it was read against its request or subscription (any IT Admin may submit the invoice of a subscription period, as it has no owning department; one for a request is submitted by the IT Admin of the department of the request), with its files, and Finance is told. Nothing is spent until Finance signs. The amounts are what was taken out in dong; the count and the price of one are what the invoice says in the currency it states.',
+      'The invoice is kept as it was read against its request or subscription (the invoice of a subscription, a period, a renewal or a seat purchase, and that of a license lot not bought for a request, is submitted only by the IT Admin who answers for it; one for a request is submitted by the IT Admin of the department of the request), with its files, and Finance is told. Nothing is spent until Finance signs. The amounts are what was taken out in dong; the count and the price of one are what the invoice says in the currency it states.',
   })
   @ApiErrorResponses(...SUBMIT_ERRORS)
   async submit(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: PurchaseInvoiceSubmitBodyDto) {
@@ -178,7 +213,7 @@ export class PurchaseInvoicesController {
     status: HttpStatus.CREATED,
     message: 'PURCHASE_INVOICE.RESUBMITTED',
     description:
-      'A new invoice for the same request or subscription that points back at the one Finance returned; the number of the returned one may come back. It says everything again, with its own files.',
+      'A new invoice for the same request, subscription or license lot (a subscription or lot not bought for a request is submitted again by the IT Admin who answers for it now) that points back at the one Finance returned; the number of the returned one may come back. It says everything again, with its own files.',
   })
   @ApiErrorResponses(...RESUBMIT_ERRORS)
   async resubmit(
@@ -220,7 +255,7 @@ export class PurchaseInvoicesController {
   @ApiSuccessResponse(PurchaseInvoiceMissingPeriodListResponseDto, {
     message: 'PURCHASE_INVOICE.MISSING_PERIODS_LISTED',
     description:
-      'Each period of a right paid by the month (a request for months of use of a plan bought by the month, while a seat of it is held) or by the cycle of a subscription whose invoice has not been submitted by the fifth working day, the payment day being the first when it is a working day. The oldest due day first. An invoice that was returned does not count. Finance reads every period; the IT Admin the ones of the departments they work and of the shared pool, which every IT Admin works.',
+      'Each period of a right paid by the month (a request for months of use of a plan bought by the month, while a seat of it is held) or by the cycle of a subscription whose invoice has not been submitted by the fifth working day, the payment day being the first when it is a working day. The oldest due day first. An invoice that was returned does not count. Finance reads every period; the IT Admin reads the ones of the departments in their scope and of the subscriptions they are responsible for.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, FORBIDDEN, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,

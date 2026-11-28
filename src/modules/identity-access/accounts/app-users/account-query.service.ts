@@ -30,7 +30,7 @@ export interface AccountView {
 }
 
 export interface InvitationView {
-  /** Delivery state of the latest invitation mail; null when no invitation was ever created. */
+  /** Null when the latest invitation has no outbox row, including after finished mail is purged at 30 days. */
   delivery: DeliveryState | null;
   /** Whether the latest link could still be used to activate the account. */
   usable: boolean;

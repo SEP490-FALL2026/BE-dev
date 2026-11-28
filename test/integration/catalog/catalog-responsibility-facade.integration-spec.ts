@@ -84,9 +84,24 @@ describe('the catalog facade that counts and hands over what an IT Admin answers
 
     const counts = await api.countResponsibilitiesOf([it3.employeeId, it2.employeeId, h.finance.employeeId]);
 
-    expect(counts.get(it3.employeeId)).toEqual({ subscriptions: 3, applications: 3 });
-    expect(counts.get(it2.employeeId)).toEqual({ subscriptions: 1, applications: 1 });
-    expect(counts.get(h.finance.employeeId)).toEqual({ subscriptions: 0, applications: 0 });
+    expect(counts.get(it3.employeeId)).toEqual({
+      subscriptions: 3,
+      applications: 3,
+      workspaces: 0,
+      licenseLots: 0,
+    });
+    expect(counts.get(it2.employeeId)).toEqual({
+      subscriptions: 1,
+      applications: 1,
+      workspaces: 0,
+      licenseLots: 0,
+    });
+    expect(counts.get(h.finance.employeeId)).toEqual({
+      subscriptions: 0,
+      applications: 0,
+      workspaces: 0,
+      licenseLots: 0,
+    });
     expect([...(await api.countResponsibilitiesOf([]))]).toEqual([]);
   });
 
@@ -102,7 +117,7 @@ describe('the catalog facade that counts and hands over what an IT Admin answers
 
     const moved = await runner.run((tx) => api.transferResponsibilities(tx, actor, leaving.employeeId, it3.employeeId));
 
-    expect(moved).toEqual(mine);
+    expect(moved).toEqual({ ...mine, workspaceIds: [], licenseLotIds: [] });
     expect(await holders('subscriptions', mine.subscriptionIds)).toEqual([it3.employeeId, it3.employeeId]);
     expect(await holders('applications', mine.applicationIds)).toEqual([it3.employeeId, it3.employeeId]);
     expect(await holders('subscriptions', others.subscriptionIds)).toEqual([it2.employeeId]);
@@ -110,6 +125,8 @@ describe('the catalog facade that counts and hands over what an IT Admin answers
     expect((await api.countResponsibilitiesOf([leaving.employeeId])).get(leaving.employeeId)).toEqual({
       subscriptions: 0,
       applications: 0,
+      workspaces: 0,
+      licenseLots: 0,
     });
     for (const id of mine.subscriptionIds) {
       expect(await audits('SUBSCRIPTION.RESPONSIBILITY_TRANSFERRED', id)).toEqual([
@@ -133,7 +150,7 @@ describe('the catalog facade that counts and hands over what an IT Admin answers
       api.transferResponsibilities(tx, await principal(h.it1), idle.employeeId, it3.employeeId),
     );
 
-    expect(moved).toEqual({ subscriptionIds: [], applicationIds: [] });
+    expect(moved).toEqual({ subscriptionIds: [], applicationIds: [], workspaceIds: [], licenseLotIds: [] });
     expect(await h.count('audit_events')).toBe(before);
   });
 

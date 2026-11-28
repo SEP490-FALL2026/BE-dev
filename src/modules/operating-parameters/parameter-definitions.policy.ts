@@ -157,6 +157,19 @@ export const PARAMETER_DEFINITIONS: readonly ParameterDefinition[] = [
     owner: 'FINANCE',
   },
   {
+    key: 'K2_INVOICE_VARIANCE_THRESHOLD_PERCENT',
+    label: 'Ngưỡng lệch hóa đơn kho',
+    group: 'BUDGET',
+    shape: { kind: 'int', min: 1, max: 50 },
+    default: 5,
+    unit: 'percent',
+    unitLabel: '%',
+    description:
+      'Allowed percent difference between a monthly pooled-quota seat-purchase invoice amount and the expected pool amount before a discrepancy case opens.',
+    source: 'QĐ-116ak',
+    owner: 'FINANCE',
+  },
+  {
     key: 'PERSONNEL_NOTICE_REVIEW_WORKING_DAYS',
     label: 'Hạn xử lý thông báo biến động nhân sự',
     group: 'PERSONNEL',
@@ -308,6 +321,30 @@ export const PARAMETER_DEFINITIONS: readonly ParameterDefinition[] = [
     description:
       'How many days before the cancellation deadline of a subscription by the year the alert turns red; a period already running keeps the value it began with.',
     source: 'FR-1.4, FR-8.2',
+  },
+  {
+    key: 'SEAT_PURCHASE_INVOICE_DUE_WORKING_DAYS',
+    label: 'Hạn nộp hóa đơn mua thêm seat',
+    group: 'SUBSCRIPTION',
+    shape: { kind: 'int', min: 1, max: 30 },
+    default: 5,
+    unit: 'working days',
+    unitLabel: 'ngày làm việc',
+    description:
+      'Working days from the start of the month or purchase approval by which Procurement must submit the seat-purchase invoice.',
+    source: 'QĐ-115h, QĐ-117m',
+  },
+  {
+    key: 'SEAT_PURCHASE_LATE_INVOICE_DAYS',
+    label: 'Hạn nộp hóa đơn mua thêm seat xuất sau',
+    group: 'SUBSCRIPTION',
+    shape: { kind: 'int', min: 1, max: 365 },
+    default: 95,
+    unit: 'days',
+    unitLabel: 'ngày',
+    description:
+      'Calendar days after the purchase month closes during which a late seat-purchase invoice is still accepted under the monthly pooled quota.',
+    source: 'QĐ-115p, QĐ-117m',
   },
   {
     key: 'ACTIVITY_WINDOW_MINUTES',

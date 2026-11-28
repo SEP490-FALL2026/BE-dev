@@ -42,9 +42,10 @@ export class AcknowledgementController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The registration has ended (DEVICE_REGISTRATION.ENDED), its signed notice is not kept yet (DEVICE_REGISTRATION.SIGNATURE_RECORD_MISSING), the version is not the one in force (DEVICE_ACKNOWLEDGEMENT.NOTICE_NOT_CURRENT) or it is acknowledged already (DEVICE_ACKNOWLEDGEMENT.ALREADY_ACKNOWLEDGED).',
+        'The registration has ended (DEVICE_REGISTRATION.ENDED), has no collector installed (DEVICE_ACKNOWLEDGEMENT.COLLECTOR_NOT_INSTALLED), its signed notice is not kept yet (DEVICE_REGISTRATION.SIGNATURE_RECORD_MISSING), the version is not the one in force (DEVICE_ACKNOWLEDGEMENT.NOTICE_NOT_CURRENT) or it is acknowledged already (DEVICE_ACKNOWLEDGEMENT.ALREADY_ACKNOWLEDGED).',
       examples: [
         EXAMPLES.REGISTRATION_ENDED,
+        EXAMPLES.COLLECTOR_NOT_INSTALLED,
         EXAMPLES.SIGNATURE_RECORD_MISSING,
         EXAMPLES.NOTICE_NOT_CURRENT,
         EXAMPLES.ALREADY_ACKNOWLEDGED,

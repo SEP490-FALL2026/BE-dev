@@ -2,6 +2,7 @@ import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../infrastructure/http/errors/api.exception';
 import { toUnavailableApiException } from '../../infrastructure/http/errors/service-unavailable';
 import { errorExampleOf } from '../../infrastructure/http/openapi-error-examples';
+import { EmployeeNotStartedError } from '../organization/public/organization.errors';
 import {
   AssignmentConflictError,
   AssignmentNotFoundError,
@@ -22,6 +23,10 @@ const UNPROCESSABLE = HttpStatus.UNPROCESSABLE_ENTITY;
 /** Maps the errors of the licensing routes to their HTTP answers; a database that cannot answer is a 503. */
 export function toLicensingApiException(error: unknown): unknown {
   if (error instanceof ApiException) return error;
+
+  if (error instanceof EmployeeNotStartedError) {
+    return refuse(HttpStatus.CONFLICT, 'EMPLOYEE.NOT_STARTED', error.message);
+  }
 
   if (error instanceof SeatBaselineClosedError)
     return refuse(HttpStatus.CONFLICT, 'SEAT_BASELINE.CLOSED', error.message);

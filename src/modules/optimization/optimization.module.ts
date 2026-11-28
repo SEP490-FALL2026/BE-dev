@@ -31,7 +31,9 @@ import { EscalationFactsService } from './escalation/escalation-facts.service';
 import { EscalationRepo } from './escalation/escalation.repo';
 import { EscalationService } from './escalation/escalation.service';
 import { GhostSeatDecisionRepo } from './ghost-seat/ghost-seat-decision.repo';
+import { GhostSeatOpenWorkReader } from './ghost-seat/department-open-work.listener';
 import { GhostSeatSeatStateRepo } from './ghost-seat/ghost-seat-seat-state.repo';
+import { GhostSeatRunFacts } from './ghost-seat/ghost-seat-run-facts.service';
 import { GhostSeatRepo } from './ghost-seat/ghost-seat.repo';
 import { GhostSeatRevocationListener } from './ghost-seat/ghost-seat-revocation.listener';
 import { GhostSeatService } from './ghost-seat/ghost-seat.service';
@@ -84,6 +86,8 @@ import { UsageRulesService } from './usage-rules/usage-rules.service';
     OptimizationApi,
     RuleRunQueryService,
     GhostSeatRepo,
+    GhostSeatRunFacts,
+    GhostSeatOpenWorkReader,
     GhostSeatService,
     GhostSeatRevocationListener,
     RuleRunRepo,

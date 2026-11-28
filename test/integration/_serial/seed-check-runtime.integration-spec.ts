@@ -50,6 +50,66 @@ async function productionApplyDriver(apiUrl: string): Promise<void> {
   ]);
 }
 
+/**
+ * Redesign wave 2, W2-25: what the dataset leaves of the company machines: seven old machines kept under their own code and five new ones the
+ * system numbered, the Office key at 12 activations used and 10 open, two machines in the stock and one broken, a task of return for each of
+ * the two people who leave, and the IT Admin who stands in for the department of the one who leaves in three days.
+ */
+async function expectCompanyMachines(sql: HttpTestApp['sql']): Promise<void> {
+  const one = async <T>(text: string): Promise<T> => (await sql.query(text)).rows[0] as T;
+  expect(
+    (await sql.query('SELECT asset_code_origin, count(*)::int AS n FROM managed_devices GROUP BY 1 ORDER BY 1')).rows,
+  ).toEqual([
+    { asset_code_origin: 'GENERATED', n: 5 },
+    { asset_code_origin: 'LEGACY', n: 7 },
+  ]);
+  expect(
+    (
+      await sql.query(
+        `SELECT asset_code FROM managed_devices WHERE asset_code_origin = 'GENERATED' ORDER BY asset_code`,
+      )
+    ).rows,
+  ).toEqual(
+    ['LAP-26-0001', 'LAP-26-0002', 'LAP-26-0003', 'LAP-26-0004', 'LAP-26-0005'].map((asset_code) => ({ asset_code })),
+  );
+  expect(await one(`SELECT count(*)::int AS n FROM managed_devices WHERE retirement_kind = 'DISPOSED'`)).toEqual({
+    n: 1,
+  });
+  expect(
+    await one(
+      `SELECT count(*)::int AS n FROM managed_devices WHERE condition = 'BROKEN' AND asset_code LIKE 'LAP-26-%'`,
+    ),
+  ).toEqual({ n: 1 });
+  // Windows comes with every laptop: one open activation of the bundled plan on each machine that is not retired.
+  expect(
+    await one(`SELECT count(*)::int AS n FROM device_activations a JOIN plans p ON p.id = a.plan_id
+        WHERE p.key_binding = 'DEVICE_BUNDLED' AND a.deactivated_at IS NULL`),
+  ).toEqual({ n: 11 });
+  const key = await one<{
+    max_activations: number;
+    initial: number;
+    operations: number;
+    open: number;
+    initial_rows: number;
+  }>(`
+    SELECT k.max_activations, k.initial_activations_used AS initial,
+           (SELECT count(*)::int FROM device_activations a WHERE a.license_key_id = k.id AND a.origin = 'OPERATION') AS operations,
+           (SELECT count(*)::int FROM device_activations a WHERE a.license_key_id = k.id AND a.deactivated_at IS NULL) AS open,
+           (SELECT count(*)::int FROM device_activations a WHERE a.license_key_id = k.id AND a.origin = 'INITIAL') AS initial_rows
+      FROM license_keys k JOIN license_lots l ON l.id = k.license_lot_id JOIN plans p ON p.id = l.plan_id
+     WHERE p.key_binding = 'DEVICE_KEY'`);
+  expect(key.max_activations).toBe(30);
+  expect(key.initial + key.operations).toBe(12);
+  expect(key.open).toBe(10);
+  expect(key.initial_rows).toBe(6);
+  expect(
+    (await sql.query(`SELECT state, count(*)::int AS n FROM device_return_tasks GROUP BY 1 ORDER BY 1`)).rows,
+  ).toEqual([{ state: 'OPEN', n: 2 }]);
+  expect(await one(`SELECT count(*)::int AS n FROM department_it_substitutes WHERE ended_at IS NULL`)).toEqual({
+    n: 1,
+  });
+}
+
 if (process.argv[2] === '--runtime-seed-driver') {
   void productionApplyDriver(process.argv[3]);
 } else {
@@ -176,6 +236,7 @@ if (process.argv[2] === '--runtime-seed-driver') {
           )
         ).rowCount,
       ).toBe(0);
+      await expectCompanyMachines(ctx.sql);
       // The chosen address is the Super Admin's login and work email; the fixture default is not used.
       expect(
         (

@@ -1,6 +1,17 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
+import { PlanWorkspaceService } from '../../../src/modules/catalog/plan/plan-workspace.service';
+import {
+  PlanNotFoundError,
+  PlanWorkspaceAmbiguousError,
+  PlanWorkspacePersonInvalidError,
+  PlanWorkspaceVendorRequiredError,
+} from '../../../src/modules/catalog/plan/plan.errors';
+import {
+  WorkspaceNotResponsibleError,
+  WorkspaceStaleError,
+} from '../../../src/modules/catalog/workspace/workspace.errors';
 import { bodyOf } from '../../support/api-body';
 import { bearer, createHttpContractApp, principal } from '../../support/http-contract-app';
 
@@ -189,6 +200,59 @@ describe('plan routes (e2e, no database)', () => {
           .expect(404);
         expect(bodyOf(response).error.code).toBe('HTTP_NOT_FOUND');
       }
+    });
+  });
+
+  describe('W3-13 workspace profile error mapping (no database)', () => {
+    let stubApp: INestApplication<App>;
+    const set = jest.fn();
+
+    beforeAll(async () => {
+      stubApp = await createHttpContractApp({
+        overrides: [{ token: PlanWorkspaceService, useValue: { set } }],
+      });
+    });
+
+    afterAll(async () => {
+      await stubApp?.close();
+    });
+
+    beforeEach(() => {
+      set.mockReset();
+    });
+
+    it.each([
+      ['409 PLAN.WORKSPACE_AMBIGUOUS', () => new PlanWorkspaceAmbiguousError([ID]), 409, 'PLAN.WORKSPACE_AMBIGUOUS'],
+      [
+        '409 WORKSPACE.STALE',
+        () => new WorkspaceStaleError(new Date('2026-12-01T00:00:00.000Z')),
+        409,
+        'WORKSPACE.STALE',
+      ],
+      [
+        '422 PLAN.WORKSPACE_VENDOR_REQUIRED',
+        () => new PlanWorkspaceVendorRequiredError(),
+        422,
+        'PLAN.WORKSPACE_VENDOR_REQUIRED',
+      ],
+      [
+        '422 PLAN.WORKSPACE_PERSON_INVALID',
+        () => new PlanWorkspacePersonInvalidError(ID),
+        422,
+        'PLAN.WORKSPACE_PERSON_INVALID',
+      ],
+      ['403 WORKSPACE.NOT_RESPONSIBLE', () => new WorkspaceNotResponsibleError(), 403, 'WORKSPACE.NOT_RESPONSIBLE'],
+      ['404 PLAN.NOT_FOUND', () => new PlanNotFoundError(), 404, 'PLAN.NOT_FOUND'],
+    ] as const)('PUT /plans/:id/workspace-profile answers %s', async (_label, buildError, status, code) => {
+      set.mockRejectedValueOnce(buildError());
+
+      const response = await request(stubApp.getHttpServer())
+        .put(`/api/v1/plans/${ID}/workspace-profile`)
+        .set('Authorization', bearer(principal(['IT_ADMIN'])))
+        .send(VALID_PROFILE)
+        .expect(status);
+
+      expect(bodyOf(response).error.code).toBe(code);
     });
   });
 });

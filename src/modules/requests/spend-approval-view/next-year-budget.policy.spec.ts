@@ -49,4 +49,14 @@ describe('QĐ-111al, R-15, R-46: what is left of the budget of the year after fo
   it('a request with nothing of the year after has no figure to read', () => {
     expect(figures({ thisMinor: 0n })).toBeNull();
   });
+
+  it('FIX-B1 F7 (D-10): subtracts next-year runningUncommittedMinor from remaining and remainingAfter', () => {
+    expect(figures({ runningUncommittedMinor: 6_000_000n, thisMinor: 35n * M })).toEqual({
+      year: 2027,
+      approvedMinor: 100n * M,
+      remainingMinor: 34n * M,
+      remainingAfterMinor: -(1n * M),
+      warning: true,
+    });
+  });
 });

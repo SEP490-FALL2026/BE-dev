@@ -24,12 +24,13 @@ export class SeatMonthSeatFactsService {
     return this.licensing.getSeatsOfMonth(month, tx, subscriptionId);
   }
 
-  /** The seats with where their holders were placed over the month and the commitment of the request behind each. */
+  /** The seats with where their holders were placed over the month, their line price (`B2-R7`), and the commitment behind each. */
   async toCharge(
     tx: DbTx,
     month: BusinessDate,
     seats: readonly SeatOfMonth[],
     commitmentOf: ReadonlyMap<string, LockedCommitmentOfRequest>,
+    linePriceByPlan?: ReadonlyMap<string, bigint | null>,
   ): Promise<SeatToCharge[]> {
     const { start, nextStart } = monthBoundsOf(month);
     const spans = await this.history.getPlacementsBetween(
@@ -52,6 +53,8 @@ export class SeatMonthSeatFactsService {
       return {
         assignmentId: seat.assignmentId,
         employeeId: seat.employeeId,
+        planId: seat.planId,
+        ...(linePriceByPlan !== undefined ? { monthlyPriceMinor: linePriceByPlan.get(seat.planId) ?? null } : {}),
         fixedDepartmentId: seat.kind === 'SERVICE' ? seat.owningDepartmentId : null,
         held: { from: seat.heldFrom, until: seat.heldUntil },
         placements: placements.get(seat.employeeId) ?? [],

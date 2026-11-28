@@ -48,6 +48,13 @@ const figuresQuery = (year?: number) => Prisma.sql`
     SELECT s.cost_center_id, EXTRACT(YEAR FROM s.month)::int, 'VND'::char(3) FROM seat_month_charges s
      WHERE s.cost_center_id IS NOT NULL
        AND NOT EXISTS (SELECT 1 FROM reference v WHERE v.cost_center_id = s.cost_center_id AND v.year = EXTRACT(YEAR FROM s.month)::int)
+    UNION
+    SELECT l.cost_center_id, EXTRACT(YEAR FROM l.month)::int, 'VND'::char(3) FROM invoice_allocations l
+     WHERE l.bucket = 'COST_CENTER' AND l.cost_center_id IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM reference v WHERE v.cost_center_id = l.cost_center_id AND v.year = EXTRACT(YEAR FROM l.month)::int)
+    UNION
+    SELECT lc.cost_center_id, EXTRACT(YEAR FROM lc.month)::int, 'VND'::char(3) FROM license_lot_charges lc
+     WHERE NOT EXISTS (SELECT 1 FROM reference v WHERE v.cost_center_id = lc.cost_center_id AND v.year = EXTRACT(YEAR FROM lc.month)::int)
   )
   SELECT p.cost_center_id AS "costCenterId", p.year, p.currency,
          v.id AS "versionId", v.number, v.base_minor AS "baseMinor",

@@ -79,6 +79,10 @@ describe('FR-4.11: what a confirmation writes', () => {
 
     expect(days.map((day) => day.identifierNormalized)).toEqual(['a@x.com', 'b@x.com']);
   });
+
+  it('writes no day for a matched row that names none', () => {
+    expect(daysToWrite([row({ cells: { days: [] } })])).toEqual([]);
+  });
 });
 
 describe('FR-4.5: the mapping a match writes', () => {

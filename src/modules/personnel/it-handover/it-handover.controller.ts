@@ -15,15 +15,14 @@ import { ItHandoverBodyDto, ItHandoverIdParamDto, ItHandoverResultResponseDto } 
 import { IT_HANDOVER_ERROR_EXAMPLES as E, toItHandoverApiException } from './it-handover.http-errors';
 import { ItHandoverService, type ItHandoverResult } from './it-handover.service';
 
-const WHO =
-  'The IT Admin who is leaving hands over before the block of the departure or the day the transfer takes effect; from then on any IT Admin does. ';
+const WHO = 'Only the Super Admin hands responsibilities over. ';
 
 const COMMON = [
   UNAUTHENTICATED_RESPONSE,
   {
     status: HttpStatus.FORBIDDEN,
-    description: `Only an IT Admin hands responsibilities over (AUTHORIZATION.FORBIDDEN). Before the block of the departure or the day the transfer takes effect only the IT Admin who is leaving does (IT_HANDOVER.NOT_YET_YOURS).`,
-    examples: [FORBIDDEN_EXAMPLE, E.NOT_YET_YOURS],
+    description: 'Only the Super Admin hands responsibilities over (AUTHORIZATION.FORBIDDEN).',
+    examples: [FORBIDDEN_EXAMPLE],
   },
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   {
@@ -53,6 +52,8 @@ const wire = (result: ItHandoverResult) => ({
   toItAdminEmployeeId: result.toEmployeeId,
   subscriptions: result.subscriptions,
   applications: result.applications,
+  workspaces: result.workspaces,
+  licenseLots: result.licenseLots,
   handedOverAt: result.at.toISOString(),
 });
 
@@ -66,14 +67,14 @@ export class ItHandoverController {
   constructor(private readonly handovers: ItHandoverService) {}
 
   @Post('offboarding-cases/:id/it-admin-handover')
-  @RequireRoles('IT_ADMIN')
+  @RequireRoles('SUPER_ADMIN')
   @ApiOperation({
     operationId: 'offboardingCaseItAdminHandover',
     summary: 'Hand the responsibilities of a leaving IT Admin to another',
   })
   @ApiSuccessResponse(ItHandoverResultResponseDto, {
     message: 'OFFBOARDING_CASE.IT_ADMIN_HANDED_OVER',
-    description: `${WHO}Every subscription and every application the person answers for now goes to the IT Admin named, in one operation: the Audit Trail names the person who gave them up, the one who took them and the departure, the log of the case says so, and the one who took them is told. The case is read again for its itHandover section.`,
+    description: `${WHO}Every subscription, application, workspace and license lot the person answers for now goes to the IT Admin named, in one operation, and the answer and the notice of the one who took them count each kind: the Audit Trail names the person who gave them up, the one who took them and the departure, the log of the case says so, and the one who took them is told. The case is read again for its itHandover section.`,
   })
   @ApiErrorResponses(...COMMON, NOT_FOUND)
   async handOverOffboarding(
@@ -91,14 +92,14 @@ export class ItHandoverController {
   }
 
   @Post('department-transfers/:id/it-admin-handover')
-  @RequireRoles('IT_ADMIN')
+  @RequireRoles('SUPER_ADMIN')
   @ApiOperation({
     operationId: 'departmentTransferItAdminHandover',
     summary: 'Hand the responsibilities of a moving IT Admin to another',
   })
   @ApiSuccessResponse(ItHandoverResultResponseDto, {
     message: 'DEPARTMENT_TRANSFER.IT_ADMIN_HANDED_OVER',
-    description: `${WHO}Every subscription and every application the person answers for now goes to the IT Admin named, in one operation: the Audit Trail names the person who gave them up, the one who took them and the transfer, and the one who took them is told. The transfer is read again for its itHandover section.`,
+    description: `${WHO}Every subscription, application, workspace and license lot the person answers for now goes to the IT Admin named, in one operation, and the answer and the notice of the one who took them count each kind: the Audit Trail names the person who gave them up, the one who took them and the transfer, and the one who took them is told. The transfer is read again for its itHandover section.`,
   })
   @ApiErrorResponses(...COMMON, NOT_FOUND)
   async handOverTransfer(

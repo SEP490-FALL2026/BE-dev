@@ -20,7 +20,9 @@ export type SaasIssueProblem =
   /** A person who is not an IT Admin asked for the reports of others. */
   | 'SCOPE_FORBIDDEN'
   /** A grant task named as linked work does not exist. */
-  | 'LINKED_WORK_INVALID';
+  | 'LINKED_WORK_INVALID'
+  /** The report is unassigned or the caller is not an acting IT Admin for the reporter’s work department. */
+  | 'NOT_IN_CHARGE';
 
 /** A report of an error in a SaaS right was refused; nothing is written. `reason` says what to put right. */
 export class SaasIssueError extends Error {

@@ -2,11 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { normalizeAccountIdentifier } from '../public/account-identifier.policy';
 import { fromDateColumn, type BusinessDate } from '../../../core/business-date';
 import { endAfterGrant } from '../../../core/term-limit';
-import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
+import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import type { SeatTarget, SeatTargetRef } from '../../catalog/public/catalog.types';
 import { CatalogApi } from '../../catalog/public/catalog.api';
+import { SeatLedgerApi } from '../../catalog/public/seat-ledger.api';
 import { SubscriptionPeriodApi } from '../../catalog/public/subscription-period.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import {
@@ -14,7 +15,6 @@ import {
   AssignmentNotFoundError,
   AssignmentNotOpenError,
   ProvisioningSubscriptionError,
-  SeatTargetNotFoundError,
 } from '../public/licensing.errors';
 import type {
   AssignmentHolder,
@@ -22,7 +22,6 @@ import type {
   ExistingAssignment,
   NewBaselineAssignment,
   SeatHolder,
-  SeatUsage,
   WaitingRegrant,
 } from '../public/licensing.types';
 import { licensingAuditEvent } from '../licensing-audit-event.mapper';
@@ -59,6 +58,10 @@ interface GrantedSeat {
   expectedEndDate: BusinessDate | null;
   /** The right of the person that this grant ended the same day (`endReplacedByGrant`, R-49); kept on the new right. */
   replacesAssignmentId?: string | null;
+  /** Personal commitment term in months for subscription-free K1 grants (`1 | 12`). */
+  personalCommitmentMonths?: 1 | 12 | null;
+  /** Rolling billing anchor date for subscription-free K1 grants (`YYYY-MM-DD`). */
+  billingAnchorOn?: BusinessDate | null;
 }
 
 /**
@@ -74,12 +77,12 @@ export class AssignmentService {
     return this.repo.countHoldingOfSubscriptions(ids, day, tx);
   }
 
-  /** The seats of these subscriptions held as of `day`, by holder (the person, or who answers for a service account), in one statement. */
+  /** The seats of these subscriptions held as of `day`, by plan and holder (the person, or who answers for a service account), in one statement. */
   countHoldingByHolder(
     ids: readonly string[],
     day: BusinessDate,
     tx?: DbTx,
-  ): Promise<{ subscriptionId: string; employeeId: string; seats: number }[]> {
+  ): Promise<{ subscriptionId: string; planId: string; employeeId: string; seats: number }[]> {
     return this.repo.countHoldingByHolder(ids, day, tx);
   }
 
@@ -89,7 +92,7 @@ export class AssignmentService {
     private readonly organizationReads: OrganizationReadApi,
     private readonly catalog: CatalogApi,
     private readonly audit: AuditApi,
-    private readonly runner: TransactionRunner,
+    private readonly seatLedger: SeatLedgerApi,
     private readonly periods: SubscriptionPeriodApi,
     private readonly carrying: AssignmentCarryRepo,
   ) {}
@@ -188,6 +191,12 @@ export class AssignmentService {
           isMachineAccount: false,
           machineAccountNote: null,
           createdByAppUserId: actor.appUserId,
+          ...(input.target.provisioningType === 'K1' && input.target.subscriptionId === null
+            ? {
+                personalCommitmentMonths: input.target.referenceCommitmentMonths ?? 1,
+                billingAnchorOn: row.effectiveFrom,
+              }
+            : {}),
         });
       } catch (error) {
         throw toAssignmentFailure(error, index) ?? error;
@@ -244,6 +253,8 @@ export class AssignmentService {
         predecessorId: null,
         baselineImportId: null,
         replacesAssignmentId: input.replacesAssignmentId ?? null,
+        personalCommitmentMonths: input.personalCommitmentMonths ?? null,
+        billingAnchorOn: input.billingAnchorOn ?? null,
         // A new grant is a plain seat: the flag is put on it afterwards, by the IT Admin (`QĐ-110m`).
         isMachineAccount: false,
         machineAccountNote: null,
@@ -322,6 +333,11 @@ export class AssignmentService {
     );
 
     return old.id;
+  }
+
+  /** Reads a single assignment record by ID within an optional transaction. */
+  findRecord(id: string, tx?: DbTx): Promise<AssignmentRecord | null> {
+    return this.repo.find(id, tx);
   }
 
   /** Whether the old right is one a grant on this target would end if no revocation task stood in the way. */
@@ -441,14 +457,20 @@ export class AssignmentService {
       startDate,
       actorAppUserId: actor.appUserId,
     };
-    await this.carryOrBuy(tx, actor, { carrying, next, requestId: input.requestId });
+    await this.carryOrBuy(tx, actor, {
+      carrying,
+      next,
+      planId: seat.planId,
+      beneficiaryEmployeeId: seat.employeeId,
+      today: input.today,
+      requestId: input.requestId,
+    });
   }
 
   /**
    * Carries the seat; when the next period holds no free seat for it and is the shared pool (no department owns it), buys one seat on it for the
-   * request and carries again: the person who comes in after the adjustment was recorded is a seat the IT Admin buys for the period (`QĐ-103q`),
-   * told like any seat a grant buys (`QĐ-110v`). Throws ProvisioningSubscriptionError
-   * (`NEXT_PERIOD_SEATS`).
+   * request (`SeatLedgerApi.buyForItems` with `effectiveOn = startDate`) and carries again (`QĐ-103q`, `QĐ-110v`). Throws ProvisioningSubscriptionError
+   * (`NEXT_PERIOD_SEATS`) when a department-owned next period cannot take the carried seat.
    */
   private async carryOrBuy(
     tx: DbTx,
@@ -456,6 +478,9 @@ export class AssignmentService {
     input: {
       carrying: Parameters<AssignmentCarryRepo['carry']>[1];
       next: { subscriptionId: string };
+      planId: string;
+      beneficiaryEmployeeId: string;
+      today: BusinessDate;
       requestId: string;
     },
   ): Promise<void> {
@@ -463,8 +488,30 @@ export class AssignmentService {
     if (refused === null) return;
     this.requireNoRoom(refused);
     const { subscriptionId } = input.next;
-    await this.catalog.lockSeatTarget(tx, { subscriptionId });
-    await this.catalog.addPoolSeat(tx, actor, subscriptionId, input.requestId);
+    const nextTarget = await this.catalog.lockSeatTarget(tx, {
+      subscriptionId,
+      planId: input.planId,
+      servingOn: input.carrying.startDate,
+    });
+    if (!nextTarget?.subscriptionLineId) {
+      throw new ProvisioningSubscriptionError('NEXT_PERIOD_SEATS');
+    }
+    const { purchase } = await this.seatLedger.buyForItems(
+      tx,
+      nextTarget.subscriptionLineId,
+      [{ requestId: input.requestId, beneficiaryEmployeeId: input.beneficiaryEmployeeId }],
+      input.carrying.startDate,
+      { actor, today: input.today, alreadyLocked: true, checkClosedMonth: false },
+    );
+    await this.seatLedger.notifySeatsBought(tx, {
+      organizationId: purchase.organizationId,
+      subscriptionId,
+      subscriptionLineId: nextTarget.subscriptionLineId,
+      seatPurchaseId: purchase.id,
+      quantity: purchase.quantity,
+      responsibleItAdminEmployeeId: nextTarget.responsibleItAdminEmployeeId ?? null,
+      actor,
+    });
     try {
       await this.carrying.carry(tx, input.carrying);
     } catch (error) {
@@ -522,7 +569,7 @@ export class AssignmentService {
         'LICENSE_ASSIGNMENT.END_REVERSED',
         'LicenseAssignment',
         reopened,
-        { validUntil: input.now.toISOString().slice(0, 10) },
+        { validUntil: await this.organizationReads.businessToday(input.now, tx) },
         { validUntil: null, requestId: input.requestId, cause },
       ),
     );
@@ -544,22 +591,5 @@ export class AssignmentService {
     await this.repo.markGranted(tx, assignmentId, { grantedOn, expectedEndDate });
 
     return { effectiveFrom: current.effectiveFrom, expectedEndDate };
-  }
-
-  /** The seats bought, taken and free on today in the organization calendar. Throws SeatTargetNotFoundError. */
-  async seatUsage(subscriptionId: string): Promise<SeatUsage> {
-    const target = await this.catalog.findSeatTarget({ subscriptionId });
-    if (!target) throw new SeatTargetNotFoundError('SUBSCRIPTION');
-    const asOf = await this.organizationReads.businessToday();
-    const occupied = await this.repo.countOccupying(subscriptionId, asOf);
-    const purchased = target.purchasedQuantity;
-
-    return {
-      subscriptionId,
-      purchased,
-      occupied,
-      free: purchased === null ? null : Math.max(0, purchased - occupied),
-      asOf,
-    };
   }
 }

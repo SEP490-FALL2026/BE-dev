@@ -101,20 +101,24 @@ describe('the right a person reports on (US-07-10 AC-2, AC-3)', () => {
 });
 
 describe('who a new report is given to', () => {
-  it('names the IT Admin in charge when they can act, else the first who can, else nobody', () => {
-    expect(assigneeOf({ inChargeEmployeeId: 'IT1', inChargeUsable: true, fallbackEmployeeId: 'IT0' })).toEqual({
+  it('gives the report to the appointed substitute when present, else the IT Admin in charge, else null', () => {
+    expect(assigneeOf({ inCharge: 'IT1', substitute: null })).toEqual({
       employeeId: 'IT1',
       byFallback: false,
     });
-    expect(assigneeOf({ inChargeEmployeeId: 'IT1', inChargeUsable: false, fallbackEmployeeId: 'IT0' })).toEqual({
-      employeeId: 'IT0',
+    expect(assigneeOf({ inCharge: 'IT1', substitute: 'IT2' })).toEqual({
+      employeeId: 'IT2',
       byFallback: true,
     });
-    expect(assigneeOf({ inChargeEmployeeId: null, inChargeUsable: false, fallbackEmployeeId: 'IT0' })).toEqual({
-      employeeId: 'IT0',
+    expect(assigneeOf({ inCharge: null, substitute: 'IT2' })).toEqual({
+      employeeId: 'IT2',
       byFallback: true,
     });
-    expect(assigneeOf({ inChargeEmployeeId: null, inChargeUsable: false, fallbackEmployeeId: null })).toBeNull();
+    expect(assigneeOf({ inCharge: 'IT1', substitute: 'IT1' })).toEqual({
+      employeeId: 'IT1',
+      byFallback: false,
+    });
+    expect(assigneeOf({ inCharge: null, substitute: null })).toBeNull();
   });
 });
 

@@ -5,7 +5,7 @@ import {
   RequestPartyIneligibleError,
   requestPartyRefusalBody,
 } from '../../identity-access/public/request-party.errors';
-import { FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
+import { EmployeeNotStartedError, FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
 import { termRuleOf } from '../../../core/term-limit';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import {
@@ -28,6 +28,7 @@ import {
   AccessRequestNotRequesterError,
   AccessRequestNotAwaitingRevisionError,
   AccessRequestNotPriceableError,
+  AccessRequestPlanBoundToDeviceError,
   AccessRequestPlanNotFoundError,
 } from './access-request.errors';
 
@@ -36,7 +37,9 @@ const refuse = (status: HttpStatus, code: string, message: string): ApiException
 
 /** What the client needs to act on a refused time of use: the contract end, or the most months the kind of plan takes. */
 function termDetailsOf(error: AccessRequestTermRefusedError): { details?: Record<string, unknown> } {
-  if (error.reason === 'TERM_CONTRACT_ENDED') return { details: { contractEndDate: error.contractEndDate } };
+  if (error.reason === 'TERM_CONTRACT_ENDED' || error.reason === 'K1_ANNUAL_CONTRACT_TOO_SHORT') {
+    return { details: { contractEndDate: error.contractEndDate } };
+  }
   if (error.reason !== 'TERM_MONTHS_OUT_OF_RANGE') return {};
   const { maxMonths } = termRuleOf(error.kind ?? 'K2');
 
@@ -60,8 +63,14 @@ export function toAccessRequestApiException(error: unknown): unknown {
   if (error instanceof AccessRequestApplicationRetiredError) {
     return refuse(HttpStatus.CONFLICT, 'ACCESS_REQUEST.APPLICATION_RETIRED', error.message);
   }
+  if (error instanceof AccessRequestPlanBoundToDeviceError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'ACCESS_REQUEST.PLAN_BOUND_TO_DEVICE', error.message);
+  }
   if (error instanceof AccessRequestNoDepartmentError) {
     return refuse(HttpStatus.CONFLICT, 'ACCESS_REQUEST.NO_DEPARTMENT', error.message);
+  }
+  if (error instanceof EmployeeNotStartedError) {
+    return refuse(HttpStatus.CONFLICT, 'EMPLOYEE.NOT_STARTED', error.message);
   }
   // The department has no Cost Center in use yet (`QĐ-87d(1)`): Finance creates it first. Nothing was written.
   if (error instanceof FinanceSetupIncompleteError) {
@@ -182,13 +191,19 @@ export const ACCESS_REQUEST_ERROR_EXAMPLES = {
   NOT_AWAITING_REVISION: example(new AccessRequestNotAwaitingRevisionError()),
   NOT_FOUND: example(new AccessRequestNotFoundError()),
   PLAN_NOT_FOUND: example(new AccessRequestPlanNotFoundError()),
+  PLAN_BOUND_TO_DEVICE: example(new AccessRequestPlanBoundToDeviceError()),
   APPLICATION_RETIRED: example(new AccessRequestApplicationRetiredError()),
   TERM_REQUIRED: example(new AccessRequestTermRefusedError('TERM_REQUIRED')),
   TERM_MONTHS_OUT_OF_RANGE: example(new AccessRequestTermRefusedError('TERM_MONTHS_OUT_OF_RANGE', null, 'K1')),
   TERM_NOT_ASKED: example(new AccessRequestTermRefusedError('TERM_NOT_ASKED')),
   TERM_LONG_TERM_NOT_ALLOWED: example(new AccessRequestTermRefusedError('TERM_LONG_TERM_NOT_ALLOWED')),
   TERM_CONTRACT_ENDED: example(new AccessRequestTermRefusedError('TERM_CONTRACT_ENDED', '2026-10-31')),
+  K1_ANNUAL_TERM_FIXED: example(new AccessRequestTermRefusedError('K1_ANNUAL_TERM_FIXED', null, 'K1')),
+  K1_ANNUAL_CONTRACT_TOO_SHORT: example(
+    new AccessRequestTermRefusedError('K1_ANNUAL_CONTRACT_TOO_SHORT', '2027-03-31', 'K1'),
+  ),
   NO_DEPARTMENT: example(new AccessRequestNoDepartmentError()),
+  EMPLOYEE_NOT_STARTED: example(new EmployeeNotStartedError()),
   REQUEST_PARTY_INELIGIBLE: example(
     new RequestPartyIneligibleError({
       reason: 'SPENDING_APPROVER',
@@ -240,11 +255,13 @@ export const ACCESS_REQUEST_ERROR_EXAMPLES = {
   EVIDENCE_REQUIRED: cancellation('EVIDENCE_REQUIRED'),
 } as const;
 
-/** The five answers of a time of use that is refused, for the routes that take one (`QĐ-111i`, `INV-07`). */
+/** The refused-term error examples for the routes that judge a request term (`QĐ-111i`, `INV-07`). */
 export const TERM_ERROR_EXAMPLES = [
   ACCESS_REQUEST_ERROR_EXAMPLES.TERM_REQUIRED,
   ACCESS_REQUEST_ERROR_EXAMPLES.TERM_MONTHS_OUT_OF_RANGE,
   ACCESS_REQUEST_ERROR_EXAMPLES.TERM_NOT_ASKED,
   ACCESS_REQUEST_ERROR_EXAMPLES.TERM_LONG_TERM_NOT_ALLOWED,
   ACCESS_REQUEST_ERROR_EXAMPLES.TERM_CONTRACT_ENDED,
+  ACCESS_REQUEST_ERROR_EXAMPLES.K1_ANNUAL_TERM_FIXED,
+  ACCESS_REQUEST_ERROR_EXAMPLES.K1_ANNUAL_CONTRACT_TOO_SHORT,
 ] as const;

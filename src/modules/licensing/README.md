@@ -24,8 +24,8 @@ dashboards; gốc `src/app/app.module.ts`.
     - `lockGrantOfRequest`, `completedGrantOfRequest`, `cancelGrantOfRequest` — task grant của một request;
       `recordProvisioningFailure` — ghi lần thử connector lỗi (US-07-04).
     - `listPersonalSeatsOf`, `countPersonalSeatsOf`, `getSeatsHeldInPlans(…, tx?)`, `listTerminatingAccess`,
-      `listRevocationsOpenedFor`, `listTransferIdsWithFailedRevocation` — đọc ghế của người và tác vụ thu hồi điều chuyển đóng thất bại; `selfExecutionMode` — IT Admin có được làm việc cho chính mình
-      không (`QĐ-77m`).
+      `listRevocationsOpenedFor`, `listTransferIdsWithFailedRevocation`, `listRightChainsOf` — đọc ghế của người và tác vụ thu hồi điều chuyển đóng thất bại; `selfExecutionMode` — đánh dấu tự thực hiện khi acting IT Admin làm tác vụ cho chính mình (cho phép, ghi `selfExecuted` và báo Super Admin một lần); `recordAvoidedCost` — ghi nhận tiết kiệm tránh chi từ kho một lần theo tác vụ cấp; `recordRealisedSaving` — ghi nhận tiết kiệm thực tế gia hạn một lần khi Finance xác nhận hóa đơn đầu kỳ mới (hoặc đóng case sai lệch).
+  - `LicensingSeatMonthApi` ([public/licensing-seat-month.api.ts](public/licensing-seat-month.api.ts)) — facade cho `budgets`: `getSeatsOfMonth`, `getSeatsInForceOn` (seat `K2` còn hiệu lực tại ngày `day` cho `runningUncommitted`), `getUnrequestedK1SeatsInForceOn` (quyền `K1` không Request kèm giá tham chiếu tháng VND của gói), `getPriorLineTargets` (mục tiêu dòng đã khóa của kỳ trước ở `subscription_line_targets` cho nhãn `(1)`), `getNextPeriodQuantities`.
     - `pageHeldSoftwareOf` — phần mềm người đó đang giữ hôm nay (ghế cá nhân đã bắt đầu, chưa hỏng/hủy/hết), một trang và
       tổng, cùng snapshot `RepeatableRead`, 3 câu lệnh dù bao nhiêu ghế; trưởng phòng đọc một thành viên
       (`personnel/department-member`).
@@ -43,24 +43,29 @@ dashboards; gốc `src/app/app.module.ts`.
   - `LicensingDashboardApi` ([public/licensing-dashboard.api.ts](public/licensing-dashboard.api.ts)) — số đếm cho trang tổng
     quan theo vai (dashboards): `employeeFacts`, `departmentFacts`, `itAdminFacts`; type ở `licensing-dashboard.types.ts`.
   - `LicensingSeatBaselineApi` ([public/licensing-seat-baseline.api.ts](public/licensing-seat-baseline.api.ts)) — seat
-    baseline (data-import, onboarding): `seatTargetRef`, `resolveBaselineTarget`, `lockBaselineTarget`, `baselineFacts`,
-    `createBaselineAssignments`, `getBaselineProgress`, `openSeatHolders`.
+    baseline (data-import, onboarding, devices): `seatTargetRef`, `resolveBaselineTarget`, `lockBaselineTarget`, `baselineFacts`,
+    `createBaselineAssignments`, `getBaselineProgress`, `openSeatHolders`, `holdInitializationOpen(tx)` (giữ hàng trạng thái baseline
+    `FOR SHARE` ở tầng `0b`, trả `true` khi pha khởi tạo còn mở).
+  - `LicensingDeviceActivationApi` ([public/licensing-device-activation.api.ts](public/licensing-device-activation.api.ts)) — kích
+    hoạt phần mềm gắn thiết bị (`DEVICE_KEY`/`DEVICE_BUNDLED`, gọi bởi `devices` trong transaction đã giữ khóa máy): `open`,
+    `openByKey`, `close`, `move`, `closeAllOfDevice`, `find`, `openOfDevice`, `hasKeyActivationHistory`, `page`. Lỗi ở
+    `public/licensing-device-activation.errors.ts`.
   - `LicensingDepartmentToolsApi` ([public/licensing-department-tools.api.ts](public/licensing-department-tools.api.ts)) — danh sách phần mềm của phòng
     (DS.4, `QĐ-111c`; một facade riêng vì `LicensingApi` đã 8 phụ thuộc): `addDepartmentSoftwareFromCatalogLink(tx, actor, { departmentId, applicationId, planId, note? })` →
     `{ entryId, added }` cho tick "thêm vào danh sách phòng" của `POST /access-requests/{id}/catalog-link` (SPEC FE IN-1; `requests` gọi trong transaction của nó, ở
     gói IN-1). Idempotent: chỗ đã có ⟹ `added: false`, không Audit, không làm hỏng transaction của người gọi; ngoài danh mục ⟹ `DepartmentSoftwareNotInCatalogError`,
-    phòng không có ⟹ `ToolsDepartmentNotFoundError` (cả hai ở `licensing.errors.ts`). Không xét lại phạm vi IT Admin: người gọi đã xét trên Request; type ở `licensing-department-tools.types.ts`.
+    phòng không có ⟹ `ToolsDepartmentNotFoundError` (cả hai ở `licensing.errors.ts`). Không xét lại phạm vi IT Admin: người gọi đã xét trên Request; type ở `licensing-department-tools.api.ts`.
 - `public/licensing.types.ts` — input/output của facade; `public/licensing-*.types.ts` — type theo nhóm việc.
 - `public/licensing.errors.ts` — lỗi nghiệp vụ (`SeatBaselineClosedError`, `RevocationRefusedError`, `Provisioning*`…).
 - `public/licensing.extension-points.ts` — bảy point dưới đây, contract và union sự kiện `RevocationEvent`.
-- `public/licensing-subscription-renewal.types.ts` — contract của hai point gia hạn: `RenewalFinancialReader`
+- `public/licensing-renewal.types.ts` — contract gia hạn seat và hai point gia hạn thuê bao: `RenewalFinancialReader`
   (snapshot tiền của người quyết) và `RenewalUsageReader` (bằng chứng sử dụng từng ghế).
 
 ## Bảng sở hữu
 
-- `license_assignments`, `seat_baseline_states`, `provisioning_tasks`, `provisioning_task_reasons`, `handover_duties` (không còn ghi từ `QĐ-110g`; bảng giữ tới đợt dọn),
-  `service_account_duty_notices` (không còn ghi từ `QĐ-110m`; bảng giữ tới đợt dọn), `assignment_expiry_reminders`, `assignment_renewal_windows`, `license_keys`, `license_key_reveal_windows`,
-  `saas_issues`, `saas_issue_entries`, `saas_issue_counters`, `subscription_renewals`,
+- `subscription_line_targets` (mục tiêu dòng thuê bao chốt tại hạn chót), `seat_purchases` được ghi qua `SeatLedgerApi` của `catalog`; `license_assignments`, `device_activations`, `seat_baseline_states`, `provisioning_tasks`, `provisioning_task_reasons`, `handover_duties` (không còn ghi từ `QĐ-110g`; bảng giữ tới đợt dọn),
+  `service_account_duty_notices` (không còn ghi từ `QĐ-110m`; bảng giữ tới đợt dọn), `assignment_expiry_reminders`, `assignment_renewal_windows`, `license_keys` (gồm `license_lot_id`, `cost_borne`, `max_activations`, `initial_activations_used`), `license_key_reveal_windows`,
+  `saas_issues`, `saas_issue_entries`, `saas_issue_counters`, `subscription_renewals` (kèm `auto_recorded`, `minimum_total_*`, `realised_savings_recorded_at/invoice_id`),
   `subscription_renewal_released_seats`, `subscription_deadline_events` (`prisma/models/licensing.prisma`).
 
 ## Extension point
@@ -80,7 +85,7 @@ dashboards; gốc `src/app/app.module.ts`.
   usage (G7) thêm reader; chưa có thì gia hạn nói `usage NOT_AVAILABLE` và xếp ghế không dùng dữ liệu sử dụng.
 - Gia hạn không còn listener chờ Người duyệt chi (`QĐ-94d`(2)): người xác nhận là trưởng phòng của phòng sở hữu thuê bao vào ngày
   quyết; phòng chưa có trưởng phòng ⟹ hồ sơ `waitingReason = NO_HEAD`, Super Admin nhận một `CONTROLLED_WAIT_ALERT` lúc đề xuất.
-- Đăng ký vào: `catalog.seat-occupancy` — `assignment/assignment-seat-occupancy.listener.ts`;
+- Đăng ký vào: `catalog.seat-occupancy` — `assignment/occupancy/assignment-seat-occupancy.listener.ts`;
   `organization.department-service-account-reader` — `assignment/assignment-service-account.listener.ts`;
   `organization.department-use-readers` — `provisioning/department-use/department-open-work.listener.ts`.
 - Đăng ký vào (thêm): `license-key/license-key-template.listener.ts` góp định nghĩa cột của lô khóa vào `ImportTemplateContributions` của `policies` (file mẫu `license-keys`).
@@ -88,8 +93,8 @@ dashboards; gốc `src/app/app.module.ts`.
 ## Hướng phụ thuộc giữa capability (R6)
 
 Không vòng (`pnpm arch:capabilities --module licensing`, gate `capability-graph`). Từ thấp lên cao: `assignment`,
-`license-key`, `saas-issue` → `provisioning`, `seat-baseline` → `department-tools`, `expiry` →
-`my-software`, `subscription-renewal` (đọc ghế, mở thu hồi qua `RevocationService`, không capability nào import nó) →
+`seat-baseline`, `saas-issue` → `license-key` → `device-activation`, `provisioning` → `department-tools`, `expiry`,
+`stock-summary` → `my-software`, `subscription-renewal` (đọc ghế, mở thu hồi qua `RevocationService`, không capability nào import nó) →
 `dashboard-facts`. Cạnh
 ngược là vòng:
 dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (như `department-tools/`), không import ngược xuống.
@@ -124,15 +129,27 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   `PROPOSAL_ALREADY_OPEN` do partial unique), `GET` (IT Admin theo phạm vi phòng, trưởng phòng theo phòng mình; ngoài phạm vi ⟹ trang rỗng),
   `POST …/{id}/acceptance` (thêm vào danh sách ngay, một lần; đã có do IT thêm tay ⟹ lấy dòng đó) và `…/rejection { reason }` (`@RequireRoles('IT_ADMIN')`; đề xuất của phòng
   mình không phụ trách ⟹ 404; chính người đã đề xuất (nay giữ vai IT Admin) không quyết đề xuất của mình ⟹ 403 `OWN_PROPOSAL` (`SoD-4`, `decidedByRefusal`); đã quyết ⟹ 409 `PROPOSAL_NOT_PENDING`; hai người quyết cùng lúc ⟹ `UPDATE … WHERE state = 'PENDING'` chỉ một thắng).
-  `DepartmentSoftwareProposalService` (một transaction mỗi bước: Audit + thông báo), `DepartmentSoftwareNotice` (`DEPARTMENT_SOFTWARE_PROPOSED` tới IT phụ trách, hoặc mọi IT Admin dùng
-  được khi chưa có; `DEPARTMENT_SOFTWARE_PROPOSAL_DECIDED` tới trưởng phòng đã đề xuất, kèm lý do khi từ chối).
-- `seat-baseline/` — xem/đóng baseline ghế (US-02-05 AC-6); `seat-baseline.controller.ts`; `SeatBaselineService`.
-- `stock-summary/` — `GET /stock-summary` (IT Admin, `QĐ-111n`): kho đếm theo kiểu cấp, một dòng cho mỗi gói chứ không cho mỗi bản ghi thuê bao. `stock.kind`
-  `SEATS` (K2: `purchased`, `assigned`, `free`, `revoking`; `purchased` và `free` là null khi một thuê bao chưa có số lượng), `KEYS` (K4: `inStore`, `assigned`, `withdrawn`
-  đếm khóa), `HOLDERS` (K1: số quyền đang giữ). Đếm trên thuê bao cấp được hôm nay (`CatalogApi.getStockPlans`), cùng nghĩa với kho của hàng cấp: ghế qua
-  `SharedPoolCapacityRepo.occupancyOfMany`, khóa qua `LicenseKeyRepo.countsOfSubscriptions`, quyền qua `AssignmentRepo.countHoldingOfSubscriptions` (mỗi loại một câu lệnh
-  cho cả trang). `mine=true` giữ gói có thuê bao mình phụ trách và chỉ đếm các thuê bao đó; không lọc theo phòng (kho không của phòng, `FR-1.12`). `stock-summary.policy.ts` thuần.
-- `provisioning/` — task grant và thu hồi; `revocation.service.ts` (mở thu hồi) với `RevocationTaskFactory`,
+  `DepartmentSoftwareProposalService` (một transaction mỗi bước: Audit + thông báo; chỉ acting IT Admin của phòng mới sửa danh sách
+  hoặc quyết định đề xuất), `DepartmentSoftwareNotice` (`DEPARTMENT_SOFTWARE_PROPOSED` tới acting IT Admins của phòng, không có thì
+  fallback Super Admin; `DEPARTMENT_SOFTWARE_PROPOSAL_DECIDED` tới trưởng phòng đã đề xuất, kèm lý do khi từ chối).
+- `seat-baseline/` — xem/đóng baseline ghế (US-02-05 AC-6); `seat-baseline.controller.ts`; `SeatBaselineService` (gồm
+  `holdInitializationOpen` khóa tầng `0b` `FOR SHARE`).
+- `stock-summary/` — `GET /stock-summary` (IT Admin): kho đếm theo kiểu cấp, một dòng cho mỗi gói (`K2`/`K4`; bỏ dòng `HOLDERS` của `K1`). `stock.kind`
+  `SEATS` (K2: `purchased`, `assigned`, `free`, `revoking`, đọc theo sổ dòng khi đã mở sổ), `KEYS` (K4 `ACCOUNT`: đếm khóa trên các lô `license_lots`), `LICENSES` (K4 `DEVICE_KEY`: `purchased`, `occupied`, `free` theo tổng lượt kích hoạt trên lô). `mine=true` giữ gói có thuê bao/lô mình phụ trách và chỉ đếm các bản ghi đó; không lọc theo phòng (`FR-1.12`). `stock-summary.policy.ts` thuần.
+- `device-activation/` — kích hoạt phần mềm gắn thiết bị (`DEVICE_KEY` và `DEVICE_BUNDLED`, không controller riêng, expose qua
+  `LicensingDeviceActivationApi`): `DeviceActivationService` (mở/mở theo khóa, kiểm trần lượt và cờ `overActivationCap`),
+  `DeviceActivationCloseService` (gỡ, chuyển máy, đóng tất cả khi ngừng dùng/hủy máy), `DeviceActivationQueryService`,
+  `device-activation.repo.ts`. Thứ tự khóa: máy (`2b`, do `devices` giữ) → lô (`6a`) → gói (`7`) → khóa (`7b`) → kích hoạt (`8`).
+- `seat-purchase/` — route mua thêm seat theo dòng (`POST /subscription-lines/{id}/purchases`, `seat-purchases.controller.ts`, `SeatPurchaseRouteService`): kiểm đủ 5 bước (line phục vụ ngày mua `K2` `FIXED` `ACTIVE`, ngày mua trong kỳ & tháng mở, mọi tác vụ cấp thuộc danh sách và nhân viên đã bắt đầu, người gọi là acting IT Admin của phòng từng người thụ hưởng ⟹ ngoài phạm vi trả `403 SEAT_PURCHASE.NOT_IN_CHARGE`, không còn kho trống tại ngày mua `409 SEAT_PURCHASE.STOCK_AVAILABLE`), hỗ trợ nhảy bậc (`TIER_STEP`, cộng `tierStepSeats` vào `minimum_seats`) và đổi loại seat (`replacesFromLineId`, ghi `REDUCE -1` + `TOP_UP +1`), gọi `SeatLedgerApi.buyForItems` / `recordTierStep` dưới khóa kỳ (`6`) → dòng (`6c`), gửi `SUBSCRIPTION_SEATS_BOUGHT` / `SEAT_LEDGER_VENDOR_RECORDED`. Nhắc quá hạn nộp hóa đơn lần mua (`SeatPurchaseInvoiceDueService` trong lượt giờ `SubscriptionRenewalSweepService`) phát `SEAT_PURCHASE_INVOICE_OVERDUE` khi `invoice_due_on < today` và chưa có hóa đơn mở.
+- `license-lot/` — tạo lô license của gói `K4` (`POST /license-lots`, IT Admin): `license-lot-create.service.ts` mở giao dịch khóa tác vụ cấp phát (`3a`) cho `purpose = REQUEST` (kiểm tra trạng thái mở, gói và acting IT Admin của phòng người nhận ⟹ `403 LICENSE_LOT.NOT_IN_CHARGE`, `422 LICENSE_LOT.REQUEST_REQUIRED`) rồi gọi `LicenseLotApi.createLot` của catalog (khóa workspace `5b` → gói `7`, kiểm cổng ≥ 2 admin workspace khi có trang quản trị). Nhập khóa vào lô nằm ở `license-key/` (`license-lot-keys.controller.ts`, `POST /license-lots/{id}/keys`, chỉ IT Admin phụ trách lô; gói `ACCOUNT` không vượt số license, `DEVICE_KEY` không giới hạn; `cost_borne = true` khi `purpose !== 'REQUEST'`). Route cũ `licenseKeyImport` vẫn nhận id lô (id lô = id thuê bao sinh ra nó).
+- `license-key/` — kho key của mua đứt K4 (US-04-12) và kho khóa dùng chung (`QĐ-103d`): `license-keys.controller.ts`; `LicenseKeyService`, `LicenseLotKeyImportService`
+  (nhập kèm `maxActivations`/`initialActivationsUsed`, nâng trần `PATCH /license-keys/{id}` với `expectedUpdatedAt`, rút khỏi kho `licenseKeyWithdraw`), `LicenseKeyAssignmentService` (gán khóa khi hoàn tất cấp K4 `ACCOUNT` trên lô đã khóa `6a → 7 → 7b → 8`, chuyển `cost_borne` từ `false` sang `true` khi cấp cho Request khác và báo kết cục về ngân sách, thu hồi trả về kho / rút). Tầng khóa: `0b` (khi có `initialActivationsUsed > 0`) → `6a` (`license_lots`) → `7` (`plans`) → `7b` (`license_keys`).
+- `provisioning/` — task grant và thu hồi; bỏ hàng việc chung `GENERAL` (`scope=GENERAL` ⟹ 422, `inGeneralQueue` đổi thành
+  `awaitingItAdmin` và `actingItAdmins`), chỉ acting IT Admin của phòng người thụ hưởng (hoặc người được chỉ định cho việc chưa xếp
+  phòng qua `itAdminsActingForUnplacedWork`, ghi `bySubstitute: true` trong Audit và tự đóng chỉ định khi tác vụ đóng) mới thao tác
+  được (403 `PROVISIONING.NOT_IN_CHARGE`); chặn cấp quyền cá nhân cho gói gắn thiết bị (`409 PROVISIONING.PLAN_BOUND_TO_DEVICE`);
+  tự thực hiện không còn bị chặn `ANOTHER_IT_ADMIN_NEEDED` (ghi `selfExecuted: true` và báo Super Admin `IT_ADMIN_SELF_EXECUTED`).
+  `revocation.service.ts` (mở thu hồi) với `RevocationTaskFactory`,
   `RevocationRecorder`, `revocation-open.policy.ts`; `provisioning.policy.ts`. Con: `tasks/`
   (`provisioning-tasks.controller.ts`; grant: `ProvisioningGrantService` → `ProvisioningGrantPlanner` (xét trước khóa) +
   `ProvisioningGrantWriter` (ghi trong transaction; Request xin lại trong ân hạn điều chuyển có `replacesAssignmentId` ⟹ `AssignmentService.endReplacedByGrant` kết thúc quyền cũ cùng thuê bao
@@ -148,8 +165,13 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   Cửa sổ Request tiếp tục (BR-MF1-08a): `expiry-renewal-window.job.ts` mỗi giờ ghi `assignment_renewal_windows` (số ngày lúc mở, bất biến)
   và báo người giữ + trưởng phòng một lần (`RENEWAL_WINDOW_OPENED`). Tác vụ `EXTEND` (`provisioning/tasks/provisioning-extension.service.ts`,
   mở qua `LicensingRenewalApi.openExtension`) hoàn tất ⟹ `GrantRequestGate.reportExtended`.
-- `license-key/` — kho key của mua đứt K4 (US-04-12) và kho khóa dùng chung (`QĐ-103d`); `license-keys.controller.ts`; `LicenseKeyService`
-  (nhập, liệt kê, xem đầy đủ, rút khỏi kho `licenseKeyWithdraw`), `LicenseKeyAssignmentService` (gán khóa khi hoàn tất cấp K4, lấy lại khi thu hồi).
+- `license-lot/` — tạo lô license của gói `K4` (`POST /license-lots`, IT Admin, W3-24): `license-lot-create.service.ts` gọi `LicenseLotApi.createLot` của catalog; lô cho Request (`purpose REQUEST`) đối chiếu task cấp phát còn mở của gói đó (`ProvisioningTaskRepo.findGrantOf`) và người gọi phải là IT Admin phụ trách phòng của người nhận (`ProvisioningTaskFrame.requireActingItAdmin`) — `LICENSE_LOT.NOT_IN_CHARGE`, `LICENSE_LOT.REQUEST_REQUIRED`. Nhập khóa vào lô nằm ở `license-key/` (`license-lot-keys.controller.ts`, `POST /license-lots/{id}/keys`, chỉ IT Admin phụ trách lô; K-A6: gói gắn tài khoản không quá số license, khóa gắn máy không giới hạn; `cost_borne` = đúng khi lô không mua cho Request). Route cũ `licenseKeyImport` vẫn nhận id lô (id lô = id thuê bao sinh ra nó).
+- `license-key/` — kho key của mua đứt K4 (US-04-12) và kho khóa dùng chung (`QĐ-103d`): `license-keys.controller.ts`; `LicenseKeyService`
+  (nhập kèm `maxActivations`/`initialActivationsUsed` áp cho cả lần nhập, `license-key-import-settings.service.ts`; nâng trần
+  `PATCH /license-keys/{id}` với `expectedUpdatedAt` (`licenseKeyUpdate`); liệt kê trả thêm `maxActivations`, `activationsUsed`,
+  `openActivations`, `capReached`, `updatedAt` và `summary.keyBinding/occupied/free`, không lộ `initial_activations_used`; xem đầy
+  đủ; rút khỏi kho `licenseKeyWithdraw`), `LicenseKeyAssignmentService` (gán khóa khi hoàn tất cấp K4 `ACCOUNT`, lấy lại khi thu
+  hồi). Tầng khóa: `0b` (khi có `initialActivationsUsed > 0`) → `6` (`subscriptions`) → `7b` (`license_keys`).
 - `my-software/` — "Phần mềm của tôi" (US-12-15 AC-2, US-16-01 AC-1): `my-software.controller.ts`
   (`GET /me/software-rights`, mọi tài khoản đã đăng nhập (`QĐ-95d`), chỉ quyền cá nhân của chính người gọi), `MySoftwareService`, `MySoftwareRepo`;
   trạng thái theo ngày nghiệp vụ ở `my-software.policy.ts`. Không đọc khóa K4, giá, Cost Center hay định danh tài khoản.
@@ -158,61 +180,37 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   (qua `AssignmentDepartmentRepo`), task cấp/thu hồi và báo lỗi IT Admin phụ trách, key trong kho. `DashboardFactsService`,
   `DashboardFactsRepo`; chỉ trả số, không dòng, giá, key hay định danh.
 - `saas-issue/` — báo lỗi quyền SaaS (BM-11, US-07-10, US-07-11); `saas-issues.controller.ts`; `SaasIssueService`,
-  `SaasIssueHandlingService`; `saas-issue.job.ts` → `saas-issue-sweep.service.ts`. `saas-issue-notifier.service.ts` ghi thông báo
-  trong transaction của thay đổi (đúng một lần cho mỗi thay đổi): `SAAS_ISSUE_SUBMITTED` cho IT Admin được giao khi gửi phiếu (không báo
-  nếu chính họ gửi); `SAAS_ISSUE_RESPONSE_OVERDUE` cho IT Admin được giao, một lần, khi lượt quét thấy quá hạn phản hồi đầu tiên;
-  `SAAS_ISSUE_STATE_CHANGED` cho bên còn lại — người báo khi IT Admin đổi trạng thái, IT Admin được giao khi người báo trả lời hoặc mở
-  lại, người báo khi lượt quét tự đóng phiếu hết hạn mở lại (`REOPEN_WINDOW_LAPSED`) — không báo người tự làm. Tham số chỉ gồm id, mã phiếu
-  và từ trạng thái; không có nội dung người báo hay IT Admin viết, trưởng phòng không được báo.
-- `subscription-renewal/` — điều chỉnh/gia hạn thuê bao kho `K2` theo kỳ (EP-11, `SBF-20`): `subscription-renewals.controller.ts`
-  (`/subscription-renewals*`, `/subscription-deadline-events`); nhóm `record/` (IT Admin ghi kết quả **một lần** tại điểm điều chỉnh: ca,
-  quyết định `IT_ADMIN_IN_CHARGE` và kết quả trong một transaction; ghi audit `substitute` và báo Finance ở `renewal-record-trail.service.ts`),
-  `seats-needed/` (số seat cần của kỳ sau, `QĐ-103e`), `outcome/` (lõi ghi kết quả: kỳ mới nối chuỗi qua `SubscriptionPeriodApi`, chuyển ghế
-  `RENEWAL_CARRY`, tiết kiệm `QĐ-66w`; route `/{id}/outcome` chỉ còn cho ca `DECIDED` cũ), `alerts/` (điểm điều chỉnh, cảnh báo đỏ gói năm, gói tháng giữ nguyên, chất lượng dữ liệu — `renewal-adjustment-alerts.policy.ts`), `deadline/`
-  (sự cố tự gia hạn/đánh dấu hết hạn theo ngày gia hạn `end`); không còn bước trưởng phòng xác nhận (route `decision` đã gỡ). Đọc theo vai ở
-  `subscription-renewal-view.service.ts` + `readScopeOf` (IT Admin, Finance đọc mọi ca; thuê bao không có phòng sở hữu, `QĐ-113g`; trưởng phòng không đọc); `subscription-renewal.job.ts` chạy mỗi giờ qua `SubscriptionRenewalSweepService`; `subscription-renewal-ranking.policy.ts`
-  còn cho route `seat-ranking` (deprecated). Ghi kết quả không tạo khoản cam kết ngân sách (`QĐ-62s`). Cột JSON
-  `subscription_renewals.decision_snapshot` đi qua codec `subscription-renewal-decision-snapshot.json.ts` (spec cạnh file).
+  `SaasIssueHandlingService` (chỉ acting IT Admin của phòng người báo mới chuyển trạng thái/đánh dấu trùng, ngoài ⟹ 403
+  `SAAS_ISSUE.NOT_IN_CHARGE`; khi gửi phiếu cho phòng chưa có acting IT Admin, bỏ fallback IT đầu tiên và bỏ 409 `NO_IT_ADMIN` —
+  tạo phiếu `NEW` với `assignedItAdmin = null` và gửi `SAAS_ISSUE_AWAITING_ASSIGNEE` tới Super Admin); `saas-issue.job.ts` →
+  `saas-issue-sweep.service.ts`. `saas-issue-notifier.service.ts` ghi thông báo trong transaction của thay đổi (đúng một lần cho mỗi
+  thay đổi): `SAAS_ISSUE_SUBMITTED` cho IT Admin được giao khi gửi phiếu (không báo nếu chính họ gửi), `SAAS_ISSUE_AWAITING_ASSIGNEE`
+  cho Super Admin khi chưa có acting IT Admin; `SAAS_ISSUE_RESPONSE_OVERDUE` cho IT Admin được giao, một lần, khi lượt quét thấy quá
+  hạn phản hồi đầu tiên; `SAAS_ISSUE_STATE_CHANGED` cho bên còn lại — người báo khi IT Admin đổi trạng thái, IT Admin được giao khi
+  người báo trả lời hoặc mở lại, người báo khi lượt quét tự đóng phiếu hết hạn mở lại (`REOPEN_WINDOW_LAPSED`) — không báo người tự
+  làm. Tham số chỉ gồm id, mã phiếu và từ trạng thái; không có nội dung người báo hay IT Admin viết, trưởng phòng không được báo.
+- Quyền cá nhân của gói `K1`: không còn thuê bao `K1` mới (`subscription_id = null`); quyền `K1` mang `license_assignments.personal_commitment_months` (`1` hoặc `12`) và `billing_anchor_on` (bất biến qua trigger `license_assignments_k1_terms`). Gói `K1` cam kết năm cố định 12 tháng (cấp mới, tiếp tục, kiểm tra hợp đồng ngắn); khi thu hồi thường/điều chuyển, phần đã trả tới `paidThroughOn` không giải phóng (còn điều chuyển tách phần tháng cuốn còn lại sang phòng mới qua `budgets`). Thuê bao `K1` cũ đã đóng (`subscriptions.closed_at`, `closed_reason = K1_WITHOUT_SUBSCRIPTION`); quyền cũ giữ `subscription_id`. `assignment-record.mapper.ts` giữ cột đọc và ánh xạ của `AssignmentRepo`.
+- `subscription-renewal/` — điều chỉnh/gia hạn thuê bao kho `K2` theo kỳ và theo dòng (`EP-11`, `SBF-20`):
+  - `lines/` (`SubscriptionRenewalLinesService`, `SubscriptionRenewalLinesFactsService`, `SubscriptionRenewalAutoService`, `subscription-line-target.repo.ts` ghi `subscription_line_targets`, `subscription-renewal-auto.repo.ts` ghi `auto_recorded`, `minimum_total_*`): tính `need`/`target`/`shortfall` từng dòng (gồm `R-LATE` sau hạn chót của gói cam kết 12 tháng: không giảm dưới `seatsAtDeadline`), khóa mục tiêu lúc qua hạn chót (`lockedBy: 'SYSTEM'`), tự ghi gia hạn `UNCONFIRMED` + `AUTO_RENEWAL_INCIDENT` nếu `autoRenew = true` hoặc đóng dòng `ENDED` nếu `autoRenew = false`, mở kỳ mới với `lines[]` (`renewedFromLineId`) và đóng dòng kỳ cũ `RENEWED` tại `startDate - 1`.
+  - `kpi/` (`KpiMissedAdjustmentService`, `SubscriptionRenewalKpiService`, `kpi-missed-adjustment.policy.ts`): tính `KPI-4` cộng dần theo sổ ngày (`K2` `FIXED`; `MEMBERS` luôn `0`) từ mục tiêu đã chốt của kỳ trước; `KPI-3` tính mẫu số từ tổng sổ cuối kỳ (`kpi3DenominatorOfLines`).
+  - `savings/` (`RenewalSavingsService`, `renewal-savings.policy.ts`, `renewal-savings.repo.ts`): `RenewalOutcomeService` để `realisedSavings: null` lúc IT Admin ghi kết quả gia hạn; `LicensingApi.recordRealisedSaving` chỉ ghi một lần khi Finance xác nhận hóa đơn đầu tiên của kỳ mới (hoặc đóng case `SBF-11a` từ hóa đơn đó); tự gia hạn không ghi.
+  - `alerts/` (`WorkspaceAdminAlertService`, `RenewalAlertsService`): trong lượt giờ `SubscriptionRenewalSweepService`, phát `WORKSPACE_ADMIN_NOT_WORKING` một lần mỗi `(workspace, admin)`, kiểm tra quá hạn hóa đơn lần mua (`SeatPurchaseInvoiceDueService`), gửi cảnh báo điểm điều chỉnh / cảnh báo đỏ / chất lượng dữ liệu.
+  - `subscription-renewals.controller.ts` nhận `lines[]` trên `subscriptionRenewalPropose` (bắt buộc cho kỳ nhiều dòng: `422 SUBSCRIPTION_RENEWAL.LINES_REQUIRED`) và trả `nextPeriod.lines[]` ở kết quả; chỉ IT Admin phụ trách thuê bao còn dùng được mới ghi kết quả (`403 SUBSCRIPTION_RENEWAL.NOT_RESPONSIBLE`). `subscription-renewal.job.ts` chạy mỗi giờ qua `SubscriptionRenewalSweepService`. Cột JSON `subscription_renewals.decision_snapshot` đi qua codec `subscription-renewal-decision-snapshot.json.ts`.
 - Gốc module (dùng chung nhiều capability): `licensing-audit-event.mapper.ts`, `licensing.http-errors.ts`;
   `licensing-alerts.policy.ts` + `licensing-alerts.service.ts` (`LicensingAlerts`) — cảnh báo license `FR-5.14` vào hộp thông báo
   (dòng 3 T−7 ở `expiry/`, dòng 12 bàn giao đã bỏ theo `QĐ-110g`, dòng 13 tài khoản dịch vụ đã bỏ theo `QĐ-110m`, dòng 38 `K1` của
   người nghỉ ở `provisioning/revocation-completion/`; hạng mục `a03-license-inbox-alerts`).
 
-## Kho dùng chung (`shared-pool/`, L0)
+## Kho dùng chung và cấp phát (`shared-pool/`, L0)
 
-- Capability không controller, không import capability licensing nào (đọc bảng bằng SQL), chỉ `CatalogApi`; `provisioning` và `public/LicensingPoolStockApi` dùng nó.
-  Seat của mọi thuê bao K2/K4 cùng plan là một kho cho mọi phòng (`QĐ-103d`): cấp không kiểm phòng sở hữu, Assignment cá nhân ghi `owning_department_id` =
-  phòng người nhận lúc cấp (tài khoản dịch vụ giữ phòng của tài khoản). `stockOf`: `free` = Σ (`purchased_quantity` − đỉnh số Assignment trên mỗi ngày từ hôm nay
-  trở đi, đếm như trigger `license_assignments_seat_capacity`: Assignment `valid_from` tương lai, kể cả seat mang sang kỳ ghi trước ngày bắt đầu, chiếm chỗ
-  từ ngày đầu của nó) trên thuê bao cấp được (không gồm `DRAFT`; kỳ đang chạy và kỳ kế tiếp chưa bắt đầu/còn nháp là một kho); `inRevocation` =
-  Assignment chưa kết thúc có tác vụ thu hồi chưa đóng.
-- `provisioningTaskGrant`: `subscriptionId` tùy chọn (không có ⟹ `chooseSubscription`: thuê bao chính, ưu tiên cái còn chỗ Trống; K5 không được có);
-  có mà không thuộc `getGrantableSubscriptions` của gói hôm nay (kỳ đã hết, hoặc kỳ kế tiếp đã chạy) ⟹ 422 `PROVISIONING.SUBSCRIPTION_NOT_GRANTABLE`.
-  Seat vừa cấp trên thuê bao có kỳ kế tiếp `ACTIVE` ghi trước ngày bắt đầu được mang sang kỳ đó ngay trong transaction của lệnh cấp (`RENEWAL_CARRY`, luật `seatsToCarry` và
-  SQL `AssignmentCarryRepo.carry` của `assignment/renewal/`, cùng đường với `outcome/` lúc ghi gia hạn; seat hết hạn trước ngày đó thì không mang); kỳ kế tiếp là kho (không phòng sở hữu) mà không đủ ghế ⟹ `CatalogApi.addPoolSeat` mua thêm 1 seat cho kỳ đó rồi mang lại (S20-T4c, báo IT phụ trách như seat mua theo lệnh cấp); kỳ kế tiếp
-  do một phòng sở hữu mà không đủ ghế ⟹ 422 `PROVISIONING.SUBSCRIPTION_NEXT_PERIOD_SEATS`, không ghi gì (sửa số ghế kỳ kế tiếp trước); lệnh cấp thất bại hoặc bị hủy thu lại cả bản ghi sang kỳ sau (`takeBackCarry`).
-  `purchase?: { reason? }` chỉ K2/K4 (K khác ⟹ 422 `PURCHASE_NOT_APPLICABLE`): còn Trống ⟹ 409 `PURCHASE_NOT_ALLOWED` (audit
-  `PROVISIONING_TASK.PURCHASE_REFUSED` ghi ở transaction riêng sau rollback); hết kho + còn seat đang thu hồi + thiếu lý do ⟹ 422
-  `PURCHASE_REASON_REQUIRED`; ngược lại `CatalogApi.addPoolSeat` (+1 seat/lần) rồi ghi Assignment, task có `purchase_kind` (`POOL_TOP_UP`/`KEY_PURCHASE`).
-  Không `purchase` mà thuê bao hết chỗ ⟹ 409 `LICENSE_ASSIGNMENT.SEAT_CAPACITY` kèm `details.freeSeatsInPool`. K1 không thuộc kho: mỗi lần cấp tự +1 số lượng
-  trong cùng transaction, không cổng phòng sở hữu (S1-04), và tác vụ ghi `purchase_kind = K1_SUBSCRIPTION` (dấu đã mua cho hóa đơn `SBF-19`).
-- _Tránh được_ (`BR-MF1-09c`): hoàn tất tác vụ cấp K2/K4 không mua ⟹ `recordAvoided` một dòng (idempotent theo tác vụ), theo tiền báo cáo (giá đã quy
-  đổi lúc ghi giá; K4 = giá mua của thuê bao `PERPETUAL`); `reportOutcome(..., facts)` báo `fromPool`,
-  `provisioningType`, `grantedOn`, `assignmentId` cho `requests` (audit `GRANT_COMPLETED.after.fromPool`).
-- Kho khóa K4 (`BR-MF1-09`, `QĐ-103d`, `QĐ-103v`, Q-10 B): khóa chỉ có hai trạng thái `IN_STORE`/`ASSIGNED` (gắn đúng một Assignment cùng thuê bao); rút
-  khỏi kho là hành động có lý do (`withdrawn_*`), khóa vẫn `IN_STORE`, không đếm, không cấp, không xem đầy đủ, không hoàn tác (trigger `license_key_guard`).
-  `free` của gói K4 = min(seat Trống, khóa Trống chưa rút − tác vụ cấp K4 đang mở chưa gắn khóa) mỗi thuê bao. Hoàn tất cấp K4 bắt buộc `licenseKeyId`
-  (khóa mua thêm phải nhập trước); thu hồi K4 hoàn tất bằng `KEY_DEACTIVATED`, khóa về kho Trống hoặc về kho và rút ngay (`keyDisposition: WITHDRAW` + lý do).
-  Thứ tự khóa: cấp = task → thuê bao → khóa → Assignment; thu hồi = task → thuê bao → Assignment → khóa; rút = thuê bao → khóa (cùng khóa thuê bao trước
-  nên không vòng). `requests` giải phóng toàn bộ cam kết của Request K4 cấp từ kho (`GRANTED_FROM_POOL`); thu hồi K4 không đổi cam kết (giá một lần).
-  Chưa làm: gắn thiết bị công ty đã đăng ký (`deviceId`, `DeviceRegistryHook`).
+- Capability không controller, không import capability licensing nào (đọc bảng bằng SQL), chỉ gọi `CatalogApi`, `SeatLedgerApi`, `LicenseLotApi`, `LicenseLotStockApi`; `provisioning` và `public/LicensingPoolStockApi` dùng nó.
+- `K2` (thuê bao nhiều dòng, sổ số seat): `chooseLine` chọn dòng còn phục vụ (kể cả dòng `RENEWED` tới `closedOn`), ưu tiên dòng còn chỗ Trống rồi `createdAt, id`. Khi hết kho (`free === 0`) và lệnh cấp có `purchase`: không còn gọi `addPoolSeat`; nếu là quyền `FIXED` thì gọi `SeatLedgerApi.buyForItems` (`TOP_UP +1`, giữ mua cho kỳ sau nếu ngày bắt đầu kỳ sau đã tới `carryOrBuy` và ghi trên dòng kỳ sau). Nếu là `K2 MEMBERS`: cấp phát ghi `MEMBER TOP_UP +1` (bù các dòng `MEMBER REDUCE` tương lai trước khi chèn quyền), thu hồi hoàn tất ghi `MEMBER REDUCE -1` có hiệu lực tại ngày thanh toán kế tiếp (`revocation-aftermath.service.ts`).
+- `K4` (lô khóa): `chooseAccountLot` qua `LicenseLotStockApi` ưu tiên lô `REQUEST` của chính Request, giữ đủ license cho người thụ hưởng đang mở (`409 LICENSE_LOT.RESERVED_FOR_REQUEST` khi hết license dư), ném `409 LICENSE_ASSIGNMENT.SEAT_CAPACITY` nếu hết kho. Hoàn tất cấp `K4 ACCOUNT` bắt buộc `licenseKeyId`, khóa `6a → 7 → 7b → 8`, cập nhật `cost_borne` và báo kết cục về `requests`/`budgets`. Thu hồi `K4` hoàn tất trả khóa về kho hoặc rút (`keyDisposition: WITHDRAW`). `K4 DEVICE_KEY`/`DEVICE_BUNDLED` gắn trực tiếp vào máy qua `device-activation/`.
+- `K1` (không thuê bao): `ProvisioningGrantWriter` không đụng `subscriptions`/`SeatLedgerApi`; ghi thẳng quyền cá nhân với `subscriptionId = null`, `personalCommitmentMonths` (`1 | 12`) và `billingAnchorOn`.
+- _Tránh được_ (`BR-MF1-09c`): hoàn tất tác vụ cấp `K2`/`K4` không mua ⟹ `GrantSettlementService` tính số tiết kiệm tránh chi (bỏ qua dòng giá trong `shared-pool.policy.ts`) và gọi `LicensingApi.recordAvoidedCost` (`months = null`, một lần theo tác vụ).
 - `grantQueueList` (module `requests`) đọc `stock { kind, free, inRevocation }` qua `LicensingPoolStockApi.getStockOfPlans` (số lần đọc cố định, không N+1).
-- Thu hồi hoàn tất phát `RevocationTaskFacts.completed` (`grantRequestId` qua chuỗi `predecessor_id` — `assignment-chain.repo.ts`, `grantedStartDate` và `grantedEndDate` là ngày bắt đầu
-  (`valid_from`) và ngày kết thúc (`expected_end_date`) của seat do lệnh cấp của Request làm ra, `provisioningType`, `endedOn`, `paidThroughOn`, `sources`) để module cam kết giải phóng theo ngày
-  (`public/seat-month-cost.policy.ts`: RV-07, M-10). `LicensingApi.listRightChainsOf` (`RightChain`) trả cùng hai ngày cho điều chuyển, và kết quả cấp (`GrantOutcomeFacts`) mang
-  `effectiveFrom` và `expectedEndDate` của seat đã cấp (sau khi cắt một năm): Request có _Thời gian dùng_ không ghi ngày kết thúc, nên ngày cuối nó trả tiền là ngày kết thúc của seat do lệnh cấp làm
-  ra, và các tháng của nó bắt đầu vào các ngày tính từ ngày bắt đầu seat (R-39). Phần ghi vào cam kết thuộc `requests` (`grant/seat-release.*`).
-- Thứ tự khóa của grant: `employee` `FOR SHARE` (ghế cá nhân) → tác vụ thu hồi sống của quyền bị thay (nếu có) → request → thuê bao `FOR UPDATE` → plan `FOR SHARE` → assignment; đếm `free` không khóa thuê bao khác của plan. Khi cấp lại quyền trong ân hạn điều chuyển mà tác vụ thu hồi `QUEUED` chỉ mang lý do `TRANSFER`, `ProvisioningReplacementService` rút lý do để hủy tác vụ trước khi kết thúc quyền cũ; còn lý do khác hoặc tác vụ `IN_PROGRESS`/`FAILED`/`COMPLETED` thì từ chối `422 LICENSE_ASSIGNMENT.OVERLAP` kèm `details.revocationTaskId` và `revocationStatus`.
+- Thu hồi hoàn tất phát `RevocationTaskFacts.completed` (`grantRequestId`, `grantedStartDate`, `grantedEndDate`, `provisioningType`, `personalCommitmentMonths`, `billingAnchorOn`, `endedOn`, `paidThroughOn`, `sources`) để `requests` giải phóng cam kết và tách phân bổ `K1` năm khi điều chuyển. `LicensingApi.listRightChainsOf` trả cùng thông tin chuỗi cho điều chuyển.
+- Thứ tự khóa của grant: `employee` `FOR SHARE` (`1`) → tác vụ cấp (`3a`) / thu hồi sống bị thay (`3b`) → request (`4`) → kỳ thuê bao (`6`) + dòng (`6c`) cho `K2` hoặc lô (`6a`) cho `K4` → plan `FOR SHARE` (`7`) → khóa (`7b`) → assignment (`8`). Khi cấp lại quyền trong ân hạn điều chuyển mà tác vụ thu hồi `QUEUED` chỉ mang lý do `TRANSFER`, `ProvisioningReplacementService` rút lý do để hủy tác vụ trước khi kết thúc quyền cũ; còn lý do khác hoặc tác vụ `IN_PROGRESS`/`FAILED`/`COMPLETED` thì từ chối `422 LICENSE_ASSIGNMENT.OVERLAP`.
 
 ## Bất biến quan trọng
 
@@ -259,3 +257,15 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
 ## Test
 
 - Unit: `src/modules/licensing/**/*.spec.ts`; HTTP: `test/http/licensing/`; integration: `test/integration/licensing/`.
+
+## Từ vựng
+
+| Từ (UI/tài liệu)    | Tên ở code/wire                   | Nghĩa duy nhất                                                                |
+| ------------------- | --------------------------------- | ----------------------------------------------------------------------------- |
+| Gói                 | `Plan`, `plan`                    | Bậc và loại seat của một ứng dụng.                                            |
+| Thuê bao            | `Subscription`                    | Cam kết có kỳ của một workspace; mỗi kỳ là một bản ghi.                       |
+| Kho                 | (không có bảng)                   | Seat hoặc license **Trống** cấp được ngay.                                    |
+| Lô khóa             | `LicenseLot`, `licenseLot`        | Khoản mua đứt `K4`; không gọi là thuê bao.                                    |
+| Gói tháng / gói năm | `commitmentTermMonths` `1` / `12` | Kỳ cam kết (không phải chu kỳ trả).                                           |
+| Giá tháng           | `monthlyUnitPrice`                | VND chưa thuế, một seat một tháng (`K1`/`K2`); với `K4` là _giá một license_. |
+| Người phụ trách     | `responsibleItAdmin`              | IT Admin trả lời cho thuê bao/workspace/lô; chỉ Super Admin đổi.              |

@@ -1,4 +1,9 @@
-import { LicenseKeyStateError } from './license-key.errors';
+import {
+  LicenseKeyInitialActivationsExceedMaxError,
+  LicenseKeyInitialActivationsOnAccountPlanError,
+  LicenseKeyMaxActivationsNotRaisedError,
+  LicenseKeyStateError,
+} from './license-key.errors';
 
 /** The most keys one batch holds; the DTO bounds the request with it. */
 export const MAX_KEYS_PER_BATCH = 1000;
@@ -49,21 +54,88 @@ export function maskKey(key: string): string {
   return `••••${key.slice(-4)}`;
 }
 
+/** How the plan of a purchase is bound once bought; null for a plan that has none (a purchase of such a plan is read as bound to an account). */
+export type KeyBinding = 'ACCOUNT' | 'DEVICE_KEY' | 'DEVICE_BUNDLED' | null;
+
 /**
- * How many licenses a purchase can give out (`US-04-12` AC-1, AC-12, `INV-01`): the smaller of the seats bought and the
- * keys that can still be used, and nothing while the seats bought are not known.
+ * How many licenses a purchase can give out (`US-04-12` AC-1, AC-12, `INV-01`): for a key that goes on a machine, the licenses bought (one key
+ * can be on many machines, so the keys are not counted); otherwise the smaller of the seats bought and the keys that can still be used. Nothing
+ * while the seats bought are not known.
  */
-export function capacityOf(input: { purchased: number | null; usableKeys: number }): number {
-  return input.purchased === null ? 0 : Math.min(input.purchased, input.usableKeys);
+export function capacityOf(input: { purchased: number | null; usableKeys: number; keyBinding?: KeyBinding }): number {
+  if (input.purchased === null) return 0;
+
+  return input.keyBinding === 'DEVICE_KEY' ? input.purchased : Math.min(input.purchased, input.usableKeys);
+}
+
+/** What is taken of the capacity: the licenses held on machines for a key on a machine, the keys given to a seat otherwise. */
+export function occupiedOf(input: { keyBinding?: KeyBinding; assignedKeys: number; deviceOccupied: number }): number {
+  return input.keyBinding === 'DEVICE_KEY' ? input.deviceOccupied : input.assignedKeys;
+}
+
+/** What is left of the capacity, never below zero. */
+export function freeOf(capacity: number, occupied: number): number {
+  return Math.max(0, capacity - occupied);
 }
 
 export type CapacityWarning = 'KEY_COUNT_DIFFERS' | 'QUANTITY_UNKNOWN';
 
-/** What the IT Admin is told about the capacity: the keys are not as many as the seats bought, or the seats are unknown. */
-export function warningOf(input: { purchased: number | null; usableKeys: number }): CapacityWarning | null {
+/**
+ * What the IT Admin is told about the capacity: the keys are not as many as the seats bought, or the seats are unknown. A key that goes on
+ * a machine is not counted against the licenses, so only the unknown licenses are told.
+ */
+export function warningOf(input: {
+  purchased: number | null;
+  usableKeys: number;
+  keyBinding?: KeyBinding;
+}): CapacityWarning | null {
   if (input.purchased === null) return 'QUANTITY_UNKNOWN';
+  if (input.keyBinding === 'DEVICE_KEY') return null;
 
   return input.usableKeys === input.purchased ? null : 'KEY_COUNT_DIFFERS';
+}
+
+/** The most activations a key may be given (CHECK `license_keys_max_activations_range`). */
+export const MAX_ACTIVATIONS_LIMIT = 100000;
+
+/**
+ * The cap of activations of a key at import: the one the IT Admin names, else the install limit of the terms of its plan, else one. Never above
+ * what the column holds, so an install limit larger than that is cut to it.
+ */
+export function resolveMaxActivations(given: number | undefined, installLimit: number | null): number {
+  return Math.min(given ?? installLimit ?? 1, MAX_ACTIVATIONS_LIMIT);
+}
+
+/** The activations a key has used: those it had when it was entered and every operation on it since, closed or not. Never goes down. */
+export function activationsUsedOf(initialActivationsUsed: number, operationActivations: number): number {
+  return initialActivationsUsed + operationActivations;
+}
+
+/** Whether a key has used all the activations it allows. */
+export function capReachedOf(activationsUsed: number, maxActivations: number): boolean {
+  return activationsUsed >= maxActivations;
+}
+
+/**
+ * What a batch may tell about the activations its keys already had (W2-Q5, the decision on R-7): none is always fine; some need a plan whose keys
+ * go to machines (an account plan has no machine to count them) and not more than the cap of the batch.
+ * Throws LicenseKeyInitialActivationsOnAccountPlanError and LicenseKeyInitialActivationsExceedMaxError.
+ */
+export function assertInitialActivationsAllowed(input: {
+  initial: number;
+  maxActivations: number;
+  keyBinding: KeyBinding;
+}): void {
+  if (input.initial === 0) return;
+  if (input.keyBinding === 'ACCOUNT') throw new LicenseKeyInitialActivationsOnAccountPlanError();
+  if (input.initial > input.maxActivations) {
+    throw new LicenseKeyInitialActivationsExceedMaxError(input.initial, input.maxActivations);
+  }
+}
+
+/** The cap of a key only goes up. Throws LicenseKeyMaxActivationsNotRaisedError. */
+export function assertMaxActivationsRaised(current: number, next: number): void {
+  if (next <= current) throw new LicenseKeyMaxActivationsNotRaisedError(current);
 }
 
 /** The longest reason a withdrawal keeps (CHECK `license_keys_withdrawal_reason`); the DTO bounds the request with it. */
@@ -72,17 +144,29 @@ export const WITHDRAWAL_REASON_MAX_LENGTH = 500;
 /** What the rules of the pool read of a key. */
 export interface KeyState {
   subscriptionId: string;
+  licenseLotId?: string | null;
   status: 'IN_STORE' | 'ASSIGNED';
   withdrawnAt: Date | null;
 }
 
 /**
- * Whether a key may be given to the seat of a grant (`BR-MF1-09`, `QĐ-103d`): a free key of the store, not withdrawn, of the purchase the
- * seat sits on. Throws LicenseKeyStateError.
+ * Whether a key may be given to the seat of a grant (`BR-MF1-09`, `QĐ-103d`): a free key of the store, not withdrawn,
+ * belonging to the chosen lot (when `expectedLotId` is provided) or matching `seatSubscriptionId`. Throws LicenseKeyStateError.
  */
-export function assertAssignable(key: KeyState, seatSubscriptionId: string | null): void {
+export function assertAssignable(
+  key: KeyState,
+  seatSubscriptionId: string | null,
+  expectedLotId?: string | null,
+): void {
   if (key.withdrawnAt !== null) throw new LicenseKeyStateError('WITHDRAWN');
   if (key.status !== 'IN_STORE') throw new LicenseKeyStateError('NOT_IN_STORE');
+  if (expectedLotId !== undefined && expectedLotId !== null) {
+    if ((key.licenseLotId ?? key.subscriptionId) !== expectedLotId) {
+      throw new LicenseKeyStateError('SUBSCRIPTION_MISMATCH');
+    }
+
+    return;
+  }
   if (key.subscriptionId !== seatSubscriptionId) throw new LicenseKeyStateError('SUBSCRIPTION_MISMATCH');
 }
 
@@ -90,4 +174,41 @@ export function assertAssignable(key: KeyState, seatSubscriptionId: string | nul
 export function assertWithdrawable(key: KeyState): void {
   if (key.withdrawnAt !== null) throw new LicenseKeyStateError('ALREADY_WITHDRAWN');
   if (key.status === 'ASSIGNED') throw new LicenseKeyStateError('ASSIGNED');
+}
+
+/** What the keys of a purchase give: the capacity by how the plan is bound, what is taken of it and what is left. */
+export interface VaultSummary {
+  purchased: number | null;
+  usableKeys: number;
+  capacity: number;
+  warning: CapacityWarning | null;
+  /** How the plan of the purchase is bound; null for a plan that has no binding (read as bound to an account). */
+  keyBinding: KeyBinding;
+  /** What is taken of the capacity: the licenses held on machines for a key on a machine, the keys given to a seat otherwise. */
+  occupied: number;
+  /** What is left of the capacity. */
+  free: number;
+}
+
+/** The summary of a purchase from its figures: how many were bought, the keys usable and assigned, and the licenses held on machines. */
+export function vaultSummaryOf(input: {
+  purchased: number | null;
+  usableKeys: number;
+  keyBinding: KeyBinding;
+  assignedKeys: number;
+  deviceOccupied: number;
+}): VaultSummary {
+  const { purchased, usableKeys, keyBinding } = input;
+  const capacity = capacityOf({ purchased, usableKeys, keyBinding });
+  const occupied = occupiedOf(input);
+
+  return {
+    purchased,
+    usableKeys,
+    capacity,
+    warning: warningOf({ purchased, usableKeys, keyBinding }),
+    keyBinding,
+    occupied,
+    free: freeOf(capacity, occupied),
+  };
 }

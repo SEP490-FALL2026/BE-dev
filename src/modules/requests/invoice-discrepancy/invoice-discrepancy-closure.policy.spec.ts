@@ -21,5 +21,14 @@ describe('what Finance may close a case of an invoice that differs with (RC-1, Q
   it('sends a suspicion on to the review of the accounts at the vendor, and an explanation nowhere', () => {
     expect(isReferred('OUT_OF_PROCESS_SUSPECTED')).toBe(true);
     expect(isReferred('EXPLAINED')).toBe(false);
+    expect(isReferred('EXCHANGE_RATE_LINE_PRICE_UPDATED')).toBe(false);
+  });
+
+  it('allows EXCHANGE_RATE_LINE_PRICE_UPDATED with 0 or positive difference and refuses negative difference (W3-05)', () => {
+    expect(closureRefusal({ outcome: 'EXCHANGE_RATE_LINE_PRICE_UPDATED', differenceMinor: 0n })).toBeNull();
+    expect(closureRefusal({ outcome: 'EXCHANGE_RATE_LINE_PRICE_UPDATED', differenceMinor: 3_500_000n })).toBeNull();
+    expect(closureRefusal({ outcome: 'EXCHANGE_RATE_LINE_PRICE_UPDATED', differenceMinor: -1n })).toBe(
+      'DIFFERENCE_INVALID',
+    );
   });
 });

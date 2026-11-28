@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { BusinessDate } from '../../../core/business-date';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { CostCenterCatalogueService } from '../cost-center/cost-center-catalogue.service';
+import { actingItAdmins, type ActingItAdminsResult } from '../department-it-substitute/department-it-substitute.policy';
 import { DepartmentRecordService } from '../department/department-record.service';
 import { OrganizationChangeService } from '../change-announcement/organization-change.service';
 import { DepartmentHeadRecord } from '../department/department.types';
@@ -9,7 +10,11 @@ import { EmployeeRecordService } from '../employee/employee-record.service';
 import { toBrief } from '../organization-brief.mapper';
 import { OrganizationContextService } from '../organization-context.service';
 import { OrganizationRepo } from '../organization.repo';
+import { resolveUnplacedWorkDesignee } from '../unplaced-work-designation/unplaced-work-designation.policy';
+import { UnplacedWorkDesignationRepo } from '../unplaced-work-designation/unplaced-work-designation.repo';
+import { EmployeeNotStartedError } from './organization.errors';
 import {
+  ActiveUnplacedWorkDesignation,
   CostCenterBrief,
   CostedOwningUnit,
   DepartmentBrief,
@@ -21,13 +26,17 @@ import {
   EmployeeImportLookupData,
   EmployeeProfile,
   EmployeeRecord,
+  EmployeeStatus,
   ItAdminInCharge,
   OnboardingFacts,
   OwningUnit,
   OrganizationRecord,
   ProfileNotice,
   ProfileNoticeRequest,
+  UnplacedWorkKind,
+  UnplacedWorkRef,
   UsableItAdmins,
+  unplacedWorkKey,
 } from './organization.types';
 
 /**
@@ -44,10 +53,28 @@ export class OrganizationReadApi {
     private readonly costCenters: CostCenterCatalogueService,
     private readonly changes: OrganizationChangeService,
     private readonly context: OrganizationContextService,
+    private readonly unplacedWorkDesignations: UnplacedWorkDesignationRepo,
   ) {}
 
   unplacedAmong(employeeIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
     return this.employees.unplacedAmong(employeeIds, tx);
+  }
+
+  /**
+   * Subset of `employeeIds` who only have future placement(s) (`valid_from > onDate`) and zero placements on or
+   * before `onDate` (default today in the organization's calendar).
+   */
+  async notStartedAmong(employeeIds: readonly string[], onDate?: BusinessDate, tx?: DbTx): Promise<Set<string>> {
+    if (employeeIds.length === 0) return new Set();
+
+    return this.employees.notStartedAmong(employeeIds, onDate ?? (await this.businessToday(new Date(), tx)), tx);
+  }
+
+  /** Throws `EmployeeNotStartedError` when any of `employeeIds` only has future placement(s) after `onDate`. */
+  async assertStartedInDepartment(employeeIds: readonly string[], onDate?: BusinessDate, tx?: DbTx): Promise<void> {
+    const notStarted = await this.notStartedAmong(employeeIds, onDate, tx);
+    const firstId = employeeIds.find((id) => notStarted.has(id));
+    if (firstId !== undefined) throw new EmployeeNotStartedError(firstId);
   }
 
   async getScheduledFirstPlacement(
@@ -185,9 +212,155 @@ export class OrganizationReadApi {
     return this.departments.idsInChargeOf(employeeId, tx);
   }
 
-  /** What an IT Admin reads and handles: the departments that name them and, while nobody usable is named, every active one. */
+  /** What an IT Admin reads: the departments that name them, active substitute assignments, and the common queue. */
   getItAdminScope(employeeId: string, usableAmong: UsableItAdmins, tx?: DbTx): Promise<string[]> {
     return this.departments.itAdminScopeOf(employeeId, usableAmong, tx);
+  }
+
+  /** What an IT Admin may act on: active departments where they are usable in-charge or usable substitute (no common queue). */
+  getItAdminActingScope(employeeId: string, usableAmong: UsableItAdmins, tx?: DbTx): Promise<string[]> {
+    return this.departments.itAdminActingScopeOf(employeeId, usableAmong, tx);
+  }
+
+  /** Resolves acting IT Admins (usable in-charge and usable appointed substitute) for a batch of departments. */
+  async itAdminsActingFor(
+    departmentIds: readonly string[],
+    usableAmong: UsableItAdmins,
+    tx?: DbTx,
+  ): Promise<Map<string, ActingItAdminsResult>> {
+    if (departmentIds.length === 0) return new Map();
+    const uniqueIds = [...new Set(departmentIds)];
+    const records = await this.departments.findMany(uniqueIds, tx);
+    if (records.length === 0) return new Map();
+    const substitutes = await this.departments.activeItSubstitutesFor(uniqueIds, tx);
+    const subByDept = new Map(substitutes.map((sub) => [sub.departmentId, sub]));
+    const candidateIds = [
+      ...new Set([
+        ...records.flatMap((record) => (record.itAdmin ? [record.itAdmin.employeeId] : [])),
+        ...substitutes.map((sub) => sub.substituteEmployeeId),
+      ]),
+    ];
+    const usable = candidateIds.length === 0 ? new Set<string>() : await usableAmong(candidateIds);
+
+    return new Map(
+      records.map((record) => {
+        const sub = subByDept.get(record.id);
+        return [
+          record.id,
+          actingItAdmins({
+            inCharge: record.itAdmin?.employeeId ?? null,
+            inChargeUsable:
+              record.itAdmin !== null &&
+              record.itAdmin.employeeStatus === 'ACTIVE' &&
+              usable.has(record.itAdmin.employeeId),
+            substitute: sub?.substituteEmployeeId ?? null,
+            substituteUsable:
+              sub !== undefined && sub.substituteStatus === 'ACTIVE' && usable.has(sub.substituteEmployeeId),
+          }),
+        ];
+      }),
+    );
+  }
+
+  /**
+   * Resolves the acting IT Admin designee for a batch of works belonging to employees without a department.
+   * Keyed by `unplacedWorkKey(workKind, workId)`; returns `null` unless the designation is active, matches the work's
+   * employee, the employee has never been placed in a department, and the designee is active and usable.
+   */
+  async itAdminsActingForUnplacedWork(
+    works: readonly UnplacedWorkRef[],
+    usableAmong: UsableItAdmins,
+    tx?: DbTx,
+  ): Promise<Map<string, string | null>> {
+    if (works.length === 0) return new Map();
+    const rows = await this.unplacedWorkDesignations.findActiveForResolution(works, tx);
+    const activeByKey = new Map(rows.map((row) => [unplacedWorkKey(row.workKind, row.workId), row]));
+    const candidateIds = [
+      ...new Set(
+        works.flatMap((work) => {
+          const row = activeByKey.get(unplacedWorkKey(work.workKind, work.workId));
+          if (
+            !row ||
+            row.employeeId !== work.employeeId ||
+            row.employeeHasAnyPlacement ||
+            row.designeeStatus !== 'ACTIVE'
+          ) {
+            return [];
+          }
+
+          return [row.designeeEmployeeId];
+        }),
+      ),
+    ];
+    const usable = candidateIds.length === 0 ? new Set<string>() : await usableAmong(candidateIds);
+
+    const resolved = new Map<string, string | null>();
+    for (const work of works) {
+      const key = unplacedWorkKey(work.workKind, work.workId);
+      const row = activeByKey.get(key);
+      resolved.set(
+        key,
+        row
+          ? resolveUnplacedWorkDesignee({
+              designationEmployeeId: row.employeeId,
+              workEmployeeId: work.employeeId,
+              employeeHasAnyPlacement: row.employeeHasAnyPlacement,
+              designeeEmployeeId: row.designeeEmployeeId,
+              designeeActive: row.designeeStatus === 'ACTIVE',
+              designeeUsable: usable.has(row.designeeEmployeeId),
+            })
+          : null,
+      );
+    }
+
+    return resolved;
+  }
+
+  /** Distinct work ids of active designations for this designee and work kind whose employee was never placed. */
+  findActiveUnplacedWorkIdsForDesignee(
+    designeeEmployeeId: string,
+    workKind: UnplacedWorkKind,
+    tx?: DbTx,
+  ): Promise<string[]> {
+    return this.unplacedWorkDesignations.findActiveWorkIdsForDesignee(designeeEmployeeId, workKind, tx);
+  }
+
+  /** Active unplaced-work designations whose employee still has zero placements, for coverage sweeps. */
+  listActiveUnplacedWorkDesignations(tx?: DbTx): Promise<ActiveUnplacedWorkDesignation[]> {
+    return this.unplacedWorkDesignations.listActiveForUnplacedEmployees(tx);
+  }
+
+  /** Active non-starting departments with their named IT Admin in charge and employee status, for coverage checks. */
+  async getActiveDepartmentsForItCoverage(tx?: DbTx): Promise<
+    {
+      id: string;
+      code: string;
+      name: string;
+      itAdminEmployeeId: string | null;
+      itAdminStatus: EmployeeStatus | null;
+    }[]
+  > {
+    const active = await this.departments.activeWithItAdmin(tx);
+
+    return active
+      .filter((department) => !department.starting)
+      .map((department) => ({
+        id: department.id,
+        code: department.code,
+        name: department.name,
+        itAdminEmployeeId: department.itAdminEmployeeId,
+        itAdminStatus: department.itAdminStatus,
+      }));
+  }
+
+  /** Work department on `today` for each employee (placement on `today`, falling back to latest placement begun by `today`). */
+  workDepartmentsOf(employeeIds: readonly string[], today: BusinessDate, tx?: DbTx): Promise<Map<string, string>> {
+    return this.employees.workDepartmentsOf(employeeIds, today, tx);
+  }
+
+  /** Employees whose work department on `today` is in `departmentIds` (current placement or latest begun by `today`). */
+  getEmployeeIdsOfWorkDepartments(departmentIds: readonly string[], today: BusinessDate, tx?: DbTx): Promise<string[]> {
+    return this.employees.employeeIdsOfWorkDepartments(departmentIds, today, tx);
   }
 
   /** Everyone placed in the department on `onDate` (default today), by employee id; null when it does not exist. */

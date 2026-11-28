@@ -16,6 +16,9 @@ const production = {
   SMTP_HOST: 'smtp.example.com',
   SMTP_FROM: 'no-reply@licenses.example.com',
   SMTP_TLS: 'true',
+  TRUST_PROXY_HOPS: '1',
+  REDIS_HOST: 'redis.internal',
+  REDIS_PASSWORD: 'test-redis-password',
 };
 const ADMINISTRATION = {
   POSTGRES_PASSWORD: 'cluster-superuser-secret',

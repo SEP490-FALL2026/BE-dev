@@ -152,6 +152,22 @@ export class PlanWorkspaceLimitExceededError extends Error {
   }
 }
 
+/** The vendor of the plan holds several workspaces: the route of the old profile does not know which one to write. */
+export class PlanWorkspaceAmbiguousError extends Error {
+  constructor(readonly workspaceIds: readonly string[]) {
+    super('The vendor of the plan holds several workspaces: record the administrators on the workspace itself.');
+    this.name = 'PlanWorkspaceAmbiguousError';
+  }
+}
+
+/** The application of the plan names no vendor, so there is no workspace to keep its administrators in. */
+export class PlanWorkspaceVendorRequiredError extends Error {
+  constructor() {
+    super('The application of the plan has no vendor: name the vendor of the application first.');
+    this.name = 'PlanWorkspaceVendorRequiredError';
+  }
+}
+
 export class PlanWorkspaceTextInvalidError extends Error {
   constructor() {
     super('A workspace text field is too long.');
@@ -177,9 +193,13 @@ export class PlanTermsBlockTypeChangeError extends Error {
 export type PlanChangeBlock =
   | 'ACTIVE_SUBSCRIPTION_WITHOUT_QUANTITY'
   | 'LICENSE_KEYS'
+  | 'LICENSE_LOTS'
   | 'PERPETUAL_SUBSCRIPTIONS'
   | 'TERM_SUBSCRIPTIONS'
   | 'CONTRACT_LINKS'
+  | 'KEY_BINDING_PURCHASES'
+  | 'KEY_BINDING_ASSIGNMENTS'
+  | 'DEVICE_ACTIVATIONS'
   | 'SUBSCRIPTIONS';
 
 export class PlanInUseBlocksChangeError extends Error {
@@ -210,5 +230,21 @@ export class PlanReferencePriceNotPositiveError extends Error {
   constructor() {
     super('The reference price of a plan must be above zero.');
     this.name = 'PlanReferencePriceNotPositiveError';
+  }
+}
+
+/** Only a K4 plan has a key binding (`plans_key_binding_k4`): a plan of another kind that names one is refused. */
+export class PlanKeyBindingNotApplicableError extends Error {
+  constructor() {
+    super('Only a K4 plan, bought once, is bound to an account or to a machine.');
+    this.name = 'PlanKeyBindingNotApplicableError';
+  }
+}
+
+/** Only a K1 or K2 plan has a reference commitment term (1 or 12 months). */
+export class PlanReferenceCommitmentNotApplicableError extends Error {
+  constructor() {
+    super('Only a K1 or K2 plan has a reference commitment term.');
+    this.name = 'PlanReferenceCommitmentNotApplicableError';
   }
 }

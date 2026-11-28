@@ -16,6 +16,7 @@ describe('the template of the license key batch', () => {
     const judged = judgeBatch(lines);
 
     expect(lines[0]).toBe(LICENSE_KEY_TEMPLATE.columns[0]?.key);
+    expect(LICENSE_KEY_TEMPLATE.title).toBe('Lô khóa K4');
     expect(judged.errors).toEqual([{ line: 1, code: 'INVALID_FORMAT' }]);
     expect(judged.rows.map((row) => row.key)).toEqual(LICENSE_KEY_TEMPLATE.sampleRows.map((row) => row[0]));
     expect(judged.rows.map((row) => row.key)).not.toContain(lines[0]);

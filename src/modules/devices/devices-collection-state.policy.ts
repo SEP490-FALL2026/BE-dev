@@ -5,6 +5,7 @@
 export const COLLECTION_STATES = [
   'RETIRED',
   'UNREGISTERED',
+  'NO_COLLECTOR',
   'COLLECTION_STOPPED',
   'ACTIVE',
   'AWAITING_ACKNOWLEDGEMENT',
@@ -14,12 +15,17 @@ export type CollectionState = (typeof COLLECTION_STATES)[number];
 export interface CollectionFacts {
   retiredAt: Date | null;
   /** The open registration of the machine, null when nobody holds it. */
-  registration: { acknowledgedFrom: Date | null; collectionStoppedAt: Date | null } | null;
+  registration: {
+    collectorInstalled: boolean;
+    acknowledgedFrom: Date | null;
+    collectionStoppedAt: Date | null;
+  } | null;
 }
 
 export function collectionStateOf(facts: CollectionFacts): CollectionState {
   if (facts.retiredAt !== null) return 'RETIRED';
   if (facts.registration === null) return 'UNREGISTERED';
+  if (!facts.registration.collectorInstalled) return 'NO_COLLECTOR';
   if (facts.registration.collectionStoppedAt !== null) return 'COLLECTION_STOPPED';
   if (facts.registration.acknowledgedFrom !== null) return 'ACTIVE';
 

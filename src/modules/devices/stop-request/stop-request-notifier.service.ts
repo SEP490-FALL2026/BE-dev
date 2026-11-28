@@ -4,6 +4,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { NotificationsApi } from '../../notifications/public/notifications.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { unplacedWorkKey } from '../../organization/public/organization.types';
 import type { StopRequestRecord } from './stop-request.repo';
 
 /** The organization a request belongs to and the time zone its day is read in. */
@@ -37,18 +38,36 @@ export class StopRequestNotifier {
   }
 
   /**
-   * The IT Admin in charge of the department of the holder when they can act, else every IT Admin who can. Never the holder: an IT Admin
-   * asking for their own machine is not told of it, and when they are the one in charge the others who can act are (any of them handles it).
+   * Acting IT Admins of the holder's work department, excluding the holder. When the holder has no work department,
+   * checks the designated IT Admin for the unplaced `DEVICE` work before falling back to the usable Super Admin
+   * (unless they are the holder).
    */
-  private async recipients(tx: DbTx, holderEmployeeId: string): Promise<string[]> {
-    const placement = await this.organizationReads.getItAdminInCharge(holderEmployeeId, undefined, tx);
-    const inCharge = placement?.itAdminEmployeeId ?? null;
-    if (inCharge !== null && inCharge !== holderEmployeeId) {
-      const usable = await this.identity.findUsableItAdminEmployeeIds([inCharge], tx);
-      if (usable.has(inCharge)) return [inCharge];
+  private async recipients(tx: DbTx, deviceId: string, holderEmployeeId: string): Promise<string[]> {
+    const today = await this.organizationReads.businessToday(new Date(), tx);
+    const deptId =
+      (await this.organizationReads.workDepartmentsOf([holderEmployeeId], today, tx)).get(holderEmployeeId) ?? null;
+    if (deptId !== null) {
+      const acting = (
+        await this.organizationReads.itAdminsActingFor(
+          [deptId],
+          (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
+          tx,
+        )
+      ).get(deptId);
+      const actors = (acting?.actors ?? []).filter((id) => id !== holderEmployeeId);
+      if (actors.length > 0) return actors;
+    } else {
+      const resolved = await this.organizationReads.itAdminsActingForUnplacedWork(
+        [{ workKind: 'DEVICE', workId: deviceId, employeeId: holderEmployeeId }],
+        (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
+        tx,
+      );
+      const designee = resolved.get(unplacedWorkKey('DEVICE', deviceId)) ?? null;
+      if (designee !== null && designee !== holderEmployeeId) return [designee];
     }
 
-    return (await this.identity.findAllUsableItAdminEmployeeIds(tx)).filter((id) => id !== holderEmployeeId);
+    const superAdmin = await this.identity.findUsableSuperAdminEmployeeId(tx);
+    return superAdmin !== null && superAdmin !== holderEmployeeId ? [superAdmin] : [];
   }
 
   private async tell(
@@ -66,7 +85,7 @@ export class StopRequestNotifier {
       dueAt: request.dueAt.toISOString(),
       dueOn: businessDateAt(request.dueAt, context.timeZone),
     };
-    for (const recipientEmployeeId of await this.recipients(tx, request.holderEmployeeId)) {
+    for (const recipientEmployeeId of await this.recipients(tx, request.deviceId, request.holderEmployeeId)) {
       await this.notifications.notifyInApp(tx, {
         organizationId: context.organizationId,
         recipientEmployeeId,

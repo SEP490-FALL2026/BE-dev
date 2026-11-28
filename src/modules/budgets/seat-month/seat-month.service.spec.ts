@@ -2,6 +2,7 @@ import type { TransactionRunner } from '../../../infrastructure/database/transac
 import type { LicensingSeatMonthApi } from '../../licensing/public/licensing-seat-month.api';
 import type { SeatOfMonth } from '../../licensing/public/licensing-seat-month.types';
 import type { SeatMonthSubscriptionService } from './seat-month-subscription.service';
+import type { SharedPoolLineRepo } from '../shared-pool-line/shared-pool-line.repo';
 import type { SeatMonthRepo } from './seat-month.repo';
 import { SeatMonthChargeError } from './seat-month.errors';
 import { SeatMonthService } from './seat-month.service';
@@ -25,7 +26,7 @@ const seatOn = (subscriptionId: string): SeatOfMonth => ({
 describe('SeatMonthService.chargeEndedMonths (SM1-03)', () => {
   const subscriptions = ['A', 'B', 'C'];
 
-  function build(options: { failing?: string[] } = {}) {
+  function build(options: { failing?: string[]; withRuns?: string[] } = {}) {
     const done = new Set<string>();
     const failing = new Set(options.failing ?? []);
     const charged: string[] = [];
@@ -37,6 +38,9 @@ describe('SeatMonthService.chargeEndedMonths (SM1-03)', () => {
 
       return Promise.resolve<number | null>(1);
     });
+    const sharedPoolLines = {
+      subscriptionIdsWithRunsForMonth: jest.fn(() => Promise.resolve(options.withRuns ?? subscriptions)),
+    };
     const service = new SeatMonthService(
       { run: (work: (tx: unknown) => Promise<unknown>) => work({}) } as unknown as TransactionRunner,
       {
@@ -46,9 +50,10 @@ describe('SeatMonthService.chargeEndedMonths (SM1-03)', () => {
       } as unknown as SeatMonthRepo,
       { getSeatsOfMonth: () => Promise.resolve(subscriptions.map(seatOn)) } as unknown as LicensingSeatMonthApi,
       { charge } as unknown as SeatMonthSubscriptionService,
+      sharedPoolLines as unknown as SharedPoolLineRepo,
     );
 
-    return { service, charge, charged, failing };
+    return { service, charge, charged, failing, sharedPoolLines };
   }
 
   it('charges the subscriptions after the one that failed, and charges the one that failed in the next pass, each once', async () => {
@@ -102,5 +107,13 @@ describe('SeatMonthService.chargeEndedMonths (SM1-03)', () => {
     await service.chargeMonth('2026-01-01');
 
     expect(charge).toHaveBeenCalledTimes(6);
+  });
+
+  it('W3-07 Ca I / F6(a): isMonthSettlingReady is false until every K2 subscription with seats or rows has seat_month_runs', async () => {
+    const partial = build({ withRuns: ['A', 'C'] });
+    expect(await partial.service.isMonthSettlingReady('org', '2026-01-01')).toBe(false);
+
+    const ready = build({ withRuns: ['A', 'B', 'C'] });
+    expect(await ready.service.isMonthSettlingReady('org', '2026-01-01')).toBe(true);
   });
 });

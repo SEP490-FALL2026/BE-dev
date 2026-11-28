@@ -9,15 +9,30 @@ import { nameLookupKey, nameRefsOf, renderNotificationText } from './inbox-notif
 const UUID = '00000000-0000-0000-0000-000000000000';
 const APP = '11111111-1111-4111-8111-111111111111';
 const PERSON = '22222222-2222-4222-8222-222222222222';
+const DEPT = '33333333-3333-4333-8333-333333333333';
 const names = new Map([
   [nameLookupKey('APPLICATION', APP), 'Figma'],
   [nameLookupKey('EMPLOYEE', PERSON), 'Lan'],
+  [nameLookupKey('DEPARTMENT', DEPT), 'Design'],
 ]);
 const render = (code: string, params: Record<string, unknown>, locale: 'vi' | 'en') =>
   renderNotificationText(code, params, locale, names);
 
 describe('a report of an error in a SaaS right', () => {
   const submitted = { issueId: UUID, issueCode: 'ISS-7', category: 'NO_ACCESS', impact: 'PARTIAL', applicationId: APP };
+
+  it('tells the Super Admin when an issue report awaits an IT Admin assignee, with or without department', () => {
+    expect(render('SAAS_ISSUE_AWAITING_ASSIGNEE', { ...submitted, departmentId: DEPT }, 'vi')).toEqual({
+      title: 'Phiếu báo lỗi chờ người tiếp nhận',
+      message:
+        'Phiếu ISS-7 về ứng dụng Figma (không vào được phần mềm, ảnh hưởng dùng được một phần) thuộc phòng Design chưa có IT Admin nào phụ trách hoặc làm thay để tiếp nhận.',
+    });
+    expect(render('SAAS_ISSUE_AWAITING_ASSIGNEE', { ...submitted, departmentId: null }, 'en')).toEqual({
+      title: 'Issue report awaiting assignee',
+      message:
+        'Issue report ISS-7 for Figma (no access to the software, impact the software works in part) has no IT Admin in charge or substitute to take it.',
+    });
+  });
 
   it('tells the IT Admin of a new report, with its kind and effect in words', () => {
     expect(render('SAAS_ISSUE_SUBMITTED', submitted, 'vi')).toEqual({
@@ -164,5 +179,76 @@ describe('a case outside the process, a vendor account difference and a request 
     expect(nameRefsOf('OUT_OF_PROCESS_CASE_REPORTED', { ...caseParams, applicationId: null }, 'vi')).toEqual([
       { kind: 'EMPLOYEE', id: PERSON },
     ]);
+  });
+});
+
+describe('department IT substitute and coverage missing notices', () => {
+  const SUB = '44444444-4444-4444-8444-444444444444';
+  const REPLACED = '55555555-5555-4555-8555-555555555555';
+  const localNames = new Map([
+    [nameLookupKey('DEPARTMENT', DEPT), 'Design'],
+    [nameLookupKey('EMPLOYEE', SUB), 'Minh'],
+    [nameLookupKey('EMPLOYEE', REPLACED), 'Ha'],
+  ]);
+  const renderLocal = (code: string, params: Record<string, unknown>, locale: 'vi' | 'en') =>
+    renderNotificationText(code, params, locale, localNames);
+
+  it('renders DEPARTMENT_IT_SUBSTITUTE_APPOINTED with and without replacedEmployeeId', () => {
+    const withReplaced = {
+      substituteId: UUID,
+      departmentId: DEPT,
+      substituteEmployeeId: SUB,
+      replacedEmployeeId: REPLACED,
+    };
+    expect(renderLocal('DEPARTMENT_IT_SUBSTITUTE_APPOINTED', withReplaced, 'vi').message).toContain('Minh');
+    expect(renderLocal('DEPARTMENT_IT_SUBSTITUTE_APPOINTED', withReplaced, 'vi').message).toContain('Design');
+    expect(renderLocal('DEPARTMENT_IT_SUBSTITUTE_APPOINTED', withReplaced, 'vi').message).toContain('Ha');
+    expect(renderLocal('DEPARTMENT_IT_SUBSTITUTE_APPOINTED', withReplaced, 'en').message).toContain('Minh');
+    expect(renderLocal('DEPARTMENT_IT_SUBSTITUTE_APPOINTED', withReplaced, 'en').message).toContain('Design');
+    expect(renderLocal('DEPARTMENT_IT_SUBSTITUTE_APPOINTED', withReplaced, 'en').message).toContain('Ha');
+
+    const withoutReplaced = { ...withReplaced, replacedEmployeeId: null };
+    expect(renderLocal('DEPARTMENT_IT_SUBSTITUTE_APPOINTED', withoutReplaced, 'vi').message).not.toContain('Ha');
+    expect(renderLocal('DEPARTMENT_IT_SUBSTITUTE_APPOINTED', withoutReplaced, 'en').message).not.toContain('Ha');
+    expect(nameRefsOf('DEPARTMENT_IT_SUBSTITUTE_APPOINTED', withReplaced, 'vi')).toEqual([
+      { kind: 'EMPLOYEE', id: SUB },
+      { kind: 'DEPARTMENT', id: DEPT },
+      { kind: 'EMPLOYEE', id: REPLACED },
+    ]);
+  });
+
+  it.each([
+    ['REMOVED', 'được gỡ bỏ', 'removed'],
+    ['IN_CHARGE_NAMED', 'đã chỉ định IT Admin phụ trách', 'an IT Admin in charge was named'],
+    ['DEPARTMENT_RETIRED', 'phòng ban ngừng hoạt động', 'the department was retired'],
+  ])('renders DEPARTMENT_IT_SUBSTITUTE_ENDED for endCause %s', (endCause, viLabel, enLabel) => {
+    const params = { substituteId: UUID, departmentId: DEPT, substituteEmployeeId: SUB, endCause };
+    expect(renderLocal('DEPARTMENT_IT_SUBSTITUTE_ENDED', params, 'vi').message).toContain(viLabel);
+    expect(renderLocal('DEPARTMENT_IT_SUBSTITUTE_ENDED', params, 'en').message).toContain(enLabel);
+  });
+
+  it.each([
+    ['NO_IN_CHARGE', null, 'chưa có IT Admin phụ trách', 'no IT Admin in charge is named'],
+    [
+      'IN_CHARGE_NOT_USABLE',
+      REPLACED,
+      'IT Admin phụ trách hiện không thể xử lý công việc',
+      'the IT Admin in charge cannot currently act',
+    ],
+  ])('renders DEPARTMENT_IT_COVERAGE_MISSING for reason %s', (reason, inChargeEmployeeId, viLabel, enLabel) => {
+    const params = { departmentId: DEPT, departmentName: 'Design', inChargeEmployeeId, reason };
+    const vi = renderLocal('DEPARTMENT_IT_COVERAGE_MISSING', params, 'vi');
+    const en = renderLocal('DEPARTMENT_IT_COVERAGE_MISSING', params, 'en');
+    expect(vi.message).toContain('Design');
+    expect(vi.message).toContain(viLabel);
+    expect(en.message).toContain('Design');
+    expect(en.message).toContain(enLabel);
+    if (inChargeEmployeeId) {
+      expect(vi.message).toContain('Ha');
+      expect(en.message).toContain('Ha');
+    } else {
+      expect(vi.message).not.toContain('Ha');
+      expect(en.message).not.toContain('Ha');
+    }
   });
 });

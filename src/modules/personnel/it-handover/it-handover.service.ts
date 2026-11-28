@@ -6,10 +6,9 @@ import { ResponsibilityHandoverRefusedError } from '../../catalog/public/catalog
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import { technicalStepRefusal } from '../personnel-self-action.policy';
 import { PersonnelAccessRefusedError } from '../public/personnel.errors';
 import { ItHandoverRefusedError } from './it-handover.errors';
-import { handoverRefusal, milestoneDay, milestoneReached } from './it-handover.policy';
+import { handoverRefusal, milestoneDay, milestoneReached, remainingResponsibilities } from './it-handover.policy';
 import { ItHandoverRepo } from './it-handover.repo';
 import { ItHandoverSourceRepo } from './it-handover-source.repo';
 import { ItHandoverTellingService } from './it-handover-telling.service';
@@ -22,6 +21,8 @@ export interface ItHandoverResult {
   toEmployeeId: string;
   subscriptions: number;
   applications: number;
+  workspaces: number;
+  licenseLots: number;
   at: Date;
 }
 
@@ -45,14 +46,13 @@ export class ItHandoverService {
     private readonly telling: ItHandoverTellingService,
   ) {}
 
-  /** Throws PersonnelAccessRefusedError for a caller who is not an IT Admin, and ItHandoverRefusedError for everything else (nothing was written). */
+  /** Throws PersonnelAccessRefusedError for a caller who is not a Super Admin, and ItHandoverRefusedError for everything else (nothing was written). */
   async handOver(
     actor: AuthenticatedPrincipal,
     source: HandoverSource,
     toEmployeeId: string,
   ): Promise<ItHandoverResult> {
-    const forbidden = technicalStepRefusal(actor);
-    if (forbidden) throw new PersonnelAccessRefusedError(forbidden);
+    if (!actor.roles.includes('SUPER_ADMIN')) throw new PersonnelAccessRefusedError('FORBIDDEN');
 
     return this.runner.run(async (tx) => {
       const employeeId = await this.sources.employeeOf(source, tx);
@@ -75,22 +75,39 @@ export class ItHandoverService {
         milestoneReached: milestoneReached(day, today),
         actorEmployeeId: actor.employeeId,
         leavingEmployeeId: employeeId,
-        remaining: (left?.subscriptions ?? 0) + (left?.applications ?? 0),
+        remaining: remainingResponsibilities(left),
       });
       if (refusal) throw new ItHandoverRefusedError(refusal);
 
       const moved = await this.move(tx, actor, source, employeeId, toEmployeeId);
       // What was counted a moment ago can have been moved by a write of its own since: nothing moved is nothing to record (the item keeps no empty hand-over).
-      if (moved.subscriptions + moved.applications === 0) throw new ItHandoverRefusedError('NOTHING_TO_HAND_OVER');
+      if (moved.subscriptions + moved.applications + moved.workspaces + moved.licenseLots === 0)
+        throw new ItHandoverRefusedError('NOTHING_TO_HAND_OVER');
       const at = new Date();
       await this.items.recordDone(tx, {
         organizationId: facts.organizationId,
         source,
-        done: { at, toEmployeeId, subscriptions: moved.subscriptions, applications: moved.applications },
+        done: { at, toEmployeeId, ...moved },
       });
-      await this.telling.tell(tx, actor, facts.organizationId, source, { employeeId, toEmployeeId, ...moved });
+      await this.telling.tell(tx, actor, facts.organizationId, source, {
+        employeeId,
+        toEmployeeId,
+        subscriptions: moved.subscriptions,
+        applications: moved.applications,
+        workspaces: moved.workspaces,
+        licenseLots: moved.licenseLots,
+      });
 
-      return { source, fromEmployeeId: employeeId, toEmployeeId, ...moved, at };
+      return {
+        source,
+        fromEmployeeId: employeeId,
+        toEmployeeId,
+        subscriptions: moved.subscriptions,
+        applications: moved.applications,
+        workspaces: moved.workspaces,
+        licenseLots: moved.licenseLots,
+        at,
+      };
     });
   }
 
@@ -101,11 +118,16 @@ export class ItHandoverService {
     source: HandoverSource,
     fromEmployeeId: string,
     toEmployeeId: string,
-  ): Promise<{ subscriptions: number; applications: number }> {
+  ): Promise<{ subscriptions: number; applications: number; workspaces: number; licenseLots: number }> {
     try {
       const moved = await this.catalog.transferResponsibilities(tx, actor, fromEmployeeId, toEmployeeId, source);
 
-      return { subscriptions: moved.subscriptionIds.length, applications: moved.applicationIds.length };
+      return {
+        subscriptions: moved.subscriptionIds.length,
+        applications: moved.applicationIds.length,
+        workspaces: moved.workspaceIds.length,
+        licenseLots: moved.licenseLotIds.length,
+      };
     } catch (error) {
       if (error instanceof ResponsibilityHandoverRefusedError)
         throw new ItHandoverRefusedError(error.problem === 'SAME_EMPLOYEE' ? 'SAME_PERSON' : 'TARGET_NOT_IT_ADMIN');

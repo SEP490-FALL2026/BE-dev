@@ -11,13 +11,21 @@ import {
   PlanPrimaryOwnerNotListedError,
   PlanProvisioningTypeMismatchError,
   PlanProvisioningTypeNotSupportedError,
+  PlanReferenceCommitmentNotApplicableError,
   PlanReferencePriceNotApplicableError,
   PlanReferencePriceNotVndError,
   PlanWorkspaceLimitExceededError,
   PlanWorkspaceMemberDuplicateError,
   PlanWorkspaceTextInvalidError,
 } from './plan.errors';
-import type { PricingModel, ProvisioningType, ReferencePrice, SeatTracking, WorkspaceRole } from './plan.types';
+import type {
+  PricingModel,
+  ProvisioningType,
+  ReferenceCommitmentMonths,
+  ReferencePrice,
+  SeatTracking,
+  WorkspaceRole,
+} from './plan.types';
 
 export const MAX_NAME_LENGTH = 200;
 export const MAX_NOTE_LENGTH = 2000;
@@ -142,6 +150,26 @@ export function kpi3Percent(activeSeats: number, purchasedSeats: number): number
 }
 
 /**
+ * Sums period-end seat counts across live lines (`seats(L, cuối kỳ)` when ledger is open, falling back to
+ * legacy `purchasedQuantity` when the ledger has not opened) as the `KPI-3` denominator.
+ */
+export function kpi3DenominatorOfLines(
+  lines: ReadonlyArray<{
+    ledgerOpenedOn: string | null;
+    seatsAtPeriodEnd: number | null;
+    fallbackQuantity: number | null;
+  }>,
+): number {
+  let total = 0;
+  for (const line of lines) {
+    const count = line.ledgerOpenedOn !== null ? (line.seatsAtPeriodEnd ?? 0) : (line.fallbackQuantity ?? 0);
+    if (count > 0) total += count;
+  }
+
+  return total;
+}
+
+/**
  * The reference price of a plan (`QĐ-113a`): none is always fine; one is for a plan that is paid for (K1, K2, K4), in dong, and above zero (the
  * amount is read in the service). The kind is judged first. Throws PlanReferencePriceNotApplicableError, PlanReferencePriceNotVndError.
  */
@@ -171,4 +199,20 @@ export function referencePriceOnKindChange(from: ProvisioningType, to: Provision
 /** Whether the quote of an assessment may become the reference price of the plan the request is linked to (`QĐ-113a`): a K1 or K2 plan that has none; a K4 plan is priced by the IT Admin. */
 export function canAdoptQuotePrice(type: ProvisioningType, current: ReferencePrice | null): boolean {
   return (type === 'K1' || type === 'K2') && current === null;
+}
+
+/** Only a K1 or K2 plan carries a reference commitment term (1 or 12 months). */
+export function assertReferenceCommitmentMonths(
+  type: ProvisioningType,
+  months: ReferenceCommitmentMonths | null,
+): void {
+  if (months === null) return;
+  if (type !== 'K1' && type !== 'K2') throw new PlanReferenceCommitmentNotApplicableError();
+}
+
+/** Keeps the reference commitment term between K1 and K2, and clears it when moving to any other kind. */
+export function referenceCommitmentOnKindChange(from: ProvisioningType, to: ProvisioningType): 'KEEP' | 'CLEAR' {
+  if (from === to) return 'KEEP';
+
+  return to === 'K1' || to === 'K2' ? 'KEEP' : 'CLEAR';
 }

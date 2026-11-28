@@ -54,7 +54,8 @@ function world(missing: string[] = [], accountState: 'present' | 'absent' = 'pre
   } as unknown as IdentityAccessApi;
   const record = jest.fn(() => Promise.resolve());
   const setSubmissionDeadline = jest.fn().mockResolvedValue({ id: 'cycle-2026', previous: '2026-12-01' });
-  const budgetCycles = { setSubmissionDeadline } as unknown as LocalDemoBudgetCycleApi;
+  const markClosedSeatMonths = jest.fn().mockResolvedValue(4);
+  const budgetCycles = { setSubmissionDeadline, markClosedSeatMonths } as unknown as LocalDemoBudgetCycleApi;
   const api = new DemoAccountsApi(
     runner,
     organizationReads,
@@ -65,7 +66,7 @@ function world(missing: string[] = [], accountState: 'present' | 'absent' = 'pre
     {} as ConfigService<DatabaseEnvironmentVariables, true>,
   );
 
-  return { api, perTransaction, getEmployeesByCodes, setSubmissionDeadline, record };
+  return { api, perTransaction, getEmployeesByCodes, setSubmissionDeadline, markClosedSeatMonths, record };
 }
 
 describe('DemoAccountsApi.describe', () => {
@@ -197,5 +198,13 @@ describe('DemoAccountsApi.lockBudgetCycle', () => {
     await api.lockBudgetCycle('org-1', 2026, '2026-11-30', attribution);
 
     expect(record).not.toHaveBeenCalled();
+  });
+
+  it('delegates markClosedSeatMonths inside a transaction', async () => {
+    const { api, markClosedSeatMonths, perTransaction } = world();
+
+    await expect(api.markClosedSeatMonths('org-1', 2026, 10, ['sub-1', 'sub-2'])).resolves.toBe(4);
+    expect(perTransaction).toHaveLength(1);
+    expect(markClosedSeatMonths).toHaveBeenCalledWith(expect.anything(), 'org-1', 2026, 10, ['sub-1', 'sub-2']);
   });
 });

@@ -19,6 +19,11 @@ export interface NewReviewPeriod {
   sharedPoolUnallocatedMinor: bigint;
   sharedPoolReserveMinor: bigint | null;
   annualCeilingMinor: bigint | null;
+  sharedPoolIdleMinor?: bigint | null | undefined;
+  sharedPoolDeviceLotMinor?: bigint | null | undefined;
+  sharedPoolReplacementMinor?: bigint | null | undefined;
+  sharedPoolVarianceMinor?: bigint | null | undefined;
+  sharedPoolVarianceInReviewMinor?: bigint | null | undefined;
   /** The last day the heads are asked to explain a quarter by (the fifth working day from the close); null for a month. */
   explanationsDueOn?: BusinessDate | null | undefined;
 }
@@ -31,6 +36,7 @@ export interface NewReviewLine {
   /** What was spent through the end of the month closed, and what was already recorded for the months after it. */
   spentMinor: bigint;
   spentAfterMonthMinor: bigint;
+  priorYearReleasedMinor?: bigint;
   committedMinor: bigint;
   pendingSpendMinor: bigint;
   remainingMinor: bigint;
@@ -45,6 +51,11 @@ export interface NewReviewLine {
 }
 
 export interface ReviewPeriodRecord extends NewReviewPeriod {
+  sharedPoolIdleMinor: bigint | null;
+  sharedPoolDeviceLotMinor: bigint | null;
+  sharedPoolReplacementMinor: bigint | null;
+  sharedPoolVarianceMinor: bigint | null;
+  sharedPoolVarianceInReviewMinor: bigint | null;
   explanationsDueOn: BusinessDate | null;
   id: string;
   state: ReviewState;
@@ -65,6 +76,7 @@ export interface LineExplanation {
 }
 
 export interface ReviewLineRecord extends NewReviewLine {
+  priorYearReleasedMinor: bigint;
   id: string;
   periodId: string;
   explanationStatus: ExplanationStatus;
@@ -90,6 +102,11 @@ const toPeriod = (row: Prisma.BudgetReviewPeriodGetPayload<object>): ReviewPerio
   sharedPoolUnallocatedMinor: row.sharedPoolUnallocatedMinor,
   sharedPoolReserveMinor: row.sharedPoolReserveMinor,
   annualCeilingMinor: row.annualCeilingMinor,
+  sharedPoolIdleMinor: row.sharedPoolIdleMinor,
+  sharedPoolDeviceLotMinor: row.sharedPoolDeviceLotMinor,
+  sharedPoolReplacementMinor: row.sharedPoolReplacementMinor,
+  sharedPoolVarianceMinor: row.sharedPoolVarianceMinor,
+  sharedPoolVarianceInReviewMinor: row.sharedPoolVarianceInReviewMinor,
   explanationsDueOn: row.explanationsDueOn === null ? null : fromDateColumn(row.explanationsDueOn),
 });
 
@@ -101,6 +118,7 @@ interface LineRow {
   reserve_minor: bigint;
   spent_minor: bigint;
   spent_after_month_minor: bigint;
+  prior_year_released_minor: bigint;
   committed_minor: bigint;
   pending_spend_minor: bigint;
   remaining_minor: bigint;
@@ -129,6 +147,7 @@ const toLine = (row: LineRow): ReviewLineRecord => ({
   reserveMinor: row.reserve_minor,
   spentMinor: row.spent_minor,
   spentAfterMonthMinor: row.spent_after_month_minor,
+  priorYearReleasedMinor: row.prior_year_released_minor,
   committedMinor: row.committed_minor,
   pendingSpendMinor: row.pending_spend_minor,
   remainingMinor: row.remaining_minor,
@@ -176,14 +195,20 @@ export class BudgetReviewRepo {
     const created = await tx.budgetReviewPeriod.create({
       data: {
         ...period,
+        sharedPoolIdleMinor: period.sharedPoolIdleMinor ?? null,
+        sharedPoolDeviceLotMinor: period.sharedPoolDeviceLotMinor ?? null,
+        sharedPoolReplacementMinor: period.sharedPoolReplacementMinor ?? null,
+        sharedPoolVarianceMinor: period.sharedPoolVarianceMinor ?? null,
+        sharedPoolVarianceInReviewMinor: period.sharedPoolVarianceInReviewMinor ?? null,
         explanationsDueOn: period.explanationsDueOn ? toDateColumn(period.explanationsDueOn) : null,
         state: period.kind === 'QUARTER' ? 'AWAITING_EXPLANATIONS' : 'SNAPSHOT',
       },
     });
     if (lines.length > 0) {
       await tx.budgetReviewLine.createMany({
-        data: lines.map(({ invoiceBasisMinor, ...line }) => ({
+        data: lines.map(({ invoiceBasisMinor, priorYearReleasedMinor, ...line }) => ({
           ...line,
+          priorYearReleasedMinor: priorYearReleasedMinor ?? 0n,
           invoiceNetMinor: invoiceBasisMinor,
           periodId: created.id,
           explanationStatus: initialExplanationStatus(period.kind, line.light, !withoutHead.has(line.costCenterId)),

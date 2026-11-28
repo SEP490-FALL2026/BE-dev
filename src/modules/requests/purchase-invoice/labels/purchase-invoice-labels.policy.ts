@@ -6,13 +6,15 @@ import type { BusinessDate } from '../../../../core/business-date';
  * month the right began. A month outside the term is a mark on the invoice, never a refusal (SPEC PI-1).
  */
 
-export type PurchaseInvoiceLabel = 'NEW_PURCHASE' | 'PERIOD' | 'RENEWAL';
+export type PurchaseInvoiceLabel = 'NEW_PURCHASE' | 'PERIOD' | 'RENEWAL' | 'SEAT_PURCHASE';
 
 /** Marks that are laid on an invoice and never refuse it. */
-export type PurchaseInvoiceFlag = 'OVER_APPROVED' | 'OUTSIDE_TERM';
+export type PurchaseInvoiceFlag = 'OVER_APPROVED' | 'OUTSIDE_TERM' | 'NO_EXPECTED_AMOUNT';
 
 export interface PurchaseInvoiceLabelInput {
-  link: 'REQUEST' | 'SUBSCRIPTION';
+  link: 'REQUEST' | 'SUBSCRIPTION' | 'LICENSE_LOT';
+  /** Subscription invoice is tied to a specific seat purchase (`SEAT_PURCHASE`, N9). */
+  hasSeatPurchase?: boolean;
   /** The request is one that goes on using a right that ended (`QĐ-111l`); its invoices are renewals. */
   continuation: boolean;
   /** An invoice of this request exists that was not returned. */
@@ -53,6 +55,9 @@ export function monthsBetween(from: BusinessDate, to: BusinessDate): number {
 }
 
 export function labelOfPurchaseInvoice(input: PurchaseInvoiceLabelInput): PurchaseInvoiceLabelResult {
+  if (input.link === 'SUBSCRIPTION' && input.hasSeatPurchase) {
+    return { label: 'SEAT_PURCHASE', periodIndex: null, periodCount: null, outsideTerm: false };
+  }
   if (input.link === 'SUBSCRIPTION' || input.continuation || input.startMonth === null) {
     return { label: 'RENEWAL', periodIndex: null, periodCount: null, outsideTerm: false };
   }
@@ -70,10 +75,15 @@ export function labelOfPurchaseInvoice(input: PurchaseInvoiceLabelInput): Purcha
 }
 
 /** The marks of an invoice, in a fixed order. */
-export function flagsOfPurchaseInvoice(input: { outsideTerm: boolean; overApproved: boolean }): PurchaseInvoiceFlag[] {
+export function flagsOfPurchaseInvoice(input: {
+  outsideTerm: boolean;
+  overApproved: boolean;
+  noExpectedAmount?: boolean;
+}): PurchaseInvoiceFlag[] {
   const flags: PurchaseInvoiceFlag[] = [];
   if (input.overApproved) flags.push('OVER_APPROVED');
   if (input.outsideTerm) flags.push('OUTSIDE_TERM');
+  if (input.noExpectedAmount) flags.push('NO_EXPECTED_AMOUNT');
 
   return flags;
 }

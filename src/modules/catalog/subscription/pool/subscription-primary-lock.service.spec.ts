@@ -1,12 +1,12 @@
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { TransactionRunner } from '../../../../infrastructure/database/transaction-runner';
 import type { AuditApi } from '../../../audit/public/audit.api';
-import type { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import type { PlanFactsService } from '../../plan/plan-facts.service';
+import type { SubscriptionPeriodLinesService } from '../../subscription-line/subscription-period-lines.service';
 import type { SubscriptionPoolService } from './subscription-pool.service';
 import { SubscriptionChangeGuard } from '../subscription-change-guard.service';
 import { SubscriptionChangeService } from '../subscription-change.service';
-import { SubscriptionNotFoundError, SubscriptionStaleError } from '../subscription.errors';
+import { SubscriptionNotFoundError, SubscriptionPrimaryRetiredError } from '../subscription.errors';
 import type { SubscriptionPricingService } from '../subscription-pricing.service';
 import type { SubscriptionViewService } from '../subscription-view.service';
 import { SubscriptionService } from '../subscription.service';
@@ -66,9 +66,6 @@ describe('Subscription primary lock order', () => {
   const pricing = {
     priceToday: jest.fn(() => Promise.resolve({ unitPrice: null, priceSnapshot: null })),
   } as unknown as SubscriptionPricingService;
-  const organization = {
-    getOrganization: jest.fn(() => Promise.resolve({ id: 'org-1' })),
-  } as unknown as OrganizationReadApi;
 
   beforeEach(() => jest.clearAllMocks());
 
@@ -82,63 +79,32 @@ describe('Subscription primary lock order', () => {
         tellSeatIncrease: jest.fn(),
       }) as unknown as SubscriptionChangeGuard;
 
-    it('locks primary candidates before plans.lockExclusive when isPrimaryForPlan is true', async () => {
-      const order: string[] = [];
-      const find = jest.fn(() => {
-        order.push('find');
-        return Promise.resolve(stored());
-      });
-      const lockPrimaryCandidates = jest.fn(() => {
-        order.push('lockPrimaryCandidates');
-        return Promise.resolve();
-      });
-      const lockExclusive = jest.fn(() => {
-        order.push('lockExclusive');
-        return Promise.resolve(plan);
-      });
-      const update = jest.fn((_tx: unknown, _id: string, state: object) => Promise.resolve(stored({ ...state })));
-
+    it('refuses isPrimaryForPlan true before any lock is taken: the mark is retired (W3-27), the lock of the first wave stays for the completion', async () => {
+      const lockPrimaryCandidates = jest.fn();
+      const lockExclusive = jest.fn();
       const service = new SubscriptionChangeService(
-        { find, lockPrimaryCandidates, update } as unknown as SubscriptionRepo,
-        { lockExclusive } as unknown as PlanFactsService,
+        { find: jest.fn(), lockPrimaryCandidates } as unknown as SubscriptionRepo,
+        { lockExclusive, lookups: jest.fn() } as unknown as PlanFactsService,
         pricing,
         view,
         audit,
         runner,
         makeGuard(),
-      );
-
-      await service.update(actor, 'sub-1', { isPrimaryForPlan: true }, updatedAt);
-
-      expect(lockPrimaryCandidates).toHaveBeenCalledWith(tx, 'plan-1', ['sub-1']);
-      expect(lockExclusive).toHaveBeenCalledWith(tx, 'plan-1');
-      expect(order).toEqual(['find', 'lockPrimaryCandidates', 'find', 'lockExclusive']);
-    });
-
-    it('checks stale edit after locking primary candidates and before locking plan', async () => {
-      const lockPrimaryCandidates = jest.fn(() => Promise.resolve());
-      const lockExclusive = jest.fn(() => Promise.resolve(plan));
-      const service = new SubscriptionChangeService(
         {
-          find: jest.fn(() => Promise.resolve(stored({ updatedAt: new Date('2026-11-19T00:00:00Z') }))),
-          lockPrimaryCandidates,
-        } as unknown as SubscriptionRepo,
-        { lockExclusive } as unknown as PlanFactsService,
-        pricing,
-        view,
-        audit,
-        runner,
-        makeGuard(),
+          activatePeriod: jest.fn(),
+          syncDraftUpdate: jest.fn(),
+          hasLines: jest.fn().mockResolvedValue(false),
+        } as unknown as SubscriptionPeriodLinesService,
       );
 
       await expect(service.update(actor, 'sub-1', { isPrimaryForPlan: true }, updatedAt)).rejects.toBeInstanceOf(
-        SubscriptionStaleError,
+        SubscriptionPrimaryRetiredError,
       );
-      expect(lockPrimaryCandidates).toHaveBeenCalledWith(tx, 'plan-1', ['sub-1']);
+      expect(lockPrimaryCandidates).not.toHaveBeenCalled();
       expect(lockExclusive).not.toHaveBeenCalled();
     });
 
-    it('keeps lock + plans.lockShared when isPrimaryForPlan is not true', async () => {
+    it('keeps lock + plans.lockShared for a change of the terms', async () => {
       const lock = jest.fn(() => Promise.resolve(stored()));
       const lockPrimaryCandidates = jest.fn();
       const lockShared = jest.fn(() => Promise.resolve(plan));
@@ -152,14 +118,14 @@ describe('Subscription primary lock order', () => {
         audit,
         runner,
         makeGuard(),
+        {
+          activatePeriod: jest.fn(),
+          syncDraftUpdate: jest.fn(),
+          hasLines: jest.fn().mockResolvedValue(false),
+        } as unknown as SubscriptionPeriodLinesService,
       );
 
-      await service.update(
-        actor,
-        'sub-1',
-        { purchasedQuantity: 6, quantityChangeReason: 'Growth' },
-        stored().updatedAt,
-      );
+      await service.update(actor, 'sub-1', { autoRenew: true }, stored().updatedAt);
 
       expect(lock).toHaveBeenCalledWith(tx, 'sub-1');
       expect(lockShared).toHaveBeenCalledWith(tx, 'plan-1');
@@ -172,6 +138,7 @@ describe('Subscription primary lock order', () => {
       ({
         assertActivation: jest.fn(),
         assertNoLiveDuplicate: jest.fn(),
+        workspaceFor: jest.fn(() => Promise.resolve(null)),
         takePrimaryFromPrevious: jest.fn(() => Promise.resolve(true)),
       }) as unknown as SubscriptionPoolService;
 
@@ -194,10 +161,15 @@ describe('Subscription primary lock order', () => {
 
       const service = new SubscriptionService(
         { find, lockPrimaryCandidates, update } as unknown as SubscriptionRepo,
-        { lockExclusive } as unknown as PlanFactsService,
+        { lockExclusive, lookups: jest.fn(() => Promise.resolve([plan])) } as unknown as PlanFactsService,
         pricing,
         view,
-        organization,
+        {
+          requireOrganizationId: jest.fn(() => Promise.resolve('org-1')),
+          createForPeriod: jest.fn(),
+          activatePeriod: jest.fn(),
+          hasLines: jest.fn(() => Promise.resolve(false)),
+        } as never,
         makePoolRules(),
         audit,
         runner,
@@ -206,7 +178,8 @@ describe('Subscription primary lock order', () => {
       await service.complete(actor, 'sub-1');
 
       expect(lockPrimaryCandidates).toHaveBeenCalledWith(tx, 'plan-1', ['sub-1', 'sub-prev']);
-      expect(order).toEqual(['find', 'lockPrimaryCandidates', 'find', 'lockExclusive']);
+      // The first read is the one that tells which workspace to lock (W3-14): the workspace comes before the period and the plan.
+      expect(order).toEqual(['find', 'find', 'lockPrimaryCandidates', 'find', 'lockExclusive']);
     });
 
     it('locks only the subscription before plans.lockExclusive when renewedFromId is null', async () => {
@@ -229,10 +202,15 @@ describe('Subscription primary lock order', () => {
 
       const service = new SubscriptionService(
         { find, lock, lockPrimaryCandidates, update } as unknown as SubscriptionRepo,
-        { lockExclusive } as unknown as PlanFactsService,
+        { lockExclusive, lookups: jest.fn(() => Promise.resolve([plan])) } as unknown as PlanFactsService,
         pricing,
         view,
-        organization,
+        {
+          requireOrganizationId: jest.fn(() => Promise.resolve('org-1')),
+          createForPeriod: jest.fn(),
+          activatePeriod: jest.fn(),
+          hasLines: jest.fn(() => Promise.resolve(false)),
+        } as never,
         makePoolRules(),
         audit,
         runner,
@@ -241,7 +219,7 @@ describe('Subscription primary lock order', () => {
       await service.complete(actor, 'sub-1');
 
       expect(lockPrimaryCandidates).not.toHaveBeenCalled();
-      expect(order).toEqual(['find', 'lock', 'lockExclusive']);
+      expect(order).toEqual(['find', 'find', 'lock', 'lockExclusive']);
     });
 
     it('throws SubscriptionNotFoundError when subscription does not exist', async () => {
@@ -250,7 +228,12 @@ describe('Subscription primary lock order', () => {
         {} as unknown as PlanFactsService,
         pricing,
         view,
-        organization,
+        {
+          requireOrganizationId: jest.fn(() => Promise.resolve('org-1')),
+          createForPeriod: jest.fn(),
+          activatePeriod: jest.fn(),
+          hasLines: jest.fn(() => Promise.resolve(false)),
+        } as never,
         makePoolRules(),
         audit,
         runner,

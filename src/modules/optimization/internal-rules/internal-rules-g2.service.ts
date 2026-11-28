@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import { describeForOperator } from '../../../infrastructure/observability/operator-error';
-import { CatalogApi } from '../../catalog/public/catalog.api';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { LicensingGhostSeatApi } from '../../licensing/public/licensing-ghost-seat.api';
 import type { RuleSeat } from '../../licensing/public/licensing-ghost-seat.types';
@@ -34,6 +33,7 @@ const factsOf = (seat: RuleSeat, holderLeft: boolean): SeatFacts => ({
   isMachineAccount: seat.isMachineAccount,
   provisioningType: seat.provisioningType,
   pricingModel: seat.pricingModel,
+  keyBinding: seat.keyBinding,
   holderLeft,
   liveRevocation: seat.liveRevocation ? { taskId: seat.liveRevocation.taskId } : null,
   terminatingUntil: seat.terminatingUntil,
@@ -55,7 +55,6 @@ export class InternalRulesG2Service {
     private readonly notifications: NotificationsApi,
     private readonly repo: GhostSeatRepo,
     private readonly ghostSeats: GhostSeatService,
-    private readonly catalog: CatalogApi,
     private readonly identity: IdentityAccessApi,
   ) {}
 
@@ -183,26 +182,26 @@ export class InternalRulesG2Service {
   }
 
   /**
-   * Who is told of a `G2` (BRD MF-5: straight to the IT Admin; `US-10-01` AC-2): the IT Admin in charge of the department the holder last
-   * worked in, else of the department that owns the seat, else the IT Admin responsible for the subscription while still usable, else the
-   * first usable IT Admin. Nobody only when the organization has no usable IT Admin at all.
+   * Acting IT Admins of the department (usable in-charge and any usable substitute), or the usable Super Admin when
+   * none can act or the seat has no department.
    */
-  private async recipientOf(tx: DbTx, seat: RuleSeat, departmentId: string | null): Promise<string | null> {
-    for (const department of new Set([departmentId, seat.owningDepartmentId])) {
-      const inCharge = department ? await this.organizationReads.getItAdminInChargeOfDepartment(department, tx) : null;
-      if (inCharge) return inCharge;
-    }
-    const responsible = seat.subscriptionId
-      ? await this.catalog.getSubscriptionResponsibleItAdmin(seat.subscriptionId, tx)
-      : null;
-    if (responsible && (await this.identity.findUsableItAdminEmployeeIds([responsible], tx)).has(responsible)) {
-      return responsible;
+  private async recipientsOf(tx: DbTx, departmentId: string | null): Promise<string[]> {
+    if (departmentId !== null) {
+      const acting = (
+        await this.organizationReads.itAdminsActingFor(
+          [departmentId],
+          (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
+          tx,
+        )
+      ).get(departmentId);
+      if (acting && acting.actors.length > 0) return acting.actors;
     }
 
-    return this.identity.findFirstUsableItAdminEmployeeId(tx);
+    const superAdmin = await this.identity.findUsableSuperAdminEmployeeId(tx);
+    return superAdmin !== null ? [superAdmin] : [];
   }
 
-  /** The IT Admin who answers for the seat is told once (`eventKey`). */
+  /** Each acting IT Admin (or Super Admin fallback) who answers for the seat is told once (`eventKey`). */
   private async tell(
     tx: DbTx,
     pass: RulePass,
@@ -210,20 +209,20 @@ export class InternalRulesG2Service {
     made: GhostSeatRecord,
     departmentId: string | null,
   ): Promise<void> {
-    const recipient = await this.recipientOf(tx, seat, departmentId);
-    if (!recipient) return;
-    await this.notifications.notifyInApp(tx, {
-      organizationId: pass.organizationId,
-      recipientEmployeeId: recipient,
-      code: 'GHOST_SEAT_G2_DETECTED',
-      subject: { type: 'GHOST_SEAT_RECOMMENDATION', id: made.id },
-      params: {
-        recommendationId: made.id,
-        employeeId: seat.employeeId,
-        applicationId: seat.applicationId,
-      },
-      eventKey: `GHOST_SEAT_G2:${made.id}`,
-    });
+    for (const recipientEmployeeId of await this.recipientsOf(tx, departmentId)) {
+      await this.notifications.notifyInApp(tx, {
+        organizationId: pass.organizationId,
+        recipientEmployeeId,
+        code: 'GHOST_SEAT_G2_DETECTED',
+        subject: { type: 'GHOST_SEAT_RECOMMENDATION', id: made.id },
+        params: {
+          recommendationId: made.id,
+          employeeId: seat.employeeId,
+          applicationId: seat.applicationId,
+        },
+        eventKey: `GHOST_SEAT_G2:${made.id}`,
+      });
+    }
   }
 
   /**

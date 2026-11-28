@@ -6,6 +6,10 @@ import type { HeldRange, PlacementPeriod } from './seat-month.types';
 export interface SeatToCharge {
   assignmentId: string;
   employeeId: string;
+  /** Plan id of the seat, used to match line-level pricing (`B2-R7`). */
+  planId?: string;
+  /** Per-line monthly price when resolved from `subscription_lines`; falls back to period price when undefined. */
+  monthlyPriceMinor?: bigint | null;
   /** A service account answers to one department whoever holds it; null for a personal seat. */
   fixedDepartmentId: string | null;
   held: HeldRange;
@@ -13,10 +17,12 @@ export interface SeatToCharge {
   commitment: { id: string; costCenterId: string } | null;
 }
 
-/** What a row of the month already applied to a commitment, found again when the month is charged again. */
+/** What a row of the month already applied to a commitment, found again when the month is charged again, and the price it recorded. */
 export interface PriorRow {
   assignmentId: string;
   departmentId: string;
+  /** The monthly price the row was charged at: a seat that has a row keeps it when the month is charged again (`Q-1`). */
+  monthlyPriceMinor: bigint;
   appliedMinor: bigint;
   commitmentId: string | null;
 }
@@ -63,6 +69,9 @@ const keyOf = (assignmentId: string, departmentId: string): string => `${assignm
  * department is the commitment's own, never the commitment of another Cost Center. A month may be charged again at any time (`QĐ-111ae`: closing the
  * numbers of a month is a picture, not a lock): what the rows applied before is first counted as held again, so the same inputs give the same rows and
  * return nothing, a row that now applies less (or none, or is gone) returns the difference, and what it returns is held for the rows after it (`SM1-06`).
+ *
+ * A seat that already has a row for the month keeps the price that row recorded when the month is charged again (the days and the commitments are worked out
+ * anew, the price is not); a seat with no row yet takes the current price (`Q-1`).
  */
 export function planSeatMonth(input: {
   month: BusinessDate;
@@ -71,18 +80,42 @@ export function planSeatMonth(input: {
   costCenterOfDepartment: ReadonlyMap<string, string>;
   heldByCommitment: ReadonlyMap<string, bigint>;
   prior: readonly PriorRow[];
+  /** When present for a commitment id: remaining held on `month` slice, or `null` if that commitment has slices for other months only. */
+  monthlySliceByCommitment?: ReadonlyMap<string, bigint | null>;
 }): SeatMonthPlan {
-  const held = new Map(input.heldByCommitment);
+  const held = initialHeldByCommitment(input.heldByCommitment, input.monthlySliceByCommitment);
   for (const row of input.prior) {
     if (row.commitmentId !== null && row.appliedMinor > 0n)
       held.set(row.commitmentId, (held.get(row.commitmentId) ?? 0n) + row.appliedMinor);
   }
-  const rows =
-    input.subscriptionMonthlyPriceMinor === null
-      ? []
-      : input.seats.flatMap((seat) => rowsOfSeat(seat, input.subscriptionMonthlyPriceMinor as bigint, input, held));
+  const recorded = new Map<string, bigint>();
+  for (const row of input.prior)
+    if (!recorded.has(row.assignmentId)) recorded.set(row.assignmentId, row.monthlyPriceMinor);
+  const rows = input.seats.flatMap((seat) => {
+    const current = seat.monthlyPriceMinor !== undefined ? seat.monthlyPriceMinor : input.subscriptionMonthlyPriceMinor;
+    const monthlyPrice = recorded.get(seat.assignmentId) ?? current;
+
+    return monthlyPrice === null ? [] : rowsOfSeat(seat, monthlyPrice, input, held);
+  });
 
   return { rows, takenByCommitment: takenOf(input.prior, rows), returned: returnedOf(input.prior, rows) };
+}
+
+function initialHeldByCommitment(
+  heldByCommitment: ReadonlyMap<string, bigint>,
+  monthlySliceByCommitment?: ReadonlyMap<string, bigint | null>,
+): Map<string, bigint> {
+  const held = new Map(heldByCommitment);
+  if (!monthlySliceByCommitment) return held;
+  for (const [id, sliceRemaining] of monthlySliceByCommitment) {
+    if (sliceRemaining === null) {
+      held.set(id, 0n);
+      continue;
+    }
+    const current = held.get(id) ?? 0n;
+    held.set(id, sliceRemaining < current ? sliceRemaining : current);
+  }
+  return held;
 }
 
 /** The rows of one seat for the month, taking what each applies out of `held` so the rows after it see what is left. */

@@ -1,5 +1,5 @@
 import type { BusinessDate } from '../../../core/business-date';
-import type { RenewalFinancialSnapshot } from '../public/licensing-subscription-renewal.types';
+import type { RenewalFinancialSnapshot } from '../public/licensing-renewal.types';
 
 export type RenewalChoice = 'RENEW' | 'REDUCE' | 'CANCEL' | 'INCREASE';
 /** `STALE`: a case closed without an outcome: one waiting for the head when the one-write renewal came, or one out of date. */
@@ -9,9 +9,10 @@ export type RenewalOutcomeKind = 'AS_DECIDED' | 'VENDOR_REFUSED' | 'DIFFERENT' |
 export type NoticeBasis = 'DECLARED' | 'INFERRED_UNCONFIRMED' | 'BY_END_DATE' | 'BY_RENEWAL_DATE' | 'BY_PAYMENT_DATE';
 /**
  * `SPENDING_APPROVER`, `CONFLICT_SUBSTITUTE` and `OWNER_DEPARTMENT_HEAD` are historical: a decision of before the one-write renewal
- * (`QĐ-103e`). `IT_ADMIN_IN_CHARGE` is the one written now: the IT Admin who records the result decides alone.
+ * (`QĐ-103e`). `IT_ADMIN_IN_CHARGE` is the one written now; `SYSTEM` is the automatic renewal recorded after the renewal day.
  */
-export type DeciderRole = 'SPENDING_APPROVER' | 'CONFLICT_SUBSTITUTE' | 'OWNER_DEPARTMENT_HEAD' | 'IT_ADMIN_IN_CHARGE';
+export type DeciderRole =
+  'SPENDING_APPROVER' | 'CONFLICT_SUBSTITUTE' | 'OWNER_DEPARTMENT_HEAD' | 'IT_ADMIN_IN_CHARGE' | 'SYSTEM';
 export type DeadlineOutcome = 'AUTO_RENEWAL_INCIDENT' | 'EXPIRY_MARKED';
 /** The order a seat is offered in when a reduction goes below the seats in use (`QĐ-66x`). */
 export type SeatRankGroup = 'REVOCATION_DECIDED' | 'HOLDER_LEFT' | 'USAGE_FLAGGED' | 'OTHER';
@@ -109,6 +110,7 @@ export interface SeatsNeededFacts {
 /** A seat held on a subscription on a day, with what the ranking of a reduction reads of it. */
 export interface HeldSeat {
   assignmentId: string;
+  planId?: string;
   employeeId: string;
   kind: 'PERSONAL' | 'SERVICE';
   validFrom: BusinessDate;

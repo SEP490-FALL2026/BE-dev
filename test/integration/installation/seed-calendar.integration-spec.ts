@@ -1,5 +1,6 @@
 import { INSTALLATION } from '../../../src/cli/seed/fixture/shared-demo-v4/installation';
 import { InstallationApi } from '../../../src/modules/installation/public/installation.api';
+import { EmployeeRepo } from '../../../src/modules/organization/employee/employee.repo';
 import type { INestApplicationContext } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { AddressInfo, Server } from 'node:net';
@@ -86,6 +87,9 @@ describe('ops:seed at the edges of the year (integration, real API and PostgreSQ
     });
     await seedStorage.start();
     ctx = await createHttpTestApp({ providerOverrides: [seedStorage.override] });
+    jest
+      .spyOn(ctx.app.get(EmployeeRepo, { strict: false }), 'databaseNow')
+      .mockImplementation(() => Promise.resolve(new Date()));
     const install = await NestFactory.createApplicationContext(
       (await import('../../../src/modules/installation/installation.module')).InstallationModule,
       { logger: false },
@@ -106,6 +110,7 @@ describe('ops:seed at the edges of the year (integration, real API and PostgreSQ
     await demo?.close();
     await ctx?.close();
     await seedStorage.stop();
+    jest.restoreAllMocks();
     jest.useRealTimers();
   });
 

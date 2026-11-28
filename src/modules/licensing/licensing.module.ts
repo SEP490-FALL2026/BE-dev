@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { LicensingSeatMonthFacadeModule } from './licensing-seat-month-facade.module';
 import { ConfigService } from '@nestjs/config';
 import { EnvironmentVariables } from '../../infrastructure/config/env-schema';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
@@ -15,17 +16,17 @@ import { AssignmentFactsRepo } from './assignment/renewal/assignment-facts.repo'
 import { AssignmentRenewalService } from './assignment/renewal/assignment-renewal.service';
 import { AssignmentDepartmentRepo } from './assignment/assignment-department.repo';
 import { RevocationCompletedFactsReader } from './provisioning/revocation-completion/revocation-completed-facts.service';
-import { AssignmentChainRepo } from './assignment/assignment-chain.repo';
 import { AssignmentRepo } from './assignment/assignment.repo';
 import { AssignmentRevocationRepo } from './assignment/assignment-revocation.repo';
 import { UsageFactsRepo } from './assignment/usage-facts.repo';
 import { RuleSeatsFactsService } from './assignment/rule-seats-facts.service';
 import { RuleSeatsRepo } from './assignment/rule-seats.repo';
 import { SharedPoolVacancyService } from './shared-pool/shared-pool-vacancy.service';
-import { AssignmentSeatOccupancy } from './assignment/assignment-seat-occupancy.listener';
+import { AssignmentSeatOccupancy } from './assignment/occupancy/assignment-seat-occupancy.listener';
 import { AssignmentServiceAccountReader } from './assignment/assignment-service-account.listener';
 import { AssignmentListService } from './assignment/assignment-list.service';
 import { AssignmentService } from './assignment/assignment.service';
+import { SubscriptionSeatUsageService } from './assignment/occupancy/seat-usage-occupancy.service';
 import { AssignmentsController } from './assignment/assignments.controller';
 import { DashboardFactsRepo } from './dashboard-facts/dashboard-facts.repo';
 import { DashboardFactsService } from './dashboard-facts/dashboard-facts.service';
@@ -52,6 +53,7 @@ import { ExpiryReminderSweeper } from './expiry/expiry-reminder.job';
 import { ExpiryRenewalWindowSweeper } from './expiry/expiry-renewal-window.job';
 import { ExpiryRenewalWindowRepo } from './expiry/expiry-renewal-window.repo';
 import { ExpiryRenewalWindowService } from './expiry/expiry-renewal-window.service';
+import { RenewalSavingsRepo } from './subscription-renewal/savings/renewal-savings.repo';
 import { ExpiryRevocationRepo } from './expiry/expiry-revocation.repo';
 import { ExpiryRevocationService } from './expiry/expiry-revocation.service';
 import { ExpiryRevocationSweeper } from './expiry/expiry-revocation.job';
@@ -61,7 +63,12 @@ import { LicenseKeyCipher, parsePreviousVaultKeys } from './license-key/license-
 import { LicenseKeyRepo } from './license-key/license-key.repo';
 import { LicenseKeyAssignmentService } from './license-key/license-key-assignment.service';
 import { LicenseKeyRevealQuotaRepo } from './license-key/license-key-reveal-quota.repo';
+import { LicenseKeyImportSettingsService } from './license-key/license-key-import-settings.service';
 import { LicenseKeyService } from './license-key/license-key.service';
+import { LicenseLotCreateController } from './license-lot/license-lot-create.controller';
+import { LicenseLotCreateService } from './license-lot/license-lot-create.service';
+import { LicenseLotKeyImportService } from './license-key/license-lot-key-import.service';
+import { LicenseLotKeysController } from './license-key/license-lot-keys.controller';
 import { LicenseKeysController } from './license-key/license-keys.controller';
 import { MySoftwareController } from './my-software/my-software.controller';
 import { MySoftwareRepo } from './my-software/my-software.repo';
@@ -81,10 +88,13 @@ import { LicensingUsageApi } from './public/licensing-usage.api';
 import { LicensingDepartmentToolsApi } from './public/licensing-department-tools.api';
 import { LicensingOpenGrantsApi } from './public/licensing-open-grants.api';
 import { LicensingPoolStockApi } from './public/licensing-pool-stock.api';
-import { LicensingSeatMonthApi } from './public/licensing-seat-month.api';
-import { AssignmentSeatMonthRepo } from './assignment/assignment-seat-month.repo';
 import { LicensingRenewalApi } from './public/licensing-renewal.api';
 import { LicensingSeatBaselineApi } from './public/licensing-seat-baseline.api';
+import { LicensingDeviceActivationApi } from './public/licensing-device-activation.api';
+import { DeviceActivationCloseService } from './device-activation/device-activation-close.service';
+import { DeviceActivationQueryService } from './device-activation/device-activation-query.service';
+import { DeviceActivationRepo } from './device-activation/device-activation.repo';
+import { DeviceActivationService } from './device-activation/device-activation.service';
 import { ProvisioningCancellationService } from './provisioning/grant-cancellation/provisioning-cancellation.service';
 import { ProvisioningDecisionService } from './provisioning/tasks/provisioning-decision.service';
 import { ProvisioningFailureService } from './provisioning/provisioning-failure.service';
@@ -120,6 +130,7 @@ import { RevocationWithdrawalService } from './provisioning/revocation-withdrawa
 import { ForRevocationWithdrawalService } from './provisioning/revocation-withdrawal/for-revocation-withdrawal.service';
 import { ProvisioningTaskReasonRepo } from './provisioning/provisioning-task-reason.repo';
 import { SaasIssueCalendar } from './saas-issue/saas-issue-calendar.service';
+import { SaasIssueOpenWorkReader } from './saas-issue/department-open-work.listener';
 import { SaasIssueFactsRepo } from './saas-issue/saas-issue-facts.repo';
 import { SaasIssueHandlingService } from './saas-issue/saas-issue-handling.service';
 import { SaasIssueNotifier } from './saas-issue/saas-issue-notifier.service';
@@ -139,8 +150,10 @@ import { SeatBaselineService } from './seat-baseline/seat-baseline.service';
 import { StockSummaryController } from './stock-summary/stock-summary.controller';
 import { StockSummaryQueryService } from './stock-summary/stock-summary-query.service';
 import { RenewalAlertsService } from './subscription-renewal/alerts/renewal-alerts.service';
+import { WorkspaceAdminAlertService } from './subscription-renewal/alerts/workspace-admin-alert.service';
 import { RenewalDeadlineService } from './subscription-renewal/deadline/renewal-deadline.service';
 import { RenewalOutcomeService } from './subscription-renewal/outcome/renewal-outcome.service';
+import { RenewalSavingsService } from './subscription-renewal/savings/renewal-savings.service';
 import { RenewalRecordService } from './subscription-renewal/record/renewal-record.service';
 import { RenewalRecordTrail } from './subscription-renewal/record/renewal-record-trail.service';
 import { RenewalNotifier } from './subscription-renewal/subscription-renewal-notifier.service';
@@ -151,8 +164,16 @@ import { SubscriptionRenewalSeatRepo } from './subscription-renewal/subscription
 import { SubscriptionRenewalSweepService } from './subscription-renewal/subscription-renewal-sweep.service';
 import { RenewalViewService } from './subscription-renewal/subscription-renewal-view.service';
 import { SubscriptionRenewalSweeper } from './subscription-renewal/subscription-renewal.job';
-import { SubscriptionRenewalRepo } from './subscription-renewal/subscription-renewal.repo';
+import { SubscriptionRenewalAutoService } from './subscription-renewal/lines/subscription-renewal-auto.service';
+import { SubscriptionRenewalLinesFactsService } from './subscription-renewal/lines/subscription-renewal-lines-facts.service';
+import { SubscriptionRenewalLinesService } from './subscription-renewal/lines/subscription-renewal-lines.service';
+import { KpiMissedAdjustmentService } from './subscription-renewal/kpi/kpi-missed-adjustment.service';
+import { SubscriptionRenewalKpiService } from './subscription-renewal/kpi/subscription-renewal-kpi.service';
+import { SubscriptionRenewalAutoRepo } from './subscription-renewal/subscription-renewal-auto.repo';
 import { SubscriptionRenewalsController } from './subscription-renewal/subscription-renewals.controller';
+import { SeatPurchaseInvoiceDueService } from './shared-pool/seat-purchase-invoice-due.service';
+import { SeatPurchaseRouteService } from './seat-purchase/seat-purchase-route.service';
+import { SeatPurchasesController } from './seat-purchase/seat-purchases.controller';
 import { PoliciesTemplateFacadeModule } from '../policies/policies-template-facade.module';
 import { LicenseKeyTemplateListener } from './license-key/license-key-template.listener';
 
@@ -166,6 +187,7 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
 @Module({
   imports: [
     PoliciesTemplateFacadeModule,
+    LicensingSeatMonthFacadeModule,
     DatabaseModule,
     AuditModule,
     OrganizationModule,
@@ -186,18 +208,20 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     ProvisioningTasksController,
     RevocationTasksController,
     LicenseKeysController,
+    LicenseLotCreateController,
+    LicenseLotKeysController,
     ExpiryController,
     SaasIssuesController,
     MySoftwareController,
     SubscriptionRenewalsController,
     StockSummaryController,
+    SeatPurchasesController,
   ],
   providers: [
     LicenseKeyTemplateListener,
     LicensingAlerts,
     AssignmentRepo,
     AssignmentRevocationRepo,
-    AssignmentChainRepo,
     RevocationCompletedFactsReader,
     AssignmentDepartmentRepo,
     AssignmentSeatOccupancy,
@@ -205,6 +229,7 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     DepartmentOpenWorkReader,
     ProvisioningDepartmentUseRepo,
     AssignmentService,
+    SubscriptionSeatUsageService,
     AssignmentEndService,
     AssignmentCarryRepo,
     AssignmentFactsRepo,
@@ -227,6 +252,8 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     SharedPoolCapacityRepo,
     SharedPoolAvoidedCostRepo,
     SharedPoolService,
+    SeatPurchaseRouteService,
+    SeatPurchaseInvoiceDueService,
     StockSummaryQueryService,
     ProvisioningTaskRepo,
     ProvisioningTaskFrame,
@@ -272,6 +299,7 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     ExpiryQueueRepo,
     ExpiryQueueService,
     SaasIssueRepo,
+    SaasIssueOpenWorkReader,
     SaasIssueFactsRepo,
     SaasIssueCalendar,
     SaasIssueNotifier,
@@ -282,8 +310,15 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     SaasIssueSweeper,
     MySoftwareRepo,
     MySoftwareService,
-    SubscriptionRenewalRepo,
+    SubscriptionRenewalLinesFactsService,
+    SubscriptionRenewalAutoService,
+    SubscriptionRenewalLinesService,
+    KpiMissedAdjustmentService,
+    SubscriptionRenewalKpiService,
+    SubscriptionRenewalAutoRepo,
     SubscriptionRenewalSeatRepo,
+    RenewalSavingsRepo,
+    RenewalSavingsService,
     RenewalPartiesService,
     RenewalRankingService,
     RenewalSeatsNeededService,
@@ -292,6 +327,7 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     RenewalRecordService,
     RenewalOutcomeService,
     RenewalAlertsService,
+    WorkspaceAdminAlertService,
     RenewalDeadlineService,
     RenewalViewService,
     SubscriptionRenewalSweepService,
@@ -303,6 +339,9 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     LicenseKeyRepo,
     LicenseKeyRevealQuotaRepo,
     LicenseKeyService,
+    LicenseLotKeyImportService,
+    LicenseLotCreateService,
+    LicenseKeyImportSettingsService,
     LicenseKeyAssignmentService,
     {
       provide: LicenseKeyCipher,
@@ -332,11 +371,14 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     SharedPoolVacancyService,
     LicensingOpenGrantsApi,
     LicensingPoolStockApi,
-    AssignmentSeatMonthRepo,
-    LicensingSeatMonthApi,
     LicensingDepartmentToolsApi,
     LicensingRenewalApi,
     LicensingSeatBaselineApi,
+    DeviceActivationRepo,
+    DeviceActivationService,
+    DeviceActivationCloseService,
+    DeviceActivationQueryService,
+    LicensingDeviceActivationApi,
   ],
   // Other modules read through the facade and bind the extension points; the capability services and the repos stay private.
   exports: [
@@ -346,10 +388,11 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     LicensingUsageApi,
     LicensingOpenGrantsApi,
     LicensingPoolStockApi,
-    LicensingSeatMonthApi,
+    LicensingSeatMonthFacadeModule,
     LicensingDepartmentToolsApi,
     LicensingRenewalApi,
     LicensingSeatBaselineApi,
+    LicensingDeviceActivationApi,
     GrantRequestGateHook,
     RevocationListeners,
     RenewalHoldHook,

@@ -31,7 +31,10 @@ export class RevocationCompletedFactsReader {
   async completedOf(
     tx: DbTx,
     task: { id: string; assignmentId: string },
-    done: Pick<RevocationCompletedFacts, 'endedOn' | 'paidThroughOn' | 'k1Checklist'> & {
+    done: Pick<
+      RevocationCompletedFacts,
+      'endedOn' | 'paidThroughOn' | 'k1Checklist' | 'personalCommitmentMonths' | 'billingAnchorOn'
+    > & {
       provisioningType: RevocationCompletedFacts['provisioningType'];
     },
   ): Promise<RevocationCompletedFacts> {
@@ -45,6 +48,8 @@ export class RevocationCompletedFactsReader {
       provisioningType: done.provisioningType,
       endedOn: done.endedOn,
       paidThroughOn: done.paidThroughOn,
+      personalCommitmentMonths: done.personalCommitmentMonths ?? null,
+      billingAnchorOn: done.billingAnchorOn ?? null,
       sources: (await this.reasons.listOf([task.id], tx)).map((reason) => reason.source),
       k1Checklist: done.k1Checklist,
     };

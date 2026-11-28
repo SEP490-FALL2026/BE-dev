@@ -5,8 +5,7 @@ import { Hook } from '../../../core/extension/hook';
 import { Listeners } from '../../../core/extension/listeners';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import type { PendingRenewal } from './licensing-renewal.types';
-import type { RenewalFinancialReader, RenewalUsageReader } from './licensing-subscription-renewal.types';
+import type { PendingRenewal, RenewalFinancialReader, RenewalUsageReader } from './licensing-renewal.types';
 import type { SeatBaselineClosedHolder } from './licensing.types';
 import type {
   GrantOutcome,
@@ -63,7 +62,13 @@ export interface GrantRequestGate {
    */
   reportRightReplaced(
     tx: DbTx,
-    input: { assignmentId: string; provisioningType: ProvisioningKind; endedOn: BusinessDate; now: Date },
+    input: {
+      assignmentId: string;
+      provisioningType: ProvisioningKind;
+      endedOn: BusinessDate;
+      now: Date;
+      newRequestId?: string;
+    },
   ): Promise<void>;
   /** Whether the request waits for the IT Admin to close the task of its grant as cancelled: nothing else is decided on it. */
   isWithdrawing(tx: DbTx, requestId: string, employeeId?: string): Promise<boolean>;
@@ -72,6 +77,22 @@ export interface GrantRequestGate {
    * and what was held for it goes back. Returns false, changing nothing, when the request was not waiting for that.
    */
   reportCancelled(tx: DbTx, requestId: string, employeeId?: string): Promise<boolean>;
+  /**
+   * Returns `${requestId}:${beneficiaryEmployeeId}` keys for items whose request is spend-approved and eligible for
+   * seat purchase on `expectedPlanId`.
+   */
+  checkSeatPurchaseItems(
+    tx: DbTx,
+    items: readonly { requestId: string; beneficiaryEmployeeId: string }[],
+    expectedPlanId: string,
+  ): Promise<Set<string>>;
+  /** Returns `(beneficiaries, chargedExcess)` per `REQUEST` lot id for `F11` seat reservation checks. */
+  reservedForRequestLots(
+    lotRequests: readonly { lotId: string; requestId: string }[],
+    tx?: DbTx,
+  ): Promise<Map<string, { beneficiaries: number; chargedExcess: number }>>;
+  /** Whether the lot already has at least one `license_lot_charges` row. */
+  hasLotCharges(lotId: string, tx?: DbTx): Promise<boolean>;
 }
 
 /** The one gate of requests the provisioning asks (bound by requests; every graph that loads licensing loads it). */

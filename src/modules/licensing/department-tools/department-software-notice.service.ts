@@ -20,14 +20,22 @@ export class DepartmentSoftwareNotice {
   ) {}
 
   /**
-   * The IT Admin in charge of the department, or, while nobody who can act is, every IT Admin who can (the proposal then falls to any of
-   * them, `US-01-11`).
+   * Notifies the acting IT Admins of the department (in-charge and active substitute), or falls back to the usable Super Admin when
+   * none can act.
    */
   async proposed(tx: DbTx, proposal: SoftwareProposal): Promise<void> {
-    const inCharge = await this.organizationReads.getItAdminInChargeOfDepartment(proposal.departmentId, tx);
-    const usable = inCharge ? await this.identity.findUsableItAdminEmployeeIds([inCharge], tx) : new Set<string>();
-    const recipients =
-      inCharge !== null && usable.has(inCharge) ? [inCharge] : await this.identity.findAllUsableItAdminEmployeeIds(tx);
+    const acting = (
+      await this.organizationReads.itAdminsActingFor(
+        [proposal.departmentId],
+        (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
+        tx,
+      )
+    ).get(proposal.departmentId);
+    let recipients = acting && acting.actors.length > 0 ? acting.actors : [];
+    if (recipients.length === 0) {
+      const superAdmin = await this.identity.findUsableSuperAdminEmployeeId(tx);
+      recipients = superAdmin !== null ? [superAdmin] : [];
+    }
     for (const recipientEmployeeId of recipients) {
       await this.notifications.notifyInApp(tx, {
         organizationId: proposal.organizationId,

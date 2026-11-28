@@ -11,6 +11,7 @@ import { NESTED_ARRAYS_RC1 } from './api-collection-registry-nested-rc1';
 import { NESTED_ARRAYS_RC2 } from './api-collection-registry-nested-rc2';
 import { NESTED_ARRAYS_SM1 } from './api-collection-registry-nested-sm1';
 import { NESTED_ARRAYS_US1 } from './api-collection-registry-nested-us1';
+import { NESTED_ARRAYS_REDESIGN_W3_TECH } from './api-collection-registry-nested-redesign-w3-tech';
 import { NESTED_ARRAYS_W2 } from './api-collection-registry-nested-w2';
 import { NESTED_ARRAYS_W3 } from './api-collection-registry-nested-w3';
 import { NESTED_ARRAYS_W6 } from './api-collection-registry-nested-w6';
@@ -354,6 +355,7 @@ export const NESTED_ARRAYS_FIRST_HALF: readonly NestedArrayEntry[] = [
   },
   // The arrays of the answers of the wave W2 (their own file: this one is at the line limit of the support files).
   ...NESTED_ARRAYS_W2,
+  ...NESTED_ARRAYS_REDESIGN_W3_TECH,
   ...NESTED_ARRAYS_W3,
   ...NESTED_ARRAYS_G9,
   ...NESTED_ARRAYS_W6,

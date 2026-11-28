@@ -332,9 +332,17 @@ export class CredentialRepo {
   async lockRegistrationForCode(
     tx: DbTx,
     registrationId: string,
-  ): Promise<{ organizationId: string; endedAt: Date | null; signatureRecorded: boolean } | null> {
-    const rows = await tx.$queryRaw<{ organizationId: string; endedAt: Date | null; signatureRecorded: boolean }[]>`
+  ): Promise<{
+    organizationId: string;
+    endedAt: Date | null;
+    collectorInstalled: boolean;
+    signatureRecorded: boolean;
+  } | null> {
+    const rows = await tx.$queryRaw<
+      { organizationId: string; endedAt: Date | null; collectorInstalled: boolean; signatureRecorded: boolean }[]
+    >`
       SELECT r.organization_id AS "organizationId", r.ended_at AS "endedAt",
+             r.collector_installed AS "collectorInstalled",
              EXISTS (SELECT 1 FROM device_signature_records s WHERE s.registration_id = r.id) AS "signatureRecorded"
         FROM device_registrations r WHERE r.id = ${registrationId}::uuid FOR SHARE`;
 

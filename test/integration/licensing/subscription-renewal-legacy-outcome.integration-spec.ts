@@ -78,7 +78,7 @@ describe('the outcome of a case decided before the one-write rule (integration, 
     );
   });
 
-  it('refuses a reduction whose seats are still held, then records it with the savings it shows', async () => {
+  it('refuses a reduction whose seats are still held, then records it with no saving yet, which is written when Finance confirms the first invoice of the new period', async () => {
     const { seats, id } = await legacy('REDUCE', 1, 3);
 
     expect(h.codeOf(await h.outcome(id, { outcome: 'AS_DECIDED', nextPeriod: nextYear(5) }).expect(422))).toBe(
@@ -102,7 +102,8 @@ describe('the outcome of a case decided before the one-write rule (integration, 
 
     expect(renewal.outcomeDetail).toMatchObject({
       kind: 'AS_DECIDED',
-      realisedSavings: { amount: '9000000', currency: 'VND' },
+      // The IT Admin records no saving: it is written once, when Finance confirms the first invoice of the new period.
+      realisedSavings: null,
     });
   });
 
@@ -185,7 +186,7 @@ describe('the outcome of a case decided before the one-write rule (integration, 
     await h.outcome(id, { outcome: 'UNCONFIRMED' }).expect(200);
   });
 
-  it('keeps the role of a decision: the three of before and the IT Admin in charge are the only ones the database accepts', async () => {
+  it('keeps the role of a decision: the three of before, the IT Admin in charge and the system are the only ones the database accepts', async () => {
     const { rows } = await h.ctx.sql.query<{ definition: string }>(
       `SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conname = 'subscription_renewals_decider_role'`,
     );
@@ -193,11 +194,11 @@ describe('the outcome of a case decided before the one-write rule (integration, 
     expect(rows).toHaveLength(1);
     const accepted = [...rows[0].definition.matchAll(/'([A-Z_]+)'::text/g)].map((match) => match[1]).sort();
     expect(accepted).toEqual(
-      ['CONFLICT_SUBSTITUTE', 'IT_ADMIN_IN_CHARGE', 'OWNER_DEPARTMENT_HEAD', 'SPENDING_APPROVER'].sort(),
+      ['CONFLICT_SUBSTITUTE', 'IT_ADMIN_IN_CHARGE', 'OWNER_DEPARTMENT_HEAD', 'SPENDING_APPROVER', 'SYSTEM'].sort(),
     );
   });
 
-  it('refuses a non-responsible IT Admin with 403 NOT_RESPONSIBLE when the responsible admin is active, and allows when locked', async () => {
+  it('refuses a non-responsible IT Admin with 403 NOT_RESPONSIBLE whether the responsible admin is active or locked', async () => {
     const other = await handOthersToSecondItAdmin(h);
     const { subscriptionId, id } = await legacy('RENEW', undefined, 0);
     await h.ctx.sql.query(`UPDATE subscriptions SET responsible_it_admin_employee_id = $1 WHERE id = $2`, [
@@ -216,6 +217,10 @@ describe('the outcome of a case decided before the one-write rule (integration, 
     ]);
     await h.ctx.sql.query(`UPDATE app_users SET status = 'LOCKED' WHERE employee_id = $1`, [lockedEmp]);
 
-    await h.outcome(id, { outcome: 'UNCONFIRMED' }).expect(200);
+    const deniedWhileLocked = await h.outcome(id, { outcome: 'UNCONFIRMED' });
+    expect([deniedWhileLocked.status, h.codeOf(deniedWhileLocked)]).toEqual([
+      403,
+      'SUBSCRIPTION_RENEWAL.NOT_RESPONSIBLE',
+    ]);
   });
 });

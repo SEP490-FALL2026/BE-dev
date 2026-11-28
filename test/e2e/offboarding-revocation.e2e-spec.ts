@@ -24,6 +24,7 @@ describe('the departure of a person and the revocation of their seats (e2e, D-3)
   beforeAll(async () => {
     await h.start();
     design = await h.departmentWithUnit('P-DES');
+    await h.setItAdminInCharge(design, { employeeId: h.it1.employeeId, account: h.it1 });
     head = await h.worker(design, 'DES-H1');
     await h.makeHead(design, head);
     // Two subscriptions the department owns (a seat sits only on a subscription of its own department, F20).

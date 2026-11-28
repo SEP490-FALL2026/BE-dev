@@ -7,6 +7,7 @@ export const snapshotOf = (record: SubscriptionRecord) => ({
   unitPrice: record.unitPrice
     ? `${record.unitPrice.amountMinor} ${record.unitPrice.currency} on ${record.unitPrice.recordedOn}`
     : null,
+  monthlyUnitPriceMinor: record.monthlyUnitPriceMinor?.toString() ?? null,
   reporting: record.priceSnapshot
     ? `${record.priceSnapshot.reportingMinor} ${record.priceSnapshot.reportingCurrency} at ${formatRate(record.priceSnapshot.rate)} of ${record.priceSnapshot.rateDate}`
     : null,
@@ -23,6 +24,10 @@ export const snapshotOf = (record: SubscriptionRecord) => ({
   responsibleItAdminEmployeeId: record.responsibleItAdminEmployeeId,
   vendorMinimumSeats: record.vendorMinimumSeats,
   isPrimaryForPlan: record.isPrimaryForPlan,
+  workspaceId: record.workspace?.id ?? null,
+  seatCounting: record.seatCounting,
+  minimumSeatsTotal: record.minimumSeatsTotal,
+  invoicedLater: record.invoicedLater,
   status: record.status,
 });
 
@@ -31,6 +36,7 @@ export const stateOf = (record: SubscriptionRecord): SubscriptionState => ({
   status: record.status,
   purchasedQuantity: record.purchasedQuantity,
   unitPrice: record.unitPrice,
+  monthlyUnitPriceMinor: record.monthlyUnitPriceMinor,
   priceSnapshot: record.priceSnapshot,
   originalPrice: record.originalPrice,
   billingCycle: record.billingCycle,
@@ -45,6 +51,10 @@ export const stateOf = (record: SubscriptionRecord): SubscriptionState => ({
   responsibleItAdminEmployeeId: record.responsibleItAdminEmployeeId,
   vendorMinimumSeats: record.vendorMinimumSeats,
   isPrimaryForPlan: record.isPrimaryForPlan,
+  workspaceId: record.workspace?.id ?? null,
+  seatCounting: record.seatCounting,
+  minimumSeatsTotal: record.minimumSeatsTotal,
+  invoicedLater: record.invoicedLater,
 });
 
 /** The state in one fixed order of keys, with money as text, so that two equal states serialize equally. */
@@ -53,6 +63,7 @@ const canonical = (state: SubscriptionState): string =>
     state.status,
     state.purchasedQuantity,
     state.unitPrice && [state.unitPrice.amountMinor.toString(), state.unitPrice.currency, state.unitPrice.recordedOn],
+    state.monthlyUnitPriceMinor?.toString() ?? null,
     state.priceSnapshot && [
       state.priceSnapshot.rate.toString(),
       state.priceSnapshot.rateDate,
@@ -74,6 +85,10 @@ const canonical = (state: SubscriptionState): string =>
     state.responsibleItAdminEmployeeId,
     state.vendorMinimumSeats,
     state.isPrimaryForPlan,
+    state.workspaceId ?? null,
+    state.seatCounting ?? 'FIXED',
+    state.minimumSeatsTotal ?? null,
+    state.invoicedLater ?? false,
   ]);
 
 /** True when two states hold the same data. */

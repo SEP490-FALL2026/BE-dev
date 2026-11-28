@@ -11,60 +11,13 @@ import type {
   AssignmentSource,
   ExistingAssignment,
 } from '../public/licensing.types';
-
-/** The columns an assignment is answered with: a list reads these and nothing else. */
-const RECORD_SELECT = {
-  id: true,
-  source: true,
-  kind: true,
-  planId: true,
-  subscriptionId: true,
-  employeeId: true,
-  accountIdentifier: true,
-  reason: true,
-  costCenterId: true,
-  owningDepartmentId: true,
-  validFrom: true,
-  validFromBasis: true,
-  validUntil: true,
-  expectedEndDate: true,
-  predecessorId: true,
-  isMachineAccount: true,
-  machineAccountNote: true,
-  failedAt: true,
-  cancelledAt: true,
-  createdAt: true,
-} satisfies Prisma.LicenseAssignmentSelect;
-type Row = Prisma.LicenseAssignmentGetPayload<{ select: typeof RECORD_SELECT }>;
+import { RECORD_SELECT, toRecord } from './assignment-record.mapper';
 
 /** An assignment holds a seat from the day it is made until it ends or fails: not ended as of `day` and not failed. */
 const HOLDING = (day: BusinessDate): Prisma.LicenseAssignmentWhereInput => ({
   failedAt: null,
   cancelledAt: null,
   OR: [{ validUntil: null }, { validUntil: { gt: toDateColumn(day) } }],
-});
-
-export const toRecord = (row: Row): AssignmentRecord => ({
-  id: row.id,
-  source: row.source,
-  kind: row.kind,
-  planId: row.planId,
-  subscriptionId: row.subscriptionId,
-  employeeId: row.employeeId,
-  accountIdentifier: row.accountIdentifier,
-  reason: row.reason,
-  costCenterId: row.costCenterId,
-  owningDepartmentId: row.owningDepartmentId,
-  effectiveFrom: fromDateColumn(row.validFrom),
-  effectiveFromBasis: row.validFromBasis,
-  validUntil: row.validUntil ? fromDateColumn(row.validUntil) : null,
-  expectedEndDate: row.expectedEndDate ? fromDateColumn(row.expectedEndDate) : null,
-  predecessorId: row.predecessorId,
-  isMachineAccount: row.isMachineAccount,
-  machineAccountNote: row.machineAccountNote,
-  failedAt: row.failedAt,
-  cancelledAt: row.cancelledAt,
-  createdAt: row.createdAt,
 });
 
 export interface NewAssignment {
@@ -86,6 +39,9 @@ export interface NewAssignment {
   baselineImportId: string | null;
   /** The older right of the same person that the grant of this one ended the day it was given (R-49); absent for every other right. */
   replacesAssignmentId?: string | null;
+  /** A personal right of a K1 plan names the months it commits to and the day its billing counts from; every other right leaves both out. */
+  personalCommitmentMonths?: 1 | 12 | null;
+  billingAnchorOn?: BusinessDate | null;
   /** A record that follows a flagged seat keeps its flag and its reason (`R-9`); every other record is written plain. */
   isMachineAccount: boolean;
   machineAccountNote: string | null;
@@ -120,6 +76,8 @@ export class AssignmentRepo {
         predecessorId: input.predecessorId,
         baselineImportId: input.baselineImportId,
         replacesAssignmentId: input.replacesAssignmentId ?? null,
+        personalCommitmentMonths: input.personalCommitmentMonths ?? null,
+        billingAnchorOn: input.billingAnchorOn ? toDateColumn(input.billingAnchorOn) : null,
         isMachineAccount: input.isMachineAccount,
         machineAccountNote: input.machineAccountNote,
         createdByAppUserId: input.createdByAppUserId,
@@ -252,6 +210,31 @@ export class AssignmentRepo {
     });
   }
 
+  /** How many assignments occupy `day` per `(subscriptionId, planId)` pair, keyed as `${subscriptionId}:${planId}`. */
+  async countOccupyingBySubscriptionPlans(
+    subscriptionIds: readonly string[],
+    day: BusinessDate,
+    tx?: DbTx,
+  ): Promise<Map<string, number>> {
+    if (subscriptionIds.length === 0) return new Map();
+    const date = toDateColumn(day);
+    const rows = await (tx ?? this.prisma).licenseAssignment.groupBy({
+      by: ['subscriptionId', 'planId'],
+      where: {
+        subscriptionId: { in: [...subscriptionIds] },
+        validFrom: { lte: date },
+        OR: [{ validUntil: null }, { validUntil: { gt: date } }],
+      },
+      _count: { _all: true },
+    });
+
+    return new Map(
+      rows
+        .filter((row): row is typeof row & { subscriptionId: string } => row.subscriptionId !== null)
+        .map((row) => [`${row.subscriptionId}:${row.planId}`, row._count._all]),
+    );
+  }
+
   /** The assignments of the subscription that have not ended and have not failed as of `day` (a future start included). */
   async countHolding(subscriptionId: string, day: BusinessDate, tx?: DbTx): Promise<number> {
     return (tx ?? this.prisma).licenseAssignment.count({ where: { subscriptionId, ...HOLDING(day) } });
@@ -322,26 +305,33 @@ export class AssignmentRepo {
   }
 
   /**
-   * The seats of these purchases held as of `day` (`HOLDING`), by the person who holds each or answers for it (a service account), in one
-   * statement: what charges a seat to the department of its holder (`QĐ-103k`).
+   * The seats of these purchases held as of `day` (`HOLDING`), by the person who holds each or answers for it (a service account) and by
+   * the plan of the seat, in one statement: what charges a seat to the department of its holder (`QĐ-103k`) at the price of its plan.
    */
   async countHoldingByHolder(
     ids: readonly string[],
     day: BusinessDate,
     tx?: DbTx,
-  ): Promise<{ subscriptionId: string; employeeId: string; seats: number }[]> {
+  ): Promise<{ subscriptionId: string; planId: string; employeeId: string; seats: number }[]> {
     if (ids.length === 0) return [];
     const rows = await (tx ?? this.prisma).licenseAssignment.groupBy({
-      by: ['subscriptionId', 'employeeId'],
+      by: ['subscriptionId', 'planId', 'employeeId'],
       where: { subscriptionId: { in: [...ids] }, ...HOLDING(day) },
       _count: { _all: true },
-      orderBy: [{ subscriptionId: 'asc' }, { employeeId: 'asc' }],
+      orderBy: [{ subscriptionId: 'asc' }, { planId: 'asc' }, { employeeId: 'asc' }],
     });
 
     return rows.flatMap((row) =>
       row.subscriptionId === null
         ? []
-        : [{ subscriptionId: row.subscriptionId, employeeId: row.employeeId, seats: row._count._all }],
+        : [
+            {
+              subscriptionId: row.subscriptionId,
+              planId: row.planId,
+              employeeId: row.employeeId,
+              seats: row._count._all,
+            },
+          ],
     );
   }
 

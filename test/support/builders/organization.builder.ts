@@ -9,6 +9,7 @@ import {
 import { DepartmentCreationWindowHook } from '../../../src/modules/organization/public/organization.extension-points';
 import { EmployeeManualService } from '../../../src/modules/organization/employee/employee-manual.service';
 import { CreateEmployeeBodyDto } from '../../../src/modules/organization/employee/employee.dto';
+import { OrganizationContextService } from '../../../src/modules/organization/organization-context.service';
 import type { HttpTestApp } from '../http-test-app';
 import { changeRoleTo, principalOf, sent } from './account.builder';
 
@@ -24,8 +25,11 @@ import { changeRoleTo, principalOf, sent } from './account.builder';
 /** The Super Admin enters one person by hand (`POST /employees`): the employee, the placement, the audit row and the notices. */
 export async function enterEmployee(ctx: HttpTestApp, adminToken: string, body: object): Promise<{ id: string }> {
   const actor = await principalOf(ctx, adminToken);
+  const today = await ctx.app.get(OrganizationContextService, { strict: false }).businessToday();
 
-  return ctx.app.get(EmployeeManualService, { strict: false }).create(actor, CreateEmployeeBodyDto.create(sent(body)));
+  return ctx.app
+    .get(EmployeeManualService, { strict: false })
+    .create(actor, CreateEmployeeBodyDto.create(sent(body)), new Date(`${today}T05:00:00Z`));
 }
 
 /** The fixtures that make a department take turns (see `createDepartment`). */

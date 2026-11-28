@@ -2,7 +2,7 @@ import { DemoApiError } from '../demo-api-client';
 import { emptyIds, type DemoRunContext } from '../demo-run.types';
 import { SHARED_DEMO_V4 as fixture } from '../fixture/shared-demo-v4';
 import { demoSteps } from '../seed-steps';
-import { deviceBody, signatureRecordBody, allowlistBody, DEVICE_STEPS } from './devices.steps';
+import { DEVICE_INITIAL_STEPS, allowlistBody, initialRecordBody, signatureRecordBody } from './devices.steps';
 
 describe('the monitoring notice and company devices', () => {
   it('declares seven unique machines, five signed records and four acknowledgements by real account holders', () => {
@@ -16,16 +16,23 @@ describe('the monitoring notice and company devices', () => {
     }
     expect(fixture.devices.find(({ assetCode }) => assetCode === 'SV-LT-004')!.holder).toBe('NV-BOD4');
   });
-  it('sends the employee UUID and hostname, and binds a signature to the current notice version', () => {
+  it('enters an old machine with its own code, kind, serial number, bundled Windows, the key it already ran and the collector on it, and binds a signature to the current notice version', () => {
     const ids = emptyIds();
     ids.employees.set('NV-DEV5', '00000000-0000-4000-8000-000000000001');
+    ids.plans.set('windows-11-pro-oem', 'windows-plan-id');
     const ctx = { fixture, ids } as unknown as DemoRunContext;
-    expect(deviceBody(ctx, fixture.devices[0])).toEqual({
+    expect(initialRecordBody(ctx, fixture.devices[0], 'key-1')).toEqual({
       assetCode: 'SV-LT-001',
+      deviceType: 'LAP',
       hostname: 'SV-LT-001',
       os: 'Windows 11',
+      serialNumber: 'SV-SN-LT-001',
+      bundledPlanIds: ['windows-plan-id'],
+      keyActivations: [{ licenseKeyId: 'key-1' }],
       holderEmployeeId: '00000000-0000-4000-8000-000000000001',
+      collectorInstalled: true,
     });
+    expect(initialRecordBody(ctx, fixture.devices[0], null)).not.toHaveProperty('keyActivations');
     expect(signatureRecordBody('document-1', 'notice-1')).toEqual({
       documentId: 'document-1',
       noticeVersionId: 'notice-1',
@@ -42,14 +49,15 @@ describe('the monitoring notice and company devices', () => {
     const keys = demoSteps(fixture).map(({ key }) => key);
     for (const [before, after] of [
       ['devices.notice', 'devices.allowlist'],
-      ['devices.allowlist', 'devices.registry'],
+      ['devices.allowlist', 'devices.initial-records'],
+      ['devices.initial-records', 'devices.registry'],
       ['devices.registry', 'devices.acknowledgements'],
     ])
       expect(keys.indexOf(before)).toBeLessThan(keys.indexOf(after));
   });
   it('publishes the notice with tool status enabled only when no notice exists', async () => {
     expect(fixture.monitoringNotice).toMatchObject({ includesToolStatus: true, requiresReacknowledgement: true });
-    const step = DEVICE_STEPS.find(({ key }) => key === 'devices.notice')!;
+    const step = DEVICE_INITIAL_STEPS.find(({ key }) => key === 'devices.notice')!;
     const call = jest
       .fn()
       .mockRejectedValueOnce(new DemoApiError('GET', '/monitoring-notices/current', 404, 'NOTICE.NOT_FOUND'))

@@ -46,6 +46,15 @@ export class ProvisioningHolderService {
     return this.organizationReads.lockEmployeeForShare(tx, employeeId);
   }
 
+  /** Delegates acting IT Admin authorization for the beneficiary/department to the shared task frame. */
+  requireActingItAdmin(
+    tx: DbTx | undefined,
+    actor: AuthenticatedPrincipal,
+    target: { beneficiaryEmployeeId: string; departmentId?: string; taskId?: string; now?: Date },
+  ): Promise<{ bySubstitute: boolean }> {
+    return this.frame.requireActingItAdmin(tx, actor, target);
+  }
+
   /**
    * No task to grant begins for a beneficiary who has left, nor from the day a departure blocks their access although they are not marked
    * left yet (`QĐ-77f`, `QĐ-110d`); a task already being worked is not touched. The grant and the claim of a queued task both ask it, in the
@@ -108,7 +117,7 @@ export class ProvisioningHolderService {
       throw new ProvisioningContractEndedError(input.requestId, contractEnd);
     }
 
-    const mode = await this.frame.selfExecutionMode(actor, input.employeeId, tx);
+    const mode = await this.frame.selfExecutionMode(actor, input.employeeId);
 
     return {
       employeeId: input.employeeId,
@@ -129,8 +138,8 @@ export class ProvisioningHolderService {
   /**
    * `named` is the person the IT Admin chose in the place of the one the request names. Throws
    * ProvisioningResponsibleNotInDepartmentError (the one the request names is not there any more),
-   * ProvisioningResponsibleInvalidError (the one the IT Admin named is not there), RequestPartyIneligibleError (the one the IT Admin
-   * named is the spending approver, `D-S21`) and ProvisioningAnotherItAdminNeededError.
+   * ProvisioningResponsibleInvalidError (the one the IT Admin named is not there), and RequestPartyIneligibleError (the one the IT Admin
+   * named is the spending approver, `D-S21`).
    */
   async service(
     tx: DbTx,
@@ -152,7 +161,7 @@ export class ProvisioningHolderService {
         ? new ProvisioningResponsibleNotInDepartmentError()
         : new ProvisioningResponsibleInvalidError(problem);
     }
-    const mode = await this.frame.selfExecutionMode(actor, employeeId, tx);
+    const mode = await this.frame.selfExecutionMode(actor, employeeId);
 
     return {
       employeeId,

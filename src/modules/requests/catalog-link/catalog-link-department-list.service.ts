@@ -2,8 +2,10 @@ import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
-import { LicensingDepartmentToolsApi } from '../../licensing/public/licensing-department-tools.api';
-import type { DepartmentSoftwareEntryResult } from '../../licensing/public/licensing-department-tools.types';
+import {
+  LicensingDepartmentToolsApi,
+  type DepartmentSoftwareEntryResult,
+} from '../../licensing/public/licensing-department-tools.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { CatalogLinkRefusedError } from '../assessment/assessment.errors';
 
@@ -40,9 +42,9 @@ export class CatalogLinkDepartmentListService {
     });
   }
 
-  /** Throws CatalogLinkRefusedError unless the department is one the IT Admin is in charge of (`US-01-11`: the ones that name them and, while nobody who can act is named, every active one). */
+  /** Throws CatalogLinkRefusedError unless the department is one the IT Admin is acting for. */
   private async requireInCharge(tx: DbTx, actor: AuthenticatedPrincipal, departmentId: string): Promise<void> {
-    const scope = await this.organizationReads.getItAdminScope(
+    const scope = await this.organizationReads.getItAdminActingScope(
       actor.employeeId,
       (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
       tx,

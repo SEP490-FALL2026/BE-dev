@@ -113,6 +113,48 @@ describe('the check of the budget of a request (BR-MF1-06e..g)', () => {
     });
   });
 
+  describe('W3-08: running uncommitted K2 cost is deducted from remaining base and remaining with reserve', () => {
+    it('SPEC-B1 case 13: base 132.000.000, spent 60.000.000, held 50.000.000, pending 10.000.000, runningUncommitted 4.500.000 -> remaining 7.500.000 (same for submission and approval)', () => {
+      const slice: YearSlice = {
+        year: 2027,
+        costMinor: 7_500_000n,
+        pendingMinor: 10_000_000n,
+        budget: {
+          versionId: 'v-2027',
+          baseMinor: 132_000_000n,
+          reserveMinor: 0n,
+          heldMinor: 50_000_000n,
+          spentMinor: 60_000_000n,
+          runningUncommittedMinor: 4_500_000n,
+        },
+      };
+
+      const onSubmission = checkBudget({ slice, priceExpired: false });
+      const onApproval = checkBudget({ slice, priceExpired: false });
+
+      expect(onSubmission.years[0].remainingBaseMinor).toBe(7_500_000n);
+      expect(onSubmission.years[0].remainingWithReserveMinor).toBe(7_500_000n);
+      expect(onSubmission.outcome).toBe('WITHIN_BASE');
+      expect(onApproval).toEqual(onSubmission);
+
+      const overByOne = checkBudget({ slice: { ...slice, costMinor: 7_500_001n }, priceExpired: false });
+      expect(overByOne.outcome).toBe('BLOCKED');
+      expect(overByOne.blockReasons).toEqual(['OVER_RESERVE']);
+      expect(overByOne.overByMinor).toBe(1n);
+    });
+
+    it('deducts runningUncommittedMinor before applying reserve when base is exceeded', () => {
+      const result = check(21n, {
+        budget: budget({ runningUncommittedMinor: 5n }),
+      });
+
+      expect(result.years[0].remainingBaseMinor).toBe(20n);
+      expect(result.years[0].remainingWithReserveMinor).toBe(30n);
+      expect(result.outcome).toBe('USES_RESERVE');
+      expect(result.overBaseByMinor).toBe(1n);
+    });
+  });
+
   describe('the codes a check carries', () => {
     it('gives the data first, then the code of the year', () => {
       expect(codesOf(check(36n, {}, true))).toEqual(['STALE_COST_EVIDENCE', 'INSUFFICIENT_BUDGET']);

@@ -6,11 +6,11 @@ import { OrganizationReadApi } from '../../organization/public/organization-read
 import type { BeneficiaryGoneScope } from '../public/requests.types';
 
 /**
- * Tells the IT Admin about a request the system did not close because its grant is being carried out (`QĐ-110d`): the vendor may already
+ * Tells the acting IT Admins about a request the system did not close because its grant is being carried out: the vendor may already
  * have sent the invitation, so the IT Admin checks it, takes it back and closes the request by hand (`DepartureCancellationService`, which
- * stays open to the IT Admin). The notice goes to the IT Admin in charge of the department the request was sent from, or, when nobody is in
- * charge, to the first IT Admin who can act. It is written in the transaction of the sweep, so it exists exactly when the sweep commits, and
- * once for the request and the person however many times the sweep looks again.
+ * stays open to the IT Admin). The notice goes to the acting IT Admins of the department the request was sent from (usable in-charge and
+ * any usable substitute), or, when none can act, to the usable Super Admin. Written in the transaction of the sweep, once per recipient,
+ * request, and person.
  */
 @Injectable()
 export class BeneficiaryGoneItNotice {
@@ -26,22 +26,33 @@ export class BeneficiaryGoneItNotice {
     employeeId: string,
     scope: BeneficiaryGoneScope,
   ): Promise<void> {
-    const recipient =
-      (await this.organizationReads.getItAdminInChargeOfDepartment(request.departmentId, tx)) ??
-      (await this.identity.findFirstUsableItAdminEmployeeId(tx));
-    if (recipient === null) return;
+    for (const recipientEmployeeId of await this.recipients(tx, request.departmentId)) {
+      await this.notifications.notifyInApp(tx, {
+        organizationId: request.organizationId,
+        recipientEmployeeId,
+        code: 'REQUEST_BENEFICIARY_GONE_IT_CHECK',
+        subject: { type: 'ACCESS_REQUEST', id: request.id },
+        params: {
+          requestId: request.id,
+          beneficiaryEmployeeId: employeeId,
+          reasonKind: scope.kind === 'ALL_OPEN' ? 'DEPARTURE' : 'TRANSFER',
+        },
+        eventKey: `BENEFICIARY_GONE_IT_CHECK:${request.id}:${employeeId}`,
+      });
+    }
+  }
 
-    await this.notifications.notifyInApp(tx, {
-      organizationId: request.organizationId,
-      recipientEmployeeId: recipient,
-      code: 'REQUEST_BENEFICIARY_GONE_IT_CHECK',
-      subject: { type: 'ACCESS_REQUEST', id: request.id },
-      params: {
-        requestId: request.id,
-        beneficiaryEmployeeId: employeeId,
-        reasonKind: scope.kind === 'ALL_OPEN' ? 'DEPARTURE' : 'TRANSFER',
-      },
-      eventKey: `BENEFICIARY_GONE_IT_CHECK:${request.id}:${employeeId}`,
-    });
+  private async recipients(tx: DbTx, departmentId: string): Promise<string[]> {
+    const acting = (
+      await this.organizationReads.itAdminsActingFor(
+        [departmentId],
+        (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
+        tx,
+      )
+    ).get(departmentId);
+    if (acting && acting.actors.length > 0) return acting.actors;
+
+    const superAdmin = await this.identity.findUsableSuperAdminEmployeeId(tx);
+    return superAdmin !== null ? [superAdmin] : [];
   }
 }

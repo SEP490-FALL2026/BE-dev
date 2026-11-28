@@ -39,6 +39,19 @@ const PUBLIC_ROOT_POLICY_FILES: ReadonlyMap<string, PolicyContract> = new Map([
     },
   ],
   [
+    'catalog/public/subscription-line-price.policy.ts',
+    {
+      reason:
+        'the baseline, the running uncommitted cost and the ceiling of a pool invoice price a seat of a plan on a period by the same line: the live line of the plan, otherwise the one closed last, the columns of the period only when it has no line',
+      entry: 'servingMonthlyPriceMinor',
+      consumers: [
+        'budgets/cycle/baseline-catalog-facts.service.ts',
+        'budgets/running-uncommitted/running-uncommitted-facts.service.ts',
+        'requests/purchase-invoice/pool-expectation/purchase-invoice-pool-expectation.service.ts',
+      ],
+    },
+  ],
+  [
     'organization/public/employee-placement.policy.ts',
     {
       reason:

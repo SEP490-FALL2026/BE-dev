@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import { GrantRequestRefusedError } from '../../public/licensing.errors';
+import { ProvisioningTaskFrame } from '../provisioning-task-frame.service';
 import { ProvisioningTaskRepo } from '../provisioning-task.repo';
 import { ProvisioningTaskViewService, type TaskView } from '../provisioning-task-view.service';
 import { ProvisioningGrantPlanner, type GrantInput } from './provisioning-grant-planner.service';
@@ -34,6 +35,7 @@ export class ProvisioningGrantService {
     private readonly views: ProvisioningTaskViewService,
     private readonly refusals: ProvisioningPurchaseRefusal,
     private readonly tasks: ProvisioningTaskRepo,
+    private readonly frame: ProvisioningTaskFrame,
   ) {}
 
   async grant(
@@ -44,7 +46,7 @@ export class ProvisioningGrantService {
     try {
       planned = await this.planner.plan(actor, input);
     } catch (error) {
-      const taken = await this.takenBy(error, input);
+      const taken = await this.takenBy(error, actor, input);
       if (taken) return taken;
       throw error;
     }
@@ -53,7 +55,7 @@ export class ProvisioningGrantService {
       record = await this.runner.run((tx) => this.writer.write(tx, actor, input, planned));
     } catch (error) {
       // Another press took the request between the read above and the lock of the write: its task is the answer.
-      const taken = await this.takenBy(error, input);
+      const taken = await this.takenBy(error, actor, input);
       if (taken) return taken;
       // The grant rolled back with nothing kept; the refusal of the purchase is the one thing that is (`US-07-13` AC-2).
       if (error instanceof PurchaseNotAllowedError) {
@@ -72,11 +74,17 @@ export class ProvisioningGrantService {
   /** The task that already answers for the request and the person, when the request is refused because it has been carried out; else null. */
   private async takenBy(
     error: unknown,
+    actor: AuthenticatedPrincipal,
     input: GrantInput,
   ): Promise<{ task: TaskView; warnings: 'DEPARTMENT_WITHOUT_IT_ADMIN'[] } | null> {
     if (!(error instanceof GrantRequestRefusedError) || error.reason !== 'ENDED') return null;
     const task = await this.tasks.findGrantOf(input.requestId, input.beneficiaryEmployeeId);
+    if (!task) return null;
+    await this.frame.requireActingItAdmin(undefined, actor, {
+      beneficiaryEmployeeId: task.assignment.employeeId,
+      taskId: task.id,
+    });
 
-    return task ? { task: (await this.views.views([task]))[0], warnings: [] } : null;
+    return { task: (await this.views.views([task]))[0], warnings: [] };
   }
 }

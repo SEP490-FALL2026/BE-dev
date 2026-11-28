@@ -27,6 +27,8 @@ export interface ReviewInput {
   invoiceBasisMinor: bigint;
   invoiceActualMinor: bigint;
   priceIncreaseMinor: bigint;
+  /** Live uncommitted K2 + unrequested K1 cost for the year, added to forecast without applying invoice variance k. */
+  runningUncommittedMinor?: bigint;
 }
 
 /** The figures the snapshot keeps, worked out from the input and never again. */

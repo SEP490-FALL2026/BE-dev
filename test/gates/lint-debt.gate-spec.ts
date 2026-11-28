@@ -20,9 +20,9 @@ const ROOT = join(__dirname, '..', '..');
 /** The most suppressions each rule and each part of the codebase may still carry. Lower these when you fix code, never raise them. */
 const CEILINGS = {
   complexity: 42,
-  'max-lines-per-function': 34,
+  'max-lines-per-function': 33,
   /** `complexity` and `max-lines-per-function` together: a function that is too long and too branched is two findings. */
-  complexityAndLines: 76,
+  complexityAndLines: 75,
   /** Every suppression in `src/modules/requests`, the module that carries most of the debt. */
   requests: 22,
 } as const;

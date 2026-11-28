@@ -1,11 +1,18 @@
-import type { DemoApplication, DemoFixture, DemoPlan, DemoSeat, DemoSubscription } from '../demo-fixture.types';
-import { EXTRA_APPLICATIONS, EXTRA_SEATS, EXTRA_SUBSCRIPTIONS, PLAN_TERMS } from './catalog-extra';
+import type {
+  DemoApplication,
+  DemoFixture,
+  DemoLot,
+  DemoPlan,
+  DemoSeat,
+  DemoSubscription,
+} from '../demo-fixture.types';
+import { EXTRA_APPLICATIONS, EXTRA_LOTS, EXTRA_SEATS, EXTRA_SUBSCRIPTIONS, PLAN_TERMS } from './catalog-extra';
 import { app, groupOf, k2, k4, monthly } from './catalog-kit';
 
 /*
  * The thirteen applications of the first dataset (twelve more are in `catalog-extra.ts`). Each (application, plan) has exactly one subscription, the stock of the shared pool (`QĐ-103d`): K2 plans have
  * seats Free to grant (Postman, Slack, GitHub, Mailchimp, Canva, Jira, Figma) and one plan is sold out (1Password); K1 plans are bought
- * on each grant; K4 plans draw from a key store (JetBrains has keys, DataGrip has none); K5 is internal software.
+ * on each grant; K4 plans are lots of licenses that draw from a key store (JetBrains has keys, DataGrip has none); K5 is internal software.
  *
  * A plan administered at the vendor (every K2, and JetBrains All Products, the K4 plan with an admin console) has a workspace profile of two
  * IT Admins (`QĐ-110k`, R-53): DataGrip, a K4 plan without one, is the control case that needs none. Mailchimp is owned by NV-ITA4, who
@@ -45,6 +52,8 @@ const APPLICATIONS: DemoApplication[] = [
         controlLevel: 'PARTIAL',
         dataLossOnRemoval: false,
         sharingPolicy: 'NOT_ALLOWED',
+        referencePrice: '500000',
+        referenceCommitmentMonths: 1,
       },
     ],
     'SAAS',
@@ -62,6 +71,8 @@ const APPLICATIONS: DemoApplication[] = [
         controlLevel: 'PARTIAL',
         dataLossOnRemoval: false,
         sharingPolicy: 'NOT_ALLOWED',
+        referencePrice: '508000',
+        referenceCommitmentMonths: 1,
       },
     ],
     'SAAS',
@@ -79,6 +90,8 @@ const APPLICATIONS: DemoApplication[] = [
         controlLevel: 'PARTIAL',
         dataLossOnRemoval: false,
         sharingPolicy: 'NOT_ALLOWED',
+        referencePrice: '300000',
+        referenceCommitmentMonths: 1,
       },
       // A K1 plan with no subscription at all, only a reference price: a request for it is priced from the plan (`QĐ-113a`, R59).
       {
@@ -111,60 +124,64 @@ const APPLICATIONS: DemoApplication[] = [
 ];
 
 const SUBSCRIPTIONS: DemoSubscription[] = [
-  { ...monthly('jira', 'jira-standard', '200000', 'NV-ITA1', 4), renewalInDays: 20 },
-  // The annual one: 12 months of commitment, renewing in 50 days; a seat costs 4.500.000 a year, 375.000 a month.
+  // QĐ-119e & L-2: Jira monthly, 255.000/user/month, 10 users (6 baseline + 4 free), MEMBERS + invoicedLater.
   {
-    key: 'figma',
-    plan: 'figma-professional',
-    kind: 'TERM',
-    unitPrice: { amount: '4500000', currency: 'VND' },
-    billingCycle: 'ANNUAL',
-    termMonths: 12,
-    renewalInDays: 50,
-    noticePeriodDays: 30,
-    responsible: 'NV-ITA2',
-    freeAfterBaseline: 4,
+    ...monthly('jira', 'jira-standard', '255000', 'NV-ITA1', 4),
+    renewalInDays: 20,
+    seatCounting: 'MEMBERS',
+    invoicedLater: true,
   },
-  { ...monthly('slack', 'slack-pro', '180000', 'NV-ITA1', 6), renewalInDays: 20 },
+  // L-2: Figma monthly, 375.000/member/month, MEMBERS + invoicedLater (vendor bills actual members after the month).
+  {
+    ...monthly('figma', 'figma-professional', '375000', 'NV-ITA2', 4),
+    renewalInDays: 20,
+    seatCounting: 'MEMBERS',
+    invoicedLater: true,
+  },
+  {
+    ...monthly('slack', 'slack-pro', '180000', 'NV-ITA1', 6),
+    renewalInDays: 20,
+    originalPrice: { amount: '7.25', currency: 'USD' },
+  },
   { ...monthly('github', 'github-team', '100000', 'NV-ITA1', 5), renewalInDays: 20 },
   { ...monthly('onepassword', 'onepassword-business', '200000', 'NV-ITA1', 0), renewalInDays: 20 },
   { ...monthly('postman', 'postman-professional', '300000', 'NV-ITA1', 5), renewalInDays: 20 },
   // The IT Admin who leaves answers for it: his departure hands it over (P5).
   { ...monthly('mailchimp', 'mailchimp-standard', '400000', 'NV-ITA4', 4), renewalInDays: 20 },
-  { ...monthly('canva', 'canva-teams', '250000', 'NV-ITA2', 4), renewalInDays: 20 },
-  // K1: bought one by one when a seat is granted, so ChatGPT and Cursor start with none (the MF-5 reduction flows count their seats).
-  { ...monthly('chatgpt', 'chatgpt-plus', '500000', 'NV-ITA1', 0), quantity: 0 },
-  // The vendor quotes 20 USD; a price is written in dong (`QĐ-111an`), so it is 508.000 (at the 25.400 the dataset used to record) and the
-  // dollar quote stays beside it as the original price (FX-1, D-45).
-  {
-    ...monthly('cursor', 'cursor-pro', '508000', 'NV-ITA1', 0),
-    quantity: 0,
-    originalPrice: { amount: '20', currency: 'USD' },
-  },
-  // The K1 plan of the person who leaves today: its one seat is his, so his revocation shows the K1 checklist (D-62).
-  { ...monthly('grammarly', 'grammarly-pro', '300000', 'NV-ITA1', 0), quantity: 1 },
-  // K4: a key is bought once; the keys sit in the key store. JetBrains has three, DataGrip none.
+  { ...monthly('canva', 'canva-teams', '250000', 'NV-ITA2', 2), renewalInDays: 20 },
+];
+
+/**
+ * K4: a key is bought once, as a lot of licenses; the keys sit in the key store. JetBrains All Products was bought twice at two prices (the first lot holds the
+ * three keys of the store, the second none yet); DataGrip has one license and no key.
+ */
+const LOTS: DemoLot[] = [
   {
     key: 'jetbrains',
     plan: 'jetbrains-all',
-    kind: 'PERPETUAL',
+    licenseCount: 3,
     unitPrice: { amount: '6000000', currency: 'VND' },
-    billingCycle: 'MONTHLY',
-    termMonths: 1,
+    purpose: 'STOCK',
+    purchasedDaysAgo: 200,
     responsible: 'NV-ITA1',
-    freeAfterBaseline: 0,
-    quantity: 3,
+  },
+  {
+    key: 'jetbrains-second',
+    plan: 'jetbrains-all',
+    licenseCount: 2,
+    unitPrice: { amount: '6500000', currency: 'VND' },
+    purpose: 'STOCK',
+    purchasedDaysAgo: 90,
+    responsible: 'NV-ITA1',
   },
   {
     key: 'datagrip',
     plan: 'jetbrains-datagrip',
-    kind: 'PERPETUAL',
+    licenseCount: 1,
     unitPrice: { amount: '3000000', currency: 'VND' },
-    billingCycle: 'MONTHLY',
-    termMonths: 1,
+    purpose: 'STOCK',
+    purchasedDaysAgo: 200,
     responsible: 'NV-ITA1',
-    freeAfterBaseline: 0,
-    quantity: 0,
   },
 ];
 
@@ -192,7 +209,8 @@ const SEATS: DemoSeat[] = [
   ...seat('figma', ['NV-DES9'], { grantedDaysAgo: 30 }),
   ...seat('figma', ['NV-DES10'], { endInDays: 20 }),
   ...seat('figma', ['NV-DES12'], { endInDays: 35 }),
-  ...seat('slack', ['NV-ENGH', 'NV-FINH']),
+  ...seat('slack', ['NV-ENGH']),
+  ...seat('slack', ['NV-FINH'], { grantedDaysAgo: 0 }),
   // The seat of the bot that posts the alerts of IT in Slack, held by an IT Admin: marked a machine account, never a ghost seat (DEMO-8).
   ...seat('slack', ['NV-ITA3']),
   // A right that ends in 7 days: its holder asked to carry it on, the request waits for the head (DEMO-5, R33).
@@ -203,36 +221,51 @@ const SEATS: DemoSeat[] = [
   ...seat('postman', ['NV-ENGH', 'NV-LGL1']),
   ...seat('mailchimp', ['NV-DEV4']),
   ...seat('canva', ['NV-DESH', 'NV-DES5']),
-  // The K1 seat of the person who leaves today: its revocation task carries the K1 checklist with the mailbox lock last (D-62).
-  ...seat('grammarly', ['NV-OFF1']),
 ];
 
 /**
  * The reference price of every paid plan (`QĐ-113a`): the price of one seat for a month of the subscription of the plan (a yearly price over 12, rounded
- * up to the dong), or the price of one key (K4). A plan the fixture gave a price by hand (a plan with no subscription) keeps it; K5 has none.
+ * up to the dong), or the price of one license of its first lot (K4). A plan the fixture gave a price by hand (K1 or a plan with no subscription) keeps it; K5 has none.
  */
 function withReferencePrices(
   applications: readonly DemoApplication[],
   subscriptions: readonly DemoSubscription[],
+  lots: readonly DemoLot[],
 ): DemoApplication[] {
   const priced = (plan: DemoPlan): DemoPlan => {
-    const subscription = subscriptions.find((candidate) => candidate.plan === plan.key);
-    if (plan.provisioningType === 'K5' || plan.referencePrice !== undefined || !subscription) return plan;
-    const amount = BigInt(subscription.unitPrice.amount);
-    const perMonth = subscription.billingCycle === 'ANNUAL' ? (amount + 11n) / 12n : amount;
+    if (plan.provisioningType === 'K5' || plan.referencePrice !== undefined) return plan;
+    if (plan.provisioningType === 'K4') {
+      const first = lots.find((candidate) => candidate.plan === plan.key);
 
-    return { ...plan, referencePrice: String(plan.provisioningType === 'K4' ? amount : perMonth) };
+      return first ? { ...plan, referencePrice: first.unitPrice.amount } : plan;
+    }
+    for (const subscription of subscriptions) {
+      const line = subscription.lines?.find((candidate) => candidate.plan === plan.key);
+      if (line) return { ...plan, referencePrice: line.monthlyUnitPrice.amount };
+      if (subscription.plan === plan.key && subscription.unitPrice) {
+        const amount = BigInt(subscription.unitPrice.amount);
+
+        return {
+          ...plan,
+          referencePrice: String(subscription.billingCycle === 'ANNUAL' ? (amount + 6n) / 12n : amount),
+        };
+      }
+    }
+
+    return plan;
   };
 
   return applications.map((application) => ({ ...application, plans: application.plans.map(priced) }));
 }
 
-export const CATALOG: Pick<DemoFixture, 'applications' | 'subscriptions' | 'seats' | 'planTerms'> = {
+export const CATALOG: Pick<DemoFixture, 'applications' | 'subscriptions' | 'lots' | 'seats' | 'planTerms'> = {
   applications: withReferencePrices(
     [...APPLICATIONS, ...EXTRA_APPLICATIONS],
     [...SUBSCRIPTIONS, ...EXTRA_SUBSCRIPTIONS],
+    [...LOTS, ...EXTRA_LOTS],
   ),
   subscriptions: [...SUBSCRIPTIONS, ...EXTRA_SUBSCRIPTIONS],
+  lots: [...LOTS, ...EXTRA_LOTS],
   seats: [...SEATS, ...EXTRA_SEATS],
   planTerms: PLAN_TERMS,
 };

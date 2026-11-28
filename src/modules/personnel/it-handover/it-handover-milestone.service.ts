@@ -3,14 +3,14 @@ import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { CatalogResponsibilityApi } from '../../catalog/public/catalog-responsibility.api';
 import { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
-import { pendingNoticeOwed, plansLeftWithoutAdmin } from './it-handover.policy';
+import { pendingNoticeOwed, remainingResponsibilities } from './it-handover.policy';
 import type { HandoverSource } from './it-handover.types';
 
 /**
  * The milestone of a departure (the block of the access) or of a transfer (the day it takes effect) is here, in the transaction that opens it
- * (`QĐ-110j`, `R-26`, `QĐ-110k`): a departure that takes the last admin of a plan at the vendor away tells every IT Admin; when the IT Admin who leaves still answers for a subscription or an application, every IT Admin who works is told, once
- * each for the file, so the work lands in the common queue and is not left to a person who is leaving. The file is never held back: a hand-over
- * not made changes nothing about its closing (`QĐ-110e`). The same milestone seen twice (a pass that runs again, another instance) tells nobody twice.
+ * (`QĐ-110j`, `R-26`, `QĐ-110k`): a departure notifies the responsible IT Admin of each workspace the person administers (or the usable
+ * Super Admin fallback) with `WORKSPACE_ADMIN_NOT_WORKING`; when the departing or transferred IT Admin still answers for a subscription or an
+ * application, the usable Super Admin is told once for the file to hand them over. The same milestone seen twice tells nobody twice.
  */
 @Injectable()
 export class ItHandoverMilestoneService {
@@ -24,26 +24,30 @@ export class ItHandoverMilestoneService {
     tx: DbTx,
     input: { organizationId: string; source: HandoverSource; employeeId: string; dueOn: BusinessDate },
   ): Promise<number> {
-    // A departure puts the plans its person administers at the vendor out of reach; a transfer does not (the account of the person goes on).
+    // A departure puts the workspaces its person administers at risk; a transfer does not (the account of the person goes on).
     if (input.source.kind === 'OFFBOARDING_CASE') await this.vendorAdminsLost(tx, input);
     const left = (await this.catalog.countResponsibilitiesOf([input.employeeId], tx)).get(input.employeeId);
-    const remaining = (left?.subscriptions ?? 0) + (left?.applications ?? 0);
+    const remaining = remainingResponsibilities(left);
     if (!pendingNoticeOwed({ milestoneReached: true, cancelled: false, remaining })) return 0;
 
     return this.notifier.itHandoverPending(tx, input);
   }
 
-  /** Every plan whose last admin at the vendor is the person who leaves is the common queue's work: every IT Admin is told once for it (`QĐ-110k`, X-IT.6). */
+  /** Notifies the responsible IT Admin (or usable Super Admin fallback) once per workspace administered by `input.employeeId`. */
   private async vendorAdminsLost(
     tx: DbTx,
     input: { organizationId: string; source: HandoverSource; employeeId: string },
   ): Promise<void> {
-    for (const role of plansLeftWithoutAdmin(await this.catalog.vendorAdminRolesOf(input.employeeId, tx))) {
-      await this.notifier.vendorAdminsGone(tx, {
+    const seen = new Set<string>();
+    for (const role of await this.catalog.vendorAdminRolesOf(input.employeeId, tx)) {
+      if (!role.workspaceId || seen.has(role.workspaceId)) continue;
+      seen.add(role.workspaceId);
+      await this.notifier.workspaceAdminNotWorking(tx, {
         organizationId: input.organizationId,
-        planId: role.planId,
-        applicationId: role.applicationId,
-        sourceId: input.source.id,
+        workspaceId: role.workspaceId,
+        employeeId: input.employeeId,
+        responsibleItAdminEmployeeId: role.responsibleItAdminEmployeeId ?? null,
+        workingAdminCount: role.othersWorking,
       });
     }
   }

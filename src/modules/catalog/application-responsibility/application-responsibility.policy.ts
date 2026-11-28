@@ -9,10 +9,10 @@ export interface TransferCaller {
 }
 
 /**
- * Whether an application is handed over, and to whom it may be (`QĐ-111g`, `R-26`, `US-04-06` AC-7, AC-8), judged in this order:
- * the authority first, then the person named. The IT Admin responsible for it hands it to another; while it needs one (nobody is
- * named, or the one named no longer works as an IT Admin) any IT Admin takes it, for themselves only; the Super Admin names any.
- * The one named must be an IT Admin who works now. Handing it to the one already responsible, who works, changes nothing.
+ * Whether an application is handed over, and to whom it may be (`QĐ-111g`, `QĐ-118f`, `QĐ-118l`), judged in this order: the authority
+ * first, then the person named. Only the Super Admin changes who is responsible for an application; an IT Admin never does, not even the one
+ * responsible and not even to take an application that needs a responsible IT Admin. The one named must be an IT Admin who works now.
+ * Handing it to the one already responsible, who works, changes nothing.
  * Throws ApplicationResponsibilityForbiddenError and ApplicationResponsibleNotItAdminError.
  */
 export function decideResponsibilityTransfer(input: {
@@ -24,10 +24,7 @@ export function decideResponsibilityTransfer(input: {
   toIsUsableItAdmin: boolean;
 }): 'CHANGE' | 'UNCHANGED' {
   const { actor, needsResponsible } = input;
-  const mayHandOver =
-    actor.role === 'SUPER_ADMIN' || (!needsResponsible && actor.employeeId === input.responsibleEmployeeId);
-  const mayTake = actor.role === 'IT_ADMIN' && needsResponsible && input.toEmployeeId === actor.employeeId;
-  if (!mayHandOver && !mayTake) throw new ApplicationResponsibilityForbiddenError();
+  if (actor.role !== 'SUPER_ADMIN') throw new ApplicationResponsibilityForbiddenError();
   if (!input.toIsUsableItAdmin) throw new ApplicationResponsibleNotItAdminError();
 
   return !needsResponsible && input.toEmployeeId === input.responsibleEmployeeId ? 'UNCHANGED' : 'CHANGE';

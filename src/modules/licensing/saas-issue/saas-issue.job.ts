@@ -41,8 +41,12 @@ export class SaasIssueSweeper implements OnApplicationBootstrap, OnModuleDestroy
 
   private async sweep(): Promise<void> {
     try {
-      const { closed, told } = await this.sweeps.run();
-      if (closed > 0 || told > 0) this.logger.log(`Closed ${closed} resolved SaaS issue(s), reminded about ${told}`);
+      const { assigned, closed, told } = await this.sweeps.run();
+      if (assigned > 0 || closed > 0 || told > 0) {
+        this.logger.log(
+          `Assigned ${assigned} awaiting SaaS issue(s), closed ${closed} resolved, reminded about ${told}`,
+        );
+      }
     } catch (error) {
       this.logger.error(`SaaS issue sweep failed: ${describeForOperator(error)}`, traceForOperator(error));
     } finally {

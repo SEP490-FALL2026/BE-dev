@@ -8,6 +8,14 @@ export class BudgetProposalNotFoundError extends Error {
   }
 }
 
+/** The baseline read a plan the catalog does not know: a seat or a line names it, so the data is broken (the plan is a foreign key). */
+export class BaselinePlanMissingError extends Error {
+  constructor(readonly planId: string) {
+    super(`The baseline reads a plan that does not exist: ${planId}.`);
+    this.name = 'BaselinePlanMissingError';
+  }
+}
+
 export class BudgetVersionNotFoundError extends Error {
   constructor() {
     super('The version does not exist.');

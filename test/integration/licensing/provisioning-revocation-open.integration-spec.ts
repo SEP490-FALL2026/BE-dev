@@ -216,7 +216,10 @@ describe('opening the revocation of a seat, the one gate of every source (integr
     it('refuses a seat of K3, which has no revocation, and writes nothing', async () => {
       const subscriptionId = await h.subscription(5, 'K4');
       const planId = await h.planOf(subscriptionId);
-      await h.ctx.sql.query(`UPDATE plans SET provisioning_type = 'K3', pricing_model = NULL WHERE id = $1`, [planId]);
+      await h.ctx.sql.query(
+        `UPDATE plans SET provisioning_type = 'K3', pricing_model = NULL, key_binding = NULL WHERE id = $1`,
+        [planId],
+      );
       const assignmentId = randomUUID();
       const holder = await h.person(code());
       await h.ctx.sql.query(

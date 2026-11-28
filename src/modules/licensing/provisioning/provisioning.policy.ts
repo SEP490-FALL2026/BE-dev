@@ -1,7 +1,6 @@
 import { isCompanyAccount } from '../public/account-identifier.policy';
 import {
   ProvisioningAccountIdentifierRequiredError,
-  ProvisioningAnotherItAdminNeededError,
   ProvisioningEvidenceRequiredError,
   ProvisioningPersonalAccountError,
   ProvisioningReasonRequiredError,
@@ -10,7 +9,11 @@ import {
   ProvisioningTaskStateError,
   ProvisioningTypeNotSupportedError,
 } from '../public/licensing.errors';
-import { ProvisioningItAdminRequiredError, ProvisioningKeyError } from './provisioning.errors';
+import {
+  ProvisioningItAdminRequiredError,
+  ProvisioningKeyError,
+  ProvisioningNotInChargeError,
+} from './provisioning.errors';
 import type {
   ProvisioningAction,
   ProvisioningChannel,
@@ -190,26 +193,62 @@ export function nextStatus(
   return action === 'COMPLETE' ? 'COMPLETED' : 'FAILED';
 }
 
-/** True when the task is in the queue every IT Admin works: nobody is in charge, or the one in charge no longer works. */
-export function inGeneralQueue(input: {
-  defaultResponsibleEmployeeId: string | null;
-  responsibleStillWorks: boolean;
-}): boolean {
-  return input.defaultResponsibleEmployeeId === null || !input.responsibleStillWorks;
+/** At most one usable in-charge IT Admin and one usable appointed substitute can act for a department. */
+export const ACTING_IT_ADMINS_MAX = 2;
+
+export interface ActingItAdminCheck {
+  inCharge: string | null;
+  substitute: string | null;
+  actors: readonly string[];
+}
+
+export interface ActingItAdminSummaryItem {
+  id: string;
+  fullName: string;
+  bySubstitute: boolean;
 }
 
 /**
- * Whether the IT Admin may work a task of which they are the beneficiary (`QĐ-77m`, `US-01-05` AC-12): not while another
- * usable IT Admin can; when none can, they may, and the act is marked as self-executed. A task of someone else is never
- * restricted. Throws ProvisioningAnotherItAdminNeededError.
+ * Verifies the caller is among the acting IT Admins of the task's department and returns whether they act as
+ * an appointed substitute rather than the in-charge IT Admin. Throws ProvisioningNotInChargeError.
+ */
+export function assertActingItAdmin(
+  actorEmployeeId: string,
+  acting: ActingItAdminCheck | undefined,
+): { bySubstitute: boolean } {
+  if (!acting || !acting.actors.includes(actorEmployeeId)) {
+    throw new ProvisioningNotInChargeError();
+  }
+
+  return {
+    bySubstitute: acting.substitute === actorEmployeeId && acting.inCharge !== actorEmployeeId,
+  };
+}
+
+/** Builds the `awaitingItAdmin` flag and `actingItAdmins` list for a task card from its department resolution. */
+export function actingItAdminsViewOf(
+  acting: ActingItAdminCheck | undefined,
+  employeeNames: ReadonlyMap<string, string>,
+): { awaitingItAdmin: boolean; actingItAdmins: ActingItAdminSummaryItem[] } {
+  const actingItAdmins = (acting?.actors ?? []).map((actorId) => ({
+    id: actorId,
+    fullName: employeeNames.get(actorId) ?? '',
+    bySubstitute: acting?.substitute === actorId && acting?.inCharge !== actorId,
+  }));
+
+  return {
+    awaitingItAdmin: actingItAdmins.length === 0,
+    actingItAdmins,
+  };
+}
+
+/**
+ * Whether the IT Admin works a task of which they are the beneficiary: allowed for acting IT Admins and marked
+ * as self-executed so the Super Admin is notified.
  */
 export function selfExecution(input: {
   actorEmployeeId: string;
   beneficiaryEmployeeId: string;
-  otherUsableItAdmins: number;
 }): 'ALLOW' | 'ALLOW_SELF_EXECUTED' {
-  if (input.actorEmployeeId !== input.beneficiaryEmployeeId) return 'ALLOW';
-  if (input.otherUsableItAdmins > 0) throw new ProvisioningAnotherItAdminNeededError();
-
-  return 'ALLOW_SELF_EXECUTED';
+  return input.actorEmployeeId === input.beneficiaryEmployeeId ? 'ALLOW_SELF_EXECUTED' : 'ALLOW';
 }

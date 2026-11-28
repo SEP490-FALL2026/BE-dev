@@ -134,6 +134,8 @@ export const IN_APP_NOTIFICATION_CODES = [
   'BUDGET_REVIEW_DUE',
   'BUDGET_REVIEW_SUMMARY',
   'BUDGET_SHARED_POOL_OVER_RESERVE',
+  'IDLE_SEAT_COST_RATIO_HIGH',
+  'LICENSE_LOT_IDLE_COST_HIGH',
   // The use of the budget of a Cost Center reached 80 or 100 percent of its base (`QĐ-111af`, RV-2): told once each time to the head of the department and Finance; the Cost Center, the year and the threshold, never a figure.
   'BUDGET_THRESHOLD_REACHED',
   // The head of a department is reminded to explain a Cost Center of a quarterly review (`QĐ-111ah`, B-7): on the due day and every Monday until they explain or Finance signs; the period, the Cost Center and the due day, never a figure.
@@ -204,8 +206,14 @@ export const IN_APP_NOTIFICATION_CODES = [
   'DEPARTMENT_SOFTWARE_PROPOSED',
   'DEPARTMENT_SOFTWARE_PROPOSAL_DECIDED',
   'VENDOR_ADMINS_BELOW_MINIMUM',
+  'WORKSPACE_ADMIN_NOT_WORKING',
   'DEPARTMENT_WITHOUT_HEAD',
   'SUBSCRIPTION_SEATS_INCREASED',
+  'SUBSCRIPTION_SEATS_REDUCED',
+  'SUBSCRIPTION_SEATS_BOUGHT',
+  'SEAT_PURCHASE_INVOICE_OVERDUE',
+  'SEAT_LEDGER_VENDOR_RECORDED',
+  'SUBSCRIPTION_PRICE_REVIEW',
   'IT_ADMIN_HANDOVER_PENDING',
   // The IT Admin who took everything a leaving IT Admin answered for is told how many subscriptions and applications are theirs now (`QĐ-110j`, SPEC P5).
   'IT_ADMIN_HANDOVER_RECEIVED',
@@ -216,17 +224,28 @@ export const IN_APP_NOTIFICATION_CODES = [
   'POLICY_PUBLISHED',
   // A batch of spend requests that opened at least one step for the spending approver: one notice for each batch and each approver (`FR-3.21`, `Q-5A-1`).
   'SPEND_BATCH_SUBMITTED',
-  // The reports of errors in SaaS rights (`FR-2.15`): the IT Admin it is given to is told when it is sent and, once, when its day to be taken up passed; the report is told of when its state changes.
+  // The reports of errors in SaaS rights (`FR-2.15`): the IT Admin it is given to is told when it is sent and, once, when its day to be taken up passed; the Super Admin is told when a report has no acting IT Admin; the reporter or assignee is told when its state changes.
   'SAAS_ISSUE_SUBMITTED',
+  'SAAS_ISSUE_AWAITING_ASSIGNEE',
   'SAAS_ISSUE_RESPONSE_OVERDUE',
   'SAAS_ISSUE_STATE_CHANGED',
   // A case outside the process closed as a report only: the person it is about and the head of their department are told (`SBF-07a`, `QĐ-103m`).
   'OUT_OF_PROCESS_CASE_REPORTED',
-  // A difference with a vendor was opened (`SBF-08`): the IT Admin in charge of the application, or every IT Admin who can act, is told once for each report, invoice or batch of the collector.
+  // A difference with a vendor was opened (`SBF-08`): the IT Admin in charge of the application, or the usable Super Admin fallback, is told once for each report, invoice or batch of the collector.
   'VENDOR_ACCOUNT_DISCREPANCY_OPENED',
-  // A holder asked to stop the collection of a machine (`US-09-04`, E1): the IT Admin in charge, or every IT Admin who can act, is told once, and once more when the request passed its day.
+  // A holder asked to stop the collection of a machine (`US-09-04`, E1): the acting IT Admins of the department, or the usable Super Admin fallback, are told once, and once more when the request passed its day.
   'DEVICE_STOP_REQUESTED',
   'DEVICE_STOP_REQUEST_OVERDUE',
+  // Department IT Admin substitute lifecycle and daily missing coverage alert for the Super Admin.
+  'DEPARTMENT_IT_SUBSTITUTE_APPOINTED',
+  'DEPARTMENT_IT_SUBSTITUTE_ENDED',
+  'DEPARTMENT_IT_COVERAGE_MISSING',
+  // Offboarding device return task waiting for acting IT coverage and daily overdue reminders.
+  'DEVICE_RETURN_OVERDUE',
+  'DEVICE_RETURN_WAITING',
+  // Unplaced-work IT Admin designations: waiting for Super Admin designation and designee notification.
+  'UNPLACED_WORK_WAITING',
+  'UNPLACED_WORK_DESIGNATED',
 ] as const;
 
 export type InAppNotificationCode = (typeof IN_APP_NOTIFICATION_CODES)[number];

@@ -50,7 +50,7 @@ describe('the finished months and quarterly explanations', () => {
       expect(body.link).toEqual({ requestId });
       expect(body.servicePeriodMonth).toBe(month);
     }
-    expect(INVOICES).toHaveLength(12);
+    expect(INVOICES).toHaveLength(14);
   });
   it('closes reviews after all invoice and expense steps', () => {
     const keys = demoSteps(fixture).map(({ key }) => key);

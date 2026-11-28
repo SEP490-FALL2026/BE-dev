@@ -12,17 +12,29 @@ import type { PurchaseInvoiceFormInput, PurchaseInvoiceSubmitInput } from './pur
 import { PurchaseInvoicePlanService } from './purchase-invoice-plan.service';
 import { PurchaseInvoiceRepo, type PurchaseInvoiceRow } from './purchase-invoice.repo';
 import type { PurchaseInvoicePlan } from './purchase-invoice.types';
+import { PurchaseInvoiceSubscriptionLinkService } from './subscription-link/purchase-invoice-subscription-link.service';
 
 /**
  * The IT Admin submits the invoice of a purchase and Finance is told (`PI-1`, `QĐ-111u`). The form is read against its request or subscription
  * in the transaction (label, period, match, department that bears it), the invoice is kept as it was read, its files are attached to it, and
  * nothing is spent yet: Finance signs the money out. The marks laid on an invoice (more than approved, outside the term) never refuse it.
  */
+const linkPersistenceFields = (link: PurchaseInvoicePlan['link']) => ({
+  linkKind: link.kind,
+  requestId: link.kind === 'REQUEST' ? link.requestId : null,
+  provisioningTaskId: link.kind === 'REQUEST' ? link.provisioningTaskId : null,
+  subscriptionId: link.kind === 'SUBSCRIPTION' ? link.subscriptionId : null,
+  seatPurchaseId: link.kind === 'SUBSCRIPTION' ? link.seatPurchaseId : null,
+  subscriptionLineIds: link.kind === 'SUBSCRIPTION' ? [...link.subscriptionLineIds] : [],
+  licenseLotId: link.kind === 'LICENSE_LOT' ? link.licenseLotId : null,
+});
+
 @Injectable()
 export class PurchaseInvoiceSubmissionService {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly plans: PurchaseInvoicePlanService,
+    private readonly subscriptionLink: PurchaseInvoiceSubscriptionLinkService,
     private readonly invoices: PurchaseInvoiceRepo,
     private readonly catalog: CatalogApi,
     private readonly identity: IdentityAccessApi,
@@ -48,7 +60,8 @@ export class PurchaseInvoiceSubmissionService {
   ): Promise<PurchaseInvoiceRow> {
     return this.runner.run(async (tx) => {
       const old = await this.invoices.lock(tx, id);
-      if (!old || old.submittedByEmployeeId !== actor.employeeId) throw new PurchaseInvoiceRefusedError('NOT_FOUND');
+      if (!old) throw new PurchaseInvoiceRefusedError('NOT_FOUND');
+      await this.subscriptionLink.requireToResubmit(old, actor.employeeId, tx);
       if (old.state !== 'RETURNED') throw new PurchaseInvoiceRefusedError('NOT_RETURNED');
       if ((await this.invoices.resubmittedAs([old.id], tx)).has(old.id)) {
         throw new PurchaseInvoiceRefusedError('ALREADY_RESUBMITTED');
@@ -59,7 +72,13 @@ export class PurchaseInvoiceSubmissionService {
               requestId: old.requestId as string,
               ...(old.provisioningTaskId ? { provisioningTaskId: old.provisioningTaskId } : {}),
             }
-          : { subscriptionId: old.subscriptionId as string };
+          : old.linkKind === 'LICENSE_LOT'
+            ? { licenseLotId: old.licenseLotId as string }
+            : {
+                subscriptionId: old.subscriptionId as string,
+                ...(old.seatPurchaseId ? { seatPurchaseId: old.seatPurchaseId } : {}),
+                ...(old.subscriptionLineIds.length > 0 ? { subscriptionLineIds: old.subscriptionLineIds } : {}),
+              };
 
       return this.keep(tx, actor, { ...body, link }, old.id);
     });
@@ -81,10 +100,7 @@ export class PurchaseInvoiceSubmissionService {
     }
     const row = await this.insert(tx, {
       organizationId: plan.organizationId,
-      linkKind: plan.link.kind,
-      requestId: plan.link.kind === 'REQUEST' ? plan.link.requestId : null,
-      provisioningTaskId: plan.link.kind === 'REQUEST' ? plan.link.provisioningTaskId : null,
-      subscriptionId: plan.link.kind === 'SUBSCRIPTION' ? plan.link.subscriptionId : null,
+      ...linkPersistenceFields(plan.link),
       vendorId: plan.vendorId,
       number: input.vendorInvoiceNumber,
       issuedOn: input.issuedOn,
@@ -126,6 +142,12 @@ export class PurchaseInvoiceSubmissionService {
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         const target = JSON.stringify(error.meta?.target ?? '');
+        if (target.includes('seat_purchase')) {
+          throw new PurchaseInvoiceRefusedError('SEAT_PURCHASE_INVOICED');
+        }
+        if (target.includes('license_lot')) {
+          throw new PurchaseInvoiceRefusedError('LOT_ALREADY_INVOICED');
+        }
         throw new PurchaseInvoiceRefusedError(target.includes('resubmission') ? 'ALREADY_RESUBMITTED' : 'NUMBER_TAKEN');
       }
       throw error;

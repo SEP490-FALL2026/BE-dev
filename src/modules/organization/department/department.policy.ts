@@ -93,14 +93,18 @@ export interface ItAdminScopeFacts {
   itAdminEmployeeId: string | null;
   /** The one named still works and holds the role on an account that can sign in. */
   itAdminUsable: boolean;
+  /** The IT Admin appointed as temporary substitute; null when none. */
+  substituteEmployeeId?: string | null;
+  /** Whether the appointed substitute still works and holds the role on a usable account. */
+  substituteUsable?: boolean;
   /** The department the installation created with the organization: it is never part of the common queue. */
   starting: boolean;
 }
 
 /**
- * The departments an IT Admin may read: those that name them IT Admin in charge, and the active ones nobody usable is in charge of,
- * whose technical work falls to every IT Admin (the common queue) so they stand in for it. The starting department is not in that
- * queue: only the IT Admin named for it reads it.
+ * The departments an IT Admin may read: those that name them IT Admin in charge, those they are appointed to stand in for,
+ * and the active ones nobody usable is in charge of, whose technical work falls to every IT Admin (the common queue). The
+ * starting department is not in that queue: only the IT Admin named or appointed for it reads it.
  */
 export function itAdminScope(callerEmployeeId: string, departments: readonly ItAdminScopeFacts[]): ReadonlySet<string> {
   return new Set(
@@ -108,7 +112,30 @@ export function itAdminScope(callerEmployeeId: string, departments: readonly ItA
       .filter(
         (department) =>
           department.itAdminEmployeeId === callerEmployeeId ||
+          (department.active &&
+            department.substituteEmployeeId === callerEmployeeId &&
+            Boolean(department.substituteUsable)) ||
           (department.active && !department.itAdminUsable && !department.starting),
+      )
+      .map((department) => department.id),
+  );
+}
+
+/**
+ * The departments an IT Admin may act on (writes and work queues): only active departments where the caller is the usable
+ * IT Admin in charge or the usable appointed substitute. No common queue fallback.
+ */
+export function itAdminActingScope(
+  callerEmployeeId: string,
+  departments: readonly ItAdminScopeFacts[],
+): ReadonlySet<string> {
+  return new Set(
+    departments
+      .filter(
+        (department) =>
+          department.active &&
+          ((department.itAdminEmployeeId === callerEmployeeId && department.itAdminUsable) ||
+            (department.substituteEmployeeId === callerEmployeeId && Boolean(department.substituteUsable))),
       )
       .map((department) => department.id),
   );

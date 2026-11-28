@@ -146,7 +146,6 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
           unitPrice: { amount: '1000000', currency: 'VND' },
           billingCycle: 'ANNUAL',
           commitmentTermMonths: 12,
-          responsibleItAdminEmployeeId: it1.employeeId,
           startDate: '2026-01-01',
           ...extra,
         })
@@ -364,8 +363,8 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
     });
 
     it('AC-9: a subscription with no deadline that ends on 31/12 and does not renew is alerted from its end date, marked as such', async () => {
-      const { planId } = await plan({ pricing: 'FLAT_RATE', type: 'K1' });
-      // A K1 plan is for one month and paid by the month (R-E01).
+      // A plan of personal accounts (K1) has no subscription since W3-27: the plan is one of seats, paid by the month.
+      const { planId } = await plan();
       await subscription(planId, {
         endDate: '2026-12-31',
         autoRenew: false,
@@ -388,29 +387,32 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
     it('AC-9: a perpetual purchase, a draft and a subscription with no date to alert from raise no review alert', async () => {
       const licensed = await plan({ kind: 'LICENSED', type: 'K4' });
       const saas = await plan();
+      const drafted = await plan();
+      // What is bought once is a lot of license keys since W3-24, not a subscription.
       await request(server())
-        .post('/api/v1/subscriptions')
+        .post('/api/v1/license-lots')
         .set(as(it1))
         .send({
           planId: licensed.planId,
-          kind: 'PERPETUAL',
-          purchasedQuantity: 50,
+          purchasedOn: '2026-03-15',
+          licenseCount: 50,
           unitPrice: { amount: '500000', currency: 'VND' },
-          startDate: '2026-03-15',
-          responsibleItAdminEmployeeId: it1.employeeId,
+          purpose: 'REPLACEMENT',
         })
         .expect(201);
       await subscription(saas.planId, { autoRenew: true });
+      // One live subscription of a plan per workspace (W3-14): the draft is of a plan of its own.
       await request(server())
         .post('/api/v1/subscriptions')
         .set(as(it1))
-        .send({ planId: saas.planId, kind: 'TERM', endDate: '2026-12-31' })
+        .send({ planId: drafted.planId, kind: 'TERM', endDate: '2026-12-31' })
         .expect(201);
 
       for (const day of ['2026-03-20', '2026-11-20', '2026-12-20']) {
         today(day);
         expect(await warningsOf(licensed.planId)).toEqual([]);
         expect(await warningsOf(saas.planId)).toEqual([]);
+        expect(await warningsOf(drafted.planId)).toEqual([]);
       }
     });
 

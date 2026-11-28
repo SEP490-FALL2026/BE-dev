@@ -34,6 +34,7 @@ const PROGRESS = {
   transfers: { inGrace: NO_LIST, graceEndingSoon: NO_LIST, revoking: NO_LIST, revocationFailed: NO_LIST },
   seatsReturned: { thisMonth: NO_LIST, reusedThisMonth: NO_LIST },
   plansBelowVendorAdminMinimum: NO_LIST,
+  workspacesBelowVendorAdminMinimum: NO_LIST,
 };
 
 interface Route {
@@ -101,6 +102,8 @@ const ROUTES: Route[] = [
         ghostSeats: COUNTED,
         missingInvoicePeriods: COUNTED,
         outOfProcessRevocationsDue: COUNTED,
+        deviceReturnTasksOpen: COUNTED,
+        deviceReturnTasksOverdue: COUNTED,
       },
     },
   },

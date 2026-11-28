@@ -32,6 +32,7 @@ const PROGRESS = progressOf({
   },
   seats: { returned: 6, reused: 3 },
   plansBelowMinimum: 2,
+  workspacesBelowMinimum: 1,
 });
 
 const FACTS: OnboardingFacts = {
@@ -100,6 +101,7 @@ describe('SuperAdminDashboardService', () => {
     expect(overview.sections.transfers.revoking).toMatchObject({ state: 'COUNTED', count: 1 });
     expect(overview.sections.seatsReturned.thisMonth.count).toBe(6);
     expect(overview.sections.plansBelowVendorAdminMinimum.count).toBe(2);
+    expect(overview.sections.workspacesBelowVendorAdminMinimum.count).toBe(1);
   });
 
   it('refuses a caller without the Super Admin role', async () => {

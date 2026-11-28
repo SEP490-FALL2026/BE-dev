@@ -5,6 +5,10 @@ import type { AuditEventInput } from '../../audit/public/audit.types';
 import type { CatalogApi } from '../../catalog/public/catalog.api';
 import type { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AssessmentReadRepo } from '../access-request/assessment-read.repo';
+import {
+  AccessRequestPlanBoundToDeviceError,
+  AccessRequestPlanNotFoundError,
+} from '../access-request/access-request.errors';
 import { CatalogLinkRefusedError } from '../assessment/assessment.errors';
 import type { AssessmentTermFitService } from '../assessment/assessment-term-fit.service';
 import { CatalogLinkService } from './catalog-link.service';
@@ -20,9 +24,16 @@ const LINKABLE = {
   planId: null,
   departmentId: 'dept',
 };
-const QUOTE = { unitPrice: { amountMinor: 3_000_000n, currency: 'VND' }, billingCycle: 'QUARTERLY' };
+const QUOTE = { unitPrice: { amountMinor: 3_000_000n, currency: 'VND' }, billingCycle: 'QUARTERLY' as const };
 
-function setup(request: object, adopted = true) {
+function setup(
+  request: object,
+  adopted = true,
+  quote: {
+    unitPrice: { amountMinor: bigint; currency: string };
+    billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
+  } = QUOTE,
+) {
   const adoptPlanQuotePrice = jest.fn().mockResolvedValue(adopted);
   const setPlan = jest.fn();
   const record = jest.fn();
@@ -34,7 +45,7 @@ function setup(request: object, adopted = true) {
       findById: jest.fn().mockResolvedValue({ ...request, planId: 'plan' }),
     } as unknown as AccessRequestRepo,
     {
-      findAssessment: jest.fn().mockResolvedValue({ quote: QUOTE }),
+      findAssessment: jest.fn().mockResolvedValue({ quote }),
       findProposal: jest.fn().mockResolvedValue(null),
     } as unknown as AssessmentReadRepo,
     {
@@ -73,6 +84,17 @@ describe('QĐ-113a linking a case B request to a plan', () => {
     },
   );
 
+  it('offers monthly reference price rounded half-away (10 000 000 annual -> 833 333)', async () => {
+    const { service, adoptPlanQuotePrice } = setup(LINKABLE, true, {
+      unitPrice: { amountMinor: 10_000_000n, currency: 'VND' },
+      billingCycle: 'ANNUAL',
+    });
+
+    await service.link(ACTOR, 'request', { planId: 'plan' });
+
+    expect(adoptPlanQuotePrice).toHaveBeenCalledWith(ACTOR, 'plan', { amountMinor: 833_333n, currency: 'VND' }, TX);
+  });
+
   it('refuses a second link of a request that already has its plan, and offers no price', async () => {
     const { service, adoptPlanQuotePrice, setPlan } = setup({ ...LINKABLE, planId: 'plan' });
 
@@ -80,4 +102,45 @@ describe('QĐ-113a linking a case B request to a plan', () => {
     expect(adoptPlanQuotePrice).not.toHaveBeenCalled();
     expect(setPlan).not.toHaveBeenCalled();
   });
+
+  it.each(['DEVICE_KEY', 'DEVICE_BUNDLED'] as const)(
+    'refuses linking case B to a %s plan with AccessRequestPlanBoundToDeviceError (W2-18)',
+    async (keyBinding) => {
+      const { service, adoptPlanQuotePrice, setPlan, catalog } = setupWithCatalog(LINKABLE, keyBinding);
+
+      await expect(service.link(ACTOR, 'request', { planId: 'plan' })).rejects.toBeInstanceOf(
+        AccessRequestPlanBoundToDeviceError,
+      );
+      expect(catalog.findPlanSeatTargets).toHaveBeenCalledWith(['plan'], TX);
+      expect(setPlan).not.toHaveBeenCalled();
+      expect(adoptPlanQuotePrice).not.toHaveBeenCalled();
+    },
+  );
 });
+
+function setupWithCatalog(request: object, keyBinding: 'ACCOUNT' | 'DEVICE_KEY' | 'DEVICE_BUNDLED') {
+  const adoptPlanQuotePrice = jest.fn();
+  const setPlan = jest.fn();
+  const findPlanSeatTargets = jest
+    .fn()
+    .mockResolvedValue([
+      { planId: 'plan', applicationId: 'app', applicationStatus: 'APPROVED', provisioningType: 'K4', keyBinding },
+    ]);
+  const service = new CatalogLinkService(
+    { run: (work: (tx: DbTx) => unknown) => work(TX) } as unknown as TransactionRunner,
+    {
+      lockById: jest.fn().mockResolvedValue(request),
+      setPlan,
+      findById: jest.fn().mockResolvedValue(request),
+    } as unknown as AccessRequestRepo,
+    { findAssessment: jest.fn(), findProposal: jest.fn().mockResolvedValue(null) } as unknown as AssessmentReadRepo,
+    { findPlanSeatTargets, adoptPlanQuotePrice } as unknown as CatalogApi,
+    { record: jest.fn() } as unknown as AuditApi,
+    {} as unknown as CatalogLinkDepartmentListService,
+    {} as unknown as AssessmentTermFitService,
+  );
+
+  expect(AccessRequestPlanNotFoundError).toBeDefined();
+
+  return { service, adoptPlanQuotePrice, setPlan, catalog: { findPlanSeatTargets } };
+}

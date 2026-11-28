@@ -57,6 +57,8 @@ describe('the runtime role has least privilege (integration, PostgreSQL)', () =>
     ['disable the append-only triggers', 'ALTER TABLE public.audit_events DISABLE TRIGGER ALL'],
     ['silence every trigger of its session', 'SET session_replication_role = replica'],
     ['update the Audit Trail', 'UPDATE public.audit_events SET action = action WHERE false'],
+    ['update the seat ledger', 'UPDATE public.seat_changes SET delta = delta WHERE false'],
+    ['update invoice allocations', 'UPDATE public.invoice_allocations SET amount_minor = amount_minor WHERE false'],
     ['delete from the Audit Trail', 'DELETE FROM public.audit_events WHERE false'],
     ['truncate the Audit Trail', 'TRUNCATE public.audit_events'],
     ['truncate an application table', 'TRUNCATE public.app_users CASCADE'],
