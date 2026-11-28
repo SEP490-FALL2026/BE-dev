@@ -145,7 +145,7 @@ flowchart BT
   requests -->|15| notifications
   requests -->|13| operating_parameters
   requests -->|109| organization
-  requests -->|34| policies
+  requests -->|35| policies
   usage -->|10| audit
   usage -->|3| budgets
   usage -->|16| catalog
