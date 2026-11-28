@@ -1,3 +1,9 @@
+import { CatalogApi } from '../../../catalog/public/catalog.api';
+import type { PlanRevocationInfo } from '../../../catalog/public/catalog.types';
+import { AssignmentChainRepo } from '../../assignment/assignment-chain.repo';
+import { SeatTargetNotFoundError } from '../../public/licensing.errors';
+import type { RevocationCompletedFacts } from '../../public/licensing.types';
+import { ProvisioningTaskReasonRepo } from '../provisioning-task-reason.repo';
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../../core/business-date';
 import { nextBillingBoundary } from '../../../../core/seat-month-cost';
@@ -26,7 +32,45 @@ export class RevocationAftermath {
     private readonly leaverAlert: RevocationLeaverAlert,
     private readonly checklists: ProvisioningK1Checklist,
     private readonly seatLedger: SeatLedgerApi,
+    private readonly catalog: CatalogApi,
+    private readonly chains: AssignmentChainRepo,
+    private readonly reasons: ProvisioningTaskReasonRepo,
   ) {}
+
+  /** How the seat of this plan is taken away. Throws SeatTargetNotFoundError. */
+  async planOf(tx: DbTx, planId: string): Promise<PlanRevocationInfo> {
+    const [plan] = await this.catalog.getPlanRevocationInfo([planId], tx);
+    if (!plan) throw new SeatTargetNotFoundError('PLAN');
+
+    return plan;
+  }
+
+  async completedOf(
+    tx: DbTx,
+    task: { id: string; assignmentId: string },
+    done: Pick<
+      RevocationCompletedFacts,
+      'endedOn' | 'paidThroughOn' | 'k1Checklist' | 'personalCommitmentMonths' | 'billingAnchorOn'
+    > & {
+      provisioningType: RevocationCompletedFacts['provisioningType'];
+    },
+  ): Promise<RevocationCompletedFacts> {
+    const grant = await this.chains.grantOfChain(tx, task.assignmentId);
+
+    return {
+      grantRequestId: grant?.requestId ?? null,
+      grantedStartDate: grant?.startDate ?? null,
+      grantedEndDate: grant?.endDate ?? null,
+      chainAssignmentIds: await this.chains.chainOf(tx, task.assignmentId),
+      provisioningType: done.provisioningType,
+      endedOn: done.endedOn,
+      paidThroughOn: done.paidThroughOn,
+      personalCommitmentMonths: done.personalCommitmentMonths ?? null,
+      billingAnchorOn: done.billingAnchorOn ?? null,
+      sources: (await this.reasons.listOf([task.id], tx)).map((reason) => reason.source),
+      k1Checklist: done.k1Checklist,
+    };
+  }
 
   /** Whether the seat holds a key (a K4 seat granted before the key pool holds none), its row locked until commit. */
   holdsKey(tx: DbTx, assignmentId: string): Promise<boolean> {

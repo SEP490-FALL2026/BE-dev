@@ -17,9 +17,11 @@ import {
 import { ProvisioningTaskFrame } from '../provisioning-task-frame.service';
 import { toRevocationFacts } from '../provisioning-task.types';
 import { ProvisioningTaskViewService, type TaskView } from '../provisioning-task-view.service';
-import { RevocationCompletedFactsReader } from './revocation-completed-facts.service';
+import { ProvisioningEvidenceFilesService } from '../evidence-files/provisioning-evidence-files.service';
 import { ProvisioningTaskRepo } from '../provisioning-task.repo';
 import { RevocationAftermath } from './revocation-aftermath.service';
+
+type EvidenceCompletionInput = CompletionInput & { evidenceDocumentIds?: readonly string[] | undefined };
 
 /**
  * What a person does to a revocation they work (`US-07-05` AC-1→AC-5, AC-8, AC-19): complete it, which is the only thing that
@@ -41,7 +43,7 @@ export class RevocationCompletionService {
     private readonly organizationReads: OrganizationReadApi,
     private readonly revocation: RevocationListeners,
     private readonly aftermath: RevocationAftermath,
-    private readonly completedFacts: RevocationCompletedFactsReader,
+    private readonly files: ProvisioningEvidenceFilesService,
   ) {}
 
   /**
@@ -50,7 +52,7 @@ export class RevocationCompletionService {
    * ProvisioningTaskNotBeforeError, ProvisioningAnotherItAdminNeededError, RevocationCompletionError, ProvisioningEvidenceRequiredError, whatever the hook
    * throws and AssignmentNotOpenError.
    */
-  async complete(actor: AuthenticatedPrincipal, id: string, input: CompletionInput): Promise<TaskView> {
+  async complete(actor: AuthenticatedPrincipal, id: string, input: EvidenceCompletionInput): Promise<TaskView> {
     const task = await this.frame.work(actor, id, {
       beforeLock: null,
       check: (locked) => {
@@ -58,12 +60,19 @@ export class RevocationCompletionService {
         nextStatus(locked.status, 'COMPLETE', locked.channel);
       },
       write: async ({ tx, task: locked, organizationId, now }) => {
+        const fileIds = await this.files.attach(
+          tx,
+          actor,
+          locked.id,
+          input.evidenceDocumentIds,
+          'PROVISIONING_EVIDENCE',
+        );
         const facts = toRevocationFacts(locked);
         const today = await this.organizationReads.businessToday(now, tx);
         // The day not before may have moved back to a later day when a reason with no grace was withdrawn: the work is not done before it.
         assertNotBefore(locked.notBefore, today);
         await this.revocation.emit(tx, { moment: 'BEFORE_WORK', task: facts, now });
-        const plan = await this.completedFacts.planOf(tx, locked.assignment.planId);
+        const plan = await this.aftermath.planOf(tx, locked.assignment.planId);
         await this.aftermath.lockLine(tx, locked);
         const assignment = await this.ending.lock(tx, locked.assignmentId);
         // A K1 completion stands on its checklist, which is kept now: the transaction ends with the completion or not at all (`QĐ-111az`).
@@ -76,7 +85,7 @@ export class RevocationCompletionService {
         await this.tasks.markRevocationCompleted(tx, locked.id, actor.appUserId, done, now);
         await this.ending.end(tx, actor, { organizationId, assignment, until: done.endOn, taskId: locked.id });
         // The listeners of the end of the work are told what the right held and when it ends, so the money held for it can be given back.
-        const completed = await this.completedFacts.completedOf(tx, locked, {
+        const completed = await this.aftermath.completedOf(tx, locked, {
           provisioningType: plan.provisioningType,
           endedOn: done.endOn,
           paidThroughOn: done.paidThroughOn,
@@ -100,7 +109,7 @@ export class RevocationCompletionService {
           now,
         });
 
-        return completedRevocationAudit(done, actor.appUserId, key, followed);
+        return completedRevocationAudit(done, actor.appUserId, key, followed, fileIds);
       },
     });
 
@@ -116,7 +125,7 @@ export class RevocationCompletionService {
   async recordAccessCut(
     actor: AuthenticatedPrincipal,
     id: string,
-    input: { accessCutOn: BusinessDate; evidence: string },
+    input: { accessCutOn: BusinessDate; evidence: string; evidenceDocumentIds?: readonly string[] | undefined },
   ): Promise<TaskView> {
     const task = await this.frame.work(actor, id, {
       beforeLock: null,
@@ -127,6 +136,7 @@ export class RevocationCompletionService {
         }
       },
       write: async ({ tx, task: locked, organizationId, now }) => {
+        const fileIds = await this.files.attach(tx, actor, locked.id, input.evidenceDocumentIds, 'ACCESS_CUT_EVIDENCE');
         const assignment = await this.ending.lock(tx, locked.assignmentId);
         if (assignment.validUntil === null) throw new AssignmentNotOpenError();
         const today = await this.organizationReads.businessToday(now, tx);
@@ -150,6 +160,7 @@ export class RevocationCompletionService {
             accessCutOn: cut.accessCutOn,
             validUntil: cut.endOn ?? assignment.validUntil,
             shortened: cut.endOn !== null,
+            evidenceDocumentIds: fileIds,
           },
         };
       },
@@ -164,6 +175,7 @@ function completedRevocationAudit(
   completedBy: string,
   key: ReturnType<typeof planKeyReturn>,
   followed: { licenseKeyId?: string | null },
+  evidenceDocumentIds: string[],
 ) {
   return {
     action: 'REVOCATION_COMPLETED' as const,
@@ -175,6 +187,7 @@ function completedRevocationAudit(
       paidThroughOn: done.paidThroughOn,
       validUntil: done.endOn,
       completedBy,
+      evidenceDocumentIds,
       ...(key ? { licenseKeyId: followed.licenseKeyId, keyDisposition: key.disposition } : {}),
     },
   };

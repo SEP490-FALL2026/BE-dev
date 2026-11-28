@@ -43,7 +43,7 @@ const COMPLETE_REVOCATION_ERRORS = [
   {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
-      'The request is invalid (VALIDATION_ERROR), or the completion is refused and nothing is stored: REVOCATION.COMPLETION_NOT_ALLOWED (the way does not fit the kind of grant), NOTE_REQUIRED, PAID_THROUGH_REQUIRED, ACCESS_STATE_REQUIRED, ACCESS_STATE_INVALID, KEY_DISPOSITION_REQUIRED (a K4 completion without keyDisposition), WITHDRAWAL_REASON_REQUIRED (a K4 key withdrawn with no reason; keyDisposition or withdrawalReason on another kind is COMPLETION_NOT_ALLOWED), no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED), or a K1 checklist that is not valid: a step missing, not ticked or ticked with no time, or no evidence (K1_CHECKLIST_INCOMPLETE), steps ticked out of their order, a step timed earlier than the one that comes before it in the list, such as the lock of the mailbox before the sign-out of the sessions (K1_CHECKLIST_OUT_OF_ORDER), or a step the variant does not have, sent twice or sent for a kind that has no checklist (COMPLETION_NOT_ALLOWED). A refusal of the checklist of a K1 task carries details { variant, codes }: the variant the server worked out and the steps it expects of this task, in order; MAILBOX_LOCKED is among them only when no other K1 revocation of the person is still to do.',
+      'The request is invalid (VALIDATION_ERROR), evidence files are invalid (PROVISIONING_TASK.EVIDENCE_FILE_INVALID, details.problem), or the completion is refused and nothing is stored: REVOCATION.COMPLETION_NOT_ALLOWED (the way does not fit the kind of grant), NOTE_REQUIRED, PAID_THROUGH_REQUIRED, ACCESS_STATE_REQUIRED, ACCESS_STATE_INVALID, KEY_DISPOSITION_REQUIRED (a K4 completion without keyDisposition), WITHDRAWAL_REASON_REQUIRED (a K4 key withdrawn with no reason; keyDisposition or withdrawalReason on another kind is COMPLETION_NOT_ALLOWED), no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED), or a K1 checklist that is not valid: a step missing, not ticked or ticked with no time, or no evidence (K1_CHECKLIST_INCOMPLETE), steps ticked out of their order, a step timed earlier than the one that comes before it in the list, such as the lock of the mailbox before the sign-out of the sessions (K1_CHECKLIST_OUT_OF_ORDER), or a step the variant does not have, sent twice or sent for a kind that has no checklist (COMPLETION_NOT_ALLOWED). A refusal of the checklist of a K1 task carries details { variant, codes }: the variant the server worked out and the steps it expects of this task, in order; MAILBOX_LOCKED is among them only when no other K1 revocation of the person is still to do.',
     examples: [
       VALIDATION_EXAMPLE,
       EXAMPLES.COMPLETION_NOT_ALLOWED,
@@ -54,6 +54,7 @@ const COMPLETE_REVOCATION_ERRORS = [
       EXAMPLES.KEY_DISPOSITION_REQUIRED,
       EXAMPLES.WITHDRAWAL_REASON_REQUIRED,
       EXAMPLES.EVIDENCE_REQUIRED,
+      EXAMPLES.EVIDENCE_FILE_INVALID,
       EXAMPLES.K1_CHECKLIST_INCOMPLETE,
       EXAMPLES.K1_CHECKLIST_OUT_OF_ORDER,
     ],
@@ -122,8 +123,13 @@ export class RevocationTasksController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The request is invalid (VALIDATION_ERROR), the day is ahead (REVOCATION.ACCESS_STATE_INVALID) or there is no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED): nothing changes.',
-      examples: [VALIDATION_EXAMPLE, EXAMPLES.ACCESS_STATE_INVALID, EXAMPLES.EVIDENCE_REQUIRED],
+        'The request is invalid (VALIDATION_ERROR), evidence files are invalid (PROVISIONING_TASK.EVIDENCE_FILE_INVALID, details.problem), the day is ahead (REVOCATION.ACCESS_STATE_INVALID) or there is no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED): nothing changes.',
+      examples: [
+        VALIDATION_EXAMPLE,
+        EXAMPLES.ACCESS_STATE_INVALID,
+        EXAMPLES.EVIDENCE_REQUIRED,
+        EXAMPLES.EVIDENCE_FILE_INVALID,
+      ],
     },
   )
   async recordAccessCut(

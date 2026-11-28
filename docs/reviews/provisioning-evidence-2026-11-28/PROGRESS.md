@@ -13,15 +13,15 @@ Skill đã đọc: `ponytail` (full), `using-superpowers`, `using-agent-skills`,
 
 ## Gói và bằng chứng
 
-| Gói | Trạng thái | sha        | EV                  | Lệnh kiểm + pass/fail thực tế                                        | CI            |
-| --- | ---------- | ---------- | ------------------- | -------------------------------------------------------------------- | ------------- |
-| P1  | xong local | bac2e26f   | SPEC §4             | quick checks exit 0; gates 346/346; unit 68/68                       | chưa chạy     |
-| P2a | xong local | b1a7440b   | EV-01…05            | quick checks 0; gates 346/346; unit 116/116                          | chờ P5        |
-| P2b | xong local | 96d829a6   | EV-09/10/14 catalog | typecheck/lint/arch/rules/format 0; gates 346/346; catalog 1079/1079 | chờ P5        |
-| P3a | xong local | commit P3a | EV-06..12 complete  | quick checks 0; gates 346/346; unit 390/390                          | P5 pending    |
-| P3b | chờ        | —          | EV-06…12 revocation | chưa chạy                                                            | chưa chạy     |
-| P4  | chờ        | —          | EV-13…16            | chưa chạy                                                            | chưa chạy     |
-| P5  | chờ        | —          | SPEC §8             | chưa chạy                                                            | chưa dispatch |
+| Gói | Trạng thái | sha        | EV                   | Lệnh kiểm + pass/fail thực tế                                        | CI            |
+| --- | ---------- | ---------- | -------------------- | -------------------------------------------------------------------- | ------------- |
+| P1  | xong local | bac2e26f   | SPEC §4              | quick checks exit 0; gates 346/346; unit 68/68                       | chưa chạy     |
+| P2a | xong local | b1a7440b   | EV-01…05             | quick checks 0; gates 346/346; unit 116/116                          | chờ P5        |
+| P2b | xong local | 96d829a6   | EV-09/10/14 catalog  | typecheck/lint/arch/rules/format 0; gates 346/346; catalog 1079/1079 | chờ P5        |
+| P3a | xong local | d99e3371   | EV-06..12 complete   | quick checks 0; gates 346/346; unit 390/390                          | P5 pending    |
+| P3b | xong local | commit P3b | EV-06..12 revocation | lint 4214 files; gates 346/346; catalog+licensing 2181/2181          | P5 pending    |
+| P4  | chờ        | —          | EV-13…16             | chưa chạy                                                            | chưa chạy     |
+| P5  | chờ        | —          | SPEC §8              | chưa chạy                                                            | chưa dispatch |
 
 ## Pre-flight interfaces
 
@@ -86,3 +86,28 @@ Skill đã đọc: `ponytail` (full), `using-superpowers`, `using-agent-skills`,
 - Ruling: `write` chung gắn file ở dòng đầu trước khi rẽ GRANT/EXTEND; `writeExtension` không gắn lần hai. Cả hai nhánh trả mảng id từ `write` để dựng audit; unit chứng minh đúng một lần gắn, trước mọi ghi và không markCompleted khi gắn bị từ chối. Input type dùng chung cho hai nhánh để giữ trần 60 dòng/hàm.
 - `Kiểm giữ:` `assertItAdmin`, khóa và đọc lại tác vụ, `requireActingItAdmin`, `cleanEvidence`/K1 trước frame, `assertNotRevocationTask`, `nextStatus`, `assertKeyFits`, checklist K1, `markCompleted`, khóa/chọn K4, `recordGranted`, gate báo kết quả và `markCostBorne` giữ thứ tự cũ giữa chúng.
 - Thêm hàng khóa `3c` trong database rules; registry mã 422 dùng file mảnh. Chưa sửa service thu hồi.
+
+## P3b — Hoàn tất thu hồi và cắt truy cập
+
+- RED: 7 fail/2 pass ở spec service; GREEN và kiểm nhanh cuối: provisioning **397 pass/0 fail**, 27 suites; gates **346 pass/0 fail**, 17 suites; typecheck/eslint/arch/rules/format exit 0.
+- Ruling: service đã đủ 8 phụ thuộc. Chuyển nguyên `planOf` và `completedOf` của `RevocationCompletedFactsReader` vào `RevocationAftermath` cùng nhóm; giữ mọi query/guard/thứ tự đọc. Xóa reader trung gian không còn caller; constructor aftermath có 7 phụ thuộc, completion có 8 kể cả file bằng chứng. Test cũ chỉ cập nhật fixture constructor, không đổi kỳ vọng.
+- Vòng sửa 1: lint báo complete 61 dòng do chữ ký input mở rộng; đưa kiểu input ra `EvidenceCompletionInput`, thân callback và thứ tự cũ không đổi. Không tăng trần/suppression.
+- `Kiểm giữ:` `assertRevocationTask`, `nextStatus`, `assertNotBefore`, `BEFORE_WORK`, đọc plan, `lockLine`, `ending.lock`, checklist K1, `planCompletion`/`cleanEvidence`/note `ALREADY_GONE`, `planKeyReturn`, ghi hoàn tất/kết thúc quyền, completion facts/`AFTER_WORK`, aftermath; access-cut giữ `NOT_TERMINATING`, `AssignmentNotOpenError`, `planAccessCut` và shorten. Gắn file đứng trước chúng trong write theo EV-09/12.
+- Unit mới kiểm attach trước khóa/ghi, lỗi attach không khóa/ghi, audit mảng rỗng khi không gửi file, `ALREADY_GONE` có note vẫn gửi file được. Registry mã 422 của cả hai route đã chuyển vào cùng file mảnh.
+- Mốc P3b đang chạy: typecheck, toàn lint, gates, unit catalog + licensing; chỉ sang P4 khi xanh.
+
+### Trạng thái khi lượt thực thi bị ngắt
+
+- P3a đã commit `d99e3371`; P3b còn WIP, chưa commit. P4/P5 chưa triển khai, chưa push hoặc dispatch CI.
+- Mốc P3b: typecheck exit 0; `pnpm lint` mặc định kết thúc exit 134 với lỗi hết heap khoảng 4 GB. Không phải kết quả lint xanh.
+- Đã thử lại với `NODE_OPTIONS=--max-old-space-size=6144`, cùng mức của `.github/workflows/ci.yml:146`; lượt này bị ngắt trước khi ghi nhận kết quả. Session `31418` không còn tồn tại và PID node đã theo dõi `34888` không còn hiện diện khi kiểm tra lại. Không kết luận mốc đã đạt.
+- Bộ kiểm nhanh P3b trước mốc vẫn có bằng chứng: typecheck/eslint/arch/rules/format exit 0; gates 346 pass/0 fail; unit provisioning 397 pass/0 fail. Chưa có kết quả unit catalog + licensing của mốc này.
+- Log CI nền đã trích được 637 test đỏ duy nhất thuộc 108 suite (`baseline-failures.log`, file log không commit); chưa phân loại run nhánh vì chưa tới P5.
+
+### Tiếp tục sau lần ngắt
+
+- Theo yêu cầu tiếp tục của user, lint đã kiểm **đủ 4.214 file**, 15 lô, **0 lỗi/0 cảnh báo**. Tập file khớp cả `rg --hidden --no-ignore`; chỉ loại `src/generated/**` đúng cấu hình ESLint. Mọi log lô đều rỗng, exit 0.
+- Ruling về môi trường: sau OOM của `pnpm lint` và lần heap 6144 MB bị ngắt, gọi đúng CLI ESLint đã cài (`node node_modules/eslint/bin/eslint.js <files>`) theo lô để giới hạn RAM/độ dài command line Windows. Không đổi tập file, cấu hình, rule, threshold hoặc suppression. Giữ nguyên bằng chứng OOM, không báo lệnh `pnpm lint` cũ xanh.
+- Đang kiểm mới typecheck/arch/rules/format/gates và toàn unit catalog + licensing với `maxWorkers=2` để giới hạn RAM; không chạy integration/http/full unit ở máy.
+- Báo cáo tổng khi xong P5 sẽ lưu tại `D:/FPT/FALL2026/NOTE MD/logsCodex.txt` theo yêu cầu mới của user; file hiện trống khi đọc.
+- Mốc P3b đã đạt: lint đủ 4.214 file xanh theo lô; typecheck/arch/rules/format exit 0; gates **346 pass/0 fail** (17 suites); `CI=true pnpm test --maxWorkers=2 src/modules/catalog src/modules/licensing` **2181 pass/0 fail**, 209 suites. Có thể sang P4.

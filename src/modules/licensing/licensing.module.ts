@@ -16,7 +16,6 @@ import { AssignmentCarryRepo } from './assignment/assignment-carry.repo';
 import { AssignmentFactsRepo } from './assignment/renewal/assignment-facts.repo';
 import { AssignmentRenewalService } from './assignment/renewal/assignment-renewal.service';
 import { AssignmentDepartmentRepo } from './assignment/assignment-department.repo';
-import { RevocationCompletedFactsReader } from './provisioning/revocation-completion/revocation-completed-facts.service';
 import { AssignmentRepo } from './assignment/assignment.repo';
 import { AssignmentRevocationRepo } from './assignment/assignment-revocation.repo';
 import { UsageFactsRepo } from './assignment/usage-facts.repo';
@@ -223,7 +222,6 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     LicensingAlerts,
     AssignmentRepo,
     AssignmentRevocationRepo,
-    RevocationCompletedFactsReader,
     AssignmentDepartmentRepo,
     AssignmentSeatOccupancy,
     AssignmentServiceAccountReader,

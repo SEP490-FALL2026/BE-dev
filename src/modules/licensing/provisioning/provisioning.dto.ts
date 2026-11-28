@@ -82,6 +82,10 @@ const COMPLETIONS = [
  * policy and answer with their own codes; a note of evidence is never a password or a key.
  */
 export const revocationCompletionBodySchema = z.strictObject({
+  evidenceDocumentIds: z.array(z.uuid()).max(20).optional().meta({
+    description:
+      'At most 3 uploaded evidence files with purpose PROVISIONING_EVIDENCE. Optional; text evidence rules are unchanged.',
+  }),
   completion: z.enum(COMPLETIONS),
   evidence: z.string().max(EVIDENCE_MAX_LENGTH).default(''),
   note: z.string().max(REVOCATION_NOTE_MAX_LENGTH).optional(),
@@ -96,6 +100,10 @@ export const revocationCompletionBodySchema = z.strictObject({
   k1Checklist: k1ChecklistBodySchema.optional(),
 });
 export const accessCutBodySchema = z.strictObject({
+  evidenceDocumentIds: z.array(z.uuid()).max(20).optional().meta({
+    description:
+      'At most 3 uploaded evidence files with purpose ACCESS_CUT_EVIDENCE. Optional; the evidence note remains required.',
+  }),
   accessCutOn: businessDate,
   evidence: z.string().max(EVIDENCE_MAX_LENGTH).default(''),
 });
