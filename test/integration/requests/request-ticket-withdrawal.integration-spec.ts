@@ -92,19 +92,29 @@ describe('W4-08: withdraw a whole request ticket (integration, real PostgreSQL)'
     requester: Person,
     department: { id: string; unitId: string },
     specs: { planId: string; position: number; over?: Partial<NewAccessRequest> }[],
+    submittedAt: Date = SUBMITTED_AT,
   ) =>
     runner.run(async (tx) => {
       const ticket = await ticketRepo.insert(tx, {
         organizationId: h.seed.organizationId,
         requesterEmployeeId: requester.employeeId,
         departmentId: department.id,
-        submittedAt: SUBMITTED_AT,
+        submittedAt,
       });
       const requestIds: string[] = [];
       for (const spec of specs) {
         const created = await requestRepo.insert(
           tx,
-          baseItem(requester, department, spec.planId, { id: ticket.id, position: spec.position }, spec.over),
+          baseItem(
+            requester,
+            department,
+            spec.planId,
+            { id: ticket.id, position: spec.position },
+            {
+              now: submittedAt,
+              ...spec.over,
+            },
+          ),
         );
         requestIds.push(created.id);
       }
@@ -119,7 +129,7 @@ describe('W4-08: withdraw a whole request ticket (integration, real PostgreSQL)'
 
   const withdrawnEventsCount = async (requestId: string): Promise<number> => {
     const { rows } = await h.ctx.sql.query<{ cnt: number }>(
-      `SELECT count(*)::int AS cnt FROM audit_events WHERE action = 'ACCESS_REQUEST.WITHDRAWN' AND entity_id = $1`,
+      `SELECT count(*)::int AS cnt FROM audit_events WHERE action = 'ACCESS_REQUEST.WITHDRAWN' AND resource_id = $1`,
       [requestId],
     );
     return rows[0].cnt;
@@ -269,10 +279,15 @@ describe('W4-08: withdraw a whole request ticket (integration, real PostgreSQL)'
     await h.enforceRequestLimits();
     await h.setParameter('REQUEST_OPEN_NEW_LIMIT', 2).expect(200);
 
-    const { ticketId, requestIds } = await insertTicket(eGh2, world.pDes, [
-      { planId: world.plans.notion, position: 1 },
-      { planId: world.plans.slack, position: 2 },
-    ]);
+    const { ticketId, requestIds } = await insertTicket(
+      eGh2,
+      world.pDes,
+      [
+        { planId: world.plans.notion, position: 1 },
+        { planId: world.plans.slack, position: 2 },
+      ],
+      new Date(),
+    );
 
     await withdrawTicket(ticketId, eGh2.account).expect(200);
     for (const id of requestIds) expect(await h.state(id)).toBe('WITHDRAWN');

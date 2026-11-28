@@ -39,7 +39,7 @@ describe('W4-07 / W4-14: ticket items keep ticket position order on one-step con
     );
     expect(summary.totals[h.reporting].runningUncommitted).toEqual({ amount: '0', currency: h.reporting });
 
-    const e5 = await h.staff(world.pDes, 'E5');
+    const e5 = await h.staff(world.pDes, 'W4-E5');
     const runner = h.ctx.app.get(TransactionRunner, { strict: false });
     const ticketRepo = h.ctx.app.get(RequestTicketRepo, { strict: false });
     const requestRepo = h.ctx.app.get(AccessRequestRepo, { strict: false });

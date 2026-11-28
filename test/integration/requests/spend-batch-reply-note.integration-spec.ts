@@ -56,7 +56,7 @@ describe('W4-10 & W4-04: head resubmission reply notes in spend batches and queu
     const head = await h.staff(unit, `BRH-${deptCounter}`);
     await h.makeHead(unit, head);
     await h.setItAdminInCharge(unit, { employeeId: h.it1.employeeId, account: h.it1 });
-    await approvedBudget(h.ctx, {
+    const version = await approvedBudget<{ id: string }>(h.ctx, {
       headToken: head.account.accessToken,
       financeToken: h.finance.accessToken,
       deciderToken: w.c1.account.accessToken,
@@ -67,7 +67,7 @@ describe('W4-10 & W4-04: head resubmission reply notes in spend batches and queu
         reserveReason: 'Fixture budget for reply-note batch test',
       },
     });
-    return { unit, member, head };
+    return { unit, member, head, versionId: version.id };
   };
 
   const ticketRequest = (input: {
@@ -274,8 +274,8 @@ describe('W4-10 & W4-04: head resubmission reply notes in spend batches and queu
   });
 
   it('§7.10 D: system rechecked return (RECHECKED_RETURNED_TO_HEAD) does not require replyNote', async () => {
-    const { unit, member, head } = await makeUnitWithBudget(2_000_000n);
-    const { rRecheck, rConsume } = await runner.run(async (tx) => {
+    const { unit, member, head, versionId } = await makeUnitWithBudget(2_000_000n);
+    const rRecheck = await runner.run(async (tx) => {
       const first = await requestRepo.insert(
         tx,
         ticketRequest({
@@ -289,28 +289,14 @@ describe('W4-10 & W4-04: head resubmission reply notes in spend batches and queu
           monthlyPriceMinor: 500_000n,
         }),
       );
-      const second = await requestRepo.insert(
-        tx,
-        ticketRequest({
-          departmentId: unit.id,
-          costCenterId: unit.unitId,
-          requesterEmployeeId: member.employeeId,
-          requesterAppUserId: member.account.appUserId,
-          headEmployeeId: head.employeeId,
-          planId: w.plans.notion,
-          termMonths: 4, // 1.2M
-          monthlyPriceMinor: 300_000n,
-        }),
-      );
-      return { rRecheck: first.id, rConsume: second.id };
+      return first.id;
     });
 
     await h.decide(rRecheck, { decision: 'APPROVE' }, head.account).expect(200);
-    await h.decide(rConsume, { decision: 'APPROVE' }, head.account).expect(200);
-    await submitWithNotes([rRecheck, rConsume], head.account).expect(201);
+    await submitWithNotes([rRecheck], head.account).expect(201);
 
-    // Approve rConsume (1.2M) leaving 0.8M -> approving rRecheck (1.5M) triggers RECHECKED_RETURNED_TO_HEAD.
-    await h.decideSpend(rConsume, { decision: 'APPROVE' }, w.c1.account).expect(200);
+    // Hold 1.2M leaving 0.8M (< 1.5M) -> approving rRecheck triggers RECHECKED_RETURNED_TO_HEAD.
+    await h.commit({ department: unit, head, member }, versionId, 2026, 1_200_000, 'HELD');
     const bounced = await h.decideSpend(rRecheck, { decision: 'APPROVE' }, w.c1.account).expect(409);
     expect(h.codeOf(bounced)).toBe('SPEND.RECHECKED_RETURNED_TO_HEAD');
 
@@ -404,16 +390,15 @@ describe('W4-10 & W4-04: head resubmission reply notes in spend batches and queu
   });
 
   it('D-10: POST /spend-batches returns STOPPED/REPLY_NOTE_REQUIRED, persists the spend_batch_items row, and GET /spend-batches/{id}/items matches', async () => {
-    const { unit, member, head } = await makeUnitWithBudget(10_000_000n);
     const r1 = await runner.run(async (tx) => {
       const created = await requestRepo.insert(
         tx,
         ticketRequest({
-          departmentId: unit.id,
-          costCenterId: unit.unitId,
-          requesterEmployeeId: member.employeeId,
-          requesterAppUserId: member.account.appUserId,
-          headEmployeeId: head.employeeId,
+          departmentId: w.pDes.id,
+          costCenterId: w.pDes.unitId,
+          requesterEmployeeId: w.e1.employeeId,
+          requesterAppUserId: w.e1.account.appUserId,
+          headEmployeeId: w.h1.employeeId,
           planId: w.plans.miro,
           termMonths: 2,
           monthlyPriceMinor: 500_000n,
@@ -422,14 +407,14 @@ describe('W4-10 & W4-04: head resubmission reply notes in spend batches and queu
       return created.id;
     });
 
-    await h.decide(r1, { decision: 'APPROVE' }, head.account).expect(200);
-    await submitWithNotes([r1], head.account).expect(201);
+    await h.decide(r1, { decision: 'APPROVE' }, w.h1.account).expect(200);
+    await submitWithNotes([r1], w.h1.account).expect(201);
     await h.decideSpend(r1, { decision: 'RETURN', reason: 'Missing spend justification' }, w.c1.account).expect(200);
 
     const submitted = h.dataOf<{
       batch: { id: string };
       results: Array<{ requestId: string; outcome: string; stopReason: string | null; reserveConfirmation: string }>;
-    }>(await submitWithNotes([r1], head.account).expect(201));
+    }>(await submitWithNotes([r1], w.h1.account).expect(201));
 
     expect(submitted.results).toEqual([
       { requestId: r1, outcome: 'STOPPED', stopReason: 'REPLY_NOTE_REQUIRED', reserveConfirmation: 'NOT_GIVEN' },
@@ -443,7 +428,7 @@ describe('W4-10 & W4-04: head resubmission reply notes in spend batches and queu
 
     const batchItems = h.dataOf<{
       items: Array<{ requestId: string; outcome: string; stopReason: string | null }>;
-    }>(await h.batchItems(submitted.batch.id, head.account, { pageSize: 100 }).expect(200)).items;
+    }>(await h.batchItems(submitted.batch.id, w.h1.account, { pageSize: 100 }).expect(200)).items;
     expect(batchItems).toMatchObject([{ requestId: r1, outcome: 'STOPPED', stopReason: 'REPLY_NOTE_REQUIRED' }]);
   });
 });
