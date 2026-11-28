@@ -7,7 +7,7 @@ import type { StopReason } from '../spend/spend-submission.policy';
 import { SpendBatchRecorder } from './spend-batch-recorder.service';
 import { SpendTicketReplyService } from './spend-ticket-reply.service';
 
-export type BatchSubmitStopReason = StopReason | 'REPLY_NOTE_REQUIRED';
+export type BatchSubmitStopReason = StopReason;
 
 export interface BatchWriteInput {
   organizationId: string;
@@ -57,7 +57,7 @@ export class SpendBatchWriterService {
       items: input.results.map((result) => ({
         requestId: result.requestId,
         outcome: result.outcome,
-        stopReason: result.stopReason as StopReason | null,
+        stopReason: result.stopReason,
         leftReason: null,
       })),
     });

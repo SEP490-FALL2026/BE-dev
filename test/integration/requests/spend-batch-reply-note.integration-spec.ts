@@ -402,4 +402,48 @@ describe('W4-10 & W4-04: head resubmission reply notes in spend batches and queu
       },
     ]);
   });
+
+  it('D-10: POST /spend-batches returns STOPPED/REPLY_NOTE_REQUIRED, persists the spend_batch_items row, and GET /spend-batches/{id}/items matches', async () => {
+    const { unit, member, head } = await makeUnitWithBudget(10_000_000n);
+    const r1 = await runner.run(async (tx) => {
+      const created = await requestRepo.insert(
+        tx,
+        ticketRequest({
+          departmentId: unit.id,
+          costCenterId: unit.unitId,
+          requesterEmployeeId: member.employeeId,
+          requesterAppUserId: member.account.appUserId,
+          headEmployeeId: head.employeeId,
+          planId: w.plans.miro,
+          termMonths: 2,
+          monthlyPriceMinor: 500_000n,
+        }),
+      );
+      return created.id;
+    });
+
+    await h.decide(r1, { decision: 'APPROVE' }, head.account).expect(200);
+    await submitWithNotes([r1], head.account).expect(201);
+    await h.decideSpend(r1, { decision: 'RETURN', reason: 'Missing spend justification' }, w.c1.account).expect(200);
+
+    const submitted = h.dataOf<{
+      batch: { id: string };
+      results: Array<{ requestId: string; outcome: string; stopReason: string | null; reserveConfirmation: string }>;
+    }>(await submitWithNotes([r1], head.account).expect(201));
+
+    expect(submitted.results).toEqual([
+      { requestId: r1, outcome: 'STOPPED', stopReason: 'REPLY_NOTE_REQUIRED', reserveConfirmation: 'NOT_GIVEN' },
+    ]);
+
+    const persisted = await h.ctx.sql.query<{ request_id: string; outcome: string; stop_reason: string | null }>(
+      `SELECT request_id, outcome::text, stop_reason FROM spend_batch_items WHERE batch_id = $1`,
+      [submitted.batch.id],
+    );
+    expect(persisted.rows).toEqual([{ request_id: r1, outcome: 'STOPPED', stop_reason: 'REPLY_NOTE_REQUIRED' }]);
+
+    const batchItems = h.dataOf<{
+      items: Array<{ requestId: string; outcome: string; stopReason: string | null }>;
+    }>(await h.batchItems(submitted.batch.id, head.account, { pageSize: 100 }).expect(200)).items;
+    expect(batchItems).toMatchObject([{ requestId: r1, outcome: 'STOPPED', stopReason: 'REPLY_NOTE_REQUIRED' }]);
+  });
 });
