@@ -43,6 +43,13 @@ Nền là commit `86562437` của `feat/redesign-w4`. Worktree `D:/Đồ án/w4-
 - Quick check bằng Node 22 đạt `pnpm typecheck`, ESLint và Prettier trên các tệp sửa, `pnpm arch:check`,
   `pnpm rules:check`, `pnpm rules:format`, 346 test tĩnh và 94 unit test trong 4 spec liên quan. OpenAPI export không
   thay đổi `openapi.json`.
+- CI tay tại `c4086786` đạt job quality (10.244 unit test, 346 test tĩnh), HTTP contract, integration tuần tự và smoke
+  test. Hai spec integration W4 `request-single-characterization` và `head-withdraw-submission-queue` đều đạt.
+  [CI tay sau review B1](https://github.com/SEP490-FALL2026/BE-dev/actions/runs/46125525574)
+- Ba shard integration song song đỏ lần lượt 256, 180 và 201 test. Đối chiếu đường dẫn suite và tên đầy đủ từng test với
+  run nền cho thấy 637 ca đỏ đều trùng nền, với 0 ca đỏ mới. Suite `device-return-task.integration-spec.ts` đạt ở lượt
+  này, gồm ca nhắc trả thiết bị quá hạn từng ngày làm việc từng đỏ ở nền.
+  [Run nền](https://github.com/SEP490-FALL2026/BE-dev/actions/runs/46043853099)
 
 ### D-2 cần Owner chốt kết quả chi theo mục phiếu
 
