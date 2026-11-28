@@ -1,4 +1,4 @@
-# SPEC — File bằng chứng khi cấp/thu hồi (28/11/2026, bản 1.1)
+# SPEC — File bằng chứng khi cấp/thu hồi (28/11/2026, bản 1.3)
 
 - **Trạng thái:** bản 1.1 (áp review độc lập Opus 28/11: B1–B4, R1–R7, N1–N5), Owner đã chốt 4 luật Q-EV1…Q-EV4 (28/11/2026, chat điều phối). Chưa vào sổ QĐ — gom ở lượt tài liệu cuối.
 - **Nền đọc code:** `origin/dev` `595cdc48` (sau #101 hóa đơn QĐ-118d, #104 hotfix worker). Mọi `file:line` tính trên sha này.
@@ -195,7 +195,10 @@ Integration (`test/integration/licensing/provisioning-evidence-files.integration
 4. File do IT khác upload ⟹ `NOT_FOUND`; file `CONTRACT_ATTACHMENT` ⟹ `PURPOSE_MISMATCH`; file `ACCESS_CUT_EVIDENCE` ở `complete` ⟹ `PURPOSE_MISMATCH`;
    file đã gắn tác vụ khác ⟹ `ALREADY_ATTACHED`; file chưa upload ⟹ `NOT_READY_TO_ATTACH`. Mỗi ca: tác vụ giữ trạng thái, không audit hoàn tất (rollback).
 5. IT không phụ trách gọi `complete` có file ⟹ 403 `PROVISIONING.NOT_IN_CHARGE` (lỗi khung thắng).
-6. Thu hồi K2 `UNTIL_PAID_END` kèm 1 PDF, rồi `access-cut` kèm 1 ảnh `ACCESS_CUT_EVIDENCE` ⟹ danh sách trả 2 file, `stage` `COMPLETION` rồi `ACCESS_CUT`.
+6. Thu hồi **K1** (hủy gia hạn, `accessState: 'UNTIL_PAID_END'` — chỉ K1 có trạng thái này; K2 trả 422 `REVOCATION.COMPLETION_NOT_ALLOWED`, luật cũ giữ
+   nguyên) kèm 1 PDF, rồi `access-cut` kèm 1 ảnh `ACCESS_CUT_EVIDENCE` ⟹ danh sách trả 2 file, `stage` `COMPLETION` rồi `ACCESS_CUT`. Dựng theo khuôn
+   `test/integration/licensing/provisioning-revocation-complete.integration-spec.ts:320-356` (ca "AC-19: cutting the access earlier…": `renewal({ ...leaving(),
+paidThroughOn, accessState: 'UNTIL_PAID_END' })` + checklist K1). _(Đính chính 1.3: bản trước ghi nhầm K2 — Codex D-1.)_
 7. `GET …/evidence-files`: IT phụ trách 200; Super Admin 200; IT khác 404 `PROVISIONING_TASK.NOT_FOUND`; Finance 403. Link: 200 `{url, expiresAt}`,
    `Cache-Control: no-store`, audit `DOCUMENT.LINK_ISSUED`; `fileId` của tác vụ khác ⟹ 404 `EVIDENCE_FILE_NOT_FOUND`.
 8. `POST /documents/{id}/links` trên file bằng chứng `READY` (IT phụ trách, Finance) ⟹ 404 `DOCUMENT.NOT_FOUND`.
