@@ -1,0 +1,149 @@
+import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
+import { AccessRequestRepo } from '../../../src/modules/requests/access-request/access-request.repo';
+import type { NewAccessRequest } from '../../../src/modules/requests/access-request/access-request.types';
+import { RequestTicketRepo } from '../../../src/modules/requests/request-ticket/request-ticket.repo';
+import { ReassignmentHarness } from '../../support/reassignment-harness';
+import { buildTicketWorld, type TicketWorld } from '../../support/request-ticket-harness';
+
+const h = new ReassignmentHarness();
+
+interface RequestMetaRow {
+  routing_mode: string;
+  one_step_reason: string | null;
+  state: string;
+}
+
+describe('W4-07 / W4-14: ticket items keep ticket position order on one-step conversion (integration, real PostgreSQL)', () => {
+  let world: TicketWorld;
+
+  beforeAll(async () => {
+    await h.start();
+    world = await buildTicketWorld(h, { budget: { baseMinor: 3_000_000n, reserveMinor: 0n } });
+  }, 240000);
+
+  afterAll(async () => {
+    await h.stop();
+  });
+
+  const requestMeta = async (id: string): Promise<RequestMetaRow> =>
+    (
+      await h.ctx.sql.query<RequestMetaRow>(
+        `SELECT routing_mode::text, one_step_reason, state::text FROM access_requests WHERE id = $1`,
+        [id],
+      )
+    ).rows[0];
+
+  it('RB-9: when requester becomes department head, ticket #1 in spend queue checks budget first and passes while #2 pending is blocked', async () => {
+    const summary = h.dataOf<{ totals: Record<string, { runningUncommitted: { amount: string; currency: string } }> }>(
+      await h.summary(h.finance, { year: 2026 }).expect(200),
+    );
+    expect(summary.totals[h.reporting].runningUncommitted).toEqual({ amount: '0', currency: h.reporting });
+
+    const e5 = await h.staff(world.pDes, 'E5');
+    const runner = h.ctx.app.get(TransactionRunner, { strict: false });
+    const ticketRepo = h.ctx.app.get(RequestTicketRepo, { strict: false });
+    const requestRepo = h.ctx.app.get(AccessRequestRepo, { strict: false });
+    const now = new Date('2026-06-01T08:00:00.000Z');
+
+    const itemBase = (
+      planId: string,
+      termMonths: number,
+      monthlyPriceMinor: bigint,
+      ticket: { id: string; position: number },
+    ): NewAccessRequest => ({
+      organizationId: h.seed.organizationId,
+      type: 'GRANT',
+      branch: 'PAID_IN_CATALOG',
+      state: 'PENDING',
+      planId,
+      requesterEmployeeId: e5.employeeId,
+      beneficiaryEmployeeIds: [e5.employeeId],
+      departmentId: world.pDes.id,
+      costCenterId: world.ccDes!.id,
+      businessReason: 'Need license for design project',
+      termMonths,
+      pricing: {
+        status: 'PRICED',
+        missingReason: null,
+        kind: 'RECURRING',
+        budgetYear: 2026,
+        expectedEndDate: null,
+        amountMonths: termMonths,
+        amount: { amountMinor: monthlyPriceMinor * BigInt(termMonths), currency: 'VND' },
+        unitPrice: { amountMinor: monthlyPriceMinor, currency: 'VND' },
+        monthlyPriceMinor,
+        billingCycle: 'MONTHLY',
+        nextYearAmount: null,
+      },
+      policy: {
+        version: 2,
+        branch: 'PAID_IN_CATALOG',
+        chain: ['NEED', 'SPEND_APPROVAL', 'IT_EXECUTION'],
+        slaWorkingDays: 3,
+      },
+      createdByAppUserId: e5.account.appUserId,
+      now,
+      needStep: {
+        state: 'PENDING',
+        assigneeEmployeeId: world.h1.employeeId,
+        routingRow: 1,
+        waitingReason: null,
+        slaWorkingDays: 3,
+      },
+      ticket,
+    });
+
+    // R11 (#2 Notion 5m x 300k = 1.5M) stays PENDING; R12 (#1 Miro 4m x 500k = 2.0M) advances to AWAITING_SPEND_SUBMISSION.
+    const { r11, r12 } = await runner.run(async (tx) => {
+      const ticket = await ticketRepo.insert(tx, {
+        organizationId: h.seed.organizationId,
+        requesterEmployeeId: e5.employeeId,
+        departmentId: world.pDes.id,
+        submittedAt: now,
+      });
+      const r11Inserted = await requestRepo.insert(
+        tx,
+        itemBase(world.plans.notion, 5, 300_000n, { id: ticket.id, position: 2 }),
+      );
+      const r12Inserted = await requestRepo.insert(
+        tx,
+        itemBase(world.plans.miro, 4, 500_000n, { id: ticket.id, position: 1 }),
+      );
+      return { r11: r11Inserted, r12: r12Inserted };
+    });
+
+    await h.decide(r12.id, { decision: 'APPROVE' }, world.h1.account).expect(200);
+    expect(await h.state(r12.id)).toBe('AWAITING_SPEND_SUBMISSION');
+    expect(await h.state(r11.id)).toBe('PENDING');
+
+    await h.makeHead(world.pDes, e5);
+
+    expect(await requestMeta(r12.id)).toEqual({
+      routing_mode: 'ONE_STEP',
+      one_step_reason: 'REQUESTER_IS_HEAD',
+      state: 'AWAITING_SPEND_DECISION',
+    });
+    expect(await h.steps(r12.id, 'SPEND_APPROVAL')).toEqual([
+      expect.objectContaining({ state: 'PENDING', assignee_employee_id: world.c1.employeeId }),
+    ]);
+
+    expect(await requestMeta(r11.id)).toEqual({
+      routing_mode: 'ONE_STEP',
+      one_step_reason: 'REQUESTER_IS_HEAD',
+      state: 'AWAITING_REQUESTER_REVISION',
+    });
+    expect(await h.stepOf(r11.id, 'NEED')).toMatchObject({ id: r11.needStepId, state: 'NOT_REQUIRED' });
+    expect(await h.steps(r11.id, 'SPEND_APPROVAL')).toEqual([]);
+
+    const { rows: checksR12 } = await h.ctx.sql.query<{ outcome: string }>(
+      `SELECT outcome::text FROM request_budget_checks WHERE request_id = $1 ORDER BY number DESC LIMIT 1`,
+      [r12.id],
+    );
+    const { rows: checksR11 } = await h.ctx.sql.query<{ outcome: string }>(
+      `SELECT outcome::text FROM request_budget_checks WHERE request_id = $1 ORDER BY number DESC LIMIT 1`,
+      [r11.id],
+    );
+    expect(checksR12[0]?.outcome).toBe('WITHIN_BASE');
+    expect(checksR11[0]?.outcome).toBe('BLOCKED');
+  });
+});

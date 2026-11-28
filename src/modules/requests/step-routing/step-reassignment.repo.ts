@@ -38,6 +38,39 @@ export interface ReassignableRequest {
   /** The people of a request for a group and the step that holds each; empty for any other request. */
   lines: { employeeId: string; needStepId: string }[];
   steps: ReassignableStep[];
+  /** Ticket membership when the request belongs to a ticket; null for standalone requests. */
+  ticket: { id: string; position: number } | null;
+}
+
+/**
+ * Reorder items so entries belonging to the same ticket occupy their existing slots in ascending ticket position,
+ * while standalone entries keep their original slots.
+ */
+export function orderByTicketPosition<T extends { ticket: { id: string; position: number } | null }>(
+  items: readonly T[],
+): T[] {
+  const grouped = new Map<string, { item: T; position: number }[]>();
+  for (const item of items) {
+    if (item.ticket === null) continue;
+    const list = grouped.get(item.ticket.id) ?? [];
+    list.push({ item, position: item.ticket.position });
+    grouped.set(item.ticket.id, list);
+  }
+
+  const queues = new Map<string, T[]>();
+  for (const [ticketId, list] of grouped) {
+    // Sort descending so pop() yields ascending ticket positions in O(1).
+    list.sort((a, b) => b.position - a.position);
+    queues.set(
+      ticketId,
+      list.map((entry) => entry.item),
+    );
+  }
+
+  return items.map((item) => {
+    if (item.ticket === null) return item;
+    return queues.get(item.ticket.id)?.pop() ?? item;
+  });
 }
 
 const OPEN = ['PENDING', 'WAITING'] as const;
@@ -51,6 +84,8 @@ const SELECT_REQUEST = {
   state: true,
   requesterEmployeeId: true,
   departmentId: true,
+  ticketId: true,
+  ticketPosition: true,
   policy: true,
   beneficiaries: { select: { employeeId: true }, orderBy: { position: 'asc' } },
   // A line the sender withdrew holds nobody; a line already decided still holds its person.
@@ -92,6 +127,16 @@ function toRequest(row: RequestRow): ReassignableRequest {
     steps: row.steps.filter(
       (step): step is typeof step & { kind: ReassignableStepKind } => step.kind !== 'FINANCE_REVIEW',
     ),
+    ticket:
+      row.ticketId !== null && row.ticketPosition !== null ? { id: row.ticketId, position: row.ticketPosition } : null,
+  };
+}
+
+function toTicketSlotRow(row: { id: string; ticketId: string | null; ticketPosition: number | null }) {
+  return {
+    id: row.id,
+    ticket:
+      row.ticketId !== null && row.ticketPosition !== null ? { id: row.ticketId, position: row.ticketPosition } : null,
   };
 }
 
@@ -118,10 +163,10 @@ export class StepReassignmentRepo {
         state: { in: ['PENDING', 'WAITING_CONTROLLED', 'AWAITING_SPEND_SUBMISSION'] },
         steps: { none: { kind: 'SPEND_APPROVAL', state: { in: ['PENDING', 'WAITING'] } } },
       },
-      select: { id: true },
+      select: { id: true, ticketId: true, ticketPosition: true },
       orderBy: { id: 'asc' },
     });
-    return rows.map((row) => row.id);
+    return orderByTicketPosition(rows.map(toTicketSlotRow)).map((row) => row.id);
   }
 
   /** How many requests sent for the department have their need step waiting for a head: what the Super Admin is told when the department is left without one. */
@@ -214,11 +259,11 @@ export class StepReassignmentRepo {
         type: { not: 'GROUP_GRANT' },
         routingMode: { not: 'ONE_STEP' },
       },
-      select: { id: true },
+      select: { id: true, ticketId: true, ticketPosition: true },
       orderBy: { id: 'asc' },
     });
 
-    return rows.map((row) => row.id);
+    return orderByTicketPosition(rows.map(toTicketSlotRow)).map((row) => row.id);
   }
 
   /** The people who hold an open step: the ones to ask whether they still work. */
