@@ -1,6 +1,7 @@
+import type { TicketRef } from '../request-ticket/request-ticket.types';
 import type { MyRequestSummaryWire } from './my-requests.dto';
 import { canWithdrawOwn, outcomeOf, spendStageOf, waitingForOf } from './my-requests.policy';
-import type { MyRequestRow, OutcomeFacts, SpendStageFacts } from './my-requests.types';
+import type { MyLine, MyRequestRow, OutcomeFacts, SpendStageFacts } from './my-requests.types';
 
 export interface EmployeeRef {
   employeeId: string;
@@ -16,8 +17,8 @@ export interface MyRequestLookups {
   facts: SpendStageFacts & OutcomeFacts;
 }
 
-/** What every list of requests says of a row, before what only one list adds (who the caller is to it, their own line). */
-export type RequestSummaryCore = Omit<MyRequestSummaryWire, 'involvement' | 'myLine'>;
+/** What every list of requests says of a row, before what only one list adds (who the caller is to it, their own line, ticket ref). */
+export type RequestSummaryCore = Omit<MyRequestSummaryWire, 'involvement' | 'myLine' | 'ticketRef'>;
 
 /** A row of the list as the wire carries it: the dates written as text, the people named, the stage and the reason read from the facts. */
 export function toSummary(
@@ -65,6 +66,27 @@ export function toSummary(
       },
       stage,
     ),
+  };
+}
+
+/** Maps a row of "my requests" with the caller's involvement, group line, and ticket reference. */
+export function toMyRequestSummary(
+  row: MyRequestRow,
+  viewerEmployeeId: string,
+  lookups: MyRequestLookups,
+  myLine: MyLine | null,
+  ticketRef: TicketRef | null,
+): MyRequestSummaryWire {
+  const sent = row.requesterEmployeeId === viewerEmployeeId;
+  const summary = toSummary(row, row.requesterEmployeeId, lookups);
+
+  return {
+    ...summary,
+    involvement: sent ? 'SENT' : 'FOR_ME',
+    myLine,
+    // Only the person who sent a request withdraws it from here; a person it is for has nothing to withdraw (`SoD-4`).
+    canWithdraw: sent && summary.canWithdraw,
+    ticketRef,
   };
 }
 

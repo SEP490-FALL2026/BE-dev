@@ -1,4 +1,4 @@
-import { myRequestSummarySchema, myRequestsQuerySchema } from './my-requests.dto';
+import { myRequestItemSchema, myRequestSummarySchema, myRequestsQuerySchema } from './my-requests.dto';
 import { requestSchema } from '../access-request/access-request.dto';
 
 describe('the query of my requests', () => {
@@ -54,5 +54,51 @@ describe('a row of my requests', () => {
 
     expect(keys).not.toMatch(/pricing|amount|price|cost|budget|commitment|check|standard|toolset|businessReason/i);
     expect(Object.keys(myRequestSummarySchema.shape.spend.unwrap().shape)).toEqual(['stage']);
+  });
+
+  it('adds nullable ticketRef to list items for standalone requests and ticket items', () => {
+    const ticketId = '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d99';
+    const item = {
+      id: '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11',
+      type: 'GRANT',
+      branch: 'PAID_IN_CATALOG',
+      state: 'PENDING',
+      routing: { mode: 'VIA_HEAD', oneStepReason: null },
+      plan: {
+        planId: '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d13',
+        planName: 'Business',
+        applicationId: '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d14',
+        applicationName: 'Figma',
+      },
+      softwareName: null,
+      beneficiary: {
+        employeeId: '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d12',
+        employeeCode: 'E-12',
+        fullName: 'Linh Tran',
+      },
+      lineCount: 1,
+      termMonths: 6,
+      expectedEndDate: null,
+      submittedAt: '2026-10-30T02:00:00.000Z',
+      updatedAt: '2026-10-30T02:00:00.000Z',
+      needStep: { state: 'PENDING', assignee: null, waitingReason: null },
+      spend: null,
+      outcome: null,
+      withdrawal: null,
+      canWithdraw: true,
+      involvement: 'SENT',
+      myLine: null,
+    };
+
+    expect(myRequestItemSchema.parse({ ...item, ticketRef: null }).ticketRef).toBeNull();
+    expect(
+      myRequestItemSchema.parse({ ...item, ticketRef: { id: ticketId, position: 2, itemCount: 3 } }).ticketRef,
+    ).toEqual({ id: ticketId, position: 2, itemCount: 3 });
+    expect(
+      myRequestItemSchema.safeParse({ ...item, ticketRef: { id: ticketId, position: 7, itemCount: 3 } }).success,
+    ).toBe(false);
+    expect(JSON.stringify(Object.keys(myRequestItemSchema.shape))).not.toMatch(
+      /pricing|amount|price|cost|budget|commitment|check|standard|toolset|businessReason/i,
+    );
   });
 });

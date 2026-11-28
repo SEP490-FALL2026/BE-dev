@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { responseBusinessDate } from '../../../infrastructure/http/dto/business-date.dto';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { costEstimateSchema, costViewSchema } from '../access-request/access-request.dto';
+import { ticketRefSchema } from '../request-ticket/request-ticket.dto';
 import { BATCH_MAX } from '../spend/spend-submission.dto';
 
 const text = (max: number) => z.string().trim().min(1).max(max);
@@ -168,6 +169,7 @@ const approvalSummarySchema = z.strictObject({
   nextYearBudget: nextYearBudgetSchema,
   /** The batch it was last sent in, when it was sent in one. */
   batchId: z.uuid().nullable(),
+  ticketRef: ticketRefSchema.nullable(),
 });
 
 const decisionSchema = z.strictObject({

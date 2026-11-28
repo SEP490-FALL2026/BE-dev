@@ -3,6 +3,7 @@ import { responseBusinessDate } from '../../../infrastructure/http/dto/business-
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { employeeRef, moneySchema } from '../access-request/access-request.dto';
+import { ticketRefSchema } from '../request-ticket/request-ticket.dto';
 
 const pagination = z.strictObject({
   page: z.number().int().positive(),
@@ -67,6 +68,7 @@ const needQueueItemSchema = z.strictObject({
     status: z.enum(['NOT_APPLICABLE', 'PRICED', 'MISSING']),
     amount: moneySchema.nullable(),
   }),
+  ticketRef: ticketRefSchema.nullable(),
 });
 
 export class NeedQueueQueryDto extends createZodDto(needQueueQuerySchema) {}

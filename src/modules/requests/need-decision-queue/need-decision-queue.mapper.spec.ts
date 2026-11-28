@@ -49,6 +49,7 @@ const lookups = (extra: Partial<NeedQueueLookups> = {}): NeedQueueLookups => ({
   ] as NeedQueueLookups['departments'],
   units: new Map([['VND', 0]]),
   due: new Map([['step-1', '2026-10-05']]),
+  ticketRefs: new Map(),
   ...extra,
 });
 
@@ -76,6 +77,7 @@ describe('a row of the queue of the need steps', () => {
       termMonths: 6,
       expectedEndDate: null,
       pricing: { status: 'PRICED', amount: { amount: '123456', currency: 'VND' } },
+      ticketRef: null,
     });
     expect(JSON.stringify(item)).not.toMatch(/remaining|committed|spent|held|primaryCode|toolset|standard/i);
     expect(item).not.toHaveProperty('samePersonAsSpend');
@@ -171,5 +173,16 @@ describe('a row of the queue of the need steps', () => {
     ['the deadline was not counted', { due: new Map() }],
   ])('refuses a step that points at a record that is missing: %s', (_label, missing) => {
     expect(() => needQueueItemOf(row(), lookups(missing as Partial<NeedQueueLookups>))).toThrow('missing record');
+  });
+
+  it('maps ticketRef as null for standalone requests and TicketRef for ticket items', () => {
+    const standalone = needQueueItemOf(row(), lookups());
+    const ticketItem = needQueueItemOf(
+      row(),
+      lookups({ ticketRefs: new Map([['req-1', { id: 'ticket-1', position: 1, itemCount: 3 }]]) }),
+    );
+
+    expect(standalone.ticketRef).toBeNull();
+    expect(ticketItem.ticketRef).toEqual({ id: 'ticket-1', position: 1, itemCount: 3 });
   });
 });

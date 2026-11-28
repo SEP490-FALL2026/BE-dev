@@ -147014,7 +147014,18 @@
                       "additionalProperties": false,
                       "nullable": true
                     },
-                    "batchId": { "type": "string", "format": "uuid", "nullable": true }
+                    "batchId": { "type": "string", "format": "uuid", "nullable": true },
+                    "ticketRef": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "position": { "type": "integer", "minimum": 1, "maximum": 6 },
+                        "itemCount": { "type": "integer", "minimum": 1, "maximum": 6 }
+                      },
+                      "required": ["id", "position", "itemCount"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    }
                   },
                   "required": [
                     "routing",
@@ -147034,7 +147045,8 @@
                     "primaryCode",
                     "outcome",
                     "nextYearBudget",
-                    "batchId"
+                    "batchId",
+                    "ticketRef"
                   ],
                   "additionalProperties": false
                 }
@@ -147826,6 +147838,17 @@
                       },
                       "required": ["status", "amount"],
                       "additionalProperties": false
+                    },
+                    "ticketRef": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "position": { "type": "integer", "minimum": 1, "maximum": 6 },
+                        "itemCount": { "type": "integer", "minimum": 1, "maximum": 6 }
+                      },
+                      "required": ["id", "position", "itemCount"],
+                      "additionalProperties": false,
+                      "nullable": true
                     }
                   },
                   "required": [
@@ -147847,7 +147870,8 @@
                     "businessReasonExcerpt",
                     "termMonths",
                     "expectedEndDate",
-                    "pricing"
+                    "pricing",
+                    "ticketRef"
                   ],
                   "additionalProperties": false
                 }
@@ -152073,6 +152097,17 @@
                       "required": ["state", "outcomeReason"],
                       "additionalProperties": false,
                       "nullable": true
+                    },
+                    "ticketRef": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "position": { "type": "integer", "minimum": 1, "maximum": 6 },
+                        "itemCount": { "type": "integer", "minimum": 1, "maximum": 6 }
+                      },
+                      "required": ["id", "position", "itemCount"],
+                      "additionalProperties": false,
+                      "nullable": true
                     }
                   },
                   "required": [
@@ -152095,7 +152130,8 @@
                     "withdrawal",
                     "canWithdraw",
                     "involvement",
-                    "myLine"
+                    "myLine",
+                    "ticketRef"
                   ],
                   "additionalProperties": false
                 }

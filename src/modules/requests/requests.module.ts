@@ -130,6 +130,7 @@ import { BudgetCheckYearsViewService } from './budget-check/budget-check-years-v
 import { ReserveConfirmationRepo } from './reserve-confirmation/reserve-confirmation.repo';
 import { ReserveConfirmationChecklist } from './reserve-confirmation/reserve-confirmation-checklist.service';
 import { ReserveConfirmationService } from './reserve-confirmation/reserve-confirmation.service';
+import { SpendApprovalQueueFactsService } from './spend-approval-view/spend-approval-queue-facts.service';
 import { SpendApprovalQueueService } from './spend-approval-view/spend-approval-queue.service';
 import { SpendApprovalSourcesService } from './spend-approval-view/spend-approval-sources.service';
 import { SpendApprovalViewService } from './spend-approval-view/spend-approval-view.service';
@@ -330,6 +331,7 @@ import { PurchaseInvoiceSubmissionService } from './purchase-invoice/purchase-in
     SpendDecisionService,
     SpendBatchGroupReturnService,
     SpendBatchDecisionService,
+    SpendApprovalQueueFactsService,
     SpendApprovalQueueService,
     SpendApprovalSourcesService,
     SpendApprovalViewService,
