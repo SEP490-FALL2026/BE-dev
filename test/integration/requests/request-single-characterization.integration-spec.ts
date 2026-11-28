@@ -36,7 +36,7 @@ describe('single requests on the Wave 3 baseline', () => {
     );
   });
 
-  it('maps missing and future-only placements to different 409 errors', async () => {
+  it('rejects an unplaced requester and distinguishes a future first placement', async () => {
     const unplaced = await h.unplacedStaff('REQ-NOPLACE');
     const future = await h.unplacedStaff('REQ-FUTURE');
     await request(h.server())
@@ -44,12 +44,12 @@ describe('single requests on the Wave 3 baseline', () => {
       .set(admin())
       .send({ departmentId: w.pDes.id, effectiveFrom: '2026-06-02' })
       .expect(201);
-    for (const [person, code] of [
-      [unplaced, 'ACCESS_REQUEST.NO_DEPARTMENT'],
-      [future, 'EMPLOYEE.NOT_STARTED'],
-    ] as const) {
-      expect(h.codeOf(await h.submit(h.form(w.plans.k5Internal), person.account).expect(409))).toBe(code);
-    }
+    const form = h.form(w.plans.k5Internal);
+    const withoutPlacement = await h.submit(form, unplaced.account).expect(422);
+    expect(h.codeOf(withoutPlacement)).toBe('REQUEST_PARTY.INELIGIBLE');
+    expect(h.detailsOf(withoutPlacement)).toMatchObject({ reason: 'UNPLACED', party: 'REQUESTER' });
+    const futurePlacement = await h.submit(form, future.account).expect(409);
+    expect(h.codeOf(futurePlacement)).toBe('EMPLOYEE.NOT_STARTED');
   });
 
   it('returns the seven single-request term refusal codes and never writes a request for them', async () => {
@@ -68,9 +68,10 @@ describe('single requests on the Wave 3 baseline', () => {
     const intern = await timedStaff('REQ-INTERN', '2026-10-01');
     const ended = await timedStaff('REQ-ENDED', '2026-05-31');
     const accountKey = await h.plan('K4');
+    const monthlyK1 = await h.planOf(await h.subscription(10, 'K1'));
     const cases = [
-      [h.form(w.plans.miro), w.e1.account, 'TERM_REQUIRED'],
-      [h.form(w.plans.miro, { termMonths: 10 }), w.e1.account, 'TERM_MONTHS_OUT_OF_RANGE'],
+      [h.form(monthlyK1), w.e1.account, 'TERM_REQUIRED'],
+      [h.form(monthlyK1, { termMonths: 10 }), w.e1.account, 'TERM_MONTHS_OUT_OF_RANGE'],
       [h.form(accountKey, { termMonths: 1 }), w.e1.account, 'TERM_NOT_ASKED'],
       [h.form(w.plans.miro, { termMonths: null }), intern, 'TERM_LONG_TERM_NOT_ALLOWED'],
       [h.form(w.plans.miro, { termMonths: 1 }), ended, 'TERM_CONTRACT_ENDED'],
@@ -78,9 +79,12 @@ describe('single requests on the Wave 3 baseline', () => {
       [h.form(w.plans.k1Annual, { termMonths: 12 }), intern, 'K1_ANNUAL_CONTRACT_TOO_SHORT'],
     ] as const;
     const before = await h.requestRows();
-    for (const [body, account, reason] of cases) {
-      expect(h.codeOf(await h.submit(body, account).expect(422))).toBe(`ACCESS_REQUEST.${reason}`);
+    const refused = [];
+    for (const [body, account] of cases) {
+      const response = await h.submit(body, account);
+      refused.push({ status: response.status, code: response.status === 422 ? h.codeOf(response) : null });
     }
+    expect(refused).toEqual(cases.map(([, , reason]) => ({ status: 422, code: `ACCESS_REQUEST.${reason}` })));
     expect(await h.requestRows()).toBe(before);
   });
 
@@ -202,27 +206,16 @@ describe('single requests on the Wave 3 baseline', () => {
     ]);
     expect(readRequest(await h.fetch(sent.id, w.e1.account).expect(200)).state).toBe('AWAITING_SPEND_SUBMISSION');
   });
-});
-
-describe('single intake with no Cost Center', () => {
-  const bare = new GroupHarness();
-  let w: TicketWorld;
-
-  beforeAll(async () => {
-    await bare.start();
-    w = await buildTicketWorld(bare, { withoutCostCenter: true });
-  }, 240000);
-
-  afterAll(async () => {
-    jest.restoreAllMocks();
-    await bare.stop();
-  });
 
   it('refuses the device plan before the Cost Center check, but submits internal K5', async () => {
-    const device = await bare.submit(bare.form(w.plans.k4DeviceKey), w.e1.account).expect(422);
-    expect(bare.codeOf(device)).toBe('ACCESS_REQUEST.PLAN_BOUND_TO_DEVICE');
-    const paid = await bare.submit(bare.form(w.plans.miro, { termMonths: 1 }), w.e1.account).expect(409);
-    expect(bare.codeOf(paid)).toBe('FINANCE.SETUP_INCOMPLETE');
-    expect(await bare.sent(w.e1, w.plans.k5Internal)).toMatchObject({ branch: 'INTERNAL_FREE', costCenter: null });
+    const bare = { ...(await h.bareDepartment()), unitId: '' };
+    const employee = await h.staff(bare, 'REQ-NO-CC');
+    await h.makeHead(bare, await h.staff(bare, 'REQ-NO-CC-HEAD'));
+    await h.setItAdminInCharge(bare, { employeeId: w.it1.employeeId, account: w.it1 });
+    const device = await h.submit(h.form(w.plans.k4DeviceKey), employee.account).expect(422);
+    expect(h.codeOf(device)).toBe('ACCESS_REQUEST.PLAN_BOUND_TO_DEVICE');
+    const paid = await h.submit(h.form(w.plans.miro, { termMonths: 1 }), employee.account).expect(409);
+    expect(h.codeOf(paid)).toBe('FINANCE.SETUP_INCOMPLETE');
+    expect(await h.sent(employee, w.plans.k5Internal)).toMatchObject({ branch: 'INTERNAL_FREE', costCenter: null });
   });
 });
