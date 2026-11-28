@@ -145,9 +145,9 @@ document_attachments — gắn file bằng chứng tác vụ` vào bảng _Thứ
     `PROVISIONING_TASK.NOT_FOUND` (không lộ tồn tại — cùng cách `ProvisioningService.get` ẩn tác vụ ngoài phạm vi).
   - **Tự chốt (TC-3):** IT đã hoàn tất nhưng nay không còn phụ trách thì **không** xem được nữa — đúng chữ Q-EV4 "IT phụ trách" và luật "người phụ trách
     hiện tại" của QĐ-118d (nộp lại hóa đơn).
-  - **Tự chốt (TC-4) — cần Owner xác nhận:** tác vụ của người **chưa xếp phòng** — hoàn tất xong thì chỉ định IT cho việc đó chấm dứt
-    (`provisioning-task-frame.service.ts:95-101`) ⟹ sau khi hoàn tất **chỉ Super Admin** xem được file của tác vụ đó. Giữ đúng luật quyền hiện có, không mở
-    thêm ngoại lệ; Owner muốn khác ⟹ sửa ở vòng sau.
+  - **TC-4 — Owner chốt 28/11/2026 (Q-EV5): chỉ Super Admin.** Tác vụ của người **chưa xếp phòng**: hoàn tất xong thì chỉ định IT cho
+    việc đó chấm dứt (`provisioning-task-frame.service.ts:95-101`) ⟹ sau khi hoàn tất **chỉ Super Admin** xem được file. Khi người đó được xếp phòng sau
+    này, IT phụ trách phòng đó tự xem được (luật tính theo phòng hiện tại — `workDepartmentsOf`). Không thêm ngoại lệ.
 - **EV-16** Kho file sập ⟹ 503 (map chung hiện có `service-unavailable.ts`); không cần code riêng.
 
 ## 6. Kiến trúc và vị trí file

@@ -140,7 +140,7 @@ contentType:'image/webp'}` qua; `{purpose:'CONTRACT_ATTACHMENT', … 'a.webp','i
       qua `picture-image.ts`, `mayOpen`. Nơi gọi duy nhất `document.service.ts:87` truyền `purpose`.
 - [ ] `test/support/fake-object-storage.ts` `GENUINE_START['image/webp']` = `[0x52,0x49,0x46,0x46,0x24,0,0,0,0x57,0x45,0x42,0x50]`.
 - [ ] Bộ kiểm nhanh + `CI=true pnpm test -- src/modules/catalog/contract`. Commit `feat(catalog): evidence purposes and WebP for provisioning
-    evidence files` — `Spec: EV-01…EV-05`.
+  evidence files` — `Spec: EV-01…EV-05`.
 
 ### P2b — Catalog: gắn/liệt kê/ký link file bằng chứng (EV-09, EV-10, EV-14 phía catalog) — cỡ M
 
@@ -188,7 +188,7 @@ contentType:'image/webp'}` qua; `{purpose:'CONTRACT_ATTACHMENT', … 'a.webp','i
       qua `/documents` với purpose `PROVISIONING_EVIDENCE`; không chứa mã QĐ). Khai 422 ở `complete` inline (`provisioning-tasks.controller.ts:229-241`).
 - [ ] Ghi: `ProvisioningService.complete` (`tasks/provisioning.service.ts:165-190`) thêm `evidenceDocumentIds?` vào kiểu `input` (`:168`) và truyền xuống;
       `ProvisioningGrantCompletion.write` / `writeExtension` (tham số thật là `context`) có **dòng đầu** `const evidenceDocumentIds = await
-    this.evidenceFiles.attach(tx, actor, context.task.id, input.evidenceDocumentIds, 'PROVISIONING_EVIDENCE')`, phần cũ y nguyên, và **trả**
+  this.evidenceFiles.attach(tx, actor, context.task.id, input.evidenceDocumentIds, 'PROVISIONING_EVIDENCE')`, phần cũ y nguyên, và **trả**
       `evidenceDocumentIds` (đang `void`); `ProvisioningService.complete` đưa giá trị trả vào `after` (`:184-188`).
 - [ ] Unit (**chỉ thêm ca** — `ProvisioningGrantCompletion` chưa có spec ⟹ spec mới `tasks/provisioning-grant-completion.service.spec.ts` hoặc thêm vào
       `tasks/provisioning.service.spec.ts`): không file ⟹ after có `evidenceDocumentIds: []`; 2 file ⟹ `evidenceFiles.attach` gọi **trước** `markCompleted`
@@ -197,7 +197,7 @@ contentType:'image/webp'}` qua; `{purpose:'CONTRACT_ATTACHMENT', … 'a.webp','i
       tác vụ, sau `3a`/`3b`, trước `4`.
 - [ ] Registry (file mảnh, mục 3): mã 422 của `provisioningTaskComplete`.
 - [ ] Bộ kiểm nhanh + `CI=true pnpm test -- src/modules/licensing/provisioning`. Commit `feat(licensing): attach evidence files when a provisioning task is
-    completed` — `Spec: EV-06…EV-12 (complete)`; `Kiểm giữ:` khung (`assertItAdmin`, khóa, `requireActingItAdmin`), `cleanEvidence`/K1 trước khung,
+  completed` — `Spec: EV-06…EV-12 (complete)`; `Kiểm giữ:` khung (`assertItAdmin`, khóa, `requireActingItAdmin`), `cleanEvidence`/K1 trước khung,
       `assertNotRevocationTask`, `nextStatus`, `assertKeyFits`, checklist K1, `markCompleted` — thứ tự giữa chúng không đổi.
 
 ### P3b — Licensing: thu hồi xong + cắt truy cập (EV-06…EV-12 cho hai route thu hồi) — cỡ S/M
@@ -219,7 +219,7 @@ và `ACCESS_CUT` có `evidenceDocumentIds`; (4) callback `complete` không vư�
       `markRevocationCompleted`. `revocation.policy.spec.ts` (389 dòng) **không** thêm ca.
 - [ ] Registry (file mảnh): mã 422 của `provisioningTaskCompleteRevocation`, `provisioningTaskRecordAccessCut`.
 - [ ] Bộ kiểm nhanh + `CI=true pnpm test -- src/modules/licensing/provisioning`. Commit `feat(licensing): attach evidence files when a revocation is
-    completed or access is cut` — `Spec: EV-06…EV-12 (revocation)`; `Kiểm giữ:` `assertRevocationTask`, `nextStatus`, `assertNotBefore`, `BEFORE_WORK`,
+  completed or access is cut` — `Spec: EV-06…EV-12 (revocation)`; `Kiểm giữ:` `assertRevocationTask`, `nextStatus`, `assertNotBefore`, `BEFORE_WORK`,
       `lockLine`, `ending.lock`, `planCompletion`/`cleanEvidence`/note `ALREADY_GONE`, `planKeyReturn`, `NOT_TERMINATING`, `AssignmentNotOpenError`,
       `planAccessCut` — thứ tự giữa chúng không đổi.
 
@@ -229,7 +229,7 @@ vào `PROGRESS.md` trước khi sang P4.
 ### P4 — Licensing: route đọc (EV-13…EV-16) — cỡ M
 
 **Tiêu chí:** (1) Super Admin đọc mọi tác vụ; (2) IT chỉ đọc khi **đang** phụ trách (`requireActingItAdmin`), ngoài phạm vi ⟹ 404
-`PROVISIONING_TASK.NOT_FOUND`; (3) tác vụ chưa xếp phòng đã hoàn tất ⟹ chỉ Super Admin (SPEC TC-4 — Owner chưa xác nhận: nếu bị đổi, chỉ sửa nhánh này).
+`PROVISIONING_TASK.NOT_FOUND`; (3) tác vụ chưa xếp phòng đã hoàn tất ⟹ chỉ Super Admin (SPEC TC-4 — Owner chốt: chỉ Super Admin; thêm 1 ca unit: tác vụ chưa xếp phòng đã hoàn tất, IT từng làm ⟹ 404).
 
 **Interfaces — Consumes:** `CatalogApi.listProvisioningEvidence`, `issueProvisioningEvidenceLink` (P2); `ProvisioningTaskFrame.requireActingItAdmin` (frame `:134`);
 repo đọc tác vụ có `assignment.employeeId` (khung đọc ở `provisioning-task-frame.service.ts:72-73` — dùng hàm đọc **không khóa** có sẵn của
