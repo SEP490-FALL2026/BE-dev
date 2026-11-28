@@ -91,9 +91,11 @@ async function fundDesign(h: RequestHarness, head: Person, approver: Person, bud
         sharedPoolReserve: { amount: '0' },
       })
       .expect(201);
-    await request(h.server()).post(`/api/v1/budget-cycles/${YEAR}/opening`).set(finance).expect(200);
   } else if (cycle.status !== 200) {
     throw new Error(`Cannot read fixture budget cycle (${cycle.status})`);
+  }
+  if (cycle.status === 404 || h.dataOf<{ status: string }>(cycle).status === 'DRAFT') {
+    await request(h.server()).post(`/api/v1/budget-cycles/${YEAR}/opening`).set(finance).expect(201);
   }
   await approvedBudget(h.ctx, {
     headToken: head.account.accessToken,
