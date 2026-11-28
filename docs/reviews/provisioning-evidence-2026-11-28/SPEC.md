@@ -1,4 +1,4 @@
-# SPEC — File bằng chứng khi cấp/thu hồi (28/11/2026, bản 1.3)
+# SPEC — File bằng chứng khi cấp/thu hồi (28/11/2026, bản 1.4)
 
 - **Trạng thái:** bản 1.1 (áp review độc lập Opus 28/11: B1–B4, R1–R7, N1–N5), Owner đã chốt 4 luật Q-EV1…Q-EV4 (28/11/2026, chat điều phối). Chưa vào sổ QĐ — gom ở lượt tài liệu cuối.
 - **Nền đọc code:** `origin/dev` `595cdc48` (sau #101 hóa đơn QĐ-118d, #104 hotfix worker). Mọi `file:line` tính trên sha này.
@@ -213,7 +213,7 @@ paidThroughOn, accessState: 'UNTIL_PAID_END' })` + checklist K1). _(Đính chín
     một tác vụ. Khuôn barrier: `git grep -ln "40P01" test/integration` lấy một spec đồng thời có sẵn.
 
 HTTP (`test/http/licensing/provisioning-evidence-files.http-spec.ts`, không DB): vai của hai route mới (Employee/Manager/Finance 403), validate `fileId`
-không phải uuid ⟹ 400, body `evidenceDocumentIds` không phải mảng uuid ⟹ 400, OpenAPI khai đủ mã + ví dụ.
+không phải uuid ⟹ 422 `VALIDATION_ERROR`, body `evidenceDocumentIds` không phải mảng uuid ⟹ 422 `VALIDATION_ERROR` (đính chính 1.4: contract dự án, `api-contract.md`), OpenAPI khai đủ mã + ví dụ.
 
 Mọi test lỗi khẳng định **mã lỗi**, không chỉ status. Không đổi kỳ vọng test cũ; test cũ chỉ được thêm ca.
 
