@@ -131,10 +131,11 @@ describe('what a supplementary file changes, and what it says (QĐ-82n, US-06-14
 
 describe('QĐ-111an, R-4: the stop reason of a batch item an older release made is read with the reasons that exist now', () => {
   it('reads a request that stopped for want of a rate as the missing price it comes to, and leaves the other reasons as they were', () => {
-    expect(['RATE_MISSING', 'PRICE_MISSING', 'OVER_RESERVE', null].map(stopReasonOf)).toEqual([
+    expect(['RATE_MISSING', 'PRICE_MISSING', 'OVER_RESERVE', 'REPLY_NOTE_REQUIRED', null].map(stopReasonOf)).toEqual([
       'PRICE_MISSING',
       'PRICE_MISSING',
       'OVER_RESERVE',
+      'REPLY_NOTE_REQUIRED',
       null,
     ]);
   });

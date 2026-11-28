@@ -1,8 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { CatalogApi } from '../../catalog/public/catalog.api';
-import { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import { AssessmentReadRepo } from '../access-request/assessment-read.repo';
 import type { ProposalRecord } from '../access-request/assessment-record.types';
 import {
   PricingViewService,
@@ -17,11 +14,18 @@ import type { SpendStage } from '../access-request/access-request.types';
 import { SpendStatusService, type SpendStatusView } from '../spend/spend-status.service';
 import { AccessRequestNotFoundError } from '../access-request/access-request.errors';
 import { viewFactsOf, hasSpendStep } from '../access-request/access-request.policy';
+import { AccessRequestViewFactsService } from './access-request-view-facts.service';
 import { RequestReadAccessService } from './request-read-access.service';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
-import type { AccessRequestRecord, ApprovalRecordRecord, NeedStepRecord } from '../access-request/access-request.types';
+import type {
+  AccessRequestRecord,
+  ApprovalRecordRecord,
+  NeedStepRecord,
+  TicketRef,
+} from '../access-request/access-request.types';
 import type { ReadableCancelCause } from '../access-request/group-request.types';
 import type { LimitExemption } from '../request-limits/request-limits.policy';
+import type { LatestReply } from '../request-reply/request-reply.types';
 
 export interface EmployeeRefView {
   employeeId: string;
@@ -74,6 +78,7 @@ export interface AccessRequestView extends Omit<
   | 'budgetYear'
   | 'planLine'
   | 'offPlan'
+  | 'ticket'
 > {
   plan: { planId: string; planName: string; applicationId: string; applicationName: string } | null;
   /** What the Employee declared of software that is not in the catalog; null for any other request. */
@@ -108,6 +113,10 @@ export interface AccessRequestView extends Omit<
   serviceAccount: ServiceAccountView | null;
   /** Why the request was left out of GH-1/GH-2 when it was sent (`QĐ-110q`); null for every other request. */
   limitExemption: LimitExemption | null;
+  /** Ticket membership reference when submitted inside a ticket; null for standalone requests. */
+  ticketRef: TicketRef | null;
+  /** Latest human resubmission reply attached to this request; null when none exists. */
+  latestReply: LatestReply | null;
 }
 
 export interface RenewalView {
@@ -153,11 +162,9 @@ export interface CancellationView {
 export class AccessRequestQueryService {
   constructor(
     private readonly repo: AccessRequestRepo,
-    private readonly organizationReads: OrganizationReadApi,
-    private readonly catalog: CatalogApi,
+    private readonly facts: AccessRequestViewFactsService,
     private readonly pricing: PricingViewService,
     private readonly costs: RequestCostViewService,
-    private readonly assessments: AssessmentReadRepo,
     private readonly spendStatus: SpendStatusService,
     private readonly readAccess: RequestReadAccessService,
   ) {}
@@ -199,19 +206,14 @@ export class AccessRequestQueryService {
         ].filter((v) => v !== null),
       ),
     ];
-    const [people, plans, department, costCenters, proposal, spend, vendorChargeUntilRenewal] = await Promise.all([
-      this.organizationReads.getEmployees(peopleIds),
-      record.planId === null ? Promise.resolve([]) : this.catalog.getPlanSummaries([record.planId]),
-      this.organizationReads.getDepartmentBrief(record.departmentId),
-      record.costCenterId === null
-        ? Promise.resolve([])
-        : this.organizationReads.costCentersByIds([record.costCenterId]),
-      record.branch === 'NEW_SOFTWARE' ? this.assessments.findProposal(record.id) : Promise.resolve(null),
-      this.spendStatus.of(record),
-      record.branch === 'INTERNAL_FREE' || record.pricing.status === 'NOT_APPLICABLE'
-        ? Promise.resolve(undefined)
-        : this.pricing.vendorChargeUntilRenewalOf(record.planId),
-    ]);
+    const [{ people, plans, department, costCenters, proposal, latestReply }, spend, vendorChargeUntilRenewal] =
+      await Promise.all([
+        this.facts.load(record, peopleIds),
+        this.spendStatus.of(record),
+        record.branch === 'INTERNAL_FREE' || record.pricing.status === 'NOT_APPLICABLE'
+          ? Promise.resolve(undefined)
+          : this.pricing.vendorChargeUntilRenewalOf(record.planId),
+      ]);
     const spendView = spend && (await this.spendViewOf(spend));
     const person = (id: string): EmployeeRefView => {
       const found = people.find((candidate) => candidate.id === id);
@@ -262,6 +264,8 @@ export class AccessRequestQueryService {
         slaWorkingDays: record.policy.slaWorkingDays,
       },
       submittedAt: record.submittedAt,
+      ticketRef: record.ticket,
+      latestReply,
       withdrawal:
         record.withdrawal === null
           ? null

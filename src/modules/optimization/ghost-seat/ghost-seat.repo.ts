@@ -274,20 +274,20 @@ export class GhostSeatRepo {
   async lastKeptOrExemptedOf(
     seatChainIds: readonly string[],
     tx?: DbTx,
-  ): Promise<Map<string, { id: string; closeReason: 'KEPT' | 'EXEMPTED'; closedOn: BusinessDate }>> {
+  ): Promise<Map<string, { id: string; closeReason: 'KEPT' | 'EXEMPTED'; closedAt: Date }>> {
     if (seatChainIds.length === 0) return new Map();
     const rows = await (tx ?? this.prisma).ghostSeatRecommendation.findMany({
       where: { seatChainId: { in: [...seatChainIds] }, state: 'CLOSED', closeReason: { in: ['KEPT', 'EXEMPTED'] } },
       orderBy: [{ closedAt: 'desc' }, { id: 'asc' }],
       select: { id: true, seatChainId: true, closeReason: true, closedAt: true },
     });
-    const out = new Map<string, { id: string; closeReason: 'KEPT' | 'EXEMPTED'; closedOn: BusinessDate }>();
+    const out = new Map<string, { id: string; closeReason: 'KEPT' | 'EXEMPTED'; closedAt: Date }>();
     for (const row of rows) {
       if (!row.seatChainId || out.has(row.seatChainId) || !row.closedAt) continue;
       out.set(row.seatChainId, {
         id: row.id,
         closeReason: row.closeReason as 'KEPT' | 'EXEMPTED',
-        closedOn: row.closedAt.toISOString().slice(0, 10),
+        closedAt: row.closedAt,
       });
     }
 

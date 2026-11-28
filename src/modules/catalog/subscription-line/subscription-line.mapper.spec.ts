@@ -9,6 +9,8 @@ import {
   SubscriptionLineQuantityViaPurchaseError,
   SubscriptionLineStaleError,
 } from './subscription-line.errors';
+import { PlanApplicationRetiredError, PlanNotFoundError } from '../plan/plan.errors';
+import { WorkspaceVendorMismatchError } from '../workspace/workspace.errors';
 import { toSubscriptionLineApiException } from './subscription-line.http-errors';
 import { toSeatChangeItem, toSubscriptionLineDetail } from './subscription-line.mapper';
 import type { SubscriptionLineRecord } from './subscription-line.types';
@@ -105,6 +107,13 @@ describe('subscription-line mapper & http-errors', () => {
       HttpStatus.UNPROCESSABLE_ENTITY,
       'SUBSCRIPTION_LINE.QUANTITY_VIA_PURCHASE',
     ],
+    [
+      new WorkspaceVendorMismatchError(),
+      HttpStatus.UNPROCESSABLE_ENTITY,
+      'SUBSCRIPTION_LINE.WORKSPACE_VENDOR_MISMATCH',
+    ],
+    [new PlanNotFoundError(), HttpStatus.UNPROCESSABLE_ENTITY, 'SUBSCRIPTION_LINE.PLAN_NOT_FOUND'],
+    [new PlanApplicationRetiredError(), HttpStatus.UNPROCESSABLE_ENTITY, 'SUBSCRIPTION_LINE.APPLICATION_RETIRED'],
   ])('maps %p to HTTP %s (%s)', (domainError, expectedStatus, expectedCode) => {
     const apiError = toSubscriptionLineApiException(domainError) as {
       getStatus: () => number;

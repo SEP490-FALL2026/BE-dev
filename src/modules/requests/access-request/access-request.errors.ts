@@ -212,3 +212,11 @@ export class AccessRequestNotRequesterError extends Error {
     super('Only the requester may send this request again.');
   }
 }
+
+/** Resubmission after a human return requires a plain-text reply note. */
+export class AccessRequestReplyNoteRequiredError extends Error {
+  constructor(readonly returnedStepId: string) {
+    super('A reply note is required when resubmitting after a human return.');
+    this.name = 'AccessRequestReplyNoteRequiredError';
+  }
+}

@@ -65,6 +65,17 @@ export class LicenseLotRepo {
     return locked.length === 0 ? null : this.find(id, tx);
   }
 
+  /** The ids of the lots, not bought for a request, this IT Admin answers for (`QĐ-118d`): one statement. */
+  async idsResponsibleFor(employeeId: string, tx?: DbTx): Promise<string[]> {
+    const rows = await (tx ?? this.prisma).licenseLot.findMany({
+      where: { responsibleItAdminEmployeeId: employeeId, purpose: { not: 'REQUEST' } },
+      select: { id: true },
+      orderBy: { id: 'asc' },
+    });
+
+    return rows.map((row) => row.id);
+  }
+
   /** The lots with these ids in one read; an id that does not exist is absent. */
   async findMany(ids: readonly string[], tx?: DbTx): Promise<Map<string, LicenseLotRecord>> {
     if (ids.length === 0) return new Map();

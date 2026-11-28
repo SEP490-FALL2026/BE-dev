@@ -15,6 +15,7 @@ import {
 } from '../step-routing/reassignment.policy';
 import { stepWaitingAuditEvent } from './reassignment-audit.mapper';
 import { reassignmentAuditEvent } from '../step-routing/step-audit-event.mapper';
+import { orderByTicketPosition } from '../request-ticket/request-ticket-order.policy';
 import { RequesterHeadConversionService } from '../step-routing/requester-head-conversion.service';
 import {
   StepReassignmentRepo,
@@ -94,8 +95,8 @@ export class StepReassignmentService {
   }
 
   /** Individual requests awaiting spend submission that still hold VIA_HEAD routing, checked once per daily pass. */
-  spendQueueRequestIds(): Promise<string[]> {
-    return this.repo.spendQueueRequestIds();
+  async spendQueueRequestIds(): Promise<string[]> {
+    return orderByTicketPosition(await this.repo.spendQueueRequestIds()).map((row) => row.id);
   }
 
   /** Looks again at one request in a transaction of its own, so that one that fails does not hold back the others. */
@@ -129,8 +130,10 @@ export class StepReassignmentService {
       endedNotRequired: 0,
       alerted: 0,
     };
-    const requests = await this.repo.lockWithOpenSteps(tx, requestIds);
-    if (requests.length === 0) return result;
+    const locked = await this.repo.lockWithOpenSteps(tx, requestIds);
+    if (locked.length === 0) return result;
+    // Locks stay ordered by id inside lockWithOpenSteps; same-ticket items check budget in ascending ticket position.
+    const requests = orderByTicketPosition(locked);
 
     const facts = await this.targets.gatherToday(tx, now);
     const gone = await this.holdersWhoLeft(tx, requests);

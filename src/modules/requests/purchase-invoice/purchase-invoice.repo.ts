@@ -83,9 +83,20 @@ export interface PurchaseInvoiceFilter {
   serviceMonth?: BusinessDate;
 }
 
-/** Whom a list is for: Finance reads every invoice; the IT Admin reads their own submissions and the ones of the requests they work (D8). */
+/**
+ * Whom a list is for: Finance reads every invoice; the IT Admin reads their own submissions, the ones of the requests they work (D8), and the
+ * ones of the subscription and of the lots not bought for a request they answer for now (QĐ-118f: the one who answers reads, and submits again, what
+ * another submitted).
+ */
 export type PurchaseInvoiceScope =
-  { kind: 'ALL' } | { kind: 'IT_ADMIN'; employeeId: string; departmentIds: readonly string[] };
+  | { kind: 'ALL' }
+  | {
+      kind: 'IT_ADMIN';
+      employeeId: string;
+      departmentIds: readonly string[];
+      subscriptionIds: readonly string[];
+      licenseLotIds: readonly string[];
+    };
 
 const scopeWhere = (scope: PurchaseInvoiceScope): Prisma.PurchaseInvoiceWhereInput =>
   scope.kind === 'ALL'
@@ -94,6 +105,8 @@ const scopeWhere = (scope: PurchaseInvoiceScope): Prisma.PurchaseInvoiceWhereInp
         OR: [
           { submittedByEmployeeId: scope.employeeId },
           { request: { departmentId: { in: [...scope.departmentIds] } } },
+          { subscriptionId: { in: [...scope.subscriptionIds] } },
+          { licenseLotId: { in: [...scope.licenseLotIds] } },
         ],
       };
 

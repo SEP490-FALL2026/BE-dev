@@ -19,7 +19,8 @@ export type StopReason =
   | 'NO_APPROVED_BUDGET'
   | 'OVER_RESERVE'
   | 'STALE_COST_EVIDENCE'
-  | 'CLOSED_OR_EXPIRED_BUDGET_PERIOD';
+  | 'CLOSED_OR_EXPIRED_BUDGET_PERIOD'
+  | 'REPLY_NOTE_REQUIRED';
 
 /** The stop reason of a batch item as it is stored: `RATE_MISSING` of a batch made before `QĐ-111an` is read as `PRICE_MISSING`. */
 export function stopReasonOf(stored: string | null): StopReason | null {

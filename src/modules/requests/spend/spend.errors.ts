@@ -76,3 +76,11 @@ export class SpendConfirmationNotInBatchError extends Error {
     this.name = 'SpendConfirmationNotInBatchError';
   }
 }
+
+/** A reply note in the body of a batch names one or more requests that are not in the batch. */
+export class SpendReplyNoteNotInBatchError extends Error {
+  constructor(readonly requestIds: readonly string[]) {
+    super(`The reply notes name requests that are not in the batch: ${requestIds.join(', ')}.`);
+    this.name = 'SpendReplyNoteNotInBatchError';
+  }
+}

@@ -9,25 +9,30 @@ import type { AccessRequestRecord } from '../access-request/access-request.types
 import { PolicyChecklistIncompleteError } from '../../policies/public/policy-checklist.errors';
 import type { ChecklistBody } from '../../policies/public/policy-checklist.types';
 import { ReserveConfirmationService } from '../reserve-confirmation/reserve-confirmation.service';
-import { SpendBatchRepo } from '../spend/spend-batch.repo';
-import { SpendBatchRecorder } from './spend-batch-recorder.service';
-import { SpendHeadService } from './spend-head.service';
-import { SpendConfirmationNotInBatchError, SpendNotInQueueError } from '../spend/spend.errors';
+import {
+  SpendConfirmationNotInBatchError,
+  SpendNotInQueueError,
+  SpendReplyNoteNotInBatchError,
+} from '../spend/spend.errors';
 import { SpendRoutingService } from '../spend/spend-routing.service';
-import type { StopReason } from '../spend/spend-submission.policy';
+import { processingOrder, restoreBodyOrder } from '../request-ticket/request-ticket-order.policy';
+import { SpendBatchWriterService, type BatchSubmitStopReason } from './spend-batch-writer.service';
+import { SpendHeadService } from './spend-head.service';
 
 /** What became of the confirmation of the reserve the head gave for a request of the batch (`RV-11`). */
 export type ConfirmationResult = 'APPLIED' | 'IGNORED' | 'NOT_GIVEN';
+export type { BatchSubmitStopReason };
 
 export interface SubmitResult {
   requestId: string;
   outcome: 'SENT_TO_APPROVER' | 'AWAITING_RESERVE_CONFIRMATION' | 'STOPPED';
-  stopReason: StopReason | null;
+  stopReason: BatchSubmitStopReason | null;
   reserveConfirmation: ConfirmationResult;
 }
 
 /** What `sendOn` made of a request, and who holds the spend step it opened (null: no step, or one that waits); the answer carries the first only. */
 interface Sent {
+  requestId: string;
   result: SubmitResult;
   openedFor: string | null;
 }
@@ -37,107 +42,108 @@ export interface ReserveConfirmationInput {
   reason: string;
 }
 
+export interface ReplyNoteInput {
+  requestId: string;
+  note: string;
+}
+
 /**
- * The head sends requests on to be decided as spend, in a batch of one or more (`US-06-14` AC-1, AC-4, AC-11). The batch is
- * an envelope (`QĐ-82j`): who sent which requests and when, nothing more; each request keeps its own steps, state and reason.
- * Each request is judged on its own by the check of the budget (`BR-MF1-06g`): within the base, it goes to the spending approver; it
- * uses the reserve, it goes to the approver only if the head gives a line of reason for it in the same act (`reserveConfirmations`,
- * `RV-11`), and otherwise stays in their queue waiting for the confirmation; blocked, or its data at fault, it stays in the queue with the
- * reason and the others go on (`FR-3.21`, `AC-9`). A confirmation given for a request the check does not say uses the reserve is left
- * unused and the answer says so; one for a request that is not in the batch refuses the batch. Only the head of the department of a
- * request sends it; a request that is not theirs is answered as if it did not exist. The check of each request, the step it is given and
- * the batch are written together.
- *
- * A batch that carries confirmations of the reserve carries the checklist of the step 1.6 too, one for the whole batch (`QĐ-111ap`, `QĐ-111aq`,
- * `QĐ-111be`): it is judged before any request is checked, an answer No refuses the whole batch and nothing of it is written, and the answers are
- * kept once for each request whose confirmation was applied, never for one that was ignored.
+ * The head sends requests on to be decided as spend, in a batch of one or more (`US-06-14` AC-1, AC-4, AC-11).
+ * Items belonging to the same multi-item ticket are processed in ascending ticket position while preserving
+ * the caller's request body order in the returned results, persisted batch items, and audit payload.
  */
 @Injectable()
 export class SpendBatchService {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly requests: AccessRequestRepo,
-    private readonly batches: SpendBatchRepo,
     private readonly head: SpendHeadService,
     private readonly routing: SpendRoutingService,
     private readonly reserve: ReserveConfirmationService,
     private readonly organizationReads: OrganizationReadApi,
-    private readonly recorder: SpendBatchRecorder,
+    private readonly writer: SpendBatchWriterService,
   ) {}
 
   /**
    * Throws SpendNotHeadError, AccessRequestNotFoundError, SpendNotInQueueError, SpendConfirmationNotInBatchError,
-   * FinanceSetupIncompleteError (the department has no Cost Center in use now, `QĐ-87g`) and what the checklist of the reserve refuses
-   * (`QĐ-111ap`); returns the id of the batch and how each fared.
+   * SpendReplyNoteNotInBatchError, FinanceSetupIncompleteError (the department has no Cost Center in use now, `QĐ-87g`)
+   * and what the checklist of the reserve refuses (`QĐ-111ap`); returns the id of the batch and how each fared.
    */
   async submit(
     actor: AuthenticatedPrincipal,
     requestIds: readonly string[],
     confirmations: readonly ReserveConfirmationInput[] = [],
     checklist?: ChecklistBody,
+    replyNotes: readonly ReplyNoteInput[] = [],
   ): Promise<{ batchId: string; results: SubmitResult[] }> {
-    // The body asks for the checklist with a confirmation; a caller that did not is refused, never let through.
-    if (confirmations.length > 0 && checklist === undefined) throw new PolicyChecklistIncompleteError('1.6', [], []);
-    const outside = confirmations.find((confirmation) => !requestIds.includes(confirmation.requestId));
-    if (outside) throw new SpendConfirmationNotInBatchError(outside.requestId);
+    validateBatchInputs(requestIds, confirmations, checklist, replyNotes);
     const departmentId = await this.head.departmentOf(actor);
     const reasons = new Map(confirmations.map((confirmation) => [confirmation.requestId, confirmation.reason]));
+    const notes = cleanNotesMap(replyNotes);
 
-    return this.runner.run(async (tx) => {
-      const locked = await this.lockAll(tx, requestIds, departmentId);
-      // A department with no Cost Center in use is stopped before anything is checked against a budget: not the answer of a year
-      // with no budget, and nothing is written.
-      const today = await this.organizationReads.businessToday(new Date(), tx);
-      const unit = (await this.organizationReads.getOwningUnits([actor.employeeId], today, tx)).get(actor.employeeId);
-      if (unit) this.organizationReads.requireUnitCostCenter(unit);
+    return this.runner.run((tx) =>
+      this.submitWithin(tx, actor, { requestIds, departmentId, confirmations, checklist, reasons, notes }),
+    );
+  }
 
-      const organizationId = (locked.get(requestIds[0]) as AccessRequestRecord).organizationId;
-      const verdict =
-        confirmations.length > 0 && checklist
-          ? await this.reserve.judgeBatchChecklist(tx, organizationId, checklist)
-          : null;
-      const now = new Date();
-      const sent: Sent[] = [];
-      for (const id of requestIds) {
-        sent.push(
-          await this.sendOn(tx, actor, locked.get(id) as AccessRequestRecord, { reason: reasons.get(id), now }),
-        );
-      }
-      // The answer is the results as they were: `SubmitResult` goes into a strict response, so who holds the steps stays here.
-      const results = sent.map((item) => item.result);
+  private async submitWithin(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    input: {
+      requestIds: readonly string[];
+      departmentId: string;
+      confirmations: readonly ReserveConfirmationInput[];
+      checklist: ChecklistBody | undefined;
+      reasons: ReadonlyMap<string, string>;
+      notes: ReadonlyMap<string, string>;
+    },
+  ): Promise<{ batchId: string; results: SubmitResult[] }> {
+    const { requestIds, departmentId, confirmations, checklist, reasons, notes } = input;
+    const locked = await this.lockAll(tx, requestIds, departmentId);
+    const today = await this.organizationReads.businessToday(new Date(), tx);
+    const unit = (await this.organizationReads.getOwningUnits([actor.employeeId], today, tx)).get(actor.employeeId);
+    if (unit) this.organizationReads.requireUnitCostCenter(unit);
 
-      const confirmed = results.filter((result) => result.reserveConfirmation === 'APPLIED').map((r) => r.requestId);
-      if (verdict && confirmed.length > 0) {
-        await this.reserve.recordBatchChecklist(tx, actor, organizationId, {
-          verdict,
-          decidedAt: now,
-          requestIds: confirmed,
-        });
-      }
-
-      const batchId = await this.batches.create(tx, {
-        organizationId,
-        departmentId,
-        submittedByEmployeeId: actor.employeeId,
-        now,
-        items: results.map((result) => ({
-          requestId: result.requestId,
-          outcome: result.outcome,
-          stopReason: result.stopReason,
-          leftReason: null,
-        })),
+    const organizationId = (locked.get(requestIds[0]) as AccessRequestRecord).organizationId;
+    const verdict =
+      confirmations.length > 0 && checklist
+        ? await this.reserve.judgeBatchChecklist(tx, organizationId, checklist)
+        : null;
+    const now = new Date();
+    const orderedIds = processingOrder(
+      requestIds.map((requestId) => ({ requestId, ticket: (locked.get(requestId) as AccessRequestRecord).ticket })),
+    );
+    const processed: Sent[] = [];
+    for (const id of orderedIds) {
+      processed.push(
+        await this.processItem(tx, actor, locked.get(id) as AccessRequestRecord, {
+          reason: reasons.get(id),
+          note: notes.get(id),
+          now,
+        }),
+      );
+    }
+    // Restore results, batch items, and recorder parallel arrays back to caller body order after ticket-ordered processing.
+    const sent = restoreBodyOrder(requestIds, processed);
+    const results = sent.map((item) => item.result);
+    const confirmed = results.filter((result) => result.reserveConfirmation === 'APPLIED').map((r) => r.requestId);
+    if (verdict && confirmed.length > 0) {
+      await this.reserve.recordBatchChecklist(tx, actor, organizationId, {
+        verdict,
+        decidedAt: now,
+        requestIds: confirmed,
       });
-      await this.recorder.submitted(tx, actor, {
-        organizationId,
-        departmentId,
-        batchId,
-        requestIds,
-        outcomes: results.map((item) => item.outcome),
-        openedFor: sent.map((item) => item.openedFor),
-      });
-
-      return { batchId, results };
+    }
+    const batchId = await this.writer.writeBatchAndAudit(tx, actor, {
+      organizationId,
+      departmentId,
+      now,
+      requestIds,
+      results,
+      openedFor: sent.map((item) => item.openedFor),
     });
+
+    return { batchId, results };
   }
 
   /** The requests locked in the order of their ids, so two batches that share a request queue instead of waiting on each other. */
@@ -163,6 +169,41 @@ export class SpendBatchService {
     return locked;
   }
 
+  private async processItem(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    request: AccessRequestRecord,
+    given: { reason: string | undefined; note: string | undefined; now: Date },
+  ): Promise<Sent> {
+    const pendingSpendReturn = await this.writer.pendingSpendReturn(tx, request.id);
+    if (pendingSpendReturn !== null && given.note === undefined) {
+      return {
+        requestId: request.id,
+        result: {
+          requestId: request.id,
+          outcome: 'STOPPED',
+          stopReason: 'REPLY_NOTE_REQUIRED',
+          reserveConfirmation: given.reason === undefined ? 'NOT_GIVEN' : 'IGNORED',
+        },
+        openedFor: null,
+      };
+    }
+
+    const sent = await this.sendOn(tx, actor, request, { reason: given.reason, now: given.now });
+    // Insert the reply only when the item actually leaves the reply-awaiting state; a STOPPED item stays in the queue.
+    if (pendingSpendReturn !== null && given.note !== undefined && sent.result.outcome !== 'STOPPED') {
+      await this.writer.recordHeadResubmission(tx, {
+        organizationId: request.organizationId,
+        requestId: request.id,
+        returnedStepId: pendingSpendReturn.stepId,
+        note: given.note,
+        authorEmployeeId: actor.employeeId,
+      });
+    }
+
+    return sent;
+  }
+
   /** One request of the batch: the check, where the check sent it, and what became of the confirmation of the reserve, if one was given. */
   private async sendOn(
     tx: DbTx,
@@ -172,7 +213,8 @@ export class SpendBatchService {
   ): Promise<Sent> {
     const ignored: ConfirmationResult = given.reason === undefined ? 'NOT_GIVEN' : 'IGNORED';
     const routed = await this.routing.route(tx, actor, request, 'SUBMISSION', given.now);
-    const stopped = (stopReason: StopReason | null): Sent => ({
+    const stopped = (stopReason: BatchSubmitStopReason | null): Sent => ({
+      requestId: request.id,
       result: { requestId: request.id, outcome: 'STOPPED', stopReason, reserveConfirmation: ignored },
       openedFor: null,
     });
@@ -180,6 +222,7 @@ export class SpendBatchService {
     if (routed.outcome === 'BLOCKED') return stopped(routed.check.blockReasons[0] ?? null);
     if (routed.outcome === 'WITHIN_BASE') {
       return {
+        requestId: request.id,
         result: { requestId: request.id, outcome: 'SENT_TO_APPROVER', stopReason: null, reserveConfirmation: ignored },
         openedFor: routed.step?.assigneeEmployeeId ?? null,
       };
@@ -188,6 +231,7 @@ export class SpendBatchService {
     const selfConfirm = request.beneficiaryEmployeeIds.includes(actor.employeeId);
     if (given.reason === undefined || selfConfirm) {
       return {
+        requestId: request.id,
         result: {
           requestId: request.id,
           outcome: 'AWAITING_RESERVE_CONFIRMATION',
@@ -204,8 +248,34 @@ export class SpendBatchService {
     });
 
     return {
+      requestId: request.id,
       result: { requestId: request.id, outcome: 'SENT_TO_APPROVER', stopReason: null, reserveConfirmation: 'APPLIED' },
       openedFor: step.assigneeEmployeeId,
     };
   }
+}
+
+function validateBatchInputs(
+  requestIds: readonly string[],
+  confirmations: readonly ReserveConfirmationInput[],
+  checklist: ChecklistBody | undefined,
+  replyNotes: readonly ReplyNoteInput[],
+): void {
+  // The body asks for the checklist with a confirmation; a caller that did not is refused, never let through.
+  if (confirmations.length > 0 && checklist === undefined) throw new PolicyChecklistIncompleteError('1.6', [], []);
+  const outside = confirmations.find((confirmation) => !requestIds.includes(confirmation.requestId));
+  if (outside) throw new SpendConfirmationNotInBatchError(outside.requestId);
+  const outsideNotes = replyNotes
+    .filter((entry) => !requestIds.includes(entry.requestId))
+    .map((entry) => entry.requestId);
+  if (outsideNotes.length > 0) throw new SpendReplyNoteNotInBatchError(outsideNotes);
+}
+
+function cleanNotesMap(replyNotes: readonly ReplyNoteInput[]): Map<string, string> {
+  const notes = new Map<string, string>();
+  for (const entry of replyNotes) {
+    const trimmed = entry.note.trim();
+    if (trimmed.length > 0) notes.set(entry.requestId, trimmed);
+  }
+  return notes;
 }

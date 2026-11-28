@@ -1,4 +1,5 @@
 import type { RouteErrorStatus } from './openapi-example-manifest';
+import { ROUTE_ERROR_CODES_W4_C_WITHDRAW } from './openapi-example-route-codes-w4-c-withdraw';
 
 /**
  * Part of ROUTE_ERROR_CODES (requests for a group and the spend step (G5)), traced on BE `0da8f56`
@@ -153,7 +154,12 @@ export const ROUTE_ERROR_CODES_REQUESTS_SPEND: Readonly<
     '403': ['SPEND.NOT_HEAD'],
     '404': ['ACCESS_REQUEST.NOT_FOUND'],
     '409': ['FINANCE.SETUP_INCOMPLETE', 'POLICY.NOT_IN_FORCE', 'POLICY.VERSION_CHANGED', 'SPEND.NOT_IN_QUEUE'],
-    '422': ['POLICY.CHECKLIST_HAS_NO', 'POLICY.CHECKLIST_INCOMPLETE', 'SPEND_BATCH.CONFIRMATION_NOT_IN_BATCH'],
+    '422': [
+      'POLICY.CHECKLIST_HAS_NO',
+      'POLICY.CHECKLIST_INCOMPLETE',
+      'SPEND.REPLY_NOTE_NOT_IN_BATCH',
+      'SPEND_BATCH.CONFIRMATION_NOT_IN_BATCH',
+    ],
   },
   spendQueueList: {
     '403': ['SPEND.NOT_HEAD'],
@@ -164,4 +170,5 @@ export const ROUTE_ERROR_CODES_REQUESTS_SPEND: Readonly<
     '409': ['POLICY.NOT_IN_FORCE', 'POLICY.VERSION_CHANGED', 'SPEND.RESERVE_NOT_PENDING'],
     '422': ['POLICY.CHECKLIST_HAS_NO', 'POLICY.CHECKLIST_INCOMPLETE'],
   },
+  ...ROUTE_ERROR_CODES_W4_C_WITHDRAW,
 };

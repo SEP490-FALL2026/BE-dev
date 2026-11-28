@@ -36,6 +36,7 @@ const ROW = {
   canWithdraw: true,
   involvement: 'SENT',
   myLine: null,
+  ticketRef: null,
 };
 const PAGE = { items: [ROW], pagination: { page: 1, pageSize: 20, totalItems: 1, totalPages: 1 } };
 

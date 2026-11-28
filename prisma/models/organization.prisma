@@ -82,6 +82,8 @@ model Organization {
   returnRequests                     ReturnRequest[]
   handoverDuties                     HandoverDuty[]
   accessRequests                     AccessRequest[]
+  requestTickets                     RequestTicket[]
+  accessRequestReplies               AccessRequestReply[]
   approvalRecords                    ApprovalRecord[]
   controlledWaitAlerts               ControlledWaitAlert[]
   stepSlaReminders                   StepSlaReminder[]
@@ -185,6 +187,7 @@ model Department {
   returnRequests          ReturnRequest[]
   handoverDuties          HandoverDuty[]
   accessRequests          AccessRequest[]
+  requestTickets          RequestTicket[]
   softwareEntries         DepartmentSoftwareEntry[]
   softwareProposals       DepartmentSoftwareProposal[]
   approvalRecords         ApprovalRecord[]
@@ -374,6 +377,8 @@ model Employee {
   revocationReasonsDecided        ProvisioningTaskReason[]            @relation("TaskReasonDecidedBy")
   retirementConfirmationsGiven    ApplicationRetirementConfirmation[] @relation("RetirementConfirmingOwner")
   accessRequestsMade              AccessRequest[]                     @relation("AccessRequestRequester")
+  requestTickets                  RequestTicket[]                     @relation("RequestTicketRequester")
+  accessRequestReplies            AccessRequestReply[]                @relation("AccessRequestReplyAuthor")
   accessRequestsWithdrawn         AccessRequest[]                     @relation("AccessRequestWithdrawer")
   accessRequestsCancelled         AccessRequest[]                     @relation("AccessRequestCanceller")
   serviceAccountsAnsweredFor      AccessRequestServiceAccount[]       @relation("ServiceAccountResponsible")

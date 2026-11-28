@@ -142,7 +142,11 @@ describe('the checklist of the spend step (integration, real PostgreSQL)', () =>
         rowCount: 0,
       });
 
-      await h.sendOn(ids, unit.head.account).expect(201);
+      await request(h.server())
+        .post('/api/v1/spend-batches')
+        .set(h.as(unit.head.account))
+        .send({ requestIds: ids, replyNotes: [{ requestId: ids[0], note: 'Clarified spend justification' }] })
+        .expect(201);
       expect(await h.state(ids[0])).toBe('AWAITING_SPEND_DECISION');
     });
 
@@ -204,7 +208,14 @@ describe('the checklist of the spend step (integration, real PostgreSQL)', () =>
         expect((await recordsOf(id))[0].reason).toContain(no());
       }
       // The head drops one and sends the others on in a new batch.
-      await h.sendOn(ids.slice(1), unit.head.account).expect(201);
+      await request(h.server())
+        .post('/api/v1/spend-batches')
+        .set(h.as(unit.head.account))
+        .send({
+          requestIds: ids.slice(1),
+          replyNotes: ids.slice(1).map((id) => ({ requestId: id, note: 'Clarified batch spend justification' })),
+        })
+        .expect(201);
       expect(await h.state(ids[1])).toBe('AWAITING_SPEND_DECISION');
     });
 

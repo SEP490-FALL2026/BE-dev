@@ -310,9 +310,12 @@ describe('device return task list, completion, device detail, and dashboard (int
       );
 
     // Next working Monday -> Saturday/Sunday skipped; Monday runs twice -> 1 notice per recipient.
+    const now = new Date();
+    const noonUtcToday = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 12);
     const findWeekday = (offset: number, weekend: boolean) => {
       for (let i = offset; i < offset + 10; i += 1) {
-        const d = new Date(Date.now() + i * 86_400_000);
+        // Noon UTC is 19:00 in Vietnam: the sweeper reads the day of the organization, and it is the same weekday there as in UTC.
+        const d = new Date(noonUtcToday + i * 86_400_000);
         const day = d.getUTCDay();
         if (weekend ? day === 0 || day === 6 : day >= 1 && day <= 5) return d;
       }

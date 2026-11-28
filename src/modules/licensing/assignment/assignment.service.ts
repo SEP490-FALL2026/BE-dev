@@ -569,7 +569,7 @@ export class AssignmentService {
         'LICENSE_ASSIGNMENT.END_REVERSED',
         'LicenseAssignment',
         reopened,
-        { validUntil: input.now.toISOString().slice(0, 10) },
+        { validUntil: await this.organizationReads.businessToday(input.now, tx) },
         { validUntil: null, requestId: input.requestId, cause },
       ),
     );

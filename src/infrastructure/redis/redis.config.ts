@@ -126,6 +126,25 @@ export function validateRedisEnvironment(input: Record<string, unknown>): RedisE
   return result;
 }
 
+const backgroundJobsTransportSchema = Joi.object({
+  NODE_ENV: Joi.string().valid('development', 'test', 'production').default('development'),
+  BACKGROUND_JOBS_TRANSPORT: redisFeatureKeys.BACKGROUND_JOBS_TRANSPORT,
+}).unknown(true);
+
+/**
+ * Reads only the transport the worker must choose before Nest builds its module graph. It deliberately does not run
+ * the whole environment schema: `ConfigModule` has already validated it when `WorkerModule` was imported and has
+ * written the defaults back into `process.env` (including `TEST_DATABASE_URL: ''`, which the full schema refuses
+ * outside the test environment), so a second whole-schema pass over `process.env` fails in production.
+ */
+export function readBackgroundJobsTransport(input: Record<string, unknown>): 'bullmq' | 'poll' {
+  const result = validateWithSchema(backgroundJobsTransportSchema, input) as Pick<
+    RedisFeatureEnvironmentVariables,
+    'BACKGROUND_JOBS_TRANSPORT'
+  >;
+  return result.BACKGROUND_JOBS_TRANSPORT;
+}
+
 export function redisSettingsFrom(config: ConfigService<RedisEnvironmentVariables, true>): RedisSettings {
   return {
     host: config.get('REDIS_HOST', { infer: true }),

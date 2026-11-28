@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
+import { orderByTicketPosition } from '../request-ticket/request-ticket-order.policy';
 import { StepReassignmentRepo } from '../step-routing/step-reassignment.repo';
 import { SpendRoutingService } from '../spend/spend-routing.service';
 
@@ -20,8 +21,8 @@ export class OneStepConversionService {
     private readonly spending: SpendRoutingService,
   ) {}
 
-  pendingIds(): Promise<string[]> {
-    return this.repo.oneStepPendingIds();
+  async pendingIds(): Promise<string[]> {
+    return orderByTicketPosition(await this.repo.oneStepPendingIds()).map((row) => row.id);
   }
 
   async finishPending(id: string, now: Date): Promise<boolean> {

@@ -38,6 +38,8 @@ export interface ReassignableRequest {
   /** The people of a request for a group and the step that holds each; empty for any other request. */
   lines: { employeeId: string; needStepId: string }[];
   steps: ReassignableStep[];
+  /** Ticket membership when the request belongs to a ticket; null for standalone requests. */
+  ticket: { id: string; position: number } | null;
 }
 
 const OPEN = ['PENDING', 'WAITING'] as const;
@@ -51,6 +53,8 @@ const SELECT_REQUEST = {
   state: true,
   requesterEmployeeId: true,
   departmentId: true,
+  ticketId: true,
+  ticketPosition: true,
   policy: true,
   beneficiaries: { select: { employeeId: true }, orderBy: { position: 'asc' } },
   // A line the sender withdrew holds nobody; a line already decided still holds its person.
@@ -92,6 +96,16 @@ function toRequest(row: RequestRow): ReassignableRequest {
     steps: row.steps.filter(
       (step): step is typeof step & { kind: ReassignableStepKind } => step.kind !== 'FINANCE_REVIEW',
     ),
+    ticket:
+      row.ticketId !== null && row.ticketPosition !== null ? { id: row.ticketId, position: row.ticketPosition } : null,
+  };
+}
+
+function toTicketSlotRow(row: { id: string; ticketId: string | null; ticketPosition: number | null }) {
+  return {
+    id: row.id,
+    ticket:
+      row.ticketId !== null && row.ticketPosition !== null ? { id: row.ticketId, position: row.ticketPosition } : null,
   };
 }
 
@@ -111,17 +125,17 @@ export class StepReassignmentRepo {
     await tx.$queryRaw`SELECT id FROM access_requests WHERE id = ANY(${[...new Set(ids)].sort()}::uuid[]) ORDER BY id FOR UPDATE`;
   }
 
-  async oneStepPendingIds(): Promise<string[]> {
+  async oneStepPendingIds(): Promise<{ id: string; ticket: { id: string; position: number } | null }[]> {
     const rows = await this.prisma.accessRequest.findMany({
       where: {
         routingMode: 'ONE_STEP',
         state: { in: ['PENDING', 'WAITING_CONTROLLED', 'AWAITING_SPEND_SUBMISSION'] },
         steps: { none: { kind: 'SPEND_APPROVAL', state: { in: ['PENDING', 'WAITING'] } } },
       },
-      select: { id: true },
+      select: { id: true, ticketId: true, ticketPosition: true },
       orderBy: { id: 'asc' },
     });
-    return rows.map((row) => row.id);
+    return rows.map(toTicketSlotRow);
   }
 
   /** How many requests sent for the department have their need step waiting for a head: what the Super Admin is told when the department is left without one. */
@@ -206,19 +220,19 @@ export class StepReassignmentRepo {
     return rows.map((row) => row.id);
   }
 
-  /** All non-group requests awaiting spend submission that still hold VIA_HEAD routing, checked by the daily sweep. */
-  async spendQueueRequestIds(): Promise<string[]> {
+  /** All non-group requests awaiting spend submission that still hold VIA_HEAD routing, with ticket membership. */
+  async spendQueueRequestIds(): Promise<{ id: string; ticket: { id: string; position: number } | null }[]> {
     const rows = await this.prisma.accessRequest.findMany({
       where: {
         state: 'AWAITING_SPEND_SUBMISSION',
         type: { not: 'GROUP_GRANT' },
         routingMode: { not: 'ONE_STEP' },
       },
-      select: { id: true },
+      select: { id: true, ticketId: true, ticketPosition: true },
       orderBy: { id: 'asc' },
     });
 
-    return rows.map((row) => row.id);
+    return rows.map(toTicketSlotRow);
   }
 
   /** The people who hold an open step: the ones to ask whether they still work. */

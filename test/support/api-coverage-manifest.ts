@@ -1,6 +1,7 @@
 import { API_COVERAGE_ORGANIZATION } from './api-coverage-manifest-organization';
 import { API_COVERAGE_PURCHASE } from './api-coverage-manifest-purchase';
 import { API_COVERAGE_REVIEW } from './api-coverage-manifest-review';
+import { API_COVERAGE_W4_C_VIEW } from './api-coverage-manifest-w4-c-view';
 import { POLICY_AND_PROFILE_OPERATIONS } from './api-coverage-manifest-policies';
 
 /** Inventory of exported HTTP operations. Add entries and HTTP tests together. */
@@ -133,10 +134,7 @@ export const API_COVERAGE_MANIFEST: readonly string[] = [
   'GET /api/v1/budgets/mine/versions',
   'GET /api/v1/budgets',
   'GET /api/v1/budgets/summary',
-  'GET /api/v1/access-requests/{id}',
-  'POST /api/v1/access-requests/{id}/need-decision',
-  'POST /api/v1/access-requests/{id}/withdraw',
-  'POST /api/v1/access-requests/renewals',
+  ...API_COVERAGE_W4_C_VIEW,
   'POST /api/v1/return-requests',
   'GET /api/v1/return-requests',
   'GET /api/v1/return-requests/{id}',

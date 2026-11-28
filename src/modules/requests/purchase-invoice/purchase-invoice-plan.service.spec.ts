@@ -2,9 +2,23 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { PurchaseInvoiceRefusedError } from './purchase-invoice.errors';
 import { PurchaseInvoicePlanService } from './purchase-invoice-plan.service';
+import { PurchaseInvoiceSubscriptionLinkService } from './subscription-link/purchase-invoice-subscription-link.service';
 
 const tx = {} as DbTx;
 const actor = { employeeId: 'it-1' } as unknown as AuthenticatedPrincipal;
+
+/** The service over the eight mocks it reads (the seventh is identity), with the real subscription link service over the same mocks. */
+const planOf = (...d: [never, never, never, never, never, never, never, never]) =>
+  new PurchaseInvoicePlanService(
+    d[0],
+    d[1],
+    d[2],
+    d[3],
+    d[4],
+    d[5],
+    d[7],
+    new PurchaseInvoiceSubscriptionLinkService(d[0], d[1], d[2], d[5], d[6]),
+  );
 
 describe('PurchaseInvoicePlanService acting scope (S2-2)', () => {
   it('checks request department against getItAdminActingScope', async () => {
@@ -15,7 +29,7 @@ describe('PurchaseInvoicePlanService acting scope (S2-2)', () => {
         return ['dept-other'];
       },
     );
-    const service = new PurchaseInvoicePlanService(
+    const service = planOf(
       {
         requestFacts: jest
           .fn()
@@ -46,7 +60,7 @@ describe('PurchaseInvoicePlanService acting scope (S2-2)', () => {
   });
 
   it('rejects REQUEST link for K2 when request has seat purchases with SEAT_PURCHASE_REQUIRED', async () => {
-    const service = new PurchaseInvoicePlanService(
+    const service = planOf(
       {
         requestFacts: jest.fn().mockResolvedValue({
           organizationId: 'org-1',
@@ -92,71 +106,6 @@ describe('PurchaseInvoicePlanService acting scope (S2-2)', () => {
     expect((caught as PurchaseInvoiceRefusedError).seatPurchaseIds).toEqual(['purchase-1']);
   });
 
-  it('rejects SUBSCRIPTION link with subscriptionLineIds when any line is already invoiced for that serviceMonth', async () => {
-    const service = new PurchaseInvoicePlanService(
-      {
-        invoicedLinesForMonth: jest
-          .fn()
-          .mockResolvedValue({ wholePeriodInvoiced: false, lineIds: new Set(['line-1']) }),
-      } as never,
-      {
-        getPlanVendorId: jest.fn().mockResolvedValue('vendor-1'),
-        getSubscriptionOriginalPrice: jest.fn().mockResolvedValue(null),
-      } as never,
-      {
-        lockPeriod: jest.fn().mockResolvedValue(null),
-        getPurchaseFacts: jest.fn().mockResolvedValue([
-          {
-            subscriptionId: 'sub-1',
-            planId: 'plan-1',
-            provisioningType: 'K2',
-            billingCycle: 'ANNUAL',
-            purchasedQuantity: 10,
-            monthlyPriceMinor: 500_000n,
-            cycleMonths: 12,
-            startDate: '2026-07-01',
-            endDate: '2027-06-30',
-            renewalDate: '2027-07-01',
-            invoicedLater: false,
-          },
-        ]),
-        linesOfSubscription: jest
-          .fn()
-          .mockResolvedValue([
-            { id: 'line-1', subscriptionId: 'sub-1', monthlyUnitPriceMinor: 500_000n, closedReason: null },
-          ]),
-      } as never,
-      {} as never,
-      {} as never,
-      {
-        getItAdminActingScope: jest.fn().mockResolvedValue([]),
-        getOrganization: jest.fn().mockResolvedValue({ id: 'org-1', timeZone: 'Asia/Ho_Chi_Minh' }),
-      } as never,
-      { findUsableItAdminEmployeeIds: jest.fn().mockResolvedValue(new Set()) } as never,
-      {} as never,
-    );
-
-    let caught: unknown;
-    try {
-      await service.plan(
-        actor,
-        {
-          link: { subscriptionId: 'sub-1', subscriptionLineIds: ['line-1'] },
-          servicePeriodMonth: '2026-11',
-          netAmount: { amount: '500000' },
-          unitPriceOriginal: { amount: '500000', currency: 'VND' },
-          quantity: 10,
-        } as never,
-        tx,
-      );
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(PurchaseInvoiceRefusedError);
-    expect((caught as PurchaseInvoiceRefusedError).reason).toBe('LINE_ALREADY_INVOICED');
-  });
-
   it('F-9: locks subscription period before checking invoicedLinesForMonth in tx and rejects whole-period invoice when any line is already invoiced (details.lineIds)', async () => {
     const order: string[] = [];
     const lockPeriod = jest.fn(() => {
@@ -167,10 +116,11 @@ describe('PurchaseInvoicePlanService acting scope (S2-2)', () => {
       order.push('invoicedLinesForMonth');
       return Promise.resolve({ wholePeriodInvoiced: false, lineIds: new Set(['line-standard']) });
     });
-    const service = new PurchaseInvoicePlanService(
+    const service = planOf(
       { invoicedLinesForMonth } as never,
       {
         getPlanVendorId: jest.fn().mockResolvedValue('vendor-1'),
+        getSubscriptionResponsibleItAdmin: jest.fn().mockResolvedValue('it-1'),
         getSubscriptionOriginalPrice: jest.fn().mockResolvedValue(null),
       } as never,
       {
@@ -231,13 +181,14 @@ describe('PurchaseInvoicePlanService acting scope (S2-2)', () => {
 
   it('F-9: skips lockPeriod on read-only preview (no tx) and allows whole-period preview when wholePeriodInvoiced has no split lines', async () => {
     const lockPeriod = jest.fn();
-    const service = new PurchaseInvoicePlanService(
+    const service = planOf(
       {
         invoicedLinesForMonth: jest.fn().mockResolvedValue({ wholePeriodInvoiced: true, lineIds: new Set() }),
         earlierOf: jest.fn().mockResolvedValue({ count: 1, earliestServiceMonth: '2026-10-01' }),
       } as never,
       {
         getPlanVendorId: jest.fn().mockResolvedValue('vendor-1'),
+        getSubscriptionResponsibleItAdmin: jest.fn().mockResolvedValue('it-1'),
         getSubscriptionOriginalPrice: jest.fn().mockResolvedValue(null),
       } as never,
       {
@@ -315,7 +266,7 @@ describe('PurchaseInvoicePlanService acting scope (S2-2)', () => {
       id: 'lot-1',
       invoiceActualMinor: 36_000_000n,
     });
-    const service = new PurchaseInvoicePlanService(
+    const service = planOf(
       {
         requestFacts: jest.fn().mockResolvedValue({ departmentId: 'dept-1', costCenterId: 'cc-1' }),
       } as never,
@@ -365,7 +316,7 @@ describe('PurchaseInvoicePlanService acting scope (S2-2)', () => {
       return Promise.resolve(2);
     });
 
-    const service = new PurchaseInvoicePlanService(
+    const service = planOf(
       { activeBeneficiaryCount } as never,
       {} as never,
       { findLot, findLotOfRequest: jest.fn(), lockLot } as never,

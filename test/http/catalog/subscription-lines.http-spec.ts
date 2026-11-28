@@ -189,7 +189,7 @@ describe('Subscription lines HTTP routes (W3-15)', () => {
       expect(bodyOf(res).error.code).toBe('SUBSCRIPTION_LINE.NOT_RESPONSIBLE');
     });
 
-    it('returns 422 SUBSCRIPTION_LINE.QUANTITY_VIA_PURCHASE, 409 SUBSCRIPTION.DUPLICATE_PLAN, 409 SUBSCRIPTION.STALE, 422 WORKSPACE_VENDOR_MISMATCH', async () => {
+    it('returns 422 SUBSCRIPTION_LINE.QUANTITY_VIA_PURCHASE, 409 SUBSCRIPTION.DUPLICATE_PLAN, 409 SUBSCRIPTION.STALE, 422 SUBSCRIPTION_LINE.WORKSPACE_VENDOR_MISMATCH', async () => {
       lineSvc.addLine.mockRejectedValueOnce(new SubscriptionLineQuantityViaPurchaseError());
       const qtyRes = await request(app.getHttpServer())
         .post(`/api/v1/subscriptions/${SUB_ID}/lines`)
@@ -220,7 +220,7 @@ describe('Subscription lines HTTP routes (W3-15)', () => {
         .set('Authorization', itAuth)
         .send(validBody)
         .expect(422);
-      expect(bodyOf(vendorRes).error.code).toBe('WORKSPACE_VENDOR_MISMATCH');
+      expect(bodyOf(vendorRes).error.code).toBe('SUBSCRIPTION_LINE.WORKSPACE_VENDOR_MISMATCH');
     });
 
     it('LINES_LIMIT: returns 409 SUBSCRIPTION.LINES_LIMIT when adding beyond 20 lines', async () => {

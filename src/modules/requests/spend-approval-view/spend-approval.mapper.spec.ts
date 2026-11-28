@@ -49,6 +49,7 @@ const lookups = (extra: Partial<QueueLookups> = {}): QueueLookups => ({
   centers: [{ id: 'cc-1', code: 'CC-01' }] as unknown as QueueLookups['centers'],
   due: new Map([['step-1', '2026-10-05']]),
   nextYear: new Map(),
+  ticketRefs: new Map(),
   ...extra,
 });
 

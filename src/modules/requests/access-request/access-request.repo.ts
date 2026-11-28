@@ -50,6 +50,11 @@ export async function markRequestOneStep(
   });
 }
 
+/** Returns ticket foreign-key columns when the request is part of a ticket. */
+function ticketColumns(ticket?: { id: string; position: number }) {
+  return ticket ? { ticketId: ticket.id, ticketPosition: ticket.position } : {};
+}
+
 const NEED_SEQUENCE = 1;
 
 /** The one writer of `access_requests`, `access_request_beneficiaries` and `access_request_steps`, and the read of a request. */
@@ -93,6 +98,7 @@ export class AccessRequestRepo {
         : { expectedEndDate: input.expectedEndDate ? toDateColumn(input.expectedEndDate) : null }),
       createdByAppUserId: input.createdByAppUserId,
       submittedAt: input.now,
+      ...ticketColumns(input.ticket),
     };
     const step = {
       kind: 'NEED' as const,

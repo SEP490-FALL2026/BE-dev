@@ -1,4 +1,5 @@
 import type { RouteErrorStatus } from './openapi-example-manifest';
+import { ROUTE_ERROR_CODES_W4_C_VIEW } from './openapi-example-route-codes-w4-c-view';
 
 /**
  * Part of ROUTE_ERROR_CODES (requests (G5)), traced on BE `0da8f56` (Prompt 02, 26/10/2026):
@@ -7,10 +8,12 @@ import type { RouteErrorStatus } from './openapi-example-manifest';
 export const ROUTE_ERROR_CODES_REQUESTS: Readonly<
   Record<string, Partial<Record<RouteErrorStatus, readonly string[]>>>
 > = {
+  ...ROUTE_ERROR_CODES_W4_C_VIEW,
   accessRequestResubmit: {
     403: ['ACCESS_REQUEST.NOT_REQUESTER'],
     404: ['ACCESS_REQUEST.NOT_FOUND'],
     409: ['ACCESS_REQUEST.NOT_AWAITING_REVISION'],
+    422: ['ACCESS_REQUEST.REPLY_NOTE_REQUIRED'],
   },
   accessRequestAssessmentComplete: {
     '403': ['ACCESS_REQUEST.ASSESSMENT_NOT_IN_CHARGE', 'ACCESS_REQUEST.OWN_REQUEST'],
@@ -272,6 +275,7 @@ export const ROUTE_ERROR_CODES_REQUESTS: Readonly<
     '422': ['REQUEST_PARTY.INELIGIBLE', 'RETURN_REQUEST.ORIGIN_MISMATCH'],
   },
   purchaseInvoicePreview: {
+    '403': ['PURCHASE_INVOICE.NOT_RESPONSIBLE'],
     '404': ['PURCHASE_INVOICE.LINK_NOT_FOUND'],
     '409': [
       'PURCHASE_INVOICE.LOT_ALREADY_INVOICED',
@@ -290,6 +294,7 @@ export const ROUTE_ERROR_CODES_REQUESTS: Readonly<
     ],
   },
   purchaseInvoiceSubmit: {
+    '403': ['PURCHASE_INVOICE.NOT_RESPONSIBLE'],
     '404': ['PURCHASE_INVOICE.LINK_NOT_FOUND'],
     '409': [
       'PURCHASE_INVOICE.LOT_ALREADY_INVOICED',
@@ -310,6 +315,7 @@ export const ROUTE_ERROR_CODES_REQUESTS: Readonly<
     ],
   },
   purchaseInvoiceResubmit: {
+    '403': ['PURCHASE_INVOICE.NOT_RESPONSIBLE'],
     '404': ['PURCHASE_INVOICE.LINK_NOT_FOUND', 'PURCHASE_INVOICE.NOT_FOUND'],
     '409': [
       'PURCHASE_INVOICE.ALREADY_RESUBMITTED',

@@ -121,3 +121,64 @@ describe('PurchaseInvoicePoolService.seatPricingOf (the ceiling of an invoice of
     expect((await service.seatPricingOf(priced, 'standard')).monthlyMinor).toBe(1_000_000n);
   });
 });
+
+describe('PurchaseInvoicePoolService.buildLicenseLotLinkFacts (who submits the invoice of a lot, QĐ-118d, Owner 28/11/2026)', () => {
+  const lotOf = (over: Record<string, unknown>) => ({
+    id: 'lot-1',
+    organizationId: 'org-1',
+    purpose: 'STOCK',
+    requestId: null,
+    invoiceActualMinor: null,
+    responsibleItAdminEmployeeId: 'it-1',
+    planId: 'plan-1',
+    licenseCount: 3,
+    unitPriceMinor: 1_000_000n,
+    ...over,
+  });
+  const build = (lot: Record<string, unknown>, actorEmployeeId: string, scope: readonly string[] = []) => {
+    const service = new PurchaseInvoicePoolService(
+      undefined as never,
+      undefined as never,
+      undefined as never,
+      undefined as never,
+      { findLot: jest.fn().mockResolvedValue(lot) } as never,
+    );
+
+    return service.buildLicenseLotLinkFacts({
+      licenseLotId: 'lot-1',
+      serviceMonth: '2026-11-01',
+      scope,
+      actorEmployeeId,
+      invoices: {
+        requestFacts: jest.fn().mockResolvedValue({ departmentId: 'dept-1', costCenterId: 'cc-1' }),
+      } as never,
+      catalog: {
+        getPlanVendorId: jest.fn().mockResolvedValue('vendor-1'),
+        getPlanOriginalPrice: jest.fn().mockResolvedValue(null),
+      } as never,
+    });
+  };
+
+  it.each(['STOCK', 'OPENING', 'REPLACEMENT'])(
+    'refuses an IT Admin who does not answer for a %s lot with NOT_RESPONSIBLE',
+    async (purpose) => {
+      await expect(build(lotOf({ purpose }), 'it-2')).rejects.toMatchObject({ reason: 'NOT_RESPONSIBLE' });
+    },
+  );
+
+  it('refuses everyone when a lot of another purpose names no IT Admin', async () => {
+    await expect(build(lotOf({ responsibleItAdminEmployeeId: null }), 'it-1')).rejects.toMatchObject({
+      reason: 'NOT_RESPONSIBLE',
+    });
+  });
+
+  it('lets the IT Admin who answers for the lot submit it', async () => {
+    await expect(build(lotOf({}), 'it-1')).resolves.toMatchObject({ link: { kind: 'LICENSE_LOT' } });
+  });
+
+  it('keeps the lot bought for a request by the department of the request, whoever answers for the lot', async () => {
+    const lot = lotOf({ purpose: 'REQUEST', requestId: 'req-1', responsibleItAdminEmployeeId: 'it-9' });
+    await expect(build(lot, 'it-1', ['dept-1'])).resolves.toMatchObject({ requestCostCenterId: 'cc-1' });
+    await expect(build(lot, 'it-1', ['dept-2'])).rejects.toMatchObject({ reason: 'LINK_NOT_FOUND' });
+  });
+});

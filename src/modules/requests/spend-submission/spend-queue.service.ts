@@ -11,6 +11,8 @@ import { SpendWireViewService } from '../spend/spend-wire-view.service';
 import { SpendRequestRepo } from '../spend/spend-request.repo';
 import { queuedStatus } from '../spend/spend-status.service';
 import type { QueueItemWire } from '../spend/spend-submission.dto';
+import type { TicketRef } from '../request-ticket/request-ticket.types';
+import { SpendTicketReplyService } from './spend-ticket-reply.service';
 
 /**
  * The queue of the head (`US-05-04` AC-11, `US-06-14` AC-1, AC-13): the requests of their department that cost money and whose
@@ -30,6 +32,7 @@ export class SpendQueueService {
     private readonly catalog: CatalogApi,
     private readonly wireView: SpendWireViewService,
     private readonly age: SlaQueueAgeService,
+    private readonly ticketReplies: SpendTicketReplyService,
   ) {}
 
   /** Throws SpendNotHeadError. */
@@ -38,7 +41,7 @@ export class SpendQueueService {
     const { rows, total } = await this.found.queuePage(departmentId, (query.page - 1) * query.pageSize, query.pageSize);
     const ids = rows.map((row) => row.id);
     const planIds = [...new Set(rows.map((row) => row.planId).filter((id): id is string => id !== null))];
-    const [checks, plans, people, units, ages, expected] = await Promise.all([
+    const [checks, plans, people, units, ages, expected, ticketRefs, awaitingReplies] = await Promise.all([
       this.checks.latestOf(ids),
       planIds.length === 0 ? Promise.resolve([]) : this.catalog.getPlanSummaries(planIds),
       this.wireView.people(
@@ -50,6 +53,8 @@ export class SpendQueueService {
       this.wireView.units(rows.map((row) => row.amountCurrency)),
       this.age.ageOf(rows.map((row) => ({ requestId: row.id, queuedAt: row.spendQueuedAt }))),
       this.outcomes.expectedFor(rows.filter((row) => row.pricingStatus === 'PRICED').map((row) => row.id)),
+      this.ticketReplies.refsOf(ids),
+      this.ticketReplies.spendReturnsAwaitingReply(ids),
     ]);
     const items = rows.map((row): QueueItemWire => {
       const status = queuedStatus(checks.get(row.id) ?? null);
@@ -87,9 +92,22 @@ export class SpendQueueService {
         waitedWorkingDays: ages.get(row.id)?.waitedWorkingDays ?? 0,
         overdue: ages.get(row.id)?.overdue ?? false,
         reminders: ages.get(row.id)?.reminders ?? 0,
+        ...queueTicketAndReplyFields(row.id, ticketRefs, awaitingReplies),
       };
     });
 
     return pageOf(items, total, query.page, query.pageSize);
   }
+}
+
+/** Kept outside `page` so existing complexity metrics on `page` remain unchanged. */
+function queueTicketAndReplyFields(
+  requestId: string,
+  ticketRefs: ReadonlyMap<string, TicketRef>,
+  awaitingReplies: ReadonlySet<string>,
+): Pick<QueueItemWire, 'ticketRef' | 'replyNoteRequired'> {
+  return {
+    ticketRef: ticketRefs.get(requestId) ?? null,
+    replyNoteRequired: awaitingReplies.has(requestId),
+  };
 }

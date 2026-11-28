@@ -85,7 +85,7 @@ export class SpendSubmissionController {
   @ApiSuccessResponse(QueueResponseDto, {
     message: 'SPEND_QUEUE.LISTED',
     description:
-      'The requests of the department of the head that cost money and whose need is approved, not yet sent on, each with where it stands (not sent, waiting for the head to confirm the reserve, or blocked with its reasons) and what a check made now says (budgetOutcome: WITHIN_BASE, USES_RESERVE, BLOCKED), so the head knows which of them needs a line of reason to be sent on, and how far over the base or the reserve a request is. Each also says since when it waits in the queue, how many working days that is, whether it has waited longer than the days the head may take and how many reminders the head has had about it. Never what is left of the budget.',
+      'The requests of the department of the head that cost money and whose need is approved, not yet sent on, each with where it stands (not sent, waiting for the head to confirm the reserve, or blocked with its reasons) and what a check made now says (budgetOutcome: WITHIN_BASE, USES_RESERVE, BLOCKED), so the head knows which of them needs a line of reason to be sent on, and how far over the base or the reserve a request is. Each also says since when it waits in the queue, how many working days that is, whether it has waited longer than the days the head may take, how many reminders the head has had about it, its ticket reference if part of a multi-item ticket, and whether a reply note is required before resubmission. Never what is left of the budget.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, NOT_HEAD, INVALID)
   async list(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: PageQueryDto) {
@@ -103,7 +103,7 @@ export class SpendSubmissionController {
     status: HttpStatus.CREATED,
     message: 'SPEND_BATCH.SUBMITTED',
     description:
-      'Sends the requests chosen, one or more, on in one batch. The amount of each is worked out again for the month of the batch and each is checked against the budget (BR-MF1-06g): within the base it goes to the spending approver; if it uses the reserve it goes only when the head gives a line of reason for it in the same act (reserveConfirmations, 1 to 500 characters, only for a request of the batch, only used when its check says it uses the reserve; the answer says IGNORED for one that does not; the batch then carries the checklist of the step, one for the whole batch, and an answer No refuses the whole batch), and otherwise stays in the queue waiting for the confirmation (AWAITING_RESERVE_CONFIRMATION); blocked (over the reserve, no approved budget in the current Cost Center, a quote that is no longer valid) or with a price in dong missing, it stays in the queue with the reason and the others go on. results says how each fared and what became of its confirmation.',
+      'Sends the requests chosen, one or more, on in one batch. Items belonging to the same multi-item ticket are checked in ticket position order while results preserve the request body order. The amount of each is worked out again for the month of the batch and each is checked against the budget (BR-MF1-06g): within the base it goes to the spending approver; if it uses the reserve it goes only when the head gives a line of reason for it in the same act (reserveConfirmations, 1 to 500 characters, only for a request of the batch, only used when its check says it uses the reserve; the answer says IGNORED for one that does not; the batch then carries the checklist of the step, one for the whole batch, and an answer No refuses the whole batch), and otherwise stays in the queue waiting for the confirmation (AWAITING_RESERVE_CONFIRMATION); blocked (over the reserve, no approved budget in the current Cost Center, a quote that is no longer valid), missing a price in dong, or awaiting a reply note after a spending approver return without replyNotes (REPLY_NOTE_REQUIRED), it stays in the queue with the reason and the others go on. results says how each fared and what became of its confirmation.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -123,10 +123,11 @@ export class SpendSubmissionController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is invalid (VALIDATION_ERROR: a reason that is empty, over 500 characters or on more than one line, or a confirmation of the reserve with no checklist), a confirmation names a request that is not in the batch (SPEND_BATCH.CONFIRMATION_NOT_IN_BATCH), the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE), or an answer is No, which refuses the whole batch (POLICY.CHECKLIST_HAS_NO). Nothing is written.',
+        'The body is invalid (VALIDATION_ERROR: a reason that is empty, over 500 characters or on more than one line, a reply note that is empty or over 1000 characters, or a confirmation of the reserve with no checklist), a confirmation names a request that is not in the batch (SPEND_BATCH.CONFIRMATION_NOT_IN_BATCH), a reply note names a request that is not in the batch (SPEND.REPLY_NOTE_NOT_IN_BATCH), the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE), or an answer is No, which refuses the whole batch (POLICY.CHECKLIST_HAS_NO). Nothing is written.',
       examples: [
         VALIDATION_EXAMPLE,
         SPEND_ERROR_EXAMPLES.CONFIRMATION_NOT_IN_BATCH,
+        SPEND_ERROR_EXAMPLES.REPLY_NOTE_NOT_IN_BATCH,
         CHECKLIST_ERROR_EXAMPLES.INCOMPLETE,
         CHECKLIST_ERROR_EXAMPLES.HAS_NO,
       ],
@@ -134,11 +135,13 @@ export class SpendSubmissionController {
   )
   async submit(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: SubmitBatchBodyDto) {
     try {
+      const replyArgs = body.replyNotes !== undefined ? ([body.replyNotes] as const) : ([] as const);
       const { batchId, results } = await this.batches.submit(
         actor,
         body.requestIds,
         body.reserveConfirmations,
         body.checklist,
+        ...replyArgs,
       );
 
       return { batch: await this.batchViews.get(actor, batchId), results };
@@ -245,7 +248,7 @@ export class SpendSubmissionController {
   @ApiSuccessResponse(BatchItemListResponseDto, {
     message: 'SPEND_BATCH.ITEMS_LISTED',
     description:
-      'The requests of the batch in the order they were sent, each with how it fared (sent to the approver, waiting for the head to confirm the reserve, or stopped with its reason), whether it left the batch and why, and the state the request is in now. The head who sent the batch and Finance see all of them; the person who holds a spend step sees the requests they hold.',
+      'The requests of the batch in the order they were sent, each with how it fared (sent to the approver, waiting for the head to confirm the reserve, or stopped with its reason), whether it left the batch and why, the state the request is in now, and its ticket reference if part of a multi-item ticket. The head who sent the batch and Finance see all of them; the person who holds a spend step sees the requests they hold.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, BATCH_NOT_FOUND, INVALID)
   async items(

@@ -3,9 +3,10 @@ import { pageOf, type Page } from '../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { RequestTicketRepo } from '../request-ticket/request-ticket.repo';
 import type { MyRequestSummaryWire } from './my-requests.dto';
 import { MyRequestsFactsRepo } from './my-requests-facts.repo';
-import { toSummary, type MyRequestLookups } from './my-requests.mapper';
+import { toMyRequestSummary, type MyRequestLookups } from './my-requests.mapper';
 import { parseStateList, statesOf } from './my-requests.policy';
 import { MyRequestsRepo } from './my-requests.repo';
 import type {
@@ -50,6 +51,7 @@ export class MyRequestsService {
     private readonly facts: MyRequestsFactsRepo,
     private readonly organizationReads: OrganizationReadApi,
     private readonly catalog: CatalogApi,
+    private readonly tickets: RequestTicketRepo,
   ) {}
 
   async list(actor: AuthenticatedPrincipal, query: MyRequestsQuery): Promise<Page<MyRequestSummaryWire>> {
@@ -66,24 +68,18 @@ export class MyRequestsService {
       query,
     );
     // The caller's own line, only in a request for a group that somebody else sent for them (the sender reads every line).
-    const lines = await this.facts.linesOf(
-      idsOf(rows, (row) => (row.type === 'GROUP_GRANT' && row.requesterEmployeeId !== me ? row.id : null)),
-      me,
-    );
+    const [lines, ticketRefs] = await Promise.all([
+      this.facts.linesOf(
+        idsOf(rows, (row) => (row.type === 'GROUP_GRANT' && row.requesterEmployeeId !== me ? row.id : null)),
+        me,
+      ),
+      this.tickets.refsOf(rows.map((row) => row.id)),
+    ]);
 
     return pageOf(
-      rows.map((row) => {
-        const sent = row.requesterEmployeeId === me;
-        const summary = toSummary(row, row.requesterEmployeeId, lookups);
-
-        return {
-          ...summary,
-          involvement: sent ? ('SENT' as const) : ('FOR_ME' as const),
-          myLine: lines.get(row.id) ?? null,
-          // Only the person who sent a request withdraws it from here; a person it is for has nothing to withdraw (`SoD-4`).
-          canWithdraw: sent && summary.canWithdraw,
-        };
-      }),
+      rows.map((row) =>
+        toMyRequestSummary(row, me, lookups, lines.get(row.id) ?? null, ticketRefs.get(row.id) ?? null),
+      ),
       total,
       query.page,
       query.pageSize,
