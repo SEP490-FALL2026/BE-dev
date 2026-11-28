@@ -32,7 +32,7 @@ export class ProvisioningEvidenceDocumentService {
   ): Promise<void> {
     const organization = await this.requireOrganization(tx);
     const now = new Date();
-    for (const id of [...input.documentIds].sort()) {
+    for (const id of input.documentIds.map((id) => id.toLowerCase()).sort()) {
       const document = await this.documents.lock(tx, id);
       if (!document || document.uploadedByAppUserId !== actor.appUserId) throw new DocumentNotFoundError();
       if (document.purpose !== input.purpose) throw new DocumentPurposeMismatchError();

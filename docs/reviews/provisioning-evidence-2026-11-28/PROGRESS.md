@@ -20,8 +20,8 @@ Skill đã đọc: `ponytail` (full), `using-superpowers`, `using-agent-skills`,
 | P2b | xong local | 96d829a6  | EV-09/10/14 catalog  | typecheck/lint/arch/rules/format 0; gates 346/346; catalog 1079/1079 | chờ P5        |
 | P3a | xong local | d99e3371  | EV-06..12 complete   | quick checks 0; gates 346/346; unit 390/390                          | P5 pending    |
 | P3b | xong local | 6a3f48bd  | EV-06..12 revocation | lint 4214 files; gates 346/346; catalog+licensing 2181/2181          | P5 pending    |
-| P4  | xong local | commit P4 | EV-13..16            | quick checks 0; gates 346/346; unit 407/407; generators 474 ops      | P5 pending    |
-| P5  | chờ        | —         | SPEC §8              | chưa chạy                                                            | chưa dispatch |
+| P4  | xong local | 0457a395  | EV-13..16            | quick checks 0; gates 346/346; unit 407/407; generators 474 ops      | P5 pending    |
+| P5  | đang kiểm  | —         | SPEC §8              | có harness, integration và HTTP; đang kiểm local trước CI              | chưa dispatch |
 
 ## Pre-flight interfaces
 
@@ -122,3 +122,31 @@ Skill đã đọc: `ponytail` (full), `using-superpowers`, `using-agent-skills`,
 - Ruling: SPEC §8/PLAN P5 ghi validation UUID là 400, nhưng API contract và pipeline Zod hiện hành trả 422 `VALIDATION_ERROR`. Giữ hành vi 422 của repo theo luật không đổi behavior ngoài EV; test HTTP mới ở P5 sẽ khẳng định 422, không thay global pipe hay kỳ vọng test cũ. Đây là lệch tài liệu về HTTP validation, không mở quyền hay đổi luật gắn/xem file.
 - Collection registry chỉ thêm entry bounded và ledger event của đúng route mới, nguồn SPEC EV-13/Q-EV3 và schema max(6)/repo take(6); giữ INITIAL registries và mọi gate/suppression.
 - Skill bổ sung đã đọc: `requesting-code-review` và `code-reviewer.md`; sẽ dùng một reviewer ngữ cảnh mới cho toàn nhánh sau P5, chỉ đọc.
+
+## P5 — Kiểm thử luồng và review toàn nhánh
+
+- Preflight sau compact đã đọc lại đủ `executing-plans`, `test-driven-development` + `writing-good-tests.md`, `verification-before-completion`, `ponytail` full, repo `be-quick-check`, `create-migration`; không mapping tên skill.
+- Thêm `ProvisioningEvidenceHarness` kế thừa `RevocationHarness`, giữ nguyên harness cũ; PostgreSQL thật, chỉ `FakeObjectStorage` và request gate là stand-in theo khuôn hiện có.
+- Ruling: tách ca K1 thu hồi/cắt truy cập sang `provisioning-evidence-files-revocation.integration-spec.ts` với harness bắt buộc, các ca còn lại ở file chính. Mỗi file một app/database, tránh trộn hai harness hoặc sửa hành vi cũ; không bỏ ca nào.
+- Integration bổ sung rollback sau file thứ nhất, SQLSTATE + tên constraint, barrier khóa hàng tài liệu ở connection thứ ba, đổi IT phụ trách, phòng mồ côi, storage 503 và số query ở 2/6 file. HTTP có role/UUID/body/OpenAPI, giữ 422 `VALIDATION_ERROR` theo ruling P4. Chưa chạy các spec này ở máy.
+- Vòng sửa local 1: Prettier cần thêm một lượt format ở HTTP chain; lint ban đầu 1 lỗi format/0 cảnh báo, sau format 0 lỗi/0 cảnh báo. Không đổi rule hoặc test cũ.
+- Review độc lập một lượt toàn nhánh (`595cdc48..0457a395` + file P5), reviewer chỉ đọc, không chạy DB/test hay sửa Git. Ba Important, không Critical/Minor, không có mục Declined to judge; chi tiết ở `REVIEW.md`. Không dispatch review lần hai.
+- Final fix pass: chuẩn hóa chữ thường UUID trước Set/sort để cùng danh tính PostgreSQL có một thứ tự khóa; thêm 3 ca unit hồi quy. RED **3 fail/14 pass**, 2 suites. Sửa fixture đọc tác vụ thứ hai bằng IT2 và thêm ca phòng mồ côi; không đổi expectation test cũ.
+- GREEN cuối: `CI=true pnpm test --maxWorkers=2 src/modules/catalog src/modules/licensing` **2194 pass/0 fail**, 209 suites; `CI=true pnpm test:gates` **346 pass/0 fail**, 17 suites. Typecheck, eslint 8 file, arch/rules/rules:format/format exit 0. Generators + arch:docs:check và capabilities hai module exit 0, không drift sinh ngoài P4. Chưa có kết quả integration/HTTP tại commit P5; sẽ push/dispatch và ghi bằng chứng CI sau.
+- `Kiểm giữ:` fix catalog chỉ chuẩn hóa ID trước vòng khóa; giữ organization read, khóa/đọc lại document, uploader → purpose → trạng thái, markAttached và audit cùng tx. Policy giữ TOO_MANY trước DUPLICATE, không đổi empty/undefined. Không chạm service nghiệp vụ cũ ở fix này.
+
+### Self-review EV → kiểm thử
+
+| EV | Kiểm thử / file |
+| --- | --- |
+| 01–03 | `contract.policy.spec.ts`: purposes/roles, upload types, target và hiding; integration ca 8/9 |
+| 04–05 | `contract.policy.spec.ts`: WebP signature/length; integration PNG/WebP ca 1, byte giả ca 9 |
+| 06–07 | grant/revocation service unit: omitted/empty IDs, ALREADY_GONE, EXTEND; integration ca 2/K1 |
+| 08 | evidence-files policy unit: max/duplicate/canonical UUID; integration ca 3 |
+| 09–10 | catalog evidence service unit + repo unit; grant/revocation unit; integration ca 1/4/10 rollback/owner/audit |
+| 11 | grant completion unit EXTEND; revocation completion unit ALREADY_GONE; K1 integration ca 6 |
+| 12 | service unit order/failure; integration ca 5 frame wins, ca 11 two connections/barrier |
+| 13 | evidence service unit + repo unit; integration ca 1/7, collection 2/6 files/query projection |
+| 14 | catalog/link unit, integration ca 7 TTL/no-store/audit without URL/foreign file |
+| 15 | evidence service unit Super/IT/EmployeeNotStarted/TC-4; integration ca 7 current IT/orphan; HTTP role tests |
+| 16 | integration storage outage 503/no audit; existing shared HTTP mapping retained |

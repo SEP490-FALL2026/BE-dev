@@ -10,6 +10,22 @@ describe('evidence file lists', () => {
     expect(assertEvidenceFileList(ids)).toEqual(['a', 'b', 'c']);
     expect(ids).toEqual(['c', 'a', 'b']);
   });
+  it('sorts UUID identities in one canonical order regardless of letter case', () => {
+    const lower = 'a0000000-0000-4000-8000-000000000001';
+    const upper = 'B0000000-0000-4000-8000-000000000002';
+    expect(assertEvidenceFileList([upper, lower])).toEqual([lower, upper.toLowerCase()]);
+  });
+  it('rejects two spellings of the same UUID as DUPLICATE before any attachment', () => {
+    const id = 'a0000000-0000-4000-8000-000000000001';
+    let refusal: unknown;
+    try {
+      assertEvidenceFileList([id, id.toUpperCase()]);
+    } catch (error) {
+      refusal = error;
+    }
+    expect(refusal).toBeInstanceOf(ProvisioningEvidenceFileInvalidError);
+    expect(refusal).toMatchObject({ problem: 'DUPLICATE' });
+  });
   it.each([
     [['a', 'b', 'c', 'd'], 'TOO_MANY'],
     [['a', 'a'], 'DUPLICATE'],

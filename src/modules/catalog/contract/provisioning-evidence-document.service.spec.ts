@@ -57,6 +57,17 @@ function setup() {
 }
 
 describe('provisioning evidence documents in catalog', () => {
+  it('takes document locks in canonical UUID order for mixed-case facade callers', async () => {
+    const { service, repo } = setup();
+    const first = 'a0000000-0000-4000-8000-000000000001';
+    const second = 'B0000000-0000-4000-8000-000000000002';
+    await service.attach(tx, actor, {
+      documentIds: [second, first],
+      provisioningTaskId: 'task',
+      purpose: 'PROVISIONING_EVIDENCE',
+    });
+    expect(repo.lock.mock.calls.map((call) => call[1])).toEqual([first, second.toLowerCase()]);
+  });
   it('locks ids in ascending order and attaches/audits each file in the supplied transaction', async () => {
     const { service, repo, audit } = setup();
     await service.attach(tx, actor, {
