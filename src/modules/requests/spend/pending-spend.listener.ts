@@ -8,10 +8,11 @@ import { BudgetCheckRepo } from './budget-check.repo';
 
 /**
  * Tells the budgets what waits to be decided as spend in a Cost Center and a year (`BR-MF1-06f`, RV-10): the requests whose newest check is
- * within the base or uses the reserve (confirmed or not) and that have no decision yet, never a blocked one (M-05). Budgets continue to use
- * `BudgetCheckRepo.pendingFor`/`pendingMany`; only item-level checks (`pendingForItem`, `QĐ-117k`(1)) exempt earlier unconfirmed items of the
- * same ticket so later ticket items are not blocked, meaning budget screens may temporarily report negative remaining (`D-11`). Adds itself
- * when the module starts so budgets never import this module (ADR-0016).
+ * within the base or uses the reserve (confirmed or not, unless a spending approver returned the request after that check per `QĐ-117k`(2))
+ * and that have no decision yet, never a blocked one (M-05). Budgets continue to use `BudgetCheckRepo.pendingFor`/`pendingMany`; only
+ * item-level checks (`pendingForItem`, `QĐ-117k`(1)) exempt earlier unconfirmed items of the same ticket so later ticket items are not
+ * blocked, meaning budget screens may temporarily report negative remaining (`D-11`). Adds itself when the module starts so budgets never
+ * import this module (ADR-0016).
  */
 @Injectable()
 export class PendingSpendListener implements PendingSpendContribution, OnModuleInit {

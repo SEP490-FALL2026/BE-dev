@@ -1,4 +1,4 @@
-import { SpendStatusService } from './spend-status.service';
+import { queuedStatus, SpendStatusService } from './spend-status.service';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 describe('BR-MF1-02: a revision uses current missing-data reasons', () => {
   const checks = {
@@ -22,5 +22,52 @@ describe('BR-MF1-02: a revision uses current missing-data reasons', () => {
       blockedReasons: ['OVER_RESERVE'],
       overBy: { minor: 99n, currency: 'VND' },
     });
+  });
+});
+
+describe('QĐ-117k(2): queuedStatus & SpendStatusService after approver RETURN', () => {
+  const checkAt = new Date('2026-06-01T09:00:00.000Z');
+  const reserveCheck = {
+    outcome: 'USES_RESERVE' as const,
+    route: 'SPEND_APPROVAL' as const,
+    blockReasons: [],
+    staleCostEvidence: false,
+    overBaseByMinor: 5_000_000n,
+    overByMinor: null,
+    currency: 'VND',
+    ranAt: checkAt,
+  };
+
+  it('returns RESERVE_CONFIRMATION when not returned after check and NOT_SUBMITTED when returned after check', () => {
+    expect(queuedStatus(reserveCheck, false)).toMatchObject({
+      stage: 'RESERVE_CONFIRMATION',
+      overBy: { minor: 5_000_000n, currency: 'VND' },
+    });
+    expect(queuedStatus(reserveCheck, true)).toEqual({
+      stage: 'NOT_SUBMITTED',
+      blockedReasons: [],
+      overBy: null,
+      refusalReason: null,
+    });
+  });
+
+  it('SpendStatusService.of checks latestSpendReturnAt relative to check.ranAt when AWAITING_SPEND_SUBMISSION', async () => {
+    const checks = { latest: jest.fn().mockResolvedValue(reserveCheck) };
+    const decisions = { latestSpendReturnAt: jest.fn() };
+    const service = new SpendStatusService(checks as never, {} as never, decisions as never);
+    const queuedReq = {
+      id: 'req-1',
+      state: 'AWAITING_SPEND_SUBMISSION',
+      policy: { chain: ['NEED', 'SPEND_APPROVAL'] },
+    } as unknown as AccessRequestRecord;
+
+    decisions.latestSpendReturnAt.mockResolvedValueOnce(new Date('2026-06-01T10:00:00.000Z'));
+    await expect(service.of(queuedReq)).resolves.toMatchObject({ stage: 'NOT_SUBMITTED' });
+
+    decisions.latestSpendReturnAt.mockResolvedValueOnce(new Date('2026-06-01T08:00:00.000Z'));
+    await expect(service.of(queuedReq)).resolves.toMatchObject({ stage: 'RESERVE_CONFIRMATION' });
+
+    decisions.latestSpendReturnAt.mockResolvedValueOnce(null);
+    await expect(service.of(queuedReq)).resolves.toMatchObject({ stage: 'RESERVE_CONFIRMATION' });
   });
 });

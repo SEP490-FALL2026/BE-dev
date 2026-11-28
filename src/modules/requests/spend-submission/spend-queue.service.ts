@@ -9,7 +9,7 @@ import { SlaQueueAgeService } from '../sla/sla-queue-age.service';
 import { SpendHeadService } from './spend-head.service';
 import { SpendWireViewService } from '../spend/spend-wire-view.service';
 import { SpendRequestRepo } from '../spend/spend-request.repo';
-import { queuedStatus } from '../spend/spend-status.service';
+import { isSpendReturnedAfterCheck, queuedStatus } from '../spend/spend-status.service';
 import type { QueueItemWire } from '../spend/spend-submission.dto';
 import type { TicketRef } from '../request-ticket/request-ticket.types';
 import { SpendReplyFactsService } from './spend-reply-facts.service';
@@ -41,7 +41,7 @@ export class SpendQueueService {
     const { rows, total } = await this.found.queuePage(departmentId, (query.page - 1) * query.pageSize, query.pageSize);
     const ids = rows.map((row) => row.id);
     const planIds = [...new Set(rows.map((row) => row.planId).filter((id): id is string => id !== null))];
-    const [checks, plans, people, units, ages, expected, ticketRefs, awaitingReplies] = await Promise.all([
+    const [checks, plans, people, units, ages, expected, ticketRefs, replyAndReturnFacts] = await Promise.all([
       this.checks.latestOf(ids),
       planIds.length === 0 ? Promise.resolve([]) : this.catalog.getPlanSummaries(planIds),
       this.wireView.people(
@@ -54,10 +54,10 @@ export class SpendQueueService {
       this.age.ageOf(rows.map((row) => ({ requestId: row.id, queuedAt: row.spendQueuedAt }))),
       this.outcomes.expectedFor(rows.filter((row) => row.pricingStatus === 'PRICED').map((row) => row.id)),
       this.replyFacts.refsOf(ids),
-      this.replyFacts.spendReturnsAwaitingReply(ids),
+      this.replyFacts.queueReplyAndReturnFacts(ids),
     ]);
     const items = rows.map((row): QueueItemWire => {
-      const status = queuedStatus(checks.get(row.id) ?? null);
+      const status = queueSpendStatus(checks.get(row.id) ?? null, row.id, replyAndReturnFacts.latestSpendReturns);
       const now = expected.get(row.id) ?? null;
       const plan = plans.find((candidate) => candidate.planId === row.planId);
       const requester = people.get(row.requesterEmployeeId);
@@ -92,12 +92,22 @@ export class SpendQueueService {
         waitedWorkingDays: ages.get(row.id)?.waitedWorkingDays ?? 0,
         overdue: ages.get(row.id)?.overdue ?? false,
         reminders: ages.get(row.id)?.reminders ?? 0,
-        ...queueTicketAndReplyFields(row.id, ticketRefs, awaitingReplies),
+        ...queueTicketAndReplyFields(row.id, ticketRefs, replyAndReturnFacts.awaitingReplies),
       };
     });
 
     return pageOf(items, total, query.page, query.pageSize);
   }
+}
+
+function queueSpendStatus(
+  check: (Parameters<typeof queuedStatus>[0] & { ranAt?: Date }) | null,
+  requestId: string,
+  latestSpendReturns: ReadonlyMap<string, Date>,
+) {
+  const returnedAt = latestSpendReturns.get(requestId) ?? null;
+  const returnedAfterCheck = check?.ranAt ? isSpendReturnedAfterCheck(check.ranAt, returnedAt) : false;
+  return queuedStatus(check, returnedAfterCheck);
 }
 
 /** Kept outside `page` so existing complexity metrics on `page` remain unchanged. */

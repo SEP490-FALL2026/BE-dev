@@ -256,8 +256,24 @@ describe('BudgetCheckRepo.pendingForItem SQL scope (D-11, QĐ-117k(1))', () => {
 
     expect(text).toContain("s.kind = 'SPEND_APPROVAL' AND s.state IN ('PENDING', 'WAITING')");
     expect(text).toContain("r.state = 'AWAITING_SPEND_SUBMISSION' AND latest.outcome = 'USES_RESERVE'");
+    expect(text).toContain("s.kind = 'SPEND_APPROVAL'");
+    expect(text).toContain("a.decision = 'RETURNED'");
+    expect(text).toContain('a.decided_at > latest.ran_at');
     expect(text).toContain('r.ticket_id IS DISTINCT FROM ?::uuid OR r.ticket_position >= ?::int');
     expect(values).toEqual([CC_ID, 2026, REQ_2, REQ_2, TICKET_1, 2]);
+  });
+
+  it('pendingFor excludes approver-returned USES_RESERVE requests after latest.ran_at without adding bound params (QĐ-117k(2))', async () => {
+    const { repo, captured } = buildRepo();
+
+    await repo.pendingFor(CC_ID, 2026, null);
+    const { text, values } = flattenSql(captured[0]);
+
+    expect(text).toContain('JOIN access_request_steps s ON s.id = a.step_id');
+    expect(text).toContain("AND s.kind = 'SPEND_APPROVAL'");
+    expect(text).toContain("AND a.decision = 'RETURNED'");
+    expect(text).toContain('AND a.decided_at > latest.ran_at');
+    expect(values).toEqual([CC_ID, 2026, null, null]);
   });
 
   it.each([

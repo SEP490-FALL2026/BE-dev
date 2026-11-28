@@ -54,5 +54,8 @@ describe('SpendReplyFactsService', () => {
 
     await expect(service.refsOf(['req-1'])).resolves.toBe(refMap);
     await expect(service.spendReturnsAwaitingReply(['req-1'])).resolves.toEqual(new Set(['req-1']));
+    const combined = await service.queueReplyAndReturnFacts(['req-1']);
+    expect(combined.awaitingReplies).toEqual(new Set(['req-1']));
+    expect(combined.latestSpendReturns.get('req-1')).toEqual(TS);
   });
 });

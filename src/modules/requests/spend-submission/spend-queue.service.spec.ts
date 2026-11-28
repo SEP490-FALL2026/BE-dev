@@ -95,11 +95,40 @@ describe('SpendQueueService.page (§7.4 ticketRef & §7.10 replyNoteRequired)', 
       { refsOf } as unknown as RequestTicketRepo,
       { returnFactsOf } as unknown as RequestReplyRepo,
     );
+    const checkRanAt = new Date('2026-05-31T23:00:00.000Z');
+    const latestChecks = new Map([
+      [
+        REQ_1,
+        {
+          outcome: 'USES_RESERVE',
+          route: 'SPEND_APPROVAL',
+          blockReasons: [],
+          staleCostEvidence: false,
+          overBaseByMinor: 500_000n,
+          overByMinor: null,
+          currency: 'VND',
+          ranAt: checkRanAt,
+        },
+      ],
+      [
+        REQ_2,
+        {
+          outcome: 'USES_RESERVE',
+          route: 'SPEND_APPROVAL',
+          blockReasons: [],
+          staleCostEvidence: false,
+          overBaseByMinor: 500_000n,
+          overByMinor: null,
+          currency: 'VND',
+          ranAt: checkRanAt,
+        },
+      ],
+    ]);
 
     const service = new SpendQueueService(
       { departmentOf: jest.fn().mockResolvedValue(DEP) } as unknown as SpendHeadService,
       { queuePage: jest.fn().mockResolvedValue({ rows, total: 2 }) } as unknown as SpendRequestRepo,
-      { latestOf: jest.fn().mockResolvedValue(new Map()) } as unknown as BudgetCheckRepo,
+      { latestOf: jest.fn().mockResolvedValue(latestChecks) } as unknown as BudgetCheckRepo,
       { expectedFor: jest.fn().mockResolvedValue(new Map()) } as unknown as SpendQueueOutcomeService,
       { getPlanSummaries: jest.fn().mockResolvedValue([]) } as unknown as CatalogApi,
       {
@@ -120,11 +149,13 @@ describe('SpendQueueService.page (§7.4 ticketRef & §7.10 replyNoteRequired)', 
     expect(returnFactsOf).toHaveBeenCalledWith([REQ_1, REQ_2]);
     expect(result.items[0]).toMatchObject({
       requestId: REQ_1,
+      stage: 'NOT_SUBMITTED',
       ticketRef: { id: TICKET_1, position: 2, itemCount: 3 },
       replyNoteRequired: true,
     });
     expect(result.items[1]).toMatchObject({
       requestId: REQ_2,
+      stage: 'RESERVE_CONFIRMATION',
       ticketRef: null,
       replyNoteRequired: false,
     });

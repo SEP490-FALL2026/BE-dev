@@ -1,3 +1,4 @@
+import request from 'supertest';
 import { BudgetCheckRepo } from '../../../src/modules/requests/spend/budget-check.repo';
 import { PendingSpendContributions } from '../../../src/modules/budgets/public/budgets.extension-points';
 import { StatusHarness } from '../../support/status-harness';
@@ -541,6 +542,41 @@ describe('the confirmation of the reserve and the check at the decision (integra
       // Another year, and another Cost Center, wait for nothing.
       expect(await repo.pendingFor(costCenter, h.year + 1, null)).toBe(0n);
       expect(await repo.pendingFor((await unit()).u.department.unitId, h.year, null)).toBe(0n);
+    });
+
+    it('QĐ-117k(2): stops counting pending spend and shows queue stage NOT_SUBMITTED as soon as C1 returns a reserve-confirmed request', async () => {
+      const { u } = await unit();
+      const id = await usingReserve(u, 45 * M);
+      await h.confirmReserve(id, { reason: 'Cần dùng dự phòng' }, u.head.account).expect(200);
+
+      const repo = h.ctx.app.get(BudgetCheckRepo, { strict: false });
+      const contributions = h.ctx.app.get(PendingSpendContributions, { strict: false });
+      const costCenter = u.department.unitId;
+      const minePending = async () =>
+        h.dataOf<{ budget: { pendingSpend: { amount: string } } }>(
+          await request(h.server())
+            .get('/api/v1/budgets/mine')
+            .query({ year: h.year })
+            .set(h.as(u.head.account))
+            .expect(200),
+        ).budget.pendingSpend.amount;
+
+      expect(await repo.pendingFor(costCenter, h.year, null)).toBe(BigInt(45 * M));
+      expect(await contributions.total(costCenter, h.year)).toBe(BigInt(45 * M));
+      expect(await minePending()).toBe(String(45 * M));
+
+      await h.decideSpend(id, { decision: 'RETURN', reason: 'Làm rõ phạm vi dùng' }, approver()).expect(200);
+
+      expect(await h.state(id)).toBe('AWAITING_SPEND_SUBMISSION');
+      expect(await repo.pendingFor(costCenter, h.year, null)).toBe(0n);
+      expect(await contributions.total(costCenter, h.year)).toBe(0n);
+      expect(await minePending()).toBe('0');
+
+      const queueItems = h.dataOf<{ items: QueueItemWire[] }>(await h.spendQueue(u.head.account).expect(200)).items;
+      expect(queueItems.find((item) => item.requestId === id)).toMatchObject({
+        requestId: id,
+        stage: 'NOT_SUBMITTED',
+      });
     });
   });
 });

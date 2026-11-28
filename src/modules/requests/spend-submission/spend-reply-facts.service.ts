@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { pendingSpendReturn } from '../request-reply/request-reply.policy';
+import { latestSpendReturnAt, pendingSpendReturn } from '../request-reply/request-reply.policy';
 import { RequestReplyRepo } from '../request-reply/request-reply.repo';
 import type { HumanReturn } from '../request-reply/request-reply.types';
 import { RequestTicketRepo } from '../request-ticket/request-ticket.repo';
@@ -30,7 +30,24 @@ export class SpendReplyFactsService {
     return pending;
   }
 
+  async queueReplyAndReturnFacts(
+    requestIds: readonly string[],
+    tx?: DbTx,
+  ): Promise<{ awaitingReplies: Set<string>; latestSpendReturns: Map<string, Date> }> {
+    const factsByRequest = tx
+      ? await this.replies.returnFactsOf(requestIds, tx)
+      : await this.replies.returnFactsOf(requestIds);
+    const awaitingReplies = new Set<string>();
+    const latestSpendReturns = new Map<string, Date>();
+    for (const [requestId, facts] of factsByRequest) {
+      if (pendingSpendReturn(facts)) awaitingReplies.add(requestId);
+      const returnedAt = latestSpendReturnAt(facts);
+      if (returnedAt) latestSpendReturns.set(requestId, returnedAt);
+    }
+    return { awaitingReplies, latestSpendReturns };
+  }
+
   async spendReturnsAwaitingReply(requestIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
-    return new Set((await this.pendingSpendReturnsOf(requestIds, tx)).keys());
+    return (await this.queueReplyAndReturnFacts(requestIds, tx)).awaitingReplies;
   }
 }

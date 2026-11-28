@@ -89,3 +89,14 @@ export function pendingSpendReturn(facts: ReturnFacts): HumanReturn | null {
   const pending = pendingHumanReturn(facts);
   return pending?.kind === 'SPEND' ? pending : null;
 }
+
+/** Latest SPEND_APPROVAL human return timestamp regardless of reply/reopen state, for QĐ-117k(2) check comparison. */
+export function latestSpendReturnAt(facts: ReturnFacts): Date | null {
+  let latest: Date | null = null;
+  for (const step of facts.steps) {
+    if (step.kind !== 'SPEND_APPROVAL' || step.state !== 'CLOSED') continue;
+    const closedAt = spendReturnAt(step);
+    if (closedAt && (latest === null || closedAt.getTime() > latest.getTime())) latest = closedAt;
+  }
+  return latest;
+}

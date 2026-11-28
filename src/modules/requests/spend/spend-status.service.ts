@@ -36,21 +36,28 @@ const status = (stage: SpendStage, rest: Partial<SpendStatusView> = {}): SpendSt
   ...rest,
 });
 
+const minorAmount = (minor: bigint | null, currency: string): { minor: bigint; currency: string } | null =>
+  minor === null ? null : { minor, currency };
+
+export function isSpendReturnedAfterCheck(ranAt: Date, returnedAt: Date | null): boolean {
+  return returnedAt !== null && returnedAt.getTime() > ranAt.getTime();
+}
+
 /**
  * Where a request in the queue of the head stands, from its newest check: blocked (and why), waiting for the head to confirm the reserve,
- * or not yet sent on. A check made before the three outcomes that blocked the request is read with the reasons it gave then.
+ * or not yet sent on. A request returned by a spending approver after its newest check shows `NOT_SUBMITTED` (`QĐ-117k`(2)).
+ * A check made before the three outcomes that blocked the request is read with the reasons it gave then.
  */
-export function queuedStatus(check: QueuedCheck | null): SpendStatusView {
-  if (check?.outcome === 'USES_RESERVE') {
-    return status('RESERVE_CONFIRMATION', {
-      overBy: check.overBaseByMinor === null ? null : { minor: check.overBaseByMinor, currency: check.currency },
-    });
+export function queuedStatus(check: QueuedCheck | null, returnedAfterCheck = false): SpendStatusView {
+  if (!check) return status('NOT_SUBMITTED');
+  if (check.outcome === 'USES_RESERVE' && !returnedAfterCheck) {
+    return status('RESERVE_CONFIRMATION', { overBy: minorAmount(check.overBaseByMinor, check.currency) });
   }
-  const blocked = check?.outcome === 'BLOCKED' || (check?.outcome === null && check.route === 'BLOCKED');
-  if (check && blocked) {
+  const blocked = check.outcome === 'BLOCKED' || (check.outcome === null && check.route === 'BLOCKED');
+  if (blocked) {
     return status('BLOCKED', {
       blockedReasons: check.outcome === null ? LEGACY_REASONS(check) : check.blockReasons,
-      overBy: check.overByMinor === null ? null : { minor: check.overByMinor, currency: check.currency },
+      overBy: minorAmount(check.overByMinor, check.currency),
     });
   }
 
@@ -81,8 +88,14 @@ export class SpendStatusService {
     switch (request.state) {
       case 'AWAITING_REQUESTER_REVISION':
         return this.returnedToRequester(request);
-      case 'AWAITING_SPEND_SUBMISSION':
-        return queuedStatus(await this.checks.latest(request.id));
+      case 'AWAITING_SPEND_SUBMISSION': {
+        const check = await this.checks.latest(request.id);
+        const returnedAfterCheck =
+          check?.outcome === 'USES_RESERVE'
+            ? isSpendReturnedAfterCheck(check.ranAt, await this.decisions.latestSpendReturnAt(request.id))
+            : false;
+        return queuedStatus(check, returnedAfterCheck);
+      }
       case 'AWAITING_SPEND_DECISION':
         return status('WAITING_SPEND_DECISION');
       case 'WAITING_CONTROLLED':

@@ -119,6 +119,17 @@ export class SpendDecisionRepo {
     return record && record.decidedByEmployeeId === employeeId ? record.decision : null;
   }
 
+  /** Timestamp of the newest SPEND_APPROVAL RETURNED approval record for the request, or null if none. */
+  async latestSpendReturnAt(requestId: string, tx?: DbTx): Promise<Date | null> {
+    const row = await (tx ?? this.prisma).approvalRecord.findFirst({
+      where: { requestId, decision: 'RETURNED', step: { kind: 'SPEND_APPROVAL' } },
+      orderBy: { decidedAt: 'desc' },
+      select: { decidedAt: true },
+    });
+
+    return row?.decidedAt ?? null;
+  }
+
   /** What the approver decided, the newest if the request was decided more than once. */
   async latest(requestId: string, tx?: DbTx): Promise<(SpendDecisionRecord & { reason: string | null }) | null> {
     const db = tx ?? this.prisma;
