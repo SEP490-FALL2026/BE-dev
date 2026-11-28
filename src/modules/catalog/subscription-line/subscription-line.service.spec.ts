@@ -245,7 +245,7 @@ describe('SubscriptionLineService (W3-15)', () => {
         },
         WorkspaceVendorMismatchError,
         HttpStatus.UNPROCESSABLE_ENTITY,
-        'WORKSPACE_VENDOR_MISMATCH',
+        'SUBSCRIPTION_LINE.WORKSPACE_VENDOR_MISMATCH',
       ],
       [
         'non-K2 plan -> 422',

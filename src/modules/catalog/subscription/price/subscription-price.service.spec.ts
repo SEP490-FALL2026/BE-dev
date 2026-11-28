@@ -10,6 +10,9 @@ const noLotStock = (): LicenseLotStockService =>
     plansWithFreeLot: jest.fn().mockResolvedValue(new Set<string>()),
   }) as unknown as LicenseLotStockService;
 
+/** The organization is on the 29th, the day after the UTC day it is 01:00 on in Vietnam. */
+const DAY_OF_ORGANIZATION = { businessToday: jest.fn().mockResolvedValue('2026-11-29') } as never;
+
 describe('BR-MF1-06 shared catalog price facts', () => {
   it.each([
     ['TERM', 'RECURRING', 100n],
@@ -32,6 +35,7 @@ describe('BR-MF1-06 shared catalog price facts', () => {
         { findPricedOfPlan } as unknown as SubscriptionRepo,
         { findPlanProvisioningType: jest.fn().mockResolvedValue('K2') } as unknown as PlanReferencePriceRepo,
         noLotStock(),
+        DAY_OF_ORGANIZATION,
       );
       const tx = {} as DbTx;
       expect(await service.priceOfPlan('plan', tx)).toEqual({
@@ -45,7 +49,7 @@ describe('BR-MF1-06 shared catalog price facts', () => {
         allowsMidTermReduction: false,
         source: 'SUBSCRIPTION',
       });
-      expect(findPricedOfPlan).toHaveBeenCalledWith('plan', tx, undefined);
+      expect(findPricedOfPlan).toHaveBeenCalledWith('plan', '2026-11-29', tx, undefined);
     },
   );
 
@@ -57,6 +61,7 @@ describe('BR-MF1-06 shared catalog price facts', () => {
         findOfPlan: jest.fn().mockResolvedValue(null),
       } as unknown as PlanReferencePriceRepo,
       noLotStock(),
+      DAY_OF_ORGANIZATION,
     );
     expect(await service.priceOfPlan('plan')).toBeNull();
   });
@@ -80,6 +85,7 @@ describe('BR-MF1-06 shared catalog price facts', () => {
           findOfPlan: findPlanReferencePrice,
         } as unknown as PlanReferencePriceRepo,
         noLotStock(),
+        DAY_OF_ORGANIZATION,
       );
 
       const price = await service.priceOfPlan('plan');
@@ -104,6 +110,7 @@ describe('BR-MF1-06 shared catalog price facts', () => {
           findOfPlan: findPlanReferencePrice,
         } as unknown as PlanReferencePriceRepo,
         noLotStock(),
+        DAY_OF_ORGANIZATION,
       );
 
       expect(await service.priceOfPlan('plan', tx)).toEqual({
@@ -128,6 +135,7 @@ describe('BR-MF1-06 shared catalog price facts', () => {
         { findPricedOfPlan: jest.fn().mockResolvedValue(null) } as unknown as SubscriptionRepo,
         { findOfPlan: findPlanReferencePrice } as unknown as PlanReferencePriceRepo,
         noLotStock(),
+        DAY_OF_ORGANIZATION,
       );
 
       expect(await service.subscriptionPriceOfPlan('plan')).toBeNull();
@@ -142,6 +150,7 @@ describe('BR-MF1-06 shared catalog price facts', () => {
           findOfPlan: jest.fn().mockResolvedValue({ provisioningType: 'K4', amountMinor: 9_000_000n, currency: 'VND' }),
         } as unknown as PlanReferencePriceRepo,
         noLotStock(),
+        DAY_OF_ORGANIZATION,
       );
 
       expect(await service.priceOfPlan('plan')).toMatchObject({ kind: 'ONE_TIME', source: 'PLAN_REFERENCE' });
@@ -161,6 +170,7 @@ describe('QĐ-113a: the "can be priced" cycles of plans count the reference pric
         findK4PlanIds: jest.fn().mockResolvedValue([]),
       } as unknown as PlanReferencePriceRepo,
       noLotStock(),
+      DAY_OF_ORGANIZATION,
     );
 
     const cycles = await service.pricedCyclesOfPlans(['a', 'b', 'c']);
@@ -180,6 +190,7 @@ describe('QĐ-113a: the "can be priced" cycles of plans count the reference pric
         findOfPlan: jest.fn().mockResolvedValue({ provisioningType: 'K4', amountMinor: 12_000_000n, currency: 'VND' }),
       } as unknown as PlanReferencePriceRepo,
       { newestFreeLotUnitPrice: jest.fn().mockResolvedValue(11_000_000n) } as unknown as LicenseLotStockService,
+      DAY_OF_ORGANIZATION,
     );
     expect(await refService.priceOfPlan('k4-plan')).toMatchObject({
       kind: 'ONE_TIME',
@@ -194,6 +205,7 @@ describe('QĐ-113a: the "can be priced" cycles of plans count the reference pric
         findOfPlan: jest.fn().mockResolvedValue(null),
       } as unknown as PlanReferencePriceRepo,
       { newestFreeLotUnitPrice: jest.fn().mockResolvedValue(11_000_000n) } as unknown as LicenseLotStockService,
+      DAY_OF_ORGANIZATION,
     );
     expect(await lotFallbackService.priceOfPlan('k4-plan')).toMatchObject({
       kind: 'ONE_TIME',
@@ -208,6 +220,7 @@ describe('QĐ-113a: the "can be priced" cycles of plans count the reference pric
         findOfPlan: jest.fn().mockResolvedValue(null),
       } as unknown as PlanReferencePriceRepo,
       { newestFreeLotUnitPrice: jest.fn().mockResolvedValue(null) } as unknown as LicenseLotStockService,
+      DAY_OF_ORGANIZATION,
     );
     expect(await missingService.priceOfPlan('k4-plan')).toBeNull();
   });

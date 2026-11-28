@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../../core/business-date';
 import { DONG } from '../../../../core/money/money';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
+import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { LicenseLotStockService } from '../../license-lot/license-lot-stock.service';
 import { SubscriptionRepo } from '../subscription.repo';
 import { PlanReferencePriceRepo } from './plan-reference-price.repo';
@@ -14,6 +15,7 @@ export class SubscriptionPriceService {
     private readonly subscriptions: SubscriptionRepo,
     private readonly references: PlanReferencePriceRepo,
     private readonly lotStock: LicenseLotStockService,
+    private readonly organizationReads: OrganizationReadApi,
   ) {}
 
   /**
@@ -70,7 +72,12 @@ export class SubscriptionPriceService {
    * adjustment and the savings of a plan are worked out from. Null when no subscription prices the plan.
    */
   async subscriptionPriceOfPlan(planId: string, tx?: DbTx, on?: BusinessDate): Promise<PlanPriceFacts | null> {
-    const priced = await this.subscriptions.findPricedOfPlan(planId, tx, on);
+    const priced = await this.subscriptions.findPricedOfPlan(
+      planId,
+      await this.organizationReads.businessToday(new Date(), tx),
+      tx,
+      on,
+    );
     if (!priced) return null;
 
     return subscriptionPlanPriceOf(priced);
@@ -85,7 +92,11 @@ export class SubscriptionPriceService {
     planIds: readonly string[],
     tx?: DbTx,
   ): Promise<Map<string, 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER' | 'ONE_TIME'>> {
-    const cycles = await this.subscriptions.findPricedCyclesOfPlans(planIds, tx);
+    const cycles = await this.subscriptions.findPricedCyclesOfPlans(
+      planIds,
+      await this.organizationReads.businessToday(new Date(), tx),
+      tx,
+    );
     const unpriced = planIds.filter((id) => !cycles.has(id));
     for (const [planId, cycle] of await this.references.findCyclesOfPlans(unpriced, tx)) cycles.set(planId, cycle);
     const stillUnpriced = planIds.filter((id) => !cycles.has(id));
@@ -106,7 +117,12 @@ export class SubscriptionPriceService {
     tx?: DbTx,
     on?: BusinessDate,
   ): Promise<{ amountMinor: bigint; currency: string } | null> {
-    const priced = await this.subscriptions.findPricedOfPlan(planId, tx, on);
+    const priced = await this.subscriptions.findPricedOfPlan(
+      planId,
+      await this.organizationReads.businessToday(new Date(), tx),
+      tx,
+      on,
+    );
     const record = priced && (await this.subscriptions.find(priced.subscriptionId, tx));
 
     return record?.originalPrice ?? null;

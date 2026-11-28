@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../../core/business-date';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
+import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { SubscriptionRepo } from '../subscription.repo';
 import { PlanReferencePriceRepo } from './plan-reference-price.repo';
 import { referencePriceSourceOf, subscriptionPlanPriceOf, type PlanPriceFacts } from './subscription-price.policy';
@@ -14,10 +15,16 @@ export class CatalogPlanPriceService {
   constructor(
     private readonly subscriptions: SubscriptionRepo,
     private readonly references: PlanReferencePriceRepo,
+    private readonly organizationReads: OrganizationReadApi,
   ) {}
 
   async priceOfPlan(planId: string, tx?: DbTx, on?: BusinessDate): Promise<PlanPriceFacts | null> {
-    const priced = await this.subscriptions.findPricedOfPlan(planId, tx, on);
+    const priced = await this.subscriptions.findPricedOfPlan(
+      planId,
+      await this.organizationReads.businessToday(new Date(), tx),
+      tx,
+      on,
+    );
     if (priced) return subscriptionPlanPriceOf(priced);
 
     const reference = await this.references.findOfPlan(planId, tx);

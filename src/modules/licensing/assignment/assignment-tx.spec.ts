@@ -315,3 +315,45 @@ describe('AssignmentService.carryOrBuy (Q-B next-period ledger purchase)', () =>
     expect(buyForItems).not.toHaveBeenCalled();
   });
 });
+
+describe('AssignmentService.giveBackReplaced (the day an ended right is given back)', () => {
+  it('records the day of the organization, not the UTC day: 01:00 in Vietnam is still yesterday in UTC', async () => {
+    const record = jest.fn().mockResolvedValue(undefined);
+    const service = new AssignmentService(
+      { reopenReplacedBy: jest.fn().mockResolvedValue('reopened-id') } as never,
+      {} as never,
+      { businessToday: jest.fn().mockResolvedValue('2026-11-29') } as never,
+      {} as never,
+      { record } as unknown as AuditApi,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+    // 2026-11-28T18:00:00Z is 01:00 on the 29th in Vietnam.
+    const now = new Date('2026-11-28T18:00:00.000Z');
+    const giveBack = (
+      service as unknown as {
+        giveBackReplaced: (
+          tx: DbTx,
+          actor: AuthenticatedPrincipal,
+          assignmentId: string,
+          input: { organizationId: string; assignmentId: string; requestId: string; now: Date },
+          cause: 'GRANT_FAILED',
+        ) => Promise<void>;
+      }
+    ).giveBackReplaced.bind(service);
+
+    await giveBack(
+      {} as DbTx,
+      {} as AuthenticatedPrincipal,
+      'assignment',
+      { organizationId: 'org', assignmentId: 'assignment', requestId: 'request', now },
+      'GRANT_FAILED',
+    );
+
+    expect(record).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ before: { validUntil: '2026-11-29' } }),
+    );
+  });
+});
