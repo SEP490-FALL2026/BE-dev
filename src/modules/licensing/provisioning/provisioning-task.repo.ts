@@ -178,6 +178,14 @@ export class ProvisioningTaskRepo {
     return row ? toRecord(row) : null;
   }
 
+  async findInOrganization(id: string, organizationId: string): Promise<ProvisioningTaskRecord | null> {
+    const row = await this.prisma.provisioningTask.findFirst({
+      where: { id, organizationId },
+      include: WITH_ASSIGNMENT,
+    });
+    return row ? toRecord(row) : null;
+  }
+
   /** The task, locked `FOR UPDATE` for the rest of the transaction, so two people working it queue; or null. */
   async lock(tx: DbTx, id: string): Promise<ProvisioningTaskRecord | null> {
     const locked = await tx.$queryRaw<

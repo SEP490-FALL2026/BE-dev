@@ -201,6 +201,11 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   (dòng 3 T−7 ở `expiry/`, dòng 12 bàn giao đã bỏ theo `QĐ-110g`, dòng 13 tài khoản dịch vụ đã bỏ theo `QĐ-110m`, dòng 38 `K1` của
   người nghỉ ở `provisioning/revocation-completion/`; hạng mục `a03-license-inbox-alerts`).
 
+- `provisioning/evidence-files/` — gắn bằng chứng trong transaction hoàn tất cấp/thu hồi/cắt truy cập; đọc qua `provisioning-evidence-files.service.ts`, controller và DTO cùng nhóm.
+  `GET /provisioning-tasks/{id}/evidence-files` trả tối đa 6 file; `POST …/{fileId}/links` ký link 300 giây, không cache.
+  Chỉ IT đang phụ trách theo `requireActingItAdmin` và Super Admin được đọc; ngoài phạm vi trả `PROVISIONING_TASK.NOT_FOUND`, file không thuộc tác vụ trả `PROVISIONING_TASK.EVIDENCE_FILE_NOT_FOUND`.
+  Gắn file qua `CatalogApi`, không query bảng catalog từ licensing; lỗi gắn trả `PROVISIONING_TASK.EVIDENCE_FILE_INVALID` với `details.problem`.
+
 ## Kho dùng chung và cấp phát (`shared-pool/`, L0)
 
 - Capability không controller, không import capability licensing nào (đọc bảng bằng SQL), chỉ gọi `CatalogApi`, `SeatLedgerApi`, `LicenseLotApi`, `LicenseLotStockApi`; `provisioning` và `public/LicensingPoolStockApi` dùng nó.

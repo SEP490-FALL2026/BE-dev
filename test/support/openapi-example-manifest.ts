@@ -1,3 +1,4 @@
+import { SUCCESS_MESSAGES_PROVISIONING_EVIDENCE } from './openapi-example-messages-provisioning-evidence';
 /**
  * The literal expectations of the OpenAPI examples (OPENAPI-EXAMPLE.1), written out so the test never asks the code that builds the
  * examples what they should be. Traced on BE `ea73c2f` and, for the G5/G6 routes, on `0da8f56`, from each handler through its service,
@@ -38,6 +39,7 @@ import { ROUTE_ERROR_CODES_USAGE } from './openapi-example-route-codes-usage';
 export type RouteErrorStatus = '400' | '401' | '403' | '404' | '409' | '413' | '415' | '422' | '429' | '500' | '503';
 
 export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
+  ...SUCCESS_MESSAGES_PROVISIONING_EVIDENCE,
   ...SUCCESS_MESSAGES_DEVICES,
   ...SUCCESS_MESSAGES_OPTIMIZATION,
   ...SUCCESS_MESSAGES_ORGANIZATION,
@@ -289,13 +291,10 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   provisioningTaskCancel: 'PROVISIONING_TASK.CANCELLED',
   provisioningTaskClaim: 'PROVISIONING_TASK.CLAIMED',
   provisioningTaskCloseFailed: 'PROVISIONING_TASK.CLOSED_FAILED',
-  provisioningTaskComplete: 'PROVISIONING_TASK.COMPLETED',
-  provisioningTaskCompleteRevocation: 'PROVISIONING_TASK.REVOCATION_COMPLETED',
   provisioningTaskGet: 'PROVISIONING_TASK.FETCHED',
   provisioningTaskGrant: 'PROVISIONING_TASK.CREATED',
   provisioningTaskHandOff: 'PROVISIONING_TASK.HANDED_OFF',
   provisioningTaskList: 'PROVISIONING_TASK.LISTED',
-  provisioningTaskRecordAccessCut: 'PROVISIONING_TASK.ACCESS_CUT',
   provisioningTaskReportFailure: 'PROVISIONING_TASK.FAILED',
   provisioningTaskRetry: 'PROVISIONING_TASK.RETRY_REQUESTED',
   reportingCurrencyGet: 'REPORTING_CURRENCY.FETCHED',

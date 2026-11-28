@@ -307,3 +307,10 @@ describe('ProvisioningTaskFrame.work', () => {
     });
   });
 });
+
+it('scopes an evidence task read to the organization without taking a lock', async () => {
+  const findFirst = jest.fn().mockResolvedValue(null);
+  const repo = new ProvisioningTaskRepo({ provisioningTask: { findFirst } } as never);
+  await expect(repo.findInOrganization('task', 'org')).resolves.toBeNull();
+  expect(findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'task', organizationId: 'org' } }));
+});

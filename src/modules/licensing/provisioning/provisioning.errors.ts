@@ -67,3 +67,10 @@ export class ProvisioningEvidenceFileInvalidError extends Error {
     this.name = 'ProvisioningEvidenceFileInvalidError';
   }
 }
+
+export class ProvisioningEvidenceFileNotFoundError extends Error {
+  constructor() {
+    super('The evidence file does not exist for this task.');
+    this.name = 'ProvisioningEvidenceFileNotFoundError';
+  }
+}

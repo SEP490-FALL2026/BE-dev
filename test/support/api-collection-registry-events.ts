@@ -1,3 +1,4 @@
+import { PROVISIONING_EVIDENCE_REGISTRY_EVENTS } from './api-collection-registry-events-provisioning-evidence';
 import type { NestedClassification, RegistryEvent } from './api-collection-registry';
 import { W2_REGISTRY_EVENTS } from './api-collection-registry-events-w2';
 import { QD111_REGISTRY_EVENTS } from './api-collection-registry-events-qd111';
@@ -69,6 +70,7 @@ export const removedByDecision = (key: string, from: NestedClassification): Regi
  * its difference. Prompt 10 (23/10/2026, commit 4cc9a47) closed these with the remediation items of the G0-G4 review.
  */
 export const REGISTRY_EVENTS_SINCE_INITIAL: readonly RegistryEvent[] = [
+  ...PROVISIONING_EVIDENCE_REGISTRY_EVENTS,
   ...W2_REGISTRY_EVENTS,
   ...W3_REGISTRY_EVENTS,
   ...REDESIGN_W3_TECH_REGISTRY_EVENTS,

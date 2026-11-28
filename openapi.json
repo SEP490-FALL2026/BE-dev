@@ -37159,6 +37159,368 @@
         "tags": ["requestable-software"]
       }
     },
+    "/api/v1/provisioning-tasks/{id}/evidence-files": {
+      "get": {
+        "operationId": "provisioningTaskEvidenceFileList",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "At most six attached evidence files, ordered by attachment time and id. Only the current responsible IT Admin or Super Admin may read them.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/EvidenceFileListResponseDto" },
+                    { "properties": { "message": { "example": "PROVISIONING_TASK.EVIDENCE_FILES_LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the responsible IT Admin and Super Admin may read evidence files.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The task is not visible to this person (PROVISIONING_TASK.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "PROVISIONING_TASK.NOT_FOUND": {
+                    "summary": "The provisioning task does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PROVISIONING_TASK.NOT_FOUND",
+                        "message": "The provisioning task does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "An id is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List the evidence files of a provisioning task",
+        "tags": ["provisioning-tasks"]
+      }
+    },
+    "/api/v1/provisioning-tasks/{id}/evidence-files/{fileId}/links": {
+      "post": {
+        "operationId": "provisioningTaskEvidenceFileLink",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } },
+          { "name": "fileId", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "A download link valid for five minutes. The link is never cached or stored in the audit trail.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/EvidenceFileLinkResponseDto" },
+                    { "properties": { "message": { "example": "PROVISIONING_TASK.EVIDENCE_FILE_LINK_ISSUED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the responsible IT Admin and Super Admin may read evidence files.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The task is hidden (PROVISIONING_TASK.NOT_FOUND), or its evidence file does not exist (PROVISIONING_TASK.EVIDENCE_FILE_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "PROVISIONING_TASK.NOT_FOUND": {
+                    "summary": "The provisioning task does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PROVISIONING_TASK.NOT_FOUND",
+                        "message": "The provisioning task does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PROVISIONING_TASK.EVIDENCE_FILE_NOT_FOUND": {
+                    "summary": "The evidence file does not exist for this task.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PROVISIONING_TASK.EVIDENCE_FILE_NOT_FOUND",
+                        "message": "The evidence file does not exist for this task.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "An id is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Get a download link for a provisioning evidence file",
+        "tags": ["provisioning-tasks"]
+      }
+    },
     "/api/v1/license-assignments": {
       "get": {
         "operationId": "licenseAssignmentList",
@@ -41458,7 +41820,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR), has no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED), a K4 grant names no key (PROVISIONING.KEY_REQUIRED) or a grant of another kind names one (PROVISIONING.KEY_NOT_APPLICABLE), or the checklist of a K1 grant is refused: a step missing, not ticked or with no time, or no evidence, or no checklist (PROVISIONING.K1_CHECKLIST_INCOMPLETE), a step timed before one that comes first (PROVISIONING.K1_CHECKLIST_OUT_OF_ORDER), a step the grant does not have or sent twice, or a checklist sent for a grant that takes none (PROVISIONING.K1_CHECKLIST_NOT_ALLOWED). A refused checklist of a K1 grant tells details.variant (GRANT) and details.codes, the steps expected in order. The task is unchanged.",
+            "description": "The request is invalid (VALIDATION_ERROR), has no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED), a K4 grant names no key (PROVISIONING.KEY_REQUIRED) or a grant of another kind names one (PROVISIONING.KEY_NOT_APPLICABLE), or the checklist of a K1 grant is refused: a step missing, not ticked or with no time, or no evidence, or no checklist (PROVISIONING.K1_CHECKLIST_INCOMPLETE), a step timed before one that comes first (PROVISIONING.K1_CHECKLIST_OUT_OF_ORDER), a step the grant does not have or sent twice, or a checklist sent for a grant that takes none (PROVISIONING.K1_CHECKLIST_NOT_ALLOWED). A refused checklist of a K1 grant tells details.variant (GRANT) and details.codes, the steps expected in order. The task is unchanged. Invalid evidence files return PROVISIONING_TASK.EVIDENCE_FILE_INVALID with details.problem.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -41471,6 +41833,18 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PROVISIONING_TASK.EVIDENCE_FILE_INVALID": {
+                    "summary": "The evidence file is not valid (PURPOSE_MISMATCH).",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PROVISIONING_TASK.EVIDENCE_FILE_INVALID",
+                        "message": "The evidence file is not valid (PURPOSE_MISMATCH).",
+                        "details": { "problem": "PURPOSE_MISMATCH" },
                         "requestId": "req_example"
                       }
                     }
@@ -43210,7 +43584,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR), or the completion is refused and nothing is stored: REVOCATION.COMPLETION_NOT_ALLOWED (the way does not fit the kind of grant), NOTE_REQUIRED, PAID_THROUGH_REQUIRED, ACCESS_STATE_REQUIRED, ACCESS_STATE_INVALID, KEY_DISPOSITION_REQUIRED (a K4 completion without keyDisposition), WITHDRAWAL_REASON_REQUIRED (a K4 key withdrawn with no reason; keyDisposition or withdrawalReason on another kind is COMPLETION_NOT_ALLOWED), no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED), or a K1 checklist that is not valid: a step missing, not ticked or ticked with no time, or no evidence (K1_CHECKLIST_INCOMPLETE), steps ticked out of their order, a step timed earlier than the one that comes before it in the list, such as the lock of the mailbox before the sign-out of the sessions (K1_CHECKLIST_OUT_OF_ORDER), or a step the variant does not have, sent twice or sent for a kind that has no checklist (COMPLETION_NOT_ALLOWED). A refusal of the checklist of a K1 task carries details { variant, codes }: the variant the server worked out and the steps it expects of this task, in order; MAILBOX_LOCKED is among them only when no other K1 revocation of the person is still to do.",
+            "description": "The request is invalid (VALIDATION_ERROR), evidence files are invalid (PROVISIONING_TASK.EVIDENCE_FILE_INVALID, details.problem), or the completion is refused and nothing is stored: REVOCATION.COMPLETION_NOT_ALLOWED (the way does not fit the kind of grant), NOTE_REQUIRED, PAID_THROUGH_REQUIRED, ACCESS_STATE_REQUIRED, ACCESS_STATE_INVALID, KEY_DISPOSITION_REQUIRED (a K4 completion without keyDisposition), WITHDRAWAL_REASON_REQUIRED (a K4 key withdrawn with no reason; keyDisposition or withdrawalReason on another kind is COMPLETION_NOT_ALLOWED), no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED), or a K1 checklist that is not valid: a step missing, not ticked or ticked with no time, or no evidence (K1_CHECKLIST_INCOMPLETE), steps ticked out of their order, a step timed earlier than the one that comes before it in the list, such as the lock of the mailbox before the sign-out of the sessions (K1_CHECKLIST_OUT_OF_ORDER), or a step the variant does not have, sent twice or sent for a kind that has no checklist (COMPLETION_NOT_ALLOWED). A refusal of the checklist of a K1 task carries details { variant, codes }: the variant the server worked out and the steps it expects of this task, in order; MAILBOX_LOCKED is among them only when no other K1 revocation of the person is still to do.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -43311,6 +43685,18 @@
                       "error": {
                         "code": "PROVISIONING_TASK.EVIDENCE_REQUIRED",
                         "message": "The completion of a task needs the evidence of what was done.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PROVISIONING_TASK.EVIDENCE_FILE_INVALID": {
+                    "summary": "The evidence file is not valid (PURPOSE_MISMATCH).",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PROVISIONING_TASK.EVIDENCE_FILE_INVALID",
+                        "message": "The evidence file is not valid (PURPOSE_MISMATCH).",
+                        "details": { "problem": "PURPOSE_MISMATCH" },
                         "requestId": "req_example"
                       }
                     }
@@ -43638,7 +44024,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR), the day is ahead (REVOCATION.ACCESS_STATE_INVALID) or there is no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED): nothing changes.",
+            "description": "The request is invalid (VALIDATION_ERROR), evidence files are invalid (PROVISIONING_TASK.EVIDENCE_FILE_INVALID, details.problem), the day is ahead (REVOCATION.ACCESS_STATE_INVALID) or there is no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED): nothing changes.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -43673,6 +44059,18 @@
                       "error": {
                         "code": "PROVISIONING_TASK.EVIDENCE_REQUIRED",
                         "message": "The completion of a task needs the evidence of what was done.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PROVISIONING_TASK.EVIDENCE_FILE_INVALID": {
+                    "summary": "The evidence file is not valid (PURPOSE_MISMATCH).",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PROVISIONING_TASK.EVIDENCE_FILE_INVALID",
+                        "message": "The evidence file is not valid (PURPOSE_MISMATCH).",
+                        "details": { "problem": "PURPOSE_MISMATCH" },
                         "requestId": "req_example"
                       }
                     }
@@ -125049,6 +125447,8 @@
                             "TAX_PAYMENT_PROOF",
                             "SIGNATURE_RECORD",
                             "IMPORT_SOURCE",
+                            "PROVISIONING_EVIDENCE",
+                            "ACCESS_CUT_EVIDENCE",
                             "COST_STATEMENT"
                           ]
                         },
@@ -125232,7 +125632,9 @@
               "PURCHASE_DOCUMENT",
               "TAX_PAYMENT_PROOF",
               "SIGNATURE_RECORD",
-              "IMPORT_SOURCE"
+              "IMPORT_SOURCE",
+              "PROVISIONING_EVIDENCE",
+              "ACCESS_CUT_EVIDENCE"
             ]
           }
         },
@@ -125259,6 +125661,8 @@
                       "TAX_PAYMENT_PROOF",
                       "SIGNATURE_RECORD",
                       "IMPORT_SOURCE",
+                      "PROVISIONING_EVIDENCE",
+                      "ACCESS_CUT_EVIDENCE",
                       "COST_STATEMENT"
                     ]
                   },
@@ -125333,6 +125737,8 @@
                       "TAX_PAYMENT_PROOF",
                       "SIGNATURE_RECORD",
                       "IMPORT_SOURCE",
+                      "PROVISIONING_EVIDENCE",
+                      "ACCESS_CUT_EVIDENCE",
                       "COST_STATEMENT"
                     ]
                   },
@@ -125716,6 +126122,61 @@
               "sharingPolicy",
               "dataLossOnRemoval"
             ],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "EvidenceFileListResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "maxItems": 6,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "stage": { "type": "string", "enum": ["COMPLETION", "ACCESS_CUT"] },
+                    "fileName": { "type": "string" },
+                    "contentType": { "type": "string" },
+                    "sizeBytes": {
+                      "type": "integer",
+                      "exclusiveMinimum": true,
+                      "maximum": 9007199254740991,
+                      "minimum": 0
+                    },
+                    "attachedAt": { "type": "string", "format": "date-time" }
+                  },
+                  "required": ["id", "stage", "fileName", "contentType", "sizeBytes", "attachedAt"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["items"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "EvidenceFileLinkResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": { "url": { "type": "string" }, "expiresAt": { "type": "string", "format": "date-time" } },
+            "required": ["url", "expiresAt"],
             "additionalProperties": false,
             "nullable": true
           }
@@ -127649,6 +128110,12 @@
       "CompleteBodyDto": {
         "type": "object",
         "properties": {
+          "evidenceDocumentIds": {
+            "description": "At most 3 uploaded evidence files with purpose PROVISIONING_EVIDENCE. Optional; the evidence note remains required.",
+            "maxItems": 20,
+            "type": "array",
+            "items": { "type": "string", "format": "uuid" }
+          },
           "evidence": { "default": "", "type": "string", "maxLength": 2000 },
           "licenseKeyId": { "type": "string", "format": "uuid" },
           "k1Checklist": {
@@ -127702,6 +128169,12 @@
       "RevocationCompletionBodyDto": {
         "type": "object",
         "properties": {
+          "evidenceDocumentIds": {
+            "description": "At most 3 uploaded evidence files with purpose PROVISIONING_EVIDENCE. Optional; text evidence rules are unchanged.",
+            "maxItems": 20,
+            "type": "array",
+            "items": { "type": "string", "format": "uuid" }
+          },
           "completion": {
             "type": "string",
             "enum": ["ACCOUNT_REMOVED", "ALREADY_GONE", "RENEWAL_CANCELLED", "OFF_SYSTEM_REVOKED", "KEY_DEACTIVATED"]
@@ -127763,6 +128236,12 @@
       "AccessCutBodyDto": {
         "type": "object",
         "properties": {
+          "evidenceDocumentIds": {
+            "description": "At most 3 uploaded evidence files with purpose ACCESS_CUT_EVIDENCE. Optional; the evidence note remains required.",
+            "maxItems": 20,
+            "type": "array",
+            "items": { "type": "string", "format": "uuid" }
+          },
           "accessCutOn": {
             "type": "string",
             "format": "date",

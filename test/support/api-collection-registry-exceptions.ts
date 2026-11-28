@@ -1,6 +1,8 @@
+import { PROVISIONING_EVIDENCE_COLLECTIONS } from './api-collection-registry-exceptions-provisioning-evidence';
 import type { CollectionException } from './api-collection-registry';
 
 export const COLLECTION_EXCEPTIONS: readonly CollectionException[] = [
+  ...PROVISIONING_EVIDENCE_COLLECTIONS,
   {
     operationId: 'currencyList',
     classification: 'bounded',

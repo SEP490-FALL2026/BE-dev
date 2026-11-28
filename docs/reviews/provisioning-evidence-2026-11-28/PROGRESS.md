@@ -13,15 +13,15 @@ Skill đã đọc: `ponytail` (full), `using-superpowers`, `using-agent-skills`,
 
 ## Gói và bằng chứng
 
-| Gói | Trạng thái | sha        | EV                   | Lệnh kiểm + pass/fail thực tế                                        | CI            |
-| --- | ---------- | ---------- | -------------------- | -------------------------------------------------------------------- | ------------- |
-| P1  | xong local | bac2e26f   | SPEC §4              | quick checks exit 0; gates 346/346; unit 68/68                       | chưa chạy     |
-| P2a | xong local | b1a7440b   | EV-01…05             | quick checks 0; gates 346/346; unit 116/116                          | chờ P5        |
-| P2b | xong local | 96d829a6   | EV-09/10/14 catalog  | typecheck/lint/arch/rules/format 0; gates 346/346; catalog 1079/1079 | chờ P5        |
-| P3a | xong local | d99e3371   | EV-06..12 complete   | quick checks 0; gates 346/346; unit 390/390                          | P5 pending    |
-| P3b | xong local | commit P3b | EV-06..12 revocation | lint 4214 files; gates 346/346; catalog+licensing 2181/2181          | P5 pending    |
-| P4  | chờ        | —          | EV-13…16             | chưa chạy                                                            | chưa chạy     |
-| P5  | chờ        | —          | SPEC §8              | chưa chạy                                                            | chưa dispatch |
+| Gói | Trạng thái | sha       | EV                   | Lệnh kiểm + pass/fail thực tế                                        | CI            |
+| --- | ---------- | --------- | -------------------- | -------------------------------------------------------------------- | ------------- |
+| P1  | xong local | bac2e26f  | SPEC §4              | quick checks exit 0; gates 346/346; unit 68/68                       | chưa chạy     |
+| P2a | xong local | b1a7440b  | EV-01…05             | quick checks 0; gates 346/346; unit 116/116                          | chờ P5        |
+| P2b | xong local | 96d829a6  | EV-09/10/14 catalog  | typecheck/lint/arch/rules/format 0; gates 346/346; catalog 1079/1079 | chờ P5        |
+| P3a | xong local | d99e3371  | EV-06..12 complete   | quick checks 0; gates 346/346; unit 390/390                          | P5 pending    |
+| P3b | xong local | 6a3f48bd  | EV-06..12 revocation | lint 4214 files; gates 346/346; catalog+licensing 2181/2181          | P5 pending    |
+| P4  | xong local | commit P4 | EV-13..16            | quick checks 0; gates 346/346; unit 407/407; generators 474 ops      | P5 pending    |
+| P5  | chờ        | —         | SPEC §8              | chưa chạy                                                            | chưa dispatch |
 
 ## Pre-flight interfaces
 
@@ -111,3 +111,14 @@ Skill đã đọc: `ponytail` (full), `using-superpowers`, `using-agent-skills`,
 - Đang kiểm mới typecheck/arch/rules/format/gates và toàn unit catalog + licensing với `maxWorkers=2` để giới hạn RAM; không chạy integration/http/full unit ở máy.
 - Báo cáo tổng khi xong P5 sẽ lưu tại `D:/FPT/FALL2026/NOTE MD/logsCodex.txt` theo yêu cầu mới của user; file hiện trống khi đọc.
 - Mốc P3b đã đạt: lint đủ 4.214 file xanh theo lô; typecheck/arch/rules/format exit 0; gates **346 pass/0 fail** (17 suites); `CI=true pnpm test --maxWorkers=2 src/modules/catalog src/modules/licensing` **2181 pass/0 fail**, 209 suites. Có thể sang P4.
+
+## P4 — Route đọc file
+
+- RED service: 8 fail/7 pass; GREEN: phạm vi đọc dùng `requireActingItAdmin(undefined, …)`; Super Admin bỏ qua acting check; IT ngoài phạm vi/EmployeeNotStarted/tác vụ chưa xếp phòng đã hoàn tất bị 404. Query task thêm `findInOrganization` không khóa để đảm bảo cả Super Admin không đọc chéo tổ chức.
+- Kiểm cuối: typecheck, eslint các file sửa, arch/rules/format, arch:docs:check exit 0; gates **346 pass/0 fail**, 17 suites; unit provisioning **407 pass/0 fail**, 27 suites.
+- Generator đã chạy `openapi:export`, `arch:routes`, `arch:graph`, capabilities licensing/catalog (không vòng); có **474 operations**. Không sửa tay generated files.
+- Vòng sửa 1: bỏ cast thừa trong helper unit. Hai file support sát trần 400 dòng: chuyển nguyên entry của ba route hoàn tất sang file mảnh cùng feature; không đổi tên/value cũ. Hiện manifest success 398 dòng, coverage 399 dòng.
+- Ruling: cập nhật số operation của HTTP presentation từ 472 lên 474 ngay cùng P4 thay vì đợi P5, để commit route không giữ kỳ vọng đếm sai đã biết. Đây đúng ngoại lệ EV-01 được user cho phép; HTTP chỉ chạy trên CI.
+- Ruling: SPEC §8/PLAN P5 ghi validation UUID là 400, nhưng API contract và pipeline Zod hiện hành trả 422 `VALIDATION_ERROR`. Giữ hành vi 422 của repo theo luật không đổi behavior ngoài EV; test HTTP mới ở P5 sẽ khẳng định 422, không thay global pipe hay kỳ vọng test cũ. Đây là lệch tài liệu về HTTP validation, không mở quyền hay đổi luật gắn/xem file.
+- Collection registry chỉ thêm entry bounded và ledger event của đúng route mới, nguồn SPEC EV-13/Q-EV3 và schema max(6)/repo take(6); giữ INITIAL registries và mọi gate/suppression.
+- Skill bổ sung đã đọc: `requesting-code-review` và `code-reviewer.md`; sẽ dùng một reviewer ngữ cảnh mới cho toàn nhánh sau P5, chỉ đọc.

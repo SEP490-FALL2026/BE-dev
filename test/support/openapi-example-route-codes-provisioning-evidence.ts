@@ -58,4 +58,8 @@ export const ROUTE_ERROR_CODES_PROVISIONING_EVIDENCE: Readonly<
       'REVOCATION.ACCESS_STATE_INVALID',
     ],
   },
+  provisioningTaskEvidenceFileList: { '404': ['PROVISIONING_TASK.NOT_FOUND'] },
+  provisioningTaskEvidenceFileLink: {
+    '404': ['PROVISIONING_TASK.NOT_FOUND', 'PROVISIONING_TASK.EVIDENCE_FILE_NOT_FOUND'],
+  },
 };

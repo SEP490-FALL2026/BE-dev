@@ -49,6 +49,7 @@ import { LicenseKeyStateError } from '../license-key/license-key.errors';
 import {
   ProvisioningItAdminRequiredError,
   ProvisioningEvidenceFileInvalidError,
+  ProvisioningEvidenceFileNotFoundError,
   ProvisioningK1ChecklistError,
   ProvisioningKeyError,
   ProvisioningNotInChargeError,
@@ -66,6 +67,8 @@ const CONFLICT = HttpStatus.CONFLICT;
  */
 export function toProvisioningApiException(error: unknown): unknown {
   if (error instanceof ApiException) return error;
+  if (error instanceof ProvisioningEvidenceFileNotFoundError)
+    return refuse(HttpStatus.NOT_FOUND, 'PROVISIONING_TASK.EVIDENCE_FILE_NOT_FOUND', error.message);
   if (error instanceof ProvisioningEvidenceFileInvalidError) {
     return refuse(UNPROCESSABLE, 'PROVISIONING_TASK.EVIDENCE_FILE_INVALID', error.message, { problem: error.problem });
   }
@@ -245,6 +248,7 @@ const K1_GRANT_EXPECTED: K1ChecklistExpectation = {
  * task routes answer with the states of a real task.
  */
 export const PROVISIONING_ERROR_EXAMPLES = {
+  EVIDENCE_FILE_NOT_FOUND: example(new ProvisioningEvidenceFileNotFoundError()),
   EVIDENCE_FILE_INVALID: example(new ProvisioningEvidenceFileInvalidError('PURPOSE_MISMATCH')),
   REQUEST_NOT_FOUND: example(new GrantRequestRefusedError('NOT_FOUND')),
   TASK_NOT_FOUND: example(new ProvisioningTaskNotFoundError()),

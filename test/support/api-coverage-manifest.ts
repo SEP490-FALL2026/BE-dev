@@ -1,3 +1,4 @@
+import { API_COVERAGE_PROVISIONING_EVIDENCE } from './api-coverage-manifest-provisioning-evidence';
 import { API_COVERAGE_ORGANIZATION } from './api-coverage-manifest-organization';
 import { API_COVERAGE_PURCHASE } from './api-coverage-manifest-purchase';
 import { API_COVERAGE_REVIEW } from './api-coverage-manifest-review';
@@ -5,6 +6,7 @@ import { POLICY_AND_PROFILE_OPERATIONS } from './api-coverage-manifest-policies'
 
 /** Inventory of exported HTTP operations. Add entries and HTTP tests together. */
 export const API_COVERAGE_MANIFEST: readonly string[] = [
+  ...API_COVERAGE_PROVISIONING_EVIDENCE,
   'GET /api/v1/cost-centers',
   'GET /api/v1/currencies',
   'GET /api/v1/subscriptions',
@@ -149,14 +151,11 @@ export const API_COVERAGE_MANIFEST: readonly string[] = [
   'POST /api/v1/license-keys/{id}/reveal',
   'POST /api/v1/license-keys/{id}/withdrawal',
   'POST /api/v1/provisioning-tasks/{id}/claim',
-  'POST /api/v1/provisioning-tasks/{id}/complete',
   'POST /api/v1/provisioning-tasks/{id}/report-failure',
   'POST /api/v1/provisioning-tasks/{id}/retry',
   'POST /api/v1/provisioning-tasks/{id}/hand-off',
   'POST /api/v1/provisioning-tasks/{id}/close-failed',
   'POST /api/v1/provisioning-tasks/{id}/cancel',
-  'POST /api/v1/provisioning-tasks/{id}/revocation-completion',
-  'POST /api/v1/provisioning-tasks/{id}/access-cut',
   'GET /api/v1/ghost-seat-recommendations',
   'GET /api/v1/ghost-seat-recommendations/{id}',
   'POST /api/v1/ghost-seat-recommendations/escalations',
