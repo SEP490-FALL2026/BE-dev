@@ -1,4 +1,4 @@
-﻿# PROGRESS — Provisioning evidence files
+# PROGRESS — Provisioning evidence files
 
 Skill đã đọc: `ponytail` (full), `using-superpowers`, `using-agent-skills`, `executing-plans`, `test-driven-development` (+ `writing-good-tests.md`), `verification-before-completion`, `git-workflow-and-versioning`, `using-git-worktrees`, repo `be-quick-check`, repo `create-migration`. Không cần mapping tên skill.
 
@@ -13,15 +13,15 @@ Skill đã đọc: `ponytail` (full), `using-superpowers`, `using-agent-skills`,
 
 ## Gói và bằng chứng
 
-| Gói | Trạng thái | sha      | EV                  | Lệnh kiểm + pass/fail thực tế                  | CI            |
-| --- | ---------- | -------- | ------------------- | ---------------------------------------------- | ------------- |
-| P1  | xong local | bac2e26f | SPEC §4             | quick checks exit 0; gates 346/346; unit 68/68 | chưa chạy     |
-| P2a | dừng D-1   | —        | EV-01…05            | chưa chạy                                      | chưa chạy     |
-| P2b | dừng D-1   | —        | EV-09/10/14 catalog | chưa chạy                                      | chưa chạy     |
-| P3a | dừng D-1   | —        | EV-06…12 complete   | chưa chạy                                      | chưa chạy     |
-| P3b | dừng D-1   | —        | EV-06…12 revocation | chưa chạy                                      | chưa chạy     |
-| P4  | dừng D-1   | —        | EV-13…16            | chưa chạy                                      | chưa chạy     |
-| P5  | dừng D-1   | —        | SPEC §8             | chưa chạy                                      | chưa dispatch |
+| Gói | Trạng thái | sha        | EV                  | Lệnh kiểm + pass/fail thực tế                  | CI            |
+| --- | ---------- | ---------- | ------------------- | ---------------------------------------------- | ------------- |
+| P1  | xong local | bac2e26f   | SPEC §4             | quick checks exit 0; gates 346/346; unit 68/68 | chưa chạy     |
+| P2a | xong local | commit n?y | EV-01?05            | quick checks 0; gates 346/346; unit 116/116    | ch? P5        |
+| P2b | dừng D-1   | —          | EV-09/10/14 catalog | chưa chạy                                      | chưa chạy     |
+| P3a | dừng D-1   | —          | EV-06…12 complete   | chưa chạy                                      | chưa chạy     |
+| P3b | dừng D-1   | —          | EV-06…12 revocation | chưa chạy                                      | chưa chạy     |
+| P4  | dừng D-1   | —          | EV-13…16            | chưa chạy                                      | chưa chạy     |
+| P5  | dừng D-1   | —          | SPEC §8             | chưa chạy                                      | chưa dispatch |
 
 ## Pre-flight interfaces
 
@@ -60,3 +60,11 @@ Skill đã đọc: `ponytail` (full), `using-superpowers`, `using-agent-skills`,
 - Tính năng chưa dùng được: P1 chỉ chuẩn bị schema/type/quyền chọn ở policy; chưa mở DTO upload, chưa gắn/đọc file.
 - Trước commit báo cáo dừng, chạy lại đúng bộ kiểm nhanh PLAN §4: typecheck/eslint/arch/rules/format đều exit 0; gates **346 pass, 0 fail** (17 suites); unit policy **68 pass, 0 fail** (1 suite). Không đổi source sau commit P1; báo cáo ghi sha `bac2e26f`.
 - CI: chưa dispatch run nhánh, chưa phân loại từng test đỏ vì dừng trước P5. Log nền đã tải để tra cứu, không dùng kết quả local để kết luận CI xanh.
+
+- Ti?p t?c theo ch? ??o m?i: SPEC 1.3 `d8f59225` ?? s?a ca 6 th?nh K1; D-1 ??ng, K2 gi? 422 `REVOCATION.COMPLETION_NOT_ALLOWED`. P2a ?ang l?m; kh?ng s?a l?i P1.
+
+## P2a ? EV-01?05
+
+- RED: contract policy 7 fail/67 pass; GREEN: catalog/contract 116 pass/0 fail (3 suites). Unit policy has 74 cases.
+- Quick checks: typecheck, changed-file eslint, arch:check, rules:check, format:check exit 0; gates 346 pass/0 fail (17 suites); targeted unit 116 pass/0 fail.
+- Self-review: WebP only for two new purposes; existing MIME/size/name rules kept; signature uses pictureKindOf; READY evidence is HIDDEN for general routes. DocumentService already passes purpose through `{ ...input, maxBytes }`, so no edit needed there.

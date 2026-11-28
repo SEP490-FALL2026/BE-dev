@@ -1,3 +1,4 @@
+import { pictureKindOf } from '../../../infrastructure/object-storage/picture-image';
 import {
   ContractNameRequiredError,
   DocumentAlreadyAttachedError,
@@ -18,6 +19,8 @@ export const NEW_DOCUMENT_PURPOSES = [
   'TAX_PAYMENT_PROOF',
   'SIGNATURE_RECORD',
   'IMPORT_SOURCE',
+  'PROVISIONING_EVIDENCE',
+  'ACCESS_CUT_EVIDENCE',
 ] as const;
 export type NewDocumentPurpose = (typeof NEW_DOCUMENT_PURPOSES)[number];
 /** The purposes a stored file has: `COST_STATEMENT` stays only so that a file kept before is still read; the database keeps the value. */
@@ -52,6 +55,11 @@ const ATTACHES_TO_SIGNER: ReadonlySet<DocumentPurpose> = new Set(['SIGNATURE_REC
 /** A purchase document may also belong to the purchase invoice it came with (`PI-1`). */
 const ATTACHES_TO_PURCHASE_INVOICE: ReadonlySet<DocumentPurpose> = new Set(['PURCHASE_DOCUMENT']);
 
+const ATTACHES_TO_PROVISIONING_TASK: ReadonlySet<DocumentPurpose> = new Set([
+  'PROVISIONING_EVIDENCE',
+  'ACCESS_CUT_EVIDENCE',
+]);
+
 /** What is kept: each type with the extensions that go with it. A name that says otherwise is refused. */
 const ALLOWED_TYPES: Record<string, readonly string[]> = {
   'application/pdf': ['pdf'],
@@ -66,7 +74,11 @@ export function assertMayChoosePurpose(purpose: DocumentPurpose, roles: readonly
 
 /** The purposes with nowhere to be attached yet are refused, after the role is checked. Throws DocumentPurposeNotAvailableError. */
 export function assertPurposeAvailable(purpose: DocumentPurpose): void {
-  if (!ATTACHES_TO_CONTRACT.has(purpose) && !ATTACHES_TO_SIGNER.has(purpose)) {
+  if (
+    !ATTACHES_TO_CONTRACT.has(purpose) &&
+    !ATTACHES_TO_SIGNER.has(purpose) &&
+    !ATTACHES_TO_PROVISIONING_TASK.has(purpose)
+  ) {
     throw new DocumentPurposeNotAvailableError(purpose);
   }
 }
@@ -74,9 +86,10 @@ export function assertPurposeAvailable(purpose: DocumentPurpose): void {
 /** A file is attached to what its purpose names and to nothing else. Throws DocumentPurposeMismatchError. */
 export function assertPurposeAttachesTo(
   purpose: DocumentPurpose,
-  target: 'CONTRACT' | 'SIGNER' | 'PURCHASE_INVOICE' | 'OUT_OF_PROCESS_CASE',
+  target: 'CONTRACT' | 'SIGNER' | 'PURCHASE_INVOICE' | 'OUT_OF_PROCESS_CASE' | 'PROVISIONING_TASK',
 ): void {
   const targets = {
+    PROVISIONING_TASK: ATTACHES_TO_PROVISIONING_TASK,
     CONTRACT: ATTACHES_TO_CONTRACT,
     SIGNER: ATTACHES_TO_SIGNER,
     PURCHASE_INVOICE: ATTACHES_TO_PURCHASE_INVOICE,
@@ -98,6 +111,7 @@ export function assertFileAllowed(input: {
   contentType: string;
   sizeBytes: number;
   maxBytes: number;
+  purpose?: DocumentPurpose;
 }): void {
   const name = input.fileName.trim();
   // eslint-disable-next-line no-control-regex
@@ -107,7 +121,12 @@ export function assertFileAllowed(input: {
   if (input.sizeBytes < 1) throw new DocumentFileInvalidError('EMPTY');
 
   const extension = name.includes('.') ? name.slice(name.lastIndexOf('.') + 1).toLowerCase() : '';
-  const extensions = ALLOWED_TYPES[input.contentType];
+  const extensions =
+    input.purpose !== undefined &&
+    ATTACHES_TO_PROVISIONING_TASK.has(input.purpose) &&
+    input.contentType === 'image/webp'
+      ? ['webp']
+      : ALLOWED_TYPES[input.contentType];
   if (!extensions?.includes(extension)) throw new DocumentTypeNotAllowedError();
   if (input.sizeBytes > input.maxBytes) throw new DocumentTooLargeError(input.maxBytes);
 }
@@ -130,13 +149,14 @@ const SIGNATURES: Readonly<Record<string, readonly number[]>> = {
 };
 
 /** How many bytes from the start of an object are enough to tell what it is. */
-export const SIGNATURE_PREFIX_BYTES = Math.max(...Object.values(SIGNATURES).map((signature) => signature.length));
+export const SIGNATURE_PREFIX_BYTES = Math.max(12, ...Object.values(SIGNATURES).map((signature) => signature.length));
 
 /**
  * Whether the first bytes of an object are those of the type it was declared to be (`US-04-04` AC-10): a name or a type
  * that says PDF is not enough, the content must begin like one. A type the system does not keep has no signature.
  */
 export function contentMatchesType(contentType: string, prefix: Uint8Array): boolean {
+  if (contentType === 'image/webp') return pictureKindOf(prefix)?.contentType === 'image/webp';
   const signature = SIGNATURES[contentType];
 
   return (
@@ -162,7 +182,7 @@ export function mayOpen(input: {
   if (!input.roles.some((role) => role === 'IT_ADMIN' || role === 'FINANCE')) return 'FORBIDDEN';
   // A signed record of a person is the IT Admin's to open; Finance has no business with it.
   if (input.purpose === 'SIGNATURE_RECORD' && !input.roles.includes('IT_ADMIN')) return 'FORBIDDEN';
-  if (input.status === 'READY') return 'OPEN';
+  if (input.status === 'READY') return ATTACHES_TO_PROVISIONING_TASK.has(input.purpose) ? 'HIDDEN' : 'OPEN';
   if (input.status === 'PENDING_ATTACH') return input.uploaderAppUserId === input.actorAppUserId ? 'OPEN' : 'HIDDEN';
 
   return 'HIDDEN';

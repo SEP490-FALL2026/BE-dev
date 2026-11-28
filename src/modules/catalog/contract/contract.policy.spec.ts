@@ -12,6 +12,7 @@ import {
 } from './contract.errors';
 import {
   LINK_TTL_SECONDS,
+  SIGNATURE_PREFIX_BYTES,
   NEW_DOCUMENT_PURPOSES,
   assertAttachable,
   assertFileAllowed,
@@ -76,6 +77,8 @@ describe('the purposes a new file may be declared with', () => {
       'TAX_PAYMENT_PROOF',
       'SIGNATURE_RECORD',
       'IMPORT_SOURCE',
+      'PROVISIONING_EVIDENCE',
+      'ACCESS_CUT_EVIDENCE',
     ]);
     expect(NEW_DOCUMENT_PURPOSES).not.toContain('COST_STATEMENT');
   });
@@ -300,4 +303,48 @@ describe('who opens a signed record', () => {
     expect(mayOpen({ ...record, roles: ['IT_ADMIN'] })).toBe('OPEN');
     expect(mayOpen({ ...record, roles: ['FINANCE'] })).toBe('FORBIDDEN');
   });
+});
+
+describe('provisioning evidence files', () => {
+  it.each(['PROVISIONING_EVIDENCE', 'ACCESS_CUT_EVIDENCE'] as const)('accepts %s only on a task', (purpose) => {
+    expect(() => assertPurposeAvailable(purpose)).not.toThrow();
+    expect(() => assertPurposeAttachesTo(purpose, 'PROVISIONING_TASK')).not.toThrow();
+    expect(() => assertPurposeAttachesTo(purpose, 'CONTRACT')).toThrow(DocumentPurposeMismatchError);
+    expect(() => assertFileAllowed({ ...pdf, purpose, fileName: 'a.webp', contentType: 'image/webp' })).not.toThrow();
+    expect(() => assertFileAllowed({ ...pdf, purpose, fileName: 'a.png', contentType: 'image/webp' })).toThrow(
+      DocumentTypeNotAllowedError,
+    );
+  });
+
+  it('keeps WebP out of older purposes and refuses a contract file on a task', () => {
+    expect(() =>
+      assertFileAllowed({ ...pdf, purpose: 'CONTRACT_ATTACHMENT', fileName: 'a.webp', contentType: 'image/webp' }),
+    ).toThrow(DocumentTypeNotAllowedError);
+    expect(() => assertFileAllowed({ ...pdf, fileName: 'a.webp', contentType: 'image/webp' })).toThrow(
+      DocumentTypeNotAllowedError,
+    );
+    expect(() => assertPurposeAttachesTo('CONTRACT_ATTACHMENT', 'PROVISIONING_TASK')).toThrow(
+      DocumentPurposeMismatchError,
+    );
+  });
+
+  it('recognizes WebP by both headers with arbitrary size bytes', () => {
+    const prefix = Uint8Array.from(Buffer.from('RIFF\x01\x02\x03\x04WEBP', 'latin1'));
+    expect(SIGNATURE_PREFIX_BYTES).toBeGreaterThanOrEqual(12);
+    expect(contentMatchesType('image/webp', prefix)).toBe(true);
+    expect(contentMatchesType('image/webp', prefix.slice(0, 11))).toBe(false);
+    expect(contentMatchesType('image/webp', Uint8Array.from(Buffer.from('RIFF1234WAVE')))).toBe(false);
+  });
+
+  it.each(['PROVISIONING_EVIDENCE', 'ACCESS_CUT_EVIDENCE'] as const)(
+    'hides READY %s on the general document routes',
+    (purpose) => {
+      const base = { purpose, uploaderAppUserId: 'it', actorAppUserId: 'it' };
+      for (const roles of [['IT_ADMIN'], ['FINANCE']]) {
+        expect(mayOpen({ ...base, roles, status: 'READY' })).toBe('HIDDEN');
+        expect(mayOpen({ ...base, roles, status: 'PENDING_ATTACH' })).toBe('OPEN');
+        expect(mayOpen({ ...base, roles, status: 'PENDING_ATTACH', actorAppUserId: 'other' })).toBe('HIDDEN');
+      }
+    },
+  );
 });
