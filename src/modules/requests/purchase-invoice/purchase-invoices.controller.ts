@@ -42,7 +42,7 @@ const FORBIDDEN = {
 const NOT_RESPONSIBLE = {
   status: HttpStatus.FORBIDDEN,
   description:
-    'The caller is not an IT Admin (FORBIDDEN), or is an IT Admin who does not answer for the subscription or the license lot (of a purpose other than a request) the invoice is linked to (PURCHASE_INVOICE.NOT_RESPONSIBLE; QĐ-118d, QĐ-118f: only the Super Admin changes who answers). The Super Admin does not submit.',
+    'The caller is not an IT Admin (FORBIDDEN), or is an IT Admin who does not answer for the subscription or the license lot (of a purpose other than a request) the invoice is linked to (PURCHASE_INVOICE.NOT_RESPONSIBLE; only the Super Admin changes who answers). The Super Admin does not submit.',
   examples: [FORBIDDEN_EXAMPLE, EXAMPLES.NOT_RESPONSIBLE],
 } as const;
 
@@ -195,7 +195,7 @@ export class PurchaseInvoicesController {
     status: HttpStatus.CREATED,
     message: 'PURCHASE_INVOICE.SUBMITTED',
     description:
-      'The invoice is kept as it was read against its request or subscription (the invoice of a subscription, a period, a renewal or a seat purchase, and that of a license lot not bought for a request, is submitted only by the IT Admin who answers for it, QĐ-118d, QĐ-118f; one for a request is submitted by the IT Admin of the department of the request), with its files, and Finance is told. Nothing is spent until Finance signs. The amounts are what was taken out in dong; the count and the price of one are what the invoice says in the currency it states.',
+      'The invoice is kept as it was read against its request or subscription (the invoice of a subscription, a period, a renewal or a seat purchase, and that of a license lot not bought for a request, is submitted only by the IT Admin who answers for it; one for a request is submitted by the IT Admin of the department of the request), with its files, and Finance is told. Nothing is spent until Finance signs. The amounts are what was taken out in dong; the count and the price of one are what the invoice says in the currency it states.',
   })
   @ApiErrorResponses(...SUBMIT_ERRORS)
   async submit(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: PurchaseInvoiceSubmitBodyDto) {
