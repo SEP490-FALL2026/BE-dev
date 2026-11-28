@@ -1,5 +1,6 @@
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import type { ChecklistVerdict } from '../../policies/public/policy-checklist.types';
 import { AccessRequestGroupUsesLinesError, AccessRequestNotFoundError } from '../access-request/access-request.errors';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { NeedDecisionService } from './need-decision.service';
@@ -98,5 +99,26 @@ describe('NeedDecisionService single need decision', () => {
     expect(f.repo.recordNeedDecision.mock.invocationCallOrder[0]).toBeLessThan(
       f.checklists.record.mock.invocationCallOrder[0],
     );
+  });
+
+  it('records the supplied checklist and reason without judging it again', async () => {
+    const f = build();
+    const verdict: ChecklistVerdict = {
+      policyVersionId: 'batch-policy',
+      versionNumber: 2,
+      stepCode: '1.2',
+      answers: [],
+      hasNo: false,
+      noItems: [],
+    };
+    const reason = 'No longer needed';
+
+    await expect(
+      f.service.decide(actor, request.id, { ...input, decision: 'REJECT' }, { verdict, reason }),
+    ).resolves.toBe(request);
+    expect(f.checklists.judge).not.toHaveBeenCalled();
+    expect(f.checklists.record).toHaveBeenCalledTimes(1);
+    expect(f.checklists.record).toHaveBeenCalledWith(tx, expect.objectContaining({ verdict, decision: 'REJECT' }));
+    expect(f.repo.recordNeedDecision.mock.calls[0]).toMatchObject([tx, { record: { decision: 'REJECTED', reason } }]);
   });
 });
