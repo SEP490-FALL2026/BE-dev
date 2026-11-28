@@ -1,7 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { EnvironmentValidationError } from '../config/environment-validation';
 import { createQueueConfiguration } from '../queue/queue-infrastructure.module';
-import { REDIS_ENVIRONMENT_KEYS, validateRedisEnvironment } from './redis.config';
+import { readBackgroundJobsTransport, REDIS_ENVIRONMENT_KEYS, validateRedisEnvironment } from './redis.config';
 
 /** Made-up values for this spec. */
 const PRODUCTION = { NODE_ENV: 'production', REDIS_HOST: 'redis.internal', REDIS_PASSWORD: 'queue-spec-password' };
@@ -45,5 +45,24 @@ describe('Redis configuration', () => {
     expect(() =>
       createQueueConfiguration(config({ ...PRODUCTION, REDIS_PORT: '6380', REDIS_TLS: 'true' })),
     ).not.toThrow();
+  });
+});
+
+describe('readBackgroundJobsTransport', () => {
+  it('defaults to bullmq outside the test environment and to poll in test', () => {
+    expect(readBackgroundJobsTransport({ NODE_ENV: 'production' })).toBe('bullmq');
+    expect(readBackgroundJobsTransport({ NODE_ENV: 'test' })).toBe('poll');
+  });
+
+  it('reads the selected transport and ignores every other key, including ones the full schema refuses', () => {
+    expect(
+      readBackgroundJobsTransport({ NODE_ENV: 'production', BACKGROUND_JOBS_TRANSPORT: 'poll', TEST_DATABASE_URL: '' }),
+    ).toBe('poll');
+  });
+
+  it('still rejects an unknown transport', () => {
+    expect(() => readBackgroundJobsTransport({ BACKGROUND_JOBS_TRANSPORT: 'kafka' })).toThrow(
+      EnvironmentValidationError,
+    );
   });
 });
