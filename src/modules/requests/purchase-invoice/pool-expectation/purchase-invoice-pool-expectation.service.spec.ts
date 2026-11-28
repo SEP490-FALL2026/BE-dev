@@ -182,27 +182,3 @@ describe('PurchaseInvoicePoolService.buildLicenseLotLinkFacts (who submits the i
     await expect(build(lot, 'it-1', ['dept-2'])).rejects.toMatchObject({ reason: 'LINK_NOT_FOUND' });
   });
 });
-
-describe('PurchaseInvoicePoolService.isOfResponsibleItAdmin: whose resubmission rule applies (QĐ-118f, Owner 28/11/2026)', () => {
-  const serviceOf = (lot: { purpose: string } | null) =>
-    new PurchaseInvoicePoolService(
-      undefined as never,
-      undefined as never,
-      undefined as never,
-      undefined as never,
-      { findLot: jest.fn().mockResolvedValue(lot) } as never,
-    );
-  const tx = {} as never;
-
-  it('is true for a subscription invoice and false for a request invoice', async () => {
-    const service = serviceOf(null);
-    expect(await service.isOfResponsibleItAdmin({ linkKind: 'SUBSCRIPTION', licenseLotId: null }, tx)).toBe(true);
-    expect(await service.isOfResponsibleItAdmin({ linkKind: 'REQUEST', licenseLotId: null }, tx)).toBe(false);
-  });
-
-  it('is true for a lot of any purpose but a request, false for the lot of a request', async () => {
-    const row = { linkKind: 'LICENSE_LOT', licenseLotId: 'lot-1' };
-    expect(await serviceOf({ purpose: 'STOCK' }).isOfResponsibleItAdmin(row, tx)).toBe(true);
-    expect(await serviceOf({ purpose: 'REQUEST' }).isOfResponsibleItAdmin(row, tx)).toBe(false);
-  });
-});

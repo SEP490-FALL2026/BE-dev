@@ -424,18 +424,41 @@ describe('purchase invoices over PostgreSQL (integration; PI-1.4, T-PI)', () => 
     for (const kept of [byResponsible, ofKey]) {
       expect(kept).toMatchObject({ label: 'RENEWAL', matchResult: 'MATCHED', chargedCostCenterId: null });
     }
-    // Another IT Admin is refused for a period, a seat purchase and the lines of a period, and the preview reads it the same way.
-    const forms: Record<string, unknown>[] = [
-      {},
-      { seatPurchaseId: randomUUID() },
-      { subscriptionLineIds: [randomUUID()] },
-    ];
+    // Another IT Admin is refused for a period, a REAL seat purchase and a REAL line of it: the refusal is the one of the responsibility, and
+    // the same forms go through for the IT Admin who answers, so it is the only thing that stopped them.
+    const lineId = (
+      await h.ctx.sql.query<{ id: string }>(
+        `SELECT id::text FROM subscription_lines WHERE subscription_id = $1 LIMIT 1`,
+        [k2],
+      )
+    ).rows[0].id;
+    numbers += 1;
+    const seatPurchaseId = (
+      await h.ctx.sql.query<{ id: string }>(
+        `INSERT INTO seat_purchases (id, organization_id, subscription_line_id, code, kind, purchased_on, quantity, invoice_obligation,
+           invoice_due_on, recorded_by_employee_id)
+         VALUES (gen_random_uuid(), $1, $2, $3, 'TOP_UP', $4::date, 2, 'WORKING_DAYS', $4::date + 9, $5)
+         RETURNING id`,
+        [h.seed.organizationId, lineId, `MUA-${String(900000 + numbers)}`, `${h.year}-09-01`, h.it1.employeeId],
+      )
+    ).rows[0].id;
+    const forms: Record<string, unknown>[] = [{}, { seatPurchaseId }, { subscriptionLineIds: [lineId] }];
     for (const link of forms) {
       expect(codeOf(await submitFor(k2, it2, 403, { servicePeriodMonth: `${h.year}-12` }, link))).toBe(
         'PURCHASE_INVOICE.NOT_RESPONSIBLE',
       );
     }
+    const refusedCount = await h.ctx.sql.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM purchase_invoices WHERE subscription_id = $1 AND submitted_by_employee_id = $2`,
+      [k2, it2.employeeId],
+    );
+    expect(refusedCount.rows[0].n).toBe('0');
+    await submitFor(k2, h.it1, 201, { servicePeriodMonth: `${h.year}-12` }, { subscriptionLineIds: [lineId] });
+    await submitFor(k2, h.it1, 201, { servicePeriodMonth: `${h.year}-10` }, { seatPurchaseId });
     expect(codeOf(await submitFor(k4, it2, 403))).toBe('PURCHASE_INVOICE.NOT_RESPONSIBLE');
+    // A subscription the first IT Admin declared is not the second one's, as it was before this rule, when any IT Admin submitted it.
+    const owned = await h.subscription(10, 'K2');
+    expect(codeOf(await submitFor(owned, it2, 403))).toBe('PURCHASE_INVOICE.NOT_RESPONSIBLE');
     const previewOf = (account: ApiAccount) =>
       api('post', '/preview', account).send(form(randomUUID(), { link: { subscriptionId: k2 }, quantity: 10 }));
     expect(codeOf(await previewOf(it2).expect(403))).toBe('PURCHASE_INVOICE.NOT_RESPONSIBLE');
@@ -471,47 +494,6 @@ describe('purchase invoices over PostgreSQL (integration; PI-1.4, T-PI)', () => 
     expect((refused.body as { error: { code: string } }).error.code).toBe('PURCHASE_INVOICE.NOT_RESPONSIBLE');
     const kept = await send(h.it1);
     expect(kept.status).toBe(201);
-  });
-
-  it('lets the IT Admin who answers now submit a returned invoice of a subscription again after the Super Admin changed who answers, and refuses the one before (QĐ-118f, Owner 28/11/2026)', async () => {
-    const owned = await h.subscription(10, 'K2');
-    await h.ctx.sql.query(
-      `UPDATE subscriptions SET original_unit_price_minor = 1500, original_currency = 'USD' WHERE id = $1`,
-      [owned],
-    );
-    const first = wire(
-      await api('post', '', h.it1)
-        .send({
-          ...form(randomUUID(), { link: { subscriptionId: owned }, quantity: 10, vendorInvoiceNumber: 'RESP-1' }),
-          documentIds: [await document()],
-        })
-        .expect(201),
-    );
-    await h.ctx.sql.query(
-      `UPDATE purchase_invoices SET state = 'RETURNED', decided_by_employee_id = $2, decided_at = now(), return_reason = 'Sai' WHERE id = $1`,
-      [first.id, h.finance.employeeId],
-    );
-    await request(h.server())
-      .post(`/api/v1/subscriptions/${owned}/responsible-it-admin`)
-      .set('Authorization', `Bearer ${h.admin}`)
-      .send({ employeeId: it2.employeeId, reason: 'IT 1 is moving to another team' })
-      .expect(200);
-    const resend = async (account: ApiAccount) => {
-      const rest: Record<string, unknown> = form(randomUUID(), { quantity: 10, vendorInvoiceNumber: 'RESP-1' });
-      delete rest.link;
-
-      return api('post', `/${first.id}/resubmission`, account).send({
-        ...rest,
-        documentIds: [await document(account)],
-      });
-    };
-
-    const before = await resend(h.it1);
-    expect(before.status).toBe(403);
-    expect((before.body as { error: { code: string } }).error.code).toBe('PURCHASE_INVOICE.NOT_RESPONSIBLE');
-    const after = await resend(it2);
-    expect(after.status).toBe(201);
-    expect(wire(after)).toMatchObject({ state: 'SUBMITTED', resubmissionOfId: first.id });
   });
 
   it('marks over an invoice of the shared pool, linked to the pool or to a K2 request, and the invoice of a renewal, by the seats bought times the price of a month times the months to the renewal day, and never refuses it (B3B-06, QĐ-103w(3), QĐ-104c(3), QĐ-104d)', async () => {

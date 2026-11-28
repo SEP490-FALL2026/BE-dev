@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { BudgetsApi } from '../../budgets/public/budgets.api';
+import { SubscriptionPeriodApi } from '../../catalog/public/subscription-period.api';
 import { FinanceApi } from '../../finance/public/finance.api';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
@@ -11,7 +12,7 @@ import { toDetail, toSummary } from './purchase-invoice.mapper';
 import { PurchaseInvoiceRepo, type PurchaseInvoiceRow, type PurchaseInvoiceScope } from './purchase-invoice.repo';
 
 /**
- * Reads of purchase invoices (`PI-1`). Finance reads every one; the IT Admin reads what they submitted and the invoices of the requests of the
+ * Reads of purchase invoices (`PI-1`). Finance reads every one; the IT Admin reads what they submitted, the invoices of the subscriptions and lots they answer for now (`QĐ-118f`) and the invoices of the requests of the
  * departments they work (`D8`): a filter that names nothing of theirs is an empty page and an id that is not theirs is not found.
  */
 @Injectable()
@@ -22,6 +23,7 @@ export class PurchaseInvoiceQueryService {
     private readonly identity: IdentityAccessApi,
     private readonly finance: FinanceApi,
     private readonly budgets: BudgetsApi,
+    private readonly subscriptions: SubscriptionPeriodApi,
   ) {}
 
   async page(
@@ -85,6 +87,7 @@ export class PurchaseInvoiceQueryService {
     return {
       kind: 'IT_ADMIN',
       employeeId: actor.employeeId,
+      subscriptionIds: await this.subscriptions.getResponsibleSubscriptionIds(actor.employeeId),
       departmentIds: await this.organizationReads.getItAdminScope(actor.employeeId, (ids) =>
         this.identity.findUsableItAdminEmployeeIds(ids),
       ),

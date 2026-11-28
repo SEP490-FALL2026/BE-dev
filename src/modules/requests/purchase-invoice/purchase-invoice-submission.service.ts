@@ -9,10 +9,10 @@ import { IdentityAccessApi } from '../../identity-access/public/identity-access.
 import { NotificationsApi } from '../../notifications/public/notifications.api';
 import { PurchaseInvoiceRefusedError } from './purchase-invoice.errors';
 import type { PurchaseInvoiceFormInput, PurchaseInvoiceSubmitInput } from './purchase-invoice.dto';
-import { PurchaseInvoicePoolService } from './pool-expectation/purchase-invoice-pool-expectation.service';
 import { PurchaseInvoicePlanService } from './purchase-invoice-plan.service';
 import { PurchaseInvoiceRepo, type PurchaseInvoiceRow } from './purchase-invoice.repo';
 import type { PurchaseInvoicePlan } from './purchase-invoice.types';
+import { PurchaseInvoiceSubscriptionLinkService } from './subscription-link/purchase-invoice-subscription-link.service';
 
 /**
  * The IT Admin submits the invoice of a purchase and Finance is told (`PI-1`, `QĐ-111u`). The form is read against its request or subscription
@@ -34,7 +34,7 @@ export class PurchaseInvoiceSubmissionService {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly plans: PurchaseInvoicePlanService,
-    private readonly pool: PurchaseInvoicePoolService,
+    private readonly subscriptionLink: PurchaseInvoiceSubscriptionLinkService,
     private readonly invoices: PurchaseInvoiceRepo,
     private readonly catalog: CatalogApi,
     private readonly identity: IdentityAccessApi,
@@ -61,9 +61,7 @@ export class PurchaseInvoiceSubmissionService {
     return this.runner.run(async (tx) => {
       const old = await this.invoices.lock(tx, id);
       if (!old) throw new PurchaseInvoiceRefusedError('NOT_FOUND');
-      if (old.submittedByEmployeeId !== actor.employeeId && !(await this.pool.isOfResponsibleItAdmin(old, tx))) {
-        throw new PurchaseInvoiceRefusedError('NOT_FOUND');
-      }
+      await this.subscriptionLink.requireToResubmit(old, actor.employeeId, tx);
       if (old.state !== 'RETURNED') throw new PurchaseInvoiceRefusedError('NOT_RETURNED');
       if ((await this.invoices.resubmittedAs([old.id], tx)).has(old.id)) {
         throw new PurchaseInvoiceRefusedError('ALREADY_RESUBMITTED');

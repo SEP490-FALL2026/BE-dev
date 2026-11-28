@@ -331,18 +331,6 @@ export class PurchaseInvoicePoolService {
     return ((await this.organizationReads.getOrganization(tx)) as { timeZone: string }).timeZone;
   }
 
-  /**
-   * Whether the invoice is answered for by the IT Admin responsible now rather than by whoever submitted it: one of a subscription, or of a lot
-   * not bought for a request (`QĐ-118d`, `QĐ-118f`). One of a request stays with the person who submitted it.
-   */
-  async isOfResponsibleItAdmin(row: { linkKind: string; licenseLotId: string | null }, tx: DbTx): Promise<boolean> {
-    if (row.linkKind === 'SUBSCRIPTION') return true;
-    if (row.linkKind !== 'LICENSE_LOT' || row.licenseLotId === null) return false;
-    const lot = await this.findLot(row.licenseLotId, tx);
-
-    return lot !== null && lot.purpose !== 'REQUEST';
-  }
-
   /** Builds link facts for a `LICENSE_LOT` purchase invoice, checking acting scope and `F14a` double-invoicing. */
   async buildLicenseLotLinkFacts(deps: {
     licenseLotId: string;
