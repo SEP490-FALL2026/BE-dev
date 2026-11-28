@@ -54,7 +54,7 @@ export class RequestResubmissionService {
       if (await this.returnedAtAssessment(tx, request.id)) {
         await this.reopenAssessment(tx, actor, request, new Date(), replyId);
       } else if (request.routing?.mode === 'ONE_STEP') {
-        await this.spending.route(tx, actor, request, 'SUBMISSION', new Date());
+        await this.spending.route(tx, actor, request, 'SUBMISSION', new Date(), replyId ? { replyId } : undefined);
       } else {
         await this.reopenNeed(tx, actor, request, new Date(), replyId);
       }

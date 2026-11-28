@@ -5,7 +5,6 @@ import {
   AccessRequestNotFoundError,
   AccessRequestWithdrawalRefusedError,
 } from '../access-request/access-request.errors';
-import { canViewRequest, viewFactsOf } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import type { WithdrawalRefusal } from '../access-request/withdrawal.policy';
@@ -13,6 +12,7 @@ import type { TicketWithdrawResultWire } from '../request-ticket/request-ticket.
 import { RequestTicketNotFoundError, RequestTicketNotRequesterError } from '../request-ticket/request-ticket.errors';
 import { orderByPosition } from '../request-ticket/request-ticket.policy';
 import { RequestTicketRepo } from '../request-ticket/request-ticket.repo';
+import { RequestReadAccessService } from '../request-view/request-read-access.service';
 import { WithdrawalService } from './withdrawal.service';
 
 type SkippableWithdrawalRefusal = Exclude<WithdrawalRefusal, 'NOT_REQUESTER' | 'REASON_REQUIRED'>;
@@ -43,6 +43,7 @@ export class TicketWithdrawalService {
     private readonly runner: TransactionRunner,
     private readonly tickets: RequestTicketRepo,
     private readonly requests: AccessRequestRepo,
+    private readonly readAccess: RequestReadAccessService,
     private readonly withdrawals: WithdrawalService,
   ) {}
 
@@ -80,7 +81,8 @@ export class TicketWithdrawalService {
     });
 
     if (items.length === 0 || records.length === 0) throw new RequestTicketNotFoundError();
-    if (!records.some((record) => canViewRequest(actor, viewFactsOf(record)))) {
+    const visibleIds = await this.readAccess.visibleItemIds(actor, records);
+    if (visibleIds.size === 0) {
       throw new RequestTicketNotFoundError();
     }
     if (records[0].requesterEmployeeId !== actor.employeeId) {

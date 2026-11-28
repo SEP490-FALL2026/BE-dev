@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { viewFactsOf } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { TicketWire } from '../request-ticket/request-ticket.dto';
 import { RequestTicketNotFoundError } from '../request-ticket/request-ticket.errors';
@@ -27,18 +26,7 @@ export class RequestTicketViewService {
     if (!ticketView) throw new RequestTicketNotFoundError();
 
     const records = await this.requests.findByIds(ticketView.items.map((item) => item.requestId));
-    const visibleIds = new Set<string>();
-
-    for (const record of records) {
-      const access = await this.readAccess.accessOf(actor, {
-        ...viewFactsOf(record),
-        id: record.id,
-        isGroup: record.type === 'GROUP_GRANT',
-        departmentId: record.departmentId,
-      });
-      if (access.read) visibleIds.add(record.id);
-    }
-
+    const visibleIds = await this.readAccess.visibleItemIds(actor, records);
     if (visibleIds.size === 0) throw new RequestTicketNotFoundError();
 
     return toTicketWire(ticketView, visibleIds);

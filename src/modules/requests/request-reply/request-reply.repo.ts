@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { pendingHumanReturn } from './request-reply.policy';
 import type { HumanReturn, LatestReply, ReplyKind } from './request-reply.types';
 
 interface StepRow {
@@ -26,6 +27,46 @@ function toHumanReturn(step: StepRow): HumanReturn | null {
   if (step.kind !== 'SPEND_APPROVAL') return null;
   const closedAt = spendReturnAt(step);
   return closedAt ? { kind: 'SPEND', stepId: step.id, closedAt } : null;
+}
+
+function extractHumanReturns(steps: readonly StepRow[]): HumanReturn[] {
+  const returns: HumanReturn[] = [];
+  let lastAssessment: StepRow | undefined;
+
+  for (const step of steps) {
+    if (step.kind === 'IT_ASSESSMENT') lastAssessment = step;
+    const mapped = toHumanReturn(step);
+    if (mapped) returns.push(mapped);
+  }
+
+  // Only a CLOSED IT_ASSESSMENT step sent the proposal back; COMPLETED does not require a reply note.
+  if (lastAssessment?.state === 'CLOSED' && lastAssessment.decidedAt !== null) {
+    returns.push({ kind: 'IT_ASSESSMENT', stepId: lastAssessment.id, closedAt: lastAssessment.decidedAt });
+  }
+  return returns;
+}
+
+function groupStepsByRequest(rows: readonly (StepRow & { requestId: string })[]): Map<string, StepRow[]> {
+  const map = new Map<string, StepRow[]>();
+  for (const row of rows) {
+    const list = map.get(row.requestId) ?? [];
+    list.push(row);
+    map.set(row.requestId, list);
+  }
+  return map;
+}
+
+function groupRepliedStepIds(
+  rows: readonly { requestId: string; returnedStepId: string | null }[],
+): Map<string, Set<string>> {
+  const map = new Map<string, Set<string>>();
+  for (const row of rows) {
+    if (row.returnedStepId === null) continue;
+    const set = map.get(row.requestId) ?? new Set<string>();
+    set.add(row.returnedStepId);
+    map.set(row.requestId, set);
+  }
+  return map;
 }
 
 @Injectable()
@@ -114,47 +155,52 @@ export class RequestReplyRepo {
       },
     });
 
-    const returns: HumanReturn[] = [];
-    let lastAssessment: StepRow | undefined;
+    return extractHumanReturns(steps);
+  }
 
-    for (const step of steps) {
-      if (step.kind === 'IT_ASSESSMENT') lastAssessment = step;
-      const mapped = toHumanReturn(step);
-      if (mapped) returns.push(mapped);
+  /**
+   * Single shared definition for queue (`replyNoteRequired`) and batch submission (`REPLY_NOTE_REQUIRED`):
+   * loads steps + replies for all given request IDs and evaluates `pendingHumanReturn`.
+   */
+  async pendingSpendReturnsOf(requestIds: readonly string[], tx?: DbTx): Promise<Map<string, HumanReturn>> {
+    const pendingByRequest = new Map<string, HumanReturn>();
+    if (requestIds.length === 0) return pendingByRequest;
+    const uniqueIds = [...new Set(requestIds)];
+    const db = tx ?? this.prisma;
+
+    // Sequential queries avoid Promise.all over the same Prisma transaction client (R2).
+    const stepRows = await db.accessRequestStep.findMany({
+      where: { requestId: { in: uniqueIds } },
+      orderBy: [{ requestId: 'asc' }, { sequence: 'asc' }],
+      select: {
+        requestId: true,
+        id: true,
+        kind: true,
+        state: true,
+        decidedAt: true,
+        approvalRecord: { select: { decision: true, decidedAt: true } },
+        spendDecision: { select: { decision: true, decidedAt: true } },
+      },
+    });
+    const replyRows = await db.accessRequestReply.findMany({
+      where: { requestId: { in: uniqueIds }, returnedStepId: { not: null } },
+      select: { requestId: true, returnedStepId: true },
+    });
+
+    const stepsByRequest = groupStepsByRequest(stepRows);
+    const repliedByRequest = groupRepliedStepIds(replyRows);
+
+    for (const requestId of uniqueIds) {
+      const returns = extractHumanReturns(stepsByRequest.get(requestId) ?? []);
+      const repliedStepIds = repliedByRequest.get(requestId) ?? new Set<string>();
+      const pending = pendingHumanReturn({ returns, repliedStepIds });
+      if (pending?.kind === 'SPEND') pendingByRequest.set(requestId, pending);
     }
 
-    if (lastAssessment?.state === 'CLOSED' && lastAssessment.decidedAt !== null) {
-      returns.push({ kind: 'IT_ASSESSMENT', stepId: lastAssessment.id, closedAt: lastAssessment.decidedAt });
-    }
-    return returns;
+    return pendingByRequest;
   }
 
   async spendReturnsAwaitingReply(requestIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
-    if (requestIds.length === 0) return new Set();
-
-    const rows = await (tx ?? this.prisma).$queryRaw<{ requestId: string }[]>`
-      WITH latest_spend_return AS (
-        SELECT DISTINCT ON (s.request_id)
-               s.request_id,
-               s.id AS step_id
-          FROM access_request_steps s
-          LEFT JOIN approval_records ar ON ar.step_id = s.id AND ar.decision = 'RETURNED'
-          LEFT JOIN spend_decisions sd ON sd.step_id = s.id AND sd.decision = 'RETURNED'
-         WHERE s.request_id = ANY(${[...new Set(requestIds)]}::uuid[])
-           AND s.kind = 'SPEND_APPROVAL'
-           AND s.state = 'CLOSED'
-           AND (ar.id IS NOT NULL OR sd.step_id IS NOT NULL)
-         ORDER BY s.request_id, COALESCE(s.decided_at, ar.decided_at, sd.decided_at) DESC, s.sequence DESC
-      )
-      SELECT l.request_id AS "requestId"
-        FROM latest_spend_return l
-       WHERE NOT EXISTS (
-         SELECT 1
-           FROM access_request_replies r
-          WHERE r.request_id = l.request_id
-            AND r.returned_step_id = l.step_id
-       )`;
-
-    return new Set(rows.map((row) => row.requestId));
+    return new Set((await this.pendingSpendReturnsOf(requestIds, tx)).keys());
   }
 }

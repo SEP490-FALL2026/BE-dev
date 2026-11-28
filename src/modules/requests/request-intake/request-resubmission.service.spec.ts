@@ -46,7 +46,7 @@ describe('BR-MF1-02: requester resubmission', () => {
   });
   it('uses the package-3 check even when its result still blocks', async () => {
     await expect(service.resubmit(actor, 'request')).resolves.toBe(request);
-    expect(spend.route).toHaveBeenCalledWith(tx, actor, request, 'SUBMISSION', expect.any(Date));
+    expect(spend.route).toHaveBeenCalledWith(tx, actor, request, 'SUBMISSION', expect.any(Date), undefined);
   });
   it('refuses a different actor before checking any budget', async () => {
     await expect(service.resubmit({ employeeId: 'other' } as never, 'request')).rejects.toBeInstanceOf(
@@ -266,15 +266,31 @@ describe('PL-2.2 (QĐ-111ap, R-24): the sender sends on again a request the head
       replies.repliedStepIds.mockResolvedValue(new Set(['step-spend-1']));
       await expect(service.resubmit(actor, 'request')).resolves.toBe(oneStep);
       expect(replies.insert).not.toHaveBeenCalled();
-      expect(spend.route).toHaveBeenCalledWith(tx, actor, oneStep, 'SUBMISSION', expect.any(Date));
+      expect(spend.route).toHaveBeenCalledWith(tx, actor, oneStep, 'SUBMISSION', expect.any(Date), undefined);
+      expect(audit.record).not.toHaveBeenCalled();
     });
 
-    it('stores voluntary replyNote with returnedStepId = null when no pending human return', async () => {
+    it('stores voluntary replyNote with returnedStepId = null and passes { replyId } to SpendRoutingService.route without emitting RESUBMITTED', async () => {
       repo.lockById.mockResolvedValue(oneStep);
       repo.findById.mockResolvedValue(oneStep);
       await service.resubmit(actor, 'request', { replyNote: 'Đã tăng ngân sách' });
       expect(replies.insert).toHaveBeenCalledWith(tx, replyPayload(null, 'Đã tăng ngân sách'));
-      expect(spend.route).toHaveBeenCalledTimes(1);
+      expect(spend.route).toHaveBeenCalledWith(tx, actor, oneStep, 'SUBMISSION', expect.any(Date), {
+        replyId: 'reply-1',
+      });
+      expect(audit.record).not.toHaveBeenCalled();
+    });
+
+    it('passes { replyId } to SpendRoutingService.route when resubmitting one-step returned by SPEND with replyNote', async () => {
+      repo.lockById.mockResolvedValue(oneStep);
+      repo.findById.mockResolvedValue(oneStep);
+      replies.humanReturnsOf.mockResolvedValue([{ kind: 'SPEND', stepId: 'step-spend-1', closedAt: dt }]);
+      await service.resubmit(actor, 'request', { replyNote: 'Giải trình cho C1' });
+      expect(replies.insert).toHaveBeenCalledWith(tx, replyPayload('step-spend-1', 'Giải trình cho C1'));
+      expect(spend.route).toHaveBeenCalledWith(tx, actor, oneStep, 'SUBMISSION', expect.any(Date), {
+        replyId: 'reply-1',
+      });
+      expect(audit.record).not.toHaveBeenCalled();
     });
   });
 });

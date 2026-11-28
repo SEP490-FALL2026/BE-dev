@@ -79,6 +79,7 @@ const recordOf = (id: string, over: Partial<AccessRequestRecord> = {}): AccessRe
 function buildService(options: {
   items?: { requestId: string; position: number }[];
   records?: AccessRequestRecord[];
+  visibleIds?: Set<string>;
   withdraw?: jest.Mock;
 }) {
   const runner = {
@@ -90,6 +91,18 @@ function buildService(options: {
   const requests = {
     findByIds: jest.fn().mockResolvedValue(options.records ?? []),
   };
+  const readAccess = {
+    visibleItemIds: jest.fn().mockImplementation((actor: AuthenticatedPrincipal, records: AccessRequestRecord[]) => {
+      if (options.visibleIds) return Promise.resolve(options.visibleIds);
+      const visible = new Set<string>();
+      for (const r of records) {
+        if (r.requesterEmployeeId === actor.employeeId || r.needStep?.assigneeEmployeeId === actor.employeeId) {
+          visible.add(r.id);
+        }
+      }
+      return Promise.resolve(visible);
+    }),
+  };
   const withdrawals = {
     withdraw: options.withdraw ?? jest.fn(),
   };
@@ -98,10 +111,11 @@ function buildService(options: {
     runner as never,
     tickets as never,
     requests as never,
+    readAccess as never,
     withdrawals as never,
   );
 
-  return { service, runner, tickets, requests, withdrawals };
+  return { service, runner, tickets, requests, readAccess, withdrawals };
 }
 
 describe('TicketWithdrawalService (W4-08)', () => {
@@ -132,6 +146,19 @@ describe('TicketWithdrawalService (W4-08)', () => {
     });
 
     await expect(service.withdraw(actorOf(HEAD_ID, ['MANAGER']), TICKET_ID, {})).rejects.toThrow(
+      RequestTicketNotRequesterError,
+    );
+    expect(withdrawals.withdraw).not.toHaveBeenCalled();
+  });
+
+  it('throws RequestTicketNotRequesterError (403) when spending approver (C1) can view an item via readAccess.visibleItemIds', async () => {
+    const { service, withdrawals } = buildService({
+      items: [{ requestId: REQ_1, position: 1 }],
+      records: [recordOf(REQ_1, { state: 'AWAITING_SPEND_DECISION' })],
+      visibleIds: new Set([REQ_1]),
+    });
+
+    await expect(service.withdraw(actorOf('emp-c1', ['SPENDING_APPROVER']), TICKET_ID, {})).rejects.toThrow(
       RequestTicketNotRequesterError,
     );
     expect(withdrawals.withdraw).not.toHaveBeenCalled();

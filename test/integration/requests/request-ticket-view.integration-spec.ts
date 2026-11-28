@@ -8,10 +8,10 @@ import type {
 } from '../../../src/modules/requests/access-request/access-request.types';
 import { RequestReplyRepo } from '../../../src/modules/requests/request-reply/request-reply.repo';
 import { RequestTicketRepo } from '../../../src/modules/requests/request-ticket/request-ticket.repo';
+import { RequestHarness } from '../../support/request-harness';
 import { buildTicketWorld, type TicketWorld } from '../../support/request-ticket-harness';
-import { SpendHarness } from '../../support/spend-harness';
 
-const h = new SpendHarness();
+const h = new RequestHarness();
 
 describe('GET /request-tickets/:id and GET /access-requests/:id ticketRef/latestReply integration', () => {
   let world: TicketWorld;

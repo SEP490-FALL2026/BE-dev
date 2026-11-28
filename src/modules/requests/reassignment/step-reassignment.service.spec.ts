@@ -1,5 +1,6 @@
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { orderByTicketPosition, type ReassignableRequest } from '../step-routing/step-reassignment.repo';
+import { orderByTicketPosition } from '../request-ticket/request-ticket-order.policy';
+import type { ReassignableRequest } from '../step-routing/step-reassignment.repo';
 import { StepReassignmentService } from './step-reassignment.service';
 
 /**

@@ -2,7 +2,8 @@ import { Injectable } from '@nestjs/common';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { BudgetsApi } from '../../budgets/public/budgets.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import { canReadRequest, type ReadAccess, type ViewFacts } from '../access-request/access-request.policy';
+import { canReadRequest, viewFactsOf, type ReadAccess, type ViewFacts } from '../access-request/access-request.policy';
+import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { RequestReadRepo } from './request-read.repo';
 
 /** What a reader of one request is judged on before the facts that cost a read are loaded. */
@@ -50,5 +51,20 @@ export class RequestReadAccessService {
       spendStepOpened: facts.spendStepOpened || spend.spendStepOpened,
       spendApproved,
     });
+  }
+
+  /** Returns the IDs of the records visible to `actor` under `accessOf`. */
+  async visibleItemIds(actor: AuthenticatedPrincipal, records: readonly AccessRequestRecord[]): Promise<Set<string>> {
+    const visible = new Set<string>();
+    for (const record of records) {
+      const access = await this.accessOf(actor, {
+        ...viewFactsOf(record),
+        id: record.id,
+        isGroup: record.type === 'GROUP_GRANT',
+        departmentId: record.departmentId,
+      });
+      if (access.read) visible.add(record.id);
+    }
+    return visible;
   }
 }

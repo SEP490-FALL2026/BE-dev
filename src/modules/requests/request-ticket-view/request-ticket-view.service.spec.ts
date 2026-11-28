@@ -123,7 +123,7 @@ describe('RequestTicketViewService', () => {
   } as unknown as TransactionRunner;
   const tickets = { view: jest.fn() };
   const requests = { findByIds: jest.fn() };
-  const readAccess = { accessOf: jest.fn() };
+  const readAccess = { visibleItemIds: jest.fn() };
   const service = new RequestTicketViewService(
     runner,
     tickets as unknown as RequestTicketRepo,
@@ -143,7 +143,7 @@ describe('RequestTicketViewService', () => {
   it('throws RequestTicketNotFoundError when caller cannot view any item', async () => {
     tickets.view.mockResolvedValue(makeTicketView(['COMPLETED', 'REJECTED', 'AWAITING_SPEND_DECISION']));
     requests.findByIds.mockResolvedValue([makeRecord('req-1'), makeRecord('req-2'), makeRecord('req-3')]);
-    readAccess.accessOf.mockResolvedValue({ read: false });
+    readAccess.visibleItemIds.mockResolvedValue(new Set());
 
     await expect(service.get(actor, '11111111-1111-4111-8111-111111111111')).rejects.toBeInstanceOf(
       RequestTicketNotFoundError,
@@ -153,9 +153,7 @@ describe('RequestTicketViewService', () => {
   it('filters items to the 1 of 3 visible to the caller while deriving status across all 3 items', async () => {
     tickets.view.mockResolvedValue(makeTicketView(['COMPLETED', 'REJECTED', 'AWAITING_SPEND_DECISION']));
     requests.findByIds.mockResolvedValue([makeRecord('req-1'), makeRecord('req-2'), makeRecord('req-3')]);
-    readAccess.accessOf.mockImplementation((_actor: unknown, subject: { id: string }) =>
-      Promise.resolve(subject.id === 'req-3' ? { read: true, onlyLineOf: null } : { read: false }),
-    );
+    readAccess.visibleItemIds.mockResolvedValue(new Set(['req-3']));
 
     const ticket = await service.get(actor, '11111111-1111-4111-8111-111111111111');
 
@@ -175,9 +173,7 @@ describe('RequestTicketViewService', () => {
   it('returns status DONE when all items are in ended states even if only a subset is visible', async () => {
     tickets.view.mockResolvedValue(makeTicketView(['COMPLETED', 'REJECTED', 'REJECTED']));
     requests.findByIds.mockResolvedValue([makeRecord('req-1'), makeRecord('req-2'), makeRecord('req-3')]);
-    readAccess.accessOf.mockImplementation((_actor: unknown, subject: { id: string }) =>
-      Promise.resolve(subject.id === 'req-1' ? { read: true, onlyLineOf: null } : { read: false }),
-    );
+    readAccess.visibleItemIds.mockResolvedValue(new Set(['req-1']));
 
     const ticket = await service.get(actor, '11111111-1111-4111-8111-111111111111');
 

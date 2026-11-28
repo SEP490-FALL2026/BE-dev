@@ -1,6 +1,6 @@
-import { processingOrder, restoreBodyOrder } from './spend-batch-order.policy';
+import { orderByTicketPosition, processingOrder, restoreBodyOrder } from './request-ticket-order.policy';
 
-describe('spend-batch-order.policy (§7.7)', () => {
+describe('request-ticket-order.policy (§7.7)', () => {
   const cases = [
     {
       name: '[R3(PH1#3), X, R1(PH1#1)] -> [R1, X, R3]',
@@ -30,6 +30,12 @@ describe('spend-batch-order.policy (§7.7)', () => {
       expectedOrder: ['X1', 'X2', 'X3'],
     },
   ];
+
+  describe('orderByTicketPosition', () => {
+    it.each(cases)('orders $name', ({ items, expectedOrder }) => {
+      expect(orderByTicketPosition(items).map((item) => item.requestId)).toEqual(expectedOrder);
+    });
+  });
 
   describe('processingOrder', () => {
     it.each(cases)('orders $name', ({ items, expectedOrder }) => {

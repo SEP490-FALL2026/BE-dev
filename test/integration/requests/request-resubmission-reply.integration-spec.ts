@@ -1,11 +1,14 @@
 import request from 'supertest';
+import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
+import { RequestReplyRepo } from '../../../src/modules/requests/request-reply/request-reply.repo';
 import { bodyOf } from '../../support/api-body';
 import { Barrier } from '../../support/concurrency-harness';
+import { GroupHarness } from '../../support/group-harness';
 import type { AccessRequestWire } from '../../support/request-harness';
 import { handOthersToSecondItAdmin } from '../../support/second-it-admin';
-import { SpendHarness, type Unit } from '../../support/spend-harness';
+import type { Unit } from '../../support/spend-harness';
 
-const h = new SpendHarness();
+const h = new GroupHarness();
 const M = 1_000_000;
 
 interface ReplyRow {
@@ -143,7 +146,15 @@ describe('W4-09: reply note on requester resubmission (integration, real Postgre
     await h.setPayments(sent.id, { amount: 150 * M });
     await resubmit(sent.id, u.head.account, { replyNote: 'Giải trình chi phí cho C1' }).expect(200);
     expect(await h.state(sent.id)).toBe('AWAITING_REQUESTER_REVISION');
-    expect(await repliesOf(sent.id)).toHaveLength(1);
+    const replies1 = await repliesOf(sent.id);
+    expect(replies1).toHaveLength(1);
+    const eventsAfterNote = await h.auditEvents('ACCESS_REQUEST', sent.id);
+    expect(eventsAfterNote.filter((e) => e.action === 'ACCESS_REQUEST.RESUBMITTED')).toHaveLength(0);
+    const checkedWithNote = eventsAfterNote.filter((e) => e.action === 'ACCESS_REQUEST.BUDGET_CHECKED');
+    expect(checkedWithNote[checkedWithNote.length - 1].after).toMatchObject({
+      trigger: 'SUBMISSION',
+      replyId: replies1[0].id,
+    });
 
     // Lower amount back within budget and resubmit WITHOUT replyNote -> 200, no 23505, still 1 reply
     await h.setPayments(sent.id, { amount: 50 * M });
@@ -207,4 +218,70 @@ describe('W4-09: reply note on requester resubmission (integration, real Postgre
       expect(await repliesOf(sent.id)).toHaveLength(1);
     }
   }, 120000);
+
+  it('RequestReplyRepo.latestOfMany & spendReturnsAwaitingReply batch queries return exact map and awaiting set', async () => {
+    const u = await unit({ total: 100 * M });
+    const reqReturned = await h.sent(u.member, paid, { termMonths: 1 });
+    const reqReplied = await h.sent(u.member, paid, { termMonths: 1 });
+    const reqPending = await h.sent(u.member, paid, { termMonths: 1 });
+
+    await h.decide(reqReturned.id, { decision: 'APPROVE' }, u.head.account).expect(200);
+    await h.decide(reqReplied.id, { decision: 'APPROVE' }, u.head.account).expect(200);
+    await h.sendOn([reqReturned.id, reqReplied.id], u.head.account).expect(201);
+    await h.decideSpend(reqReturned.id, { decision: 'RETURN', reason: 'Need spend info' }, h.boss.account).expect(200);
+    await h.decideSpend(reqReplied.id, { decision: 'RETURN', reason: 'Need spend info 2' }, h.boss.account).expect(200);
+
+    await request(h.server())
+      .post('/api/v1/spend-batches')
+      .set(h.as(u.head.account))
+      .send({ requestIds: [reqReplied.id], replyNotes: [{ requestId: reqReplied.id, note: 'Answered spend info' }] })
+      .expect(201);
+
+    const repo = h.ctx.app.get(RequestReplyRepo, { strict: false });
+    const awaiting = await repo.spendReturnsAwaitingReply([reqReturned.id, reqReplied.id, reqPending.id]);
+    expect(awaiting).toEqual(new Set([reqReturned.id]));
+
+    const latest = await repo.latestOfMany([reqReturned.id, reqReplied.id, reqPending.id]);
+    expect(latest.has(reqReturned.id)).toBe(false);
+    expect(latest.has(reqPending.id)).toBe(false);
+    expect(latest.get(reqReplied.id)).toMatchObject({
+      kind: 'HEAD_RESUBMISSION',
+      note: 'Answered spend info',
+      author: { id: u.head.employeeId },
+    });
+  });
+
+  it('nit: COMPLETED IT_ASSESSMENT step is not treated as pending human return when proposal blocks on budget', async () => {
+    const u = await unit(); // 0 budget -> blocks after completed IT assessment
+    const oneStepProposal = await h.proposed(u.head);
+    await h.saveAssessment(oneStepProposal.id, h.assessmentBody(), h.it1).expect(200);
+    await h.completeAssessment(oneStepProposal.id, h.it1).expect(200);
+    expect(await h.state(oneStepProposal.id)).toBe('AWAITING_REQUESTER_REVISION');
+
+    const runner = h.ctx.app.get(TransactionRunner, { strict: false });
+    const repo = h.ctx.app.get(RequestReplyRepo, { strict: false });
+    const returns = await runner.run((tx) => repo.humanReturnsOf(tx, oneStepProposal.id));
+    expect(returns).toEqual([]);
+
+    await resubmit(oneStepProposal.id, u.head.account).expect(200);
+    expect(await repliesOf(oneStepProposal.id)).toEqual([]);
+  });
+
+  it('nit: group request returned at NEED requires replyNote on resubmission (422 -> 200)', async () => {
+    const u = await unit({ total: 100 * M });
+    const people = await h.colleagues(u, 2);
+    const group = h.dataOf<{ request: AccessRequestWire }>(
+      await h.submitGroup(h.groupBody(paid, people), u.head.account).expect(201),
+    ).request;
+
+    await h.decide(group.id, { decision: 'RETURN', reason: 'Clarify group size' }, u.head.account).expect(200);
+    expect(await h.state(group.id)).toBe('AWAITING_REQUESTER_REVISION');
+
+    const missing = await resubmit(group.id, u.head.account, {}).expect(422);
+    expect(bodyOf(missing).error.code).toBe('ACCESS_REQUEST.REPLY_NOTE_REQUIRED');
+
+    await resubmit(group.id, u.head.account, { replyNote: 'Both people work on design' }).expect(200);
+    expect(await h.state(group.id)).toBe('PENDING');
+    expect(await repliesOf(group.id)).toHaveLength(1);
+  });
 });

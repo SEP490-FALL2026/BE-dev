@@ -5,6 +5,7 @@ import { RequestTicketRepo } from '../../../src/modules/requests/request-ticket/
 import { createCostCenter, createDepartment } from '../../support/builders/organization.builder';
 import { approvedBudget } from '../../support/builders/budget.builder';
 import { buildTicketWorld, type TicketWorld } from '../../support/request-ticket-harness';
+import { BudgetCheckRepo } from '../../../src/modules/requests/spend/budget-check.repo';
 import { SpendHarness } from '../../support/spend-harness';
 
 const h = new SpendHarness();
@@ -198,7 +199,7 @@ describe('W4-07: ticket order in spend batches (integration, real PostgreSQL)', 
     );
     expect(summary.totals[h.reporting].runningUncommitted).toEqual({ amount: '0', currency: h.reporting });
 
-    const { miroId, notionId } = await runner.run(async (tx) => {
+    const { ticketId, miroId, notionId } = await runner.run(async (tx) => {
       const ticket = await ticketRepo.insert(tx, {
         organizationId: h.seed.organizationId,
         requesterEmployeeId: reqB.employeeId,
@@ -233,7 +234,7 @@ describe('W4-07: ticket order in spend batches (integration, real PostgreSQL)', 
           ticket: { id: ticket.id, position: 2 },
         }),
       );
-      return { miroId: miro.id, notionId: notion.id };
+      return { ticketId: ticket.id, miroId: miro.id, notionId: notion.id };
     });
 
     await h.decide(miroId, { decision: 'APPROVE' }, headB.account).expect(200);
@@ -256,5 +257,32 @@ describe('W4-07: ticket order in spend batches (integration, real PostgreSQL)', 
     ]);
     expect(await h.state(miroId)).toBe('AWAITING_SPEND_SUBMISSION');
     expect(await h.state(notionId)).toBe('AWAITING_SPEND_DECISION');
+
+    // D-11 scope matrix on pendingForItem (Miro #1 2.5M is still AWAITING_RESERVE_CONFIRMATION):
+    const checkRepo = h.ctx.app.get(BudgetCheckRepo, { strict: false });
+    expect(
+      await checkRepo.pendingForItem(unitB.unitId, 2026, {
+        id: '00000000-0000-4000-8000-0000000000aa',
+        ticket: { id: ticketId, position: 2 },
+      }),
+    ).toBe(0n);
+    expect(
+      await checkRepo.pendingForItem(unitB.unitId, 2026, {
+        id: '00000000-0000-4000-8000-0000000000ab',
+        ticket: { id: ticketId, position: 0 },
+      }),
+    ).toBe(2_500_000n);
+    expect(
+      await checkRepo.pendingForItem(unitB.unitId, 2026, {
+        id: '00000000-0000-4000-8000-0000000000ac',
+        ticket: { id: '00000000-0000-4000-8000-0000000000dd', position: 2 },
+      }),
+    ).toBe(2_500_000n);
+    expect(
+      await checkRepo.pendingForItem(unitB.unitId, 2026, {
+        id: '00000000-0000-4000-8000-0000000000ad',
+        ticket: null,
+      }),
+    ).toBe(2_500_000n);
   });
 });

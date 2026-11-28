@@ -1,3 +1,5 @@
+import type { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { BudgetCheckRepo } from './budget-check.repo';
 import { checkBudget, codesOf, costInDong, wireRouteOf, type YearBudget, type YearSlice } from './budget-check.policy';
 
 /** Base 100, reserve 10, spent 40, held 20 and 15 waiting to be decided: 25 left of the base and 35 with the reserve. */
@@ -183,5 +185,109 @@ describe('QĐ-111an, S-1: the cost of a request is its amount in dong, as it sta
 
   it('judges no amount left in another currency: nothing converts it, so the request has no cost to check', () => {
     expect(costInDong({ amountMinor: 1_000n, currency: 'USD' })).toBeNull();
+  });
+});
+
+describe('BudgetCheckRepo.pendingForItem SQL scope (D-11, QĐ-117k(1))', () => {
+  const CC_ID = '00000000-0000-4000-8000-0000000000c1';
+  const REQ_2 = '00000000-0000-4000-8000-000000000002';
+  const TICKET_1 = '00000000-0000-4000-8000-000000000101';
+  const TICKET_2 = '00000000-0000-4000-8000-000000000102';
+
+  interface SqlNode {
+    strings: readonly string[];
+    values: readonly unknown[];
+  }
+
+  function flattenSql(part: SqlNode): { text: string; values: unknown[] } {
+    let text = part.strings[0] ?? '';
+    const flatValues: unknown[] = [];
+    for (let i = 0; i < part.values.length; i += 1) {
+      const val = part.values[i];
+      if (val !== null && typeof val === 'object' && 'strings' in val && 'values' in val) {
+        const sub = flattenSql(val as SqlNode);
+        text += sub.text;
+        flatValues.push(...sub.values);
+      } else {
+        text += '?';
+        flatValues.push(val);
+      }
+      text += part.strings[i + 1] ?? '';
+    }
+    return { text, values: flatValues };
+  }
+
+  const buildRepo = () => {
+    const captured: SqlNode[] = [];
+    const queryRaw = jest.fn((strings: TemplateStringsArray, ...values: unknown[]) => {
+      captured.push({ strings, values });
+      return Promise.resolve([{ cost_center_id: CC_ID, year: 2026, total: 1_500_000n }]);
+    });
+    const repo = new BudgetCheckRepo({ $queryRaw: queryRaw } as unknown as PrismaService);
+    return { repo, captured };
+  };
+
+  it('pendingFor emits no ticket exclusion', async () => {
+    const { repo, captured } = buildRepo();
+
+    expect(await repo.pendingFor(CC_ID, 2026, REQ_2)).toBe(1_500_000n);
+    const { text, values } = flattenSql(captured[0]);
+
+    expect(text).not.toContain('IS DISTINCT FROM');
+    expect(text).not.toContain('ticket_position');
+    expect(values).toEqual([CC_ID, 2026, REQ_2, REQ_2]);
+  });
+
+  it('pendingForItem with ticket = null (standalone) omits ticket exclusion', async () => {
+    const { repo, captured } = buildRepo();
+
+    await repo.pendingForItem(CC_ID, 2026, { id: REQ_2, ticket: null });
+    const { text, values } = flattenSql(captured[0]);
+
+    expect(text).not.toContain('IS DISTINCT FROM');
+    expect(values).toEqual([CC_ID, 2026, REQ_2, REQ_2]);
+  });
+
+  it('pendingForItem with ticket emits same-ticket earlier-position exclusion only on branch 2', async () => {
+    const { repo, captured } = buildRepo();
+
+    await repo.pendingForItem(CC_ID, 2026, { id: REQ_2, ticket: { id: TICKET_1, position: 2 } });
+    const { text, values } = flattenSql(captured[0]);
+
+    expect(text).toContain("s.kind = 'SPEND_APPROVAL' AND s.state IN ('PENDING', 'WAITING')");
+    expect(text).toContain("r.state = 'AWAITING_SPEND_SUBMISSION' AND latest.outcome = 'USES_RESERVE'");
+    expect(text).toContain('r.ticket_id IS DISTINCT FROM ?::uuid OR r.ticket_position >= ?::int');
+    expect(values).toEqual([CC_ID, 2026, REQ_2, REQ_2, TICKET_1, 2]);
+  });
+
+  it.each([
+    {
+      name: 'excludes earlier item of same ticket',
+      row: { ticketId: TICKET_1, ticketPosition: 1 },
+      caller: { ticketId: TICKET_1, position: 2 },
+      included: false,
+    },
+    {
+      name: 'includes later item of same ticket',
+      row: { ticketId: TICKET_1, ticketPosition: 3 },
+      caller: { ticketId: TICKET_1, position: 2 },
+      included: true,
+    },
+    {
+      name: 'includes item of another ticket',
+      row: { ticketId: TICKET_2, ticketPosition: 1 },
+      caller: { ticketId: TICKET_1, position: 2 },
+      included: true,
+    },
+    {
+      name: 'includes standalone item (ticket_id = NULL)',
+      row: { ticketId: null, ticketPosition: null },
+      caller: { ticketId: TICKET_1, position: 2 },
+      included: true,
+    },
+  ])('predicate semantics: $name', ({ row, caller, included }) => {
+    const matchesPredicate =
+      row.ticketId !== caller.ticketId || (row.ticketPosition !== null && row.ticketPosition >= caller.position);
+    expect(matchesPredicate).toBe(included);
   });
 });

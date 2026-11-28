@@ -15,9 +15,9 @@ import {
 } from '../step-routing/reassignment.policy';
 import { stepWaitingAuditEvent } from './reassignment-audit.mapper';
 import { reassignmentAuditEvent } from '../step-routing/step-audit-event.mapper';
+import { orderByTicketPosition } from '../request-ticket/request-ticket-order.policy';
 import { RequesterHeadConversionService } from '../step-routing/requester-head-conversion.service';
 import {
-  orderByTicketPosition,
   StepReassignmentRepo,
   type ReassignableRequest,
   type ReassignableStep,
@@ -95,8 +95,8 @@ export class StepReassignmentService {
   }
 
   /** Individual requests awaiting spend submission that still hold VIA_HEAD routing, checked once per daily pass. */
-  spendQueueRequestIds(): Promise<string[]> {
-    return this.repo.spendQueueRequestIds();
+  async spendQueueRequestIds(): Promise<string[]> {
+    return orderByTicketPosition(await this.repo.spendQueueRequestIds()).map((row) => row.id);
   }
 
   /** Looks again at one request in a transaction of its own, so that one that fails does not hold back the others. */

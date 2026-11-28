@@ -286,7 +286,7 @@ export class BudgetCheckService {
     const year = pricing.budgetYear;
     const budget = await this.budgetOf(tx, costCenter, year);
     const pendingMinor =
-      costCenter.id === null ? 0n : await this.checks.pendingFor(costCenter.id, year, request.id, tx);
+      costCenter.id === null ? 0n : await this.checks.pendingForItem(costCenter.id, year, request, tx);
     const assessment = request.branch === 'NEW_SOFTWARE' ? await this.assessments.findAssessment(request.id, tx) : null;
     const quoteValidUntil = assessment?.quote?.validUntil ?? null;
     const result = checkBudget({

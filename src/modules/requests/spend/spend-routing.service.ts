@@ -132,6 +132,7 @@ export class SpendRoutingService {
     actor: AuthenticatedPrincipal | null,
     request: AccessRequestRecord,
     outcome: { status: 'NOT_CHECKABLE'; reason: NotCheckable },
+    replyId?: string,
   ): Promise<RoutingOutcome> {
     if (request.routing?.mode !== 'ONE_STEP') {
       // A batch stops the item here: the one who asked and the IT Admin in charge are told why (`BRD 5.5.4`). A confirmation of the reserve
@@ -160,7 +161,7 @@ export class SpendRoutingService {
         'ACCESS_REQUEST.ONE_STEP_PRICE_MISSING',
         'ACCESS_REQUEST',
         request.id,
-        { requestId: request.id, reason: outcome.reason },
+        { requestId: request.id, reason: outcome.reason, ...(replyId ? { replyId } : {}) },
       ),
     );
     return outcome;
@@ -173,22 +174,29 @@ export class SpendRoutingService {
     request: AccessRequestRecord,
     trigger: CheckTrigger,
     now: Date,
+    options?: { replyId?: string },
   ): Promise<RoutingOutcome> {
     const outcome = await this.checks.run(tx, request, trigger, actor, now);
-    if (outcome.status === 'NOT_CHECKABLE') return this.notCheckable(tx, actor, request, outcome);
+    if (outcome.status === 'NOT_CHECKABLE') return this.notCheckable(tx, actor, request, outcome, options?.replyId);
 
-    if (request.routing?.mode === 'ONE_STEP') await this.requests.setOneStepBlockedReason(tx, request.id, null);
-    const { check } = outcome;
     const oneStep = request.routing?.mode === 'ONE_STEP';
+    if (oneStep) await this.requests.setOneStepBlockedReason(tx, request.id, null);
+    const { check } = outcome;
     const opened = this.opensSpend(check.outcome, oneStep) ? await this.openSpend(tx, request, now) : null;
-    const state = opened?.state ?? (oneStep ? 'AWAITING_REQUESTER_REVISION' : 'AWAITING_SPEND_SUBMISSION');
-
-    const step = opened?.step ?? null;
+    const { state, step } = this.nextRouteTarget(opened, oneStep);
 
     await this.requests.setState(tx, request.id, state);
-    await this.recordChecked(tx, actor, request, check, state, step);
+    await this.recordChecked(tx, actor, request, check, state, step, options?.replyId);
 
     return { status: 'ROUTED', outcome: check.outcome ?? 'BLOCKED', check, step };
+  }
+
+  private nextRouteTarget(
+    opened: { state: AccessRequestState; step: SpendStepRecord } | null,
+    oneStep: boolean,
+  ): { state: AccessRequestState; step: SpendStepRecord | null } {
+    if (opened !== null) return opened;
+    return { state: oneStep ? 'AWAITING_REQUESTER_REVISION' : 'AWAITING_SPEND_SUBMISSION', step: null };
   }
 
   /** The audit event of a check and where it sent the request; the notices of the head and the requester are projected from it. */
@@ -199,6 +207,7 @@ export class SpendRoutingService {
     check: CheckRecord,
     state: AccessRequestState,
     opened: SpendStepRecord | null,
+    replyId?: string,
   ): Promise<void> {
     await this.audit.record(
       tx,
@@ -224,6 +233,7 @@ export class SpendRoutingService {
           opened: opened ? 'SPEND_APPROVAL' : null,
           // Who holds the spend step just opened, for the notice of a one-step request (null while it waits).
           spendAssigneeEmployeeId: opened?.assigneeEmployeeId ?? null,
+          ...(check.trigger === 'SUBMISSION' && replyId ? { replyId } : {}),
         },
       ),
     );

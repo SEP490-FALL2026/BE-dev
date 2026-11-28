@@ -5,6 +5,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
+import { pendingHumanReturn } from '../request-reply/request-reply.policy';
 import type { RequestReplyRepo } from '../request-reply/request-reply.repo';
 import type { HumanReturn } from '../request-reply/request-reply.types';
 import type { RequestTicketRepo } from '../request-ticket/request-ticket.repo';
@@ -126,15 +127,22 @@ function buildHarness(options: {
     });
   });
   const recorderSubmitted = jest.fn().mockResolvedValue(undefined);
-  const humanReturnsOf = jest.fn((_t: unknown, id: string) => Promise.resolve(options.humanReturns?.get(id) ?? []));
-  const repliedStepIds = jest.fn((_t: unknown, id: string) =>
-    Promise.resolve(options.repliedSteps?.get(id) ?? new Set<string>()),
-  );
+  const pendingSpendReturnsOf = jest.fn((ids: readonly string[]) => {
+    const map = new Map<string, HumanReturn>();
+    for (const id of ids) {
+      const pending = pendingHumanReturn({
+        returns: options.humanReturns?.get(id) ?? [],
+        repliedStepIds: options.repliedSteps?.get(id) ?? new Set<string>(),
+      });
+      if (pending?.kind === 'SPEND') map.set(id, pending);
+    }
+    return Promise.resolve(map);
+  });
   const insertReply = jest.fn().mockResolvedValue({ id: 'reply-1' });
 
   const ticketReplies = new SpendTicketReplyService(
     { refsOf: jest.fn() } as unknown as RequestTicketRepo,
-    { humanReturnsOf, repliedStepIds, insert: insertReply } as unknown as RequestReplyRepo,
+    { pendingSpendReturnsOf, insert: insertReply } as unknown as RequestReplyRepo,
   );
   const writer = new SpendBatchWriterService(
     { create: createBatch } as unknown as SpendBatchRepo,

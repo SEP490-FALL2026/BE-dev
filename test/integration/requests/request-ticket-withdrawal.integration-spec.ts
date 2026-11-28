@@ -143,16 +143,19 @@ describe('W4-08: withdraw a whole request ticket (integration, real PostgreSQL)'
     ]);
     const [r1, r2, r3] = requestIds;
 
-    // (A) H1 approves R1; E1 withdraws R2 individually -> R2 WITHDRAWN, R1/R3 remain open
+    // (A) H1 approves R1 and sends R1 to spend decision so C1 can view it; E1 withdraws R2 individually -> R2 WITHDRAWN, R1/R3 remain open
     await h.decide(r1, { decision: 'APPROVE' }, world.h1.account).expect(200);
+    await h.sendOn([r1], world.h1.account).expect(201);
     await withdrawSingle(r2, world.e1.account).expect(200);
     expect(await h.state(r2)).toBe('WITHDRAWN');
-    expect(await h.state(r1)).toBe('AWAITING_SPEND_SUBMISSION');
+    expect(await h.state(r1)).toBe('AWAITING_SPEND_DECISION');
     expect(await h.state(r3)).toBe('PENDING');
 
-    // (C) H1 (can view, not requester) -> 403 REQUEST_TICKET.NOT_REQUESTER; outsider -> 404 REQUEST_TICKET.NOT_FOUND
+    // (C) H1 & C1 (can view, not requester) -> 403 REQUEST_TICKET.NOT_REQUESTER; outsider -> 404 REQUEST_TICKET.NOT_FOUND
     const headForbidden = await withdrawTicket(ticketId, world.h1.account).expect(403);
     expect(bodyOf(headForbidden).error.code).toBe('REQUEST_TICKET.NOT_REQUESTER');
+    const c1Forbidden = await withdrawTicket(ticketId, world.c1.account).expect(403);
+    expect(bodyOf(c1Forbidden).error.code).toBe('REQUEST_TICKET.NOT_REQUESTER');
     const outsiderHidden = await withdrawTicket(ticketId, outsider.account).expect(404);
     expect(bodyOf(outsiderHidden).error.code).toBe('REQUEST_TICKET.NOT_FOUND');
     const missingTicket = await withdrawTicket(randomUUID(), world.e1.account).expect(404);

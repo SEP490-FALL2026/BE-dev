@@ -82,7 +82,7 @@ controller) và `requests-work-facade.module.ts` (phần worker chạy, API dùn
 ## Tầng trong module
 
 Đồ thị capability → capability của `requests` **không có vòng** (R6; `pnpm arch:capabilities --module requests`, gate
-`capability-graph`): 49 capability, 157 cạnh. Cạnh đi từ tầng cao xuống tầng thấp hoặc ngang tầng, không vòng. **Cột tầng do lệnh tính** từ
+`capability-graph`): 49 capability, 158 cạnh. Cạnh đi từ tầng cao xuống tầng thấp hoặc ngang tầng, không vòng. **Cột tầng do lệnh tính** từ
 cùng đồ thị gate dùng, không viết tay, và `scripts/verify/capability-graph.test.mjs` đọc bảng này so với lệnh (lệch thì test đỏ): có
 controller thì L3; còn lại, không import capability nào thì L0, chỉ import L0 thì L1, import ít nhất một L1 hoặc L2 thì L2.
 

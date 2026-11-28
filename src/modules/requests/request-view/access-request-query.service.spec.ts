@@ -9,6 +9,7 @@ import { AssessmentReadRepo } from '../access-request/assessment-read.repo';
 import { RequestReplyRepo } from '../request-reply/request-reply.repo';
 import { SpendStatusService } from '../spend/spend-status.service';
 import { AccessRequestQueryService } from './access-request-query.service';
+import { AccessRequestViewFactsService } from './access-request-view-facts.service';
 import { PricingViewService } from './pricing-view.service';
 import { RequestCostViewService } from './request-cost-view.service';
 import { RequestReadAccessService } from './request-read-access.service';
@@ -105,6 +106,7 @@ describe('AccessRequestQueryService', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         AccessRequestQueryService,
+        AccessRequestViewFactsService,
         { provide: AccessRequestRepo, useValue: repo },
         { provide: OrganizationReadApi, useValue: organizationReads },
         { provide: CatalogApi, useValue: catalog },

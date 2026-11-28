@@ -42,37 +42,6 @@ export interface ReassignableRequest {
   ticket: { id: string; position: number } | null;
 }
 
-/**
- * Reorder items so entries belonging to the same ticket occupy their existing slots in ascending ticket position,
- * while standalone entries keep their original slots.
- */
-export function orderByTicketPosition<T extends { ticket: { id: string; position: number } | null }>(
-  items: readonly T[],
-): T[] {
-  const grouped = new Map<string, { item: T; position: number }[]>();
-  for (const item of items) {
-    if (item.ticket === null) continue;
-    const list = grouped.get(item.ticket.id) ?? [];
-    list.push({ item, position: item.ticket.position });
-    grouped.set(item.ticket.id, list);
-  }
-
-  const queues = new Map<string, T[]>();
-  for (const [ticketId, list] of grouped) {
-    // Sort descending so pop() yields ascending ticket positions in O(1).
-    list.sort((a, b) => b.position - a.position);
-    queues.set(
-      ticketId,
-      list.map((entry) => entry.item),
-    );
-  }
-
-  return items.map((item) => {
-    if (item.ticket === null) return item;
-    return queues.get(item.ticket.id)?.pop() ?? item;
-  });
-}
-
 const OPEN = ['PENDING', 'WAITING'] as const;
 
 const SELECT_REQUEST = {
@@ -156,7 +125,7 @@ export class StepReassignmentRepo {
     await tx.$queryRaw`SELECT id FROM access_requests WHERE id = ANY(${[...new Set(ids)].sort()}::uuid[]) ORDER BY id FOR UPDATE`;
   }
 
-  async oneStepPendingIds(): Promise<string[]> {
+  async oneStepPendingIds(): Promise<{ id: string; ticket: { id: string; position: number } | null }[]> {
     const rows = await this.prisma.accessRequest.findMany({
       where: {
         routingMode: 'ONE_STEP',
@@ -166,7 +135,7 @@ export class StepReassignmentRepo {
       select: { id: true, ticketId: true, ticketPosition: true },
       orderBy: { id: 'asc' },
     });
-    return orderByTicketPosition(rows.map(toTicketSlotRow)).map((row) => row.id);
+    return rows.map(toTicketSlotRow);
   }
 
   /** How many requests sent for the department have their need step waiting for a head: what the Super Admin is told when the department is left without one. */
@@ -251,8 +220,8 @@ export class StepReassignmentRepo {
     return rows.map((row) => row.id);
   }
 
-  /** All non-group requests awaiting spend submission that still hold VIA_HEAD routing, checked by the daily sweep. */
-  async spendQueueRequestIds(): Promise<string[]> {
+  /** All non-group requests awaiting spend submission that still hold VIA_HEAD routing, with ticket membership. */
+  async spendQueueRequestIds(): Promise<{ id: string; ticket: { id: string; position: number } | null }[]> {
     const rows = await this.prisma.accessRequest.findMany({
       where: {
         state: 'AWAITING_SPEND_SUBMISSION',
@@ -263,7 +232,7 @@ export class StepReassignmentRepo {
       orderBy: { id: 'asc' },
     });
 
-    return orderByTicketPosition(rows.map(toTicketSlotRow)).map((row) => row.id);
+    return rows.map(toTicketSlotRow);
   }
 
   /** The people who hold an open step: the ones to ask whether they still work. */

@@ -15,7 +15,7 @@ import {
   SpendReplyNoteNotInBatchError,
 } from '../spend/spend.errors';
 import { SpendRoutingService } from '../spend/spend-routing.service';
-import { processingOrder, restoreBodyOrder } from './spend-batch-order.policy';
+import { processingOrder, restoreBodyOrder } from '../request-ticket/request-ticket-order.policy';
 import { SpendBatchWriterService, type BatchSubmitStopReason } from './spend-batch-writer.service';
 import { SpendHeadService } from './spend-head.service';
 

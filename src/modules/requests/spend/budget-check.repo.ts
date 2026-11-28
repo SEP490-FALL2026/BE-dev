@@ -181,15 +181,27 @@ export class BudgetCheckRepo {
 
   /**
    * What the requests of the Cost Center that wait to be decided as spend cost in the year (`BR-MF1-06f`, RV-10): the one definition of
-   * _a request that waits to be decided_, which the check reads and the budgets read through `PendingSpendContributions`. It is a request
-   * whose newest check is within the base or uses the reserve (confirmed or not) and that has no decision yet: either its spend step is
-   * open, or it waits in the queue of its head for the confirmation of the reserve, with no supplementary file after its newest check. A
-   * blocked request is not counted (M-05), nor one with a check made before the three outcomes. The cost is the one that check kept, in
-   * the reporting currency, in the year the check was made for: a request that waits over 01/01 counts in the new year when it is checked
-   * again at its decision (`QĐ-109e`). `exceptRequestId` is the request that is being checked: it does not wait on itself.
+   * _a request that waits to be decided_, which budgets read through `PendingSpendContributions` (budget views may temporarily show negative
+   * remaining when an unconfirmed ticket item precedes a later one under `QĐ-117k`(1), accepted in `D-11`). When judging a budget check via
+   * {@link pendingForItem}, `QĐ-117k`(1) exempts unconfirmed (`AWAITING_SPEND_SUBMISSION + USES_RESERVE`) items of the **same ticket** at an
+   * earlier `ticket_position` (`D-11`); requests with an open `SPEND_APPROVAL` step, later ticket positions, other tickets, and standalone
+   * requests remain counted. `exceptRequestId` is the request that is being checked: it does not wait on itself.
    */
   async pendingFor(costCenterId: string, year: number, exceptRequestId: string | null, tx?: DbTx): Promise<bigint> {
     return (await this.pendingMany([{ costCenterId, year }], tx, exceptRequestId)).get(`${costCenterId}:${year}`) ?? 0n;
+  }
+
+  /** Item-scoped pending spend for budget checks (`QĐ-117k`(1), `D-11`): ignores earlier unconfirmed items of the same ticket. */
+  async pendingForItem(
+    costCenterId: string,
+    year: number,
+    request: { id: string; ticket: { id: string; position: number } | null },
+    tx?: DbTx,
+  ): Promise<bigint> {
+    const scope = request.ticket ? { ticketId: request.ticket.id, position: request.ticket.position } : null;
+    return (
+      (await this.queryPending([{ costCenterId, year }], tx, request.id, scope)).get(`${costCenterId}:${year}`) ?? 0n
+    );
   }
 
   /** The same definition as a single check, grouped for every requested Cost Center and year in one statement. */
@@ -198,8 +210,21 @@ export class BudgetCheckRepo {
     tx?: DbTx,
     exceptRequestId: string | null = null,
   ): Promise<Map<string, bigint>> {
+    return this.queryPending(pairs, tx, exceptRequestId, null);
+  }
+
+  private async queryPending(
+    pairs: readonly { costCenterId: string; year: number }[],
+    tx: DbTx | undefined,
+    exceptRequestId: string | null,
+    ticketScope: { ticketId: string; position: number } | null,
+  ): Promise<Map<string, bigint>> {
     if (pairs.length === 0) return new Map();
     const wanted = Prisma.join(pairs.map((pair) => Prisma.sql`(${pair.costCenterId}::uuid, ${pair.year}::int)`));
+    // NULL-safe exclusion of earlier same-ticket items awaiting reserve confirmation (QĐ-117k(1), D-11).
+    const excludeEarlierSameTicket = ticketScope
+      ? Prisma.sql`AND (r.ticket_id IS DISTINCT FROM ${ticketScope.ticketId}::uuid OR r.ticket_position >= ${ticketScope.position}::int)`
+      : Prisma.empty;
     const rows = await (tx ?? this.prisma).$queryRaw<{ cost_center_id: string; year: number; total: bigint }[]>`
       SELECT COALESCE(latest.cost_center_id, r.cost_center_id) AS cost_center_id, y.year, SUM(y.cost_minor)::bigint AS total
         FROM access_requests r
@@ -218,7 +243,8 @@ export class BudgetCheckRepo {
               WHERE s.request_id = r.id AND s.kind = 'SPEND_APPROVAL' AND s.state IN ('PENDING', 'WAITING')
            )
            OR (r.state = 'AWAITING_SPEND_SUBMISSION' AND latest.outcome = 'USES_RESERVE'
-               AND NOT EXISTS (SELECT 1 FROM request_supplements p WHERE p.request_id = r.id AND p.created_at > latest.ran_at))
+               AND NOT EXISTS (SELECT 1 FROM request_supplements p WHERE p.request_id = r.id AND p.created_at > latest.ran_at)
+               ${excludeEarlierSameTicket})
          )
        GROUP BY COALESCE(latest.cost_center_id, r.cost_center_id), y.year`;
 
