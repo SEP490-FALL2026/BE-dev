@@ -1,5 +1,6 @@
 import { API_COVERAGE_WAVE2 } from './api-coverage-manifest-wave2';
 import { API_COVERAGE_WAVE3_TECH } from './api-coverage-manifest-wave3-tech';
+import { API_COVERAGE_W4_C_WITHDRAW } from './api-coverage-manifest-w4-c-withdraw';
 
 /**
  * The exported operations of the purchases of a department and what comes of an invoice that differs (`PI-1`, `PI-2`, `RC-1`), a part of
@@ -8,6 +9,7 @@ import { API_COVERAGE_WAVE3_TECH } from './api-coverage-manifest-wave3-tech';
 export const API_COVERAGE_PURCHASE: readonly string[] = [
   ...API_COVERAGE_WAVE2,
   ...API_COVERAGE_WAVE3_TECH,
+  ...API_COVERAGE_W4_C_WITHDRAW,
   'POST /api/v1/purchase-invoices/preview',
   'POST /api/v1/purchase-invoices',
   'POST /api/v1/purchase-invoices/{id}/resubmission',

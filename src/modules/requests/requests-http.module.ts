@@ -29,6 +29,7 @@ import { SpendApprovalsController } from './spend-approval/spend-approvals.contr
 import { SpendSubmissionController } from './spend-submission/spend-submission.controller';
 import { RequestTimingsController } from './timing/request-timings.controller';
 import { WithdrawalController } from './withdraw/withdrawal.controller';
+import { TicketWithdrawalsController } from './withdraw/ticket-withdrawals.controller';
 
 /**
  * The HTTP side of the requests module, mounted by the API only. Controllers stay separate from `RequestsModule`
@@ -42,6 +43,7 @@ import { WithdrawalController } from './withdraw/withdrawal.controller';
     AccessRequestsController,
     NeedDecisionController,
     WithdrawalController,
+    TicketWithdrawalsController,
     SimilarSeatsController,
     CancellationController,
     ProposalsController,

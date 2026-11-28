@@ -71,6 +71,7 @@ import { NeedDecisionService } from './need-decision/need-decision.service';
 import { WithdrawalPreconditions } from './withdraw/withdrawal-preconditions.service';
 import { WithdrawalWriter } from './withdraw/withdrawal-writer.service';
 import { WithdrawalService } from './withdraw/withdrawal.service';
+import { TicketWithdrawalService } from './withdraw/ticket-withdrawal.service';
 import { DepartureCancellationService } from './cancellation/departure-cancellation.service';
 import { BeneficiaryGoneCancellation } from './cancellation/beneficiary-gone-cancellation.service';
 import { BeneficiaryGoneClosing } from './cancellation/beneficiary-gone-closing.service';
@@ -271,6 +272,7 @@ import { PurchaseInvoiceSubmissionService } from './purchase-invoice/purchase-in
     WithdrawalPreconditions,
     WithdrawalWriter,
     WithdrawalService,
+    TicketWithdrawalService,
     DepartureCancellationService,
     // The system closes the open requests of a person who is gone (`QĐ-110d`, `QĐ-110o`); `RequestsApi` opens it to `personnel`.
     BeneficiaryGoneClosing,
@@ -481,6 +483,7 @@ import { PurchaseInvoiceSubmissionService } from './purchase-invoice/purchase-in
     SpendQueueService,
     SupplementQueryService,
     SupplementService,
+    TicketWithdrawalService,
     WithdrawalService,
   ],
 })

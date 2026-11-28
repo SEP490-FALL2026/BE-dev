@@ -1,4 +1,5 @@
 import type { RouteErrorStatus } from './openapi-example-manifest';
+import { ROUTE_ERROR_CODES_W4_C_WITHDRAW } from './openapi-example-route-codes-w4-c-withdraw';
 
 /**
  * Part of ROUTE_ERROR_CODES (requests for a group and the spend step (G5)), traced on BE `0da8f56`
@@ -164,4 +165,5 @@ export const ROUTE_ERROR_CODES_REQUESTS_SPEND: Readonly<
     '409': ['POLICY.NOT_IN_FORCE', 'POLICY.VERSION_CHANGED', 'SPEND.RESERVE_NOT_PENDING'],
     '422': ['POLICY.CHECKLIST_HAS_NO', 'POLICY.CHECKLIST_INCOMPLETE'],
   },
+  ...ROUTE_ERROR_CODES_W4_C_WITHDRAW,
 };
