@@ -1,5 +1,6 @@
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import type { RequestTicketRepo } from '../request-ticket/request-ticket.repo';
 import type { SpendBatchRepo } from '../spend/spend-batch.repo';
 import type { SpendRequestRepo } from '../spend/spend-request.repo';
 import type { SpendWireViewService } from '../spend/spend-wire-view.service';
@@ -17,7 +18,18 @@ const principal = (employeeId: string, roles: string[]): AuthenticatedPrincipal 
   roles,
 });
 
-function build(heldBy: string[]) {
+function build(
+  heldBy: string[],
+  items: {
+    requestId: string;
+    position: number;
+    outcome: string;
+    stopReason: string | null;
+    leftReason: string | null;
+    leftAt: Date | null;
+  }[] = [],
+  ticketRefs: Map<string, { id: string; position: number; itemCount: number }> = new Map(),
+) {
   const record = {
     id: BATCH,
     organizationId: 'org',
@@ -28,19 +40,23 @@ function build(heldBy: string[]) {
   };
   const findById = jest.fn().mockResolvedValue(record);
   const heldByMock = jest.fn().mockResolvedValue(heldBy);
-  const pageItems = jest.fn().mockResolvedValue({ items: [], total: 0 });
+  const pageItems = jest.fn().mockResolvedValue({ items, total: items.length });
+  const refsOf = jest.fn().mockResolvedValue(ticketRefs);
   const service = new SpendBatchViewService(
     { findById, heldBy: heldByMock, pageItems } as unknown as SpendBatchRepo,
-    { statesOf: jest.fn().mockResolvedValue(new Map()) } as unknown as SpendRequestRepo,
+    {
+      statesOf: jest.fn().mockResolvedValue(new Map(items.map((item) => [item.requestId, 'AWAITING_SPEND_DECISION']))),
+    } as unknown as SpendRequestRepo,
     { getDepartmentBrief: jest.fn().mockResolvedValue({ id: 'dep', code: 'ENG' }) } as unknown as OrganizationReadApi,
     {
       people: jest
         .fn()
         .mockResolvedValue(new Map([[HEAD, { employeeId: HEAD, employeeCode: 'NV-1', fullName: 'An Nguyen' }]])),
     } as unknown as SpendWireViewService,
+    { refsOf } as unknown as RequestTicketRepo,
   );
 
-  return { service, heldBy: heldByMock, pageItems };
+  return { service, heldBy: heldByMock, pageItems, refsOf };
 }
 
 describe('SpendBatchViewService: who reads a batch', () => {
@@ -82,4 +98,37 @@ describe('SpendBatchViewService: who reads a batch', () => {
       await expect(service.items(stranger, BATCH, { page: 1, pageSize: 20 })).rejects.toThrow();
     },
   );
+
+  it('adds ticketRef for ticket items via one refsOf call and sets null for standalone requests (§7.4)', async () => {
+    const ticketRef = { id: '0a1b2c3d-0000-4000-8000-000000000t01', position: 2, itemCount: 3 };
+    const { service, refsOf } = build(
+      [],
+      [
+        {
+          requestId: 'req-1',
+          position: 1,
+          outcome: 'SENT_TO_APPROVER',
+          stopReason: null,
+          leftReason: null,
+          leftAt: null,
+        },
+        {
+          requestId: 'req-2',
+          position: 2,
+          outcome: 'SENT_TO_APPROVER',
+          stopReason: null,
+          leftReason: null,
+          leftAt: null,
+        },
+      ],
+      new Map([['req-1', ticketRef]]),
+    );
+
+    const result = await service.items(principal('finance-employee', ['FINANCE']), BATCH, { page: 1, pageSize: 20 });
+
+    expect(refsOf).toHaveBeenCalledTimes(1);
+    expect(refsOf).toHaveBeenCalledWith(['req-1', 'req-2']);
+    expect(result.items[0]).toMatchObject({ requestId: 'req-1', ticketRef });
+    expect(result.items[1]).toMatchObject({ requestId: 'req-2', ticketRef: null });
+  });
 });

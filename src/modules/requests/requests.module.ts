@@ -141,12 +141,14 @@ import { SpendBatchGroupReturnService } from './spend-approval/spend-batch-group
 import { SpendDecisionService } from './spend-approval/spend-decision.service';
 import { SpendBatchRecorder } from './spend-submission/spend-batch-recorder.service';
 import { SpendBatchService } from './spend-submission/spend-batch.service';
+import { SpendBatchWriterService } from './spend-submission/spend-batch-writer.service';
 import { SpendBatchListService } from './spend-submission/spend-batch-list.service';
 import { SpendBatchViewService } from './spend-submission/spend-batch-view.service';
 import { SpendEffectsService } from './spend-effects/spend-effects.service';
 import { SpendHeadService } from './spend-submission/spend-head.service';
 import { SpendQueueService } from './spend-submission/spend-queue.service';
 import { SpendQueueOutcomeService } from './spend-submission/spend-queue-outcome.service';
+import { SpendTicketReplyService } from './spend-submission/spend-ticket-reply.service';
 import { SpendApprovalSnapshotService } from './spend-approval-view/spend-approval-snapshot.service';
 import { NextYearBudgetRepo } from './spend-approval-view/next-year-budget.repo';
 import { NextYearBudgetService } from './spend-approval-view/next-year-budget.service';
@@ -306,6 +308,8 @@ import { PurchaseInvoiceSubmissionService } from './purchase-invoice/purchase-in
     SpendHeadService,
     SpendBatchRepo,
     SpendBatchRecorder,
+    SpendTicketReplyService,
+    SpendBatchWriterService,
     SpendBatchService,
     SpendBatchViewService,
     SpendBatchListService,

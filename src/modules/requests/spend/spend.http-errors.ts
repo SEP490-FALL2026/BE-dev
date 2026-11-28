@@ -12,6 +12,7 @@ import {
   SpendDecisionRefusedError,
   SpendNotHeadError,
   SpendNotInQueueError,
+  SpendReplyNoteNotInBatchError,
   SpendReserveRefusedError,
   SpendReviewNotFoundError,
   SpendSupplementRefusedError,
@@ -44,6 +45,13 @@ export function toSpendApiException(error: unknown): unknown {
       code: 'SPEND_BATCH.CONFIRMATION_NOT_IN_BATCH',
       message: error.message,
       details: { requestId: error.requestId },
+    });
+  }
+  if (error instanceof SpendReplyNoteNotInBatchError) {
+    return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, {
+      code: 'SPEND.REPLY_NOTE_NOT_IN_BATCH',
+      message: error.message,
+      details: { requestIds: [...error.requestIds] },
     });
   }
   if (error instanceof SpendReserveRefusedError) {
@@ -112,6 +120,7 @@ export const SPEND_ERROR_EXAMPLES = {
   NOT_IN_QUEUE: example(new SpendNotInQueueError('<request-id>')),
   BATCH_NOT_FOUND: example(new SpendBatchNotFoundError()),
   CONFIRMATION_NOT_IN_BATCH: example(new SpendConfirmationNotInBatchError('<request-id>')),
+  REPLY_NOTE_NOT_IN_BATCH: example(new SpendReplyNoteNotInBatchError(['<request-id>'])),
   RESERVE_NOT_PENDING: example(new SpendReserveRefusedError('RESERVE_NOT_PENDING')),
   RESERVE_CONFIRMER_IS_BENEFICIARY: example(new SpendReserveRefusedError('RESERVE_CONFIRMER_IS_BENEFICIARY')),
   NOT_THE_ASSIGNEE: example(new SpendDecisionRefusedError('NOT_THE_ASSIGNEE')),
