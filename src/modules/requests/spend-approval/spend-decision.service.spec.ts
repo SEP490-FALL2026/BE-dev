@@ -30,9 +30,10 @@ function build(record: AccessRequestRecord = request) {
     findOpen: jest.fn().mockResolvedValue({ id: 'step', assigneeEmployeeId: actor.employeeId, state: 'PENDING' }),
   };
   const checks = {
-    run: jest
-      .fn()
-      .mockResolvedValue({ status: 'CHECKED', check: { id: 'check', outcome: 'COVERED', overByMinor: null } }),
+    run: jest.fn().mockResolvedValue({
+      status: 'CHECKED',
+      check: { id: 'check', outcome: 'WITHIN_BASE', blockReasons: [], overByMinor: null },
+    }),
   };
   const confirmations = { ofStep: jest.fn().mockResolvedValue(null) };
   const effects = { sendBack: jest.fn() };
@@ -77,11 +78,12 @@ describe('SpendDecisionService single spend decision', () => {
     const f = build(record);
     f.checks.run.mockResolvedValue({
       status: 'CHECKED',
-      check: { id: 'check', outcome: 'BLOCKED', blockReasons: ['INSUFFICIENT_BUDGET'], overByMinor: 12n },
+      check: { id: 'check', outcome: 'BLOCKED', blockReasons: ['OVER_RESERVE'], overByMinor: 12n },
     });
     await expect(f.service.decide(actor, request.id, input)).resolves.toMatchObject({
       status: 'BOUNCED',
       to,
+      reasons: ['OVER_RESERVE'],
       overBy: '12',
     });
     expect(f.effects.sendBack).toHaveBeenCalledTimes(1);
