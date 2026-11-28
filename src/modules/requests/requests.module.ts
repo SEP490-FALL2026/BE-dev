@@ -256,7 +256,6 @@ const HTTP_FACING_SERVICES = [
   RequestHistoryService,
   RequestPreviewService,
   RequestResubmissionService,
-  RequestTicketRepo,
   RequestTicketViewService,
   RequestTimingService,
   ReserveConfirmationService,
@@ -307,6 +306,7 @@ const HTTP_FACING_SERVICES = [
     // The grace of a transfer, the extension point this module opens for personnel (`QĐ-110q`, R-49).
     TransferGraceHoldContributions,
     RequestReplyRepo,
+    RequestTicketRepo,
     RequestSenderService,
     // The listeners of the outcome of a request, the extension point this module opens, and the service that tells them.
     RequestOutcomeListeners,
