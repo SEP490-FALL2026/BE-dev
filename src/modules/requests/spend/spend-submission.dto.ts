@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { checklistBodySchema } from '../../policies/public/policy-checklist.types';
 import { requestStateSchema } from '../access-request/access-request.dto';
+import { ticketRefSchema } from '../request-ticket/request-ticket.dto';
 
 const text = (max: number) => z.string().trim().min(1).max(max);
 const money = z.strictObject({ amount: z.string(), currency: z.string() });
@@ -43,6 +44,16 @@ export const submitBatchBodySchema = z
      * when the batch carries a confirmation, and left out otherwise.
      */
     checklist: checklistBodySchema.optional(),
+    /**
+     * Plain-text reply notes provided by the head when resubmitting requests returned by the spending approver (1 to 1000 trimmed characters).
+     */
+    replyNotes: z
+      .array(z.strictObject({ requestId: z.uuid(), note: text(1000) }))
+      .max(BATCH_MAX)
+      .refine((items) => new Set(items.map((item) => item.requestId)).size === items.length, {
+        message: 'A request has one reply note.',
+      })
+      .optional(),
   })
   .refine((body) => (body.reserveConfirmations ?? []).length === 0 || body.checklist !== undefined, {
     path: ['checklist'],
@@ -96,7 +107,7 @@ const budgetOutcomeSchema = z.enum(['WITHIN_BASE', 'USES_RESERVE', 'BLOCKED']);
 const blockReasonSchema = z.enum(['PRICE_EXPIRED', 'NO_APPROVED_BUDGET', 'OVER_RESERVE']);
 
 /** A request waiting in the queue of the head: what it is, what it costs, and why it is not yet sent, never a budget figure. */
-const queueItemSchema = z.strictObject({
+export const queueItemSchema = z.strictObject({
   requestId: z.uuid(),
   plan: z.strictObject({ planId: z.uuid(), planName: z.string(), applicationName: z.string() }).nullable(),
   softwareName: z.string().nullable(),
@@ -128,6 +139,9 @@ const queueItemSchema = z.strictObject({
   overdue: z.boolean(),
   /** How many reminders the head has had about this request. */
   reminders: z.number().int().nonnegative(),
+  ticketRef: ticketRefSchema.nullable(),
+  /** True when the request has an unreplied return from the spending approver and needs a reply note on resubmission. */
+  replyNoteRequired: z.boolean(),
 });
 
 const batchSchema = z.strictObject({
@@ -139,10 +153,12 @@ const batchSchema = z.strictObject({
 });
 
 /** How one request of the batch fared and what became of the confirmation of the reserve the head gave for it, if any. */
-const submitResultSchema = z.strictObject({
+export const submitResultSchema = z.strictObject({
   requestId: z.uuid(),
   outcome: z.enum(['SENT_TO_APPROVER', 'AWAITING_RESERVE_CONFIRMATION', 'STOPPED']),
-  stopReason: z.enum(['PRICE_EXPIRED', 'NO_APPROVED_BUDGET', 'OVER_RESERVE', 'PRICE_MISSING']).nullable(),
+  stopReason: z
+    .enum(['PRICE_EXPIRED', 'NO_APPROVED_BUDGET', 'OVER_RESERVE', 'PRICE_MISSING', 'REPLY_NOTE_REQUIRED'])
+    .nullable(),
   /** `APPLIED`: the confirmation was kept and the spend step opened; `IGNORED`: it was given for a request that does not use the reserve; `NOT_GIVEN`. */
   reserveConfirmation: z.enum(['APPLIED', 'IGNORED', 'NOT_GIVEN']),
 });
@@ -159,7 +175,7 @@ const reserveConfirmationResultSchema = z.strictObject({
   confirmationKept: z.boolean(),
 });
 
-const batchItemSchema = z.strictObject({
+export const batchItemSchema = z.strictObject({
   requestId: z.uuid(),
   position: z.number().int().positive(),
   outcome: z
@@ -173,6 +189,7 @@ const batchItemSchema = z.strictObject({
       'PRICE_MISSING',
       'STALE_COST_EVIDENCE',
       'CLOSED_OR_EXPIRED_BUDGET_PERIOD',
+      'REPLY_NOTE_REQUIRED',
     ])
     .nullable(),
   leftReason: z
@@ -184,6 +201,7 @@ const batchItemSchema = z.strictObject({
   leftAt: z.iso.datetime().nullable(),
   /** Where the request is now; it is the request that holds the state, never the batch. */
   requestState: requestStateSchema,
+  ticketRef: ticketRefSchema.nullable(),
 });
 
 /** A line of the current plan the request may be attached to. */

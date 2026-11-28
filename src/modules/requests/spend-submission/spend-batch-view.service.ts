@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { RequestTicketRepo } from '../request-ticket/request-ticket.repo';
 import { SpendBatchRepo, type BatchRecord } from '../spend/spend-batch.repo';
 import { SpendBatchNotFoundError } from '../spend/spend.errors';
 import { SpendWireViewService } from '../spend/spend-wire-view.service';
@@ -22,6 +23,7 @@ export class SpendBatchViewService {
     private readonly found: SpendRequestRepo,
     private readonly organizationReads: OrganizationReadApi,
     private readonly wireView: SpendWireViewService,
+    private readonly tickets: RequestTicketRepo,
   ) {}
 
   /** Throws SpendBatchNotFoundError. */
@@ -54,7 +56,8 @@ export class SpendBatchViewService {
     const readsAll = batch.submittedByEmployeeId === actor.employeeId || isFinance(actor);
     const held = readsAll ? undefined : await this.batches.heldBy(id, actor.employeeId);
     const { items, total } = await this.batches.pageItems(id, (query.page - 1) * query.pageSize, query.pageSize, held);
-    const states = await this.found.statesOf(items.map((item) => item.requestId));
+    const requestIds = items.map((item) => item.requestId);
+    const [states, ticketRefs] = await Promise.all([this.found.statesOf(requestIds), this.tickets.refsOf(requestIds)]);
 
     return pageOf(
       items.map((item): BatchItemWire => ({
@@ -65,6 +68,7 @@ export class SpendBatchViewService {
         leftReason: item.leftReason,
         leftAt: item.leftAt?.toISOString() ?? null,
         requestState: states.get(item.requestId) as BatchItemWire['requestState'],
+        ticketRef: ticketRefs.get(item.requestId) ?? null,
       })),
       total,
       query.page,
