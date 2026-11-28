@@ -62153,7 +62153,7 @@
             }
           },
           "403": {
-            "description": "Only the IT Admin submits an invoice, and only the IT Admin and Finance read one.",
+            "description": "The caller is not an IT Admin (FORBIDDEN), or is an IT Admin who does not answer for the subscription or the license lot (of a purpose other than a request) the invoice is linked to (PURCHASE_INVOICE.NOT_RESPONSIBLE; only the Super Admin changes who answers). The Super Admin does not submit.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -62168,13 +62168,24 @@
                         "requestId": "req_example"
                       }
                     }
+                  },
+                  "PURCHASE_INVOICE.NOT_RESPONSIBLE": {
+                    "summary": "The purchase invoice was refused: NOT_RESPONSIBLE.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.NOT_RESPONSIBLE",
+                        "message": "The purchase invoice was refused: NOT_RESPONSIBLE.",
+                        "requestId": "req_example"
+                      }
+                    }
                   }
                 }
               }
             }
           },
           "404": {
-            "description": "The request or subscription does not exist or is not one the IT Admin works (PURCHASE_INVOICE.LINK_NOT_FOUND); any IT Admin works a subscription of the shared pool.",
+            "description": "The request (or the license lot bought for it) does not exist or is not one of a department the IT Admin works (PURCHASE_INVOICE.LINK_NOT_FOUND), or the subscription or lot does not exist.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -62466,7 +62477,7 @@
         },
         "responses": {
           "201": {
-            "description": "The invoice is kept as it was read against its request or subscription (any IT Admin may submit the invoice of a subscription period, as it has no owning department; one for a request is submitted by the IT Admin of the department of the request), with its files, and Finance is told. Nothing is spent until Finance signs. The amounts are what was taken out in dong; the count and the price of one are what the invoice says in the currency it states.",
+            "description": "The invoice is kept as it was read against its request or subscription (the invoice of a subscription, a period, a renewal or a seat purchase, and that of a license lot not bought for a request, is submitted only by the IT Admin who answers for it; one for a request is submitted by the IT Admin of the department of the request), with its files, and Finance is told. Nothing is spent until Finance signs. The amounts are what was taken out in dong; the count and the price of one are what the invoice says in the currency it states.",
             "content": {
               "application/json": {
                 "schema": {
@@ -62532,7 +62543,7 @@
             }
           },
           "403": {
-            "description": "Only the IT Admin submits an invoice, and only the IT Admin and Finance read one.",
+            "description": "The caller is not an IT Admin (FORBIDDEN), or is an IT Admin who does not answer for the subscription or the license lot (of a purpose other than a request) the invoice is linked to (PURCHASE_INVOICE.NOT_RESPONSIBLE; only the Super Admin changes who answers). The Super Admin does not submit.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -62547,13 +62558,24 @@
                         "requestId": "req_example"
                       }
                     }
+                  },
+                  "PURCHASE_INVOICE.NOT_RESPONSIBLE": {
+                    "summary": "The purchase invoice was refused: NOT_RESPONSIBLE.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.NOT_RESPONSIBLE",
+                        "message": "The purchase invoice was refused: NOT_RESPONSIBLE.",
+                        "requestId": "req_example"
+                      }
+                    }
                   }
                 }
               }
             }
           },
           "404": {
-            "description": "The request or subscription does not exist or is not one the IT Admin works (PURCHASE_INVOICE.LINK_NOT_FOUND); any IT Admin works a subscription of the shared pool.",
+            "description": "The request (or the license lot bought for it) does not exist or is not one of a department the IT Admin works (PURCHASE_INVOICE.LINK_NOT_FOUND), or the subscription or lot does not exist.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -63066,7 +63088,7 @@
         },
         "responses": {
           "201": {
-            "description": "A new invoice for the same request or subscription that points back at the one Finance returned; the number of the returned one may come back. It says everything again, with its own files.",
+            "description": "A new invoice for the same request, subscription or license lot (a subscription or lot not bought for a request is submitted again by the IT Admin who answers for it now) that points back at the one Finance returned; the number of the returned one may come back. It says everything again, with its own files.",
             "content": {
               "application/json": {
                 "schema": {
@@ -63132,7 +63154,7 @@
             }
           },
           "403": {
-            "description": "Only the IT Admin submits an invoice, and only the IT Admin and Finance read one.",
+            "description": "The caller is not an IT Admin (FORBIDDEN), or is an IT Admin who does not answer for the subscription or the license lot (of a purpose other than a request) the invoice is linked to (PURCHASE_INVOICE.NOT_RESPONSIBLE; only the Super Admin changes who answers). The Super Admin does not submit.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -63147,13 +63169,24 @@
                         "requestId": "req_example"
                       }
                     }
+                  },
+                  "PURCHASE_INVOICE.NOT_RESPONSIBLE": {
+                    "summary": "The purchase invoice was refused: NOT_RESPONSIBLE.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.NOT_RESPONSIBLE",
+                        "message": "The purchase invoice was refused: NOT_RESPONSIBLE.",
+                        "requestId": "req_example"
+                      }
+                    }
                   }
                 }
               }
             }
           },
           "404": {
-            "description": "The invoice does not exist or was not submitted by the caller (PURCHASE_INVOICE.NOT_FOUND), or its request or subscription is not one the IT Admin works (PURCHASE_INVOICE.LINK_NOT_FOUND).",
+            "description": "The invoice does not exist, or one for a request was not submitted by the caller (PURCHASE_INVOICE.NOT_FOUND), or its request is not one of a department the IT Admin works (PURCHASE_INVOICE.LINK_NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },

@@ -49,6 +49,7 @@ describe('LicenseLotLockService (tier 6a, then the plan at tier 7)', () => {
       }),
       find: jest.fn().mockResolvedValue(found),
       findMany: jest.fn().mockResolvedValue(new Map(found ? [[found.id, found]] : [])),
+      idsResponsibleFor: jest.fn().mockResolvedValue(['lot-1']),
     } as unknown as LicenseLotRepo;
     const plans = {
       lockShared: jest.fn().mockImplementation(() => {
@@ -101,5 +102,15 @@ describe('LicenseLotLockService (tier 6a, then the plan at tier 7)', () => {
     expect((plans as unknown as { lockShared: jest.Mock }).lockShared).not.toHaveBeenCalled();
     await expect(service.idsOfLots(['lot-1', 'sub-9'])).resolves.toEqual(new Set(['lot-1']));
     expect((lots as unknown as { findMany: jest.Mock }).findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('names the lots an IT Admin answers for in one read of the repo, with their own id', async () => {
+    const { service, lots } = setup(lot());
+
+    await expect(service.responsibleLotIds('it-1')).resolves.toEqual(['lot-1']);
+    expect((lots as unknown as { idsResponsibleFor: jest.Mock }).idsResponsibleFor).toHaveBeenCalledWith(
+      'it-1',
+      undefined,
+    );
   });
 });
