@@ -4,6 +4,7 @@ import { RequestsRoutingFacadeModule } from './requests-routing-facade.module';
 import { RequestsDashboardApi } from './public/requests-dashboard.api';
 import { RequestResubmissionService } from './request-intake/request-resubmission.service';
 import { RequestTicketRepo } from './request-ticket/request-ticket.repo';
+import { RequestTicketViewService } from './request-ticket-view/request-ticket-view.service';
 import { RequestReplyRepo } from './request-reply/request-reply.repo';
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
@@ -244,6 +245,7 @@ import { PurchaseInvoiceSubmissionService } from './purchase-invoice/purchase-in
     RequestReplyRepo,
     RequestResubmissionService,
     RequestTicketRepo,
+    RequestTicketViewService,
     RequestSenderService,
     RequestDraftService,
     RequestDraftSubmitService,
@@ -472,6 +474,7 @@ import { PurchaseInvoiceSubmissionService } from './purchase-invoice/purchase-in
     RequestPreviewService,
     RequestResubmissionService,
     RequestTicketRepo,
+    RequestTicketViewService,
     RequestTimingService,
     ReserveConfirmationService,
     ReturnRequestQueryService,

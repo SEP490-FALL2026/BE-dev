@@ -22,6 +22,7 @@ import { SUCCESS_MESSAGES_DEVICES } from './openapi-example-messages-devices';
 import { SUCCESS_MESSAGES_OPTIMIZATION } from './openapi-example-messages-optimization';
 import { SUCCESS_MESSAGES_PURCHASE_INVOICE } from './openapi-example-messages-purchase-invoice';
 import { SUCCESS_MESSAGES_USAGE } from './openapi-example-messages-usage';
+import { SUCCESS_MESSAGES_W4_C_VIEW } from './openapi-example-messages-w4-c-view';
 import { SUCCESS_MESSAGES_WAVE3_TECH } from './openapi-example-route-codes-wave3-tech';
 import { ROUTE_ERROR_CODES_DEVICES } from './openapi-example-route-codes-devices';
 import { ROUTE_ERROR_CODES_HEALTH } from './openapi-example-route-codes-health';
@@ -44,6 +45,7 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   ...SUCCESS_MESSAGES_POLICIES,
   ...SUCCESS_MESSAGES_PURCHASE_INVOICE,
   ...SUCCESS_MESSAGES_USAGE,
+  ...SUCCESS_MESSAGES_W4_C_VIEW,
   ...SUCCESS_MESSAGES_WAVE3_TECH,
   accessRequestAssessmentComplete: 'ACCESS_REQUEST.ASSESSMENT_COMPLETED',
   accessRequestAssessmentGet: 'ACCESS_REQUEST.ASSESSMENT_FETCHED',
@@ -55,10 +57,6 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   accessRequestDraftList: 'ACCESS_REQUEST.DRAFTS_LISTED',
   accessRequestDraftSave: 'ACCESS_REQUEST.DRAFT_SAVED',
   accessRequestDraftSubmit: 'ACCESS_REQUEST.SUBMITTED',
-  accessRequestGet: 'ACCESS_REQUEST.FETCHED',
-  accessRequestInternalRegister: 'ACCESS_REQUEST.INTERNAL_SOFTWARE_REGISTERED',
-  accessRequestLineCloseForDeparture: 'ACCESS_REQUEST.LINE_CANCELLED',
-  accessRequestLineList: 'GROUP_REQUEST.LINES_LISTED',
   accessRequestLineNeedDecide: 'GROUP_REQUEST.NEED_DECIDED',
   accessRequestLineWithdraw: 'GROUP_REQUEST.LINE_WITHDRAWN',
   accessRequestNeedDecide: 'ACCESS_REQUEST.NEED_DECIDED',

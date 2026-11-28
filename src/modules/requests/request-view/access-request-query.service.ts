@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
@@ -19,9 +19,16 @@ import { AccessRequestNotFoundError } from '../access-request/access-request.err
 import { viewFactsOf, hasSpendStep } from '../access-request/access-request.policy';
 import { RequestReadAccessService } from './request-read-access.service';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
-import type { AccessRequestRecord, ApprovalRecordRecord, NeedStepRecord } from '../access-request/access-request.types';
+import type {
+  AccessRequestRecord,
+  ApprovalRecordRecord,
+  NeedStepRecord,
+  TicketRef,
+} from '../access-request/access-request.types';
 import type { ReadableCancelCause } from '../access-request/group-request.types';
 import type { LimitExemption } from '../request-limits/request-limits.policy';
+import { RequestReplyRepo } from '../request-reply/request-reply.repo';
+import type { LatestReply } from '../request-reply/request-reply.types';
 
 export interface EmployeeRefView {
   employeeId: string;
@@ -109,6 +116,10 @@ export interface AccessRequestView extends Omit<
   serviceAccount: ServiceAccountView | null;
   /** Why the request was left out of GH-1/GH-2 when it was sent (`QĐ-110q`); null for every other request. */
   limitExemption: LimitExemption | null;
+  /** Ticket membership reference when submitted inside a ticket; null for standalone requests. */
+  ticketRef: TicketRef | null;
+  /** Latest human resubmission reply attached to this request; null when none exists. */
+  latestReply: LatestReply | null;
 }
 
 export interface RenewalView {
@@ -152,6 +163,9 @@ export interface CancellationView {
 /** Reading a request (`US-05-03` AC-12: who holds the step and why). Only the people `canReadRequest` names see it. */
 @Injectable()
 export class AccessRequestQueryService {
+  @Inject(RequestReplyRepo)
+  private readonly replies!: RequestReplyRepo;
+
   constructor(
     private readonly repo: AccessRequestRepo,
     private readonly organizationReads: OrganizationReadApi,
@@ -200,19 +214,21 @@ export class AccessRequestQueryService {
         ].filter((v) => v !== null),
       ),
     ];
-    const [people, plans, department, costCenters, proposal, spend, vendorChargeUntilRenewal] = await Promise.all([
-      this.organizationReads.getEmployees(peopleIds),
-      record.planId === null ? Promise.resolve([]) : this.catalog.getPlanSummaries([record.planId]),
-      this.organizationReads.getDepartmentBrief(record.departmentId),
-      record.costCenterId === null
-        ? Promise.resolve([])
-        : this.organizationReads.costCentersByIds([record.costCenterId]),
-      record.branch === 'NEW_SOFTWARE' ? this.assessments.findProposal(record.id) : Promise.resolve(null),
-      this.spendStatus.of(record),
-      record.branch === 'INTERNAL_FREE' || record.pricing.status === 'NOT_APPLICABLE'
-        ? Promise.resolve(undefined)
-        : this.pricing.vendorChargeUntilRenewalOf(record.planId),
-    ]);
+    const [people, plans, department, costCenters, proposal, spend, vendorChargeUntilRenewal, latestReply] =
+      await Promise.all([
+        this.organizationReads.getEmployees(peopleIds),
+        record.planId === null ? Promise.resolve([]) : this.catalog.getPlanSummaries([record.planId]),
+        this.organizationReads.getDepartmentBrief(record.departmentId),
+        record.costCenterId === null
+          ? Promise.resolve([])
+          : this.organizationReads.costCentersByIds([record.costCenterId]),
+        record.branch === 'NEW_SOFTWARE' ? this.assessments.findProposal(record.id) : Promise.resolve(null),
+        this.spendStatus.of(record),
+        record.branch === 'INTERNAL_FREE' || record.pricing.status === 'NOT_APPLICABLE'
+          ? Promise.resolve(undefined)
+          : this.pricing.vendorChargeUntilRenewalOf(record.planId),
+        this.replies.latestOf(record.id),
+      ]);
     const spendView = spend && (await this.spendViewOf(spend));
     const person = (id: string): EmployeeRefView => {
       const found = people.find((candidate) => candidate.id === id);
@@ -263,6 +279,8 @@ export class AccessRequestQueryService {
         slaWorkingDays: record.policy.slaWorkingDays,
       },
       submittedAt: record.submittedAt,
+      ticketRef: record.ticket,
+      latestReply,
       withdrawal:
         record.withdrawal === null
           ? null

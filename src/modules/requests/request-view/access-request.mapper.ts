@@ -4,6 +4,8 @@ import type { AccessRequestView } from './access-request-query.service';
 export const toWire = (view: AccessRequestView) => ({
   ...view,
   submittedAt: view.submittedAt.toISOString(),
+  ticketRef: view.ticketRef ?? null,
+  latestReply: view.latestReply ? { ...view.latestReply, createdAt: view.latestReply.createdAt.toISOString() } : null,
   needStep: {
     ...view.needStep,
     createdAt: view.needStep.createdAt.toISOString(),

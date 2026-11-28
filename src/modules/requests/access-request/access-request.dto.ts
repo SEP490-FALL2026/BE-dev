@@ -276,6 +276,21 @@ export const requestSchema = z.strictObject({
     slaWorkingDays: z.number().int().positive(),
   }),
   submittedAt: z.iso.datetime(),
+  ticketRef: z
+    .strictObject({
+      id: z.uuid(),
+      position: z.number().int().min(1).max(6),
+      itemCount: z.number().int().min(1).max(6),
+    })
+    .nullable(),
+  latestReply: z
+    .strictObject({
+      kind: z.enum(['REQUESTER_RESUBMISSION', 'HEAD_RESUBMISSION']),
+      note: z.string(),
+      author: z.strictObject({ id: z.uuid(), name: z.string() }),
+      createdAt: z.iso.datetime(),
+    })
+    .nullable(),
   needStep: needStepSchema,
   needDecision: needDecisionSchema.nullable(),
   /**

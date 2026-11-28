@@ -47,6 +47,8 @@ const baseRequestView = (over: Record<string, unknown> = {}) => ({
   cost: null,
   policy: { version: 1, hasSpendStep: true, slaWorkingDays: 3 },
   submittedAt: TS,
+  ticketRef: null,
+  latestReply: null,
   withdrawal: null,
   cancellation: null,
   serviceAccount: null,
@@ -195,5 +197,47 @@ describe('accessRequestGet & spendApprovalGet vendorChargeUntilRenewal (http con
     expect(
       'vendorChargeUntilRenewal' in (withoutCharge.body as { data: { spendApproval: object } }).data.spendApproval,
     ).toBe(false);
+  });
+
+  it('includes ticketRef: null and latestReply: null for standalone requests on accessRequestGet', async () => {
+    requestQueries.get.mockResolvedValueOnce(baseRequestView());
+
+    const response = await request(app.getHttpServer())
+      .get(`/api/v1/access-requests/${REQ_ID}`)
+      .set('Authorization', auth)
+      .expect(200);
+
+    const wire = (response.body as { data: { request: Record<string, unknown> } }).data.request;
+    expect(wire.ticketRef).toBeNull();
+    expect(wire.latestReply).toBeNull();
+  });
+
+  it('includes ticketRef and serialized latestReply when present on accessRequestGet', async () => {
+    const ticketRef = { id: '77777777-7777-4777-8777-777777777777', position: 2, itemCount: 3 };
+    requestQueries.get.mockResolvedValueOnce(
+      baseRequestView({
+        ticketRef,
+        latestReply: {
+          kind: 'REQUESTER_RESUBMISSION',
+          note: 'dùng cho dự án X, 3 tháng',
+          author: { id: EMP_ID, name: 'Nguyen Van A' },
+          createdAt: TS,
+        },
+      }),
+    );
+
+    const response = await request(app.getHttpServer())
+      .get(`/api/v1/access-requests/${REQ_ID}`)
+      .set('Authorization', auth)
+      .expect(200);
+
+    const wire = (response.body as { data: { request: Record<string, unknown> } }).data.request;
+    expect(wire.ticketRef).toEqual(ticketRef);
+    expect(wire.latestReply).toEqual({
+      kind: 'REQUESTER_RESUBMISSION',
+      note: 'dùng cho dự án X, 3 tháng',
+      author: { id: EMP_ID, name: 'Nguyen Van A' },
+      createdAt: TS.toISOString(),
+    });
   });
 });

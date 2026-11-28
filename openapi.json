@@ -87434,6 +87434,160 @@
         "tags": ["access-requests"]
       }
     },
+    "/api/v1/request-tickets/{id}": {
+      "get": {
+        "operationId": "requestTicketGet",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns the request ticket with the items the caller is allowed to view, sorted by position, and the latest resubmission reply on each visible item. Ticket status is derived across all items in the ticket.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/TicketResponseDto" },
+                    { "properties": { "message": { "example": "REQUEST_TICKET.FOUND" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The request ticket does not exist, or the caller cannot view any of its items (REQUEST_TICKET.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "REQUEST_TICKET.NOT_FOUND": {
+                    "summary": "The request ticket does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "REQUEST_TICKET.NOT_FOUND",
+                        "message": "The request ticket does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The ticket id is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Get a request ticket",
+        "tags": ["request-tickets"]
+      }
+    },
     "/api/v1/access-requests/{id}/need-decision": {
       "post": {
         "operationId": "accessRequestNeedDecide",
@@ -142119,6 +142273,34 @@
                     "additionalProperties": false
                   },
                   "submittedAt": { "type": "string", "format": "date-time" },
+                  "ticketRef": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "string", "format": "uuid" },
+                      "position": { "type": "integer", "minimum": 1, "maximum": 6 },
+                      "itemCount": { "type": "integer", "minimum": 1, "maximum": 6 }
+                    },
+                    "required": ["id", "position", "itemCount"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "latestReply": {
+                    "type": "object",
+                    "properties": {
+                      "kind": { "type": "string", "enum": ["REQUESTER_RESUBMISSION", "HEAD_RESUBMISSION"] },
+                      "note": { "type": "string" },
+                      "author": {
+                        "type": "object",
+                        "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                        "required": ["id", "name"],
+                        "additionalProperties": false
+                      },
+                      "createdAt": { "type": "string", "format": "date-time" }
+                    },
+                    "required": ["kind", "note", "author", "createdAt"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
                   "needStep": {
                     "type": "object",
                     "properties": {
@@ -142269,6 +142451,8 @@
                   "cost",
                   "policy",
                   "submittedAt",
+                  "ticketRef",
+                  "latestReply",
                   "needStep",
                   "needDecision",
                   "withdrawal",
@@ -142726,6 +142910,34 @@
                     "additionalProperties": false
                   },
                   "submittedAt": { "type": "string", "format": "date-time" },
+                  "ticketRef": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "string", "format": "uuid" },
+                      "position": { "type": "integer", "minimum": 1, "maximum": 6 },
+                      "itemCount": { "type": "integer", "minimum": 1, "maximum": 6 }
+                    },
+                    "required": ["id", "position", "itemCount"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "latestReply": {
+                    "type": "object",
+                    "properties": {
+                      "kind": { "type": "string", "enum": ["REQUESTER_RESUBMISSION", "HEAD_RESUBMISSION"] },
+                      "note": { "type": "string" },
+                      "author": {
+                        "type": "object",
+                        "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                        "required": ["id", "name"],
+                        "additionalProperties": false
+                      },
+                      "createdAt": { "type": "string", "format": "date-time" }
+                    },
+                    "required": ["kind", "note", "author", "createdAt"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
                   "needStep": {
                     "type": "object",
                     "properties": {
@@ -142876,6 +143088,8 @@
                   "cost",
                   "policy",
                   "submittedAt",
+                  "ticketRef",
+                  "latestReply",
                   "needStep",
                   "needDecision",
                   "withdrawal",
@@ -143764,6 +143978,37 @@
                         "additionalProperties": false
                       },
                       "submittedAt": { "type": "string", "format": "date-time" },
+                      "ticketRef": {
+                        "type": "object",
+                        "properties": {
+                          "id": { "type": "string", "format": "uuid" },
+                          "position": { "type": "integer", "minimum": 1, "maximum": 6 },
+                          "itemCount": { "type": "integer", "minimum": 1, "maximum": 6 }
+                        },
+                        "required": ["id", "position", "itemCount"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      },
+                      "latestReply": {
+                        "type": "object",
+                        "properties": {
+                          "kind": { "type": "string", "enum": ["REQUESTER_RESUBMISSION", "HEAD_RESUBMISSION"] },
+                          "note": { "type": "string" },
+                          "author": {
+                            "type": "object",
+                            "properties": {
+                              "id": { "type": "string", "format": "uuid" },
+                              "name": { "type": "string" }
+                            },
+                            "required": ["id", "name"],
+                            "additionalProperties": false
+                          },
+                          "createdAt": { "type": "string", "format": "date-time" }
+                        },
+                        "required": ["kind", "note", "author", "createdAt"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      },
                       "needStep": {
                         "type": "object",
                         "properties": {
@@ -143914,6 +144159,8 @@
                       "cost",
                       "policy",
                       "submittedAt",
+                      "ticketRef",
+                      "latestReply",
                       "needStep",
                       "needDecision",
                       "withdrawal",
@@ -143951,6 +144198,128 @@
                 "additionalProperties": false
               }
             ],
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "TicketResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "ticket": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string", "format": "uuid" },
+                  "requester": {
+                    "type": "object",
+                    "properties": {
+                      "employeeId": { "type": "string", "format": "uuid" },
+                      "employeeCode": { "type": "string" },
+                      "fullName": { "type": "string" }
+                    },
+                    "required": ["employeeId", "employeeCode", "fullName"],
+                    "additionalProperties": false
+                  },
+                  "department": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "string", "format": "uuid" },
+                      "code": { "type": "string" },
+                      "name": { "type": "string" }
+                    },
+                    "required": ["id", "code", "name"],
+                    "additionalProperties": false
+                  },
+                  "submittedAt": { "type": "string", "format": "date-time" },
+                  "status": { "type": "string", "enum": ["IN_PROGRESS", "DONE"] },
+                  "items": {
+                    "maxItems": 6,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "position": { "type": "integer", "minimum": 1, "maximum": 6 },
+                        "requestId": { "type": "string", "format": "uuid" },
+                        "plan": {
+                          "type": "object",
+                          "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                          "required": ["id", "name"],
+                          "additionalProperties": false
+                        },
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "PENDING",
+                            "WAITING_CONTROLLED",
+                            "AWAITING_EXECUTION",
+                            "AWAITING_IT_ASSESSMENT",
+                            "AWAITING_SPEND_SUBMISSION",
+                            "AWAITING_SPEND_DECISION",
+                            "AWAITING_REQUESTER_REVISION",
+                            "REJECTED",
+                            "IT_REJECTED",
+                            "EXECUTING",
+                            "COMPLETED",
+                            "FAILED",
+                            "AWAITING_IT_CLOSE",
+                            "WITHDRAWN",
+                            "CANCELLED"
+                          ]
+                        },
+                        "termMonths": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "maximum": 9007199254740991,
+                          "nullable": true,
+                          "minimum": 0
+                        },
+                        "routingMode": { "type": "string", "enum": ["VIA_HEAD", "ONE_STEP"] },
+                        "latestReply": {
+                          "type": "object",
+                          "properties": {
+                            "kind": { "type": "string", "enum": ["REQUESTER_RESUBMISSION", "HEAD_RESUBMISSION"] },
+                            "note": { "type": "string" },
+                            "author": {
+                              "type": "object",
+                              "properties": {
+                                "id": { "type": "string", "format": "uuid" },
+                                "name": { "type": "string" }
+                              },
+                              "required": ["id", "name"],
+                              "additionalProperties": false
+                            },
+                            "createdAt": { "type": "string", "format": "date-time" }
+                          },
+                          "required": ["kind", "note", "author", "createdAt"],
+                          "additionalProperties": false,
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "position",
+                        "requestId",
+                        "plan",
+                        "state",
+                        "termMonths",
+                        "routingMode",
+                        "latestReply"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": ["id", "requester", "department", "submittedAt", "status", "items"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["ticket"],
+            "additionalProperties": false,
             "nullable": true
           }
         },
@@ -145189,6 +145558,34 @@
                     "additionalProperties": false
                   },
                   "submittedAt": { "type": "string", "format": "date-time" },
+                  "ticketRef": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "string", "format": "uuid" },
+                      "position": { "type": "integer", "minimum": 1, "maximum": 6 },
+                      "itemCount": { "type": "integer", "minimum": 1, "maximum": 6 }
+                    },
+                    "required": ["id", "position", "itemCount"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "latestReply": {
+                    "type": "object",
+                    "properties": {
+                      "kind": { "type": "string", "enum": ["REQUESTER_RESUBMISSION", "HEAD_RESUBMISSION"] },
+                      "note": { "type": "string" },
+                      "author": {
+                        "type": "object",
+                        "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                        "required": ["id", "name"],
+                        "additionalProperties": false
+                      },
+                      "createdAt": { "type": "string", "format": "date-time" }
+                    },
+                    "required": ["kind", "note", "author", "createdAt"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
                   "needStep": {
                     "type": "object",
                     "properties": {
@@ -145339,6 +145736,8 @@
                   "cost",
                   "policy",
                   "submittedAt",
+                  "ticketRef",
+                  "latestReply",
                   "needStep",
                   "needDecision",
                   "withdrawal",
@@ -148617,6 +149016,34 @@
                     "additionalProperties": false
                   },
                   "submittedAt": { "type": "string", "format": "date-time" },
+                  "ticketRef": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "string", "format": "uuid" },
+                      "position": { "type": "integer", "minimum": 1, "maximum": 6 },
+                      "itemCount": { "type": "integer", "minimum": 1, "maximum": 6 }
+                    },
+                    "required": ["id", "position", "itemCount"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "latestReply": {
+                    "type": "object",
+                    "properties": {
+                      "kind": { "type": "string", "enum": ["REQUESTER_RESUBMISSION", "HEAD_RESUBMISSION"] },
+                      "note": { "type": "string" },
+                      "author": {
+                        "type": "object",
+                        "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                        "required": ["id", "name"],
+                        "additionalProperties": false
+                      },
+                      "createdAt": { "type": "string", "format": "date-time" }
+                    },
+                    "required": ["kind", "note", "author", "createdAt"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
                   "needStep": {
                     "type": "object",
                     "properties": {
@@ -148767,6 +149194,8 @@
                   "cost",
                   "policy",
                   "submittedAt",
+                  "ticketRef",
+                  "latestReply",
                   "needStep",
                   "needDecision",
                   "withdrawal",
@@ -150908,6 +151337,34 @@
                     "additionalProperties": false
                   },
                   "submittedAt": { "type": "string", "format": "date-time" },
+                  "ticketRef": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "string", "format": "uuid" },
+                      "position": { "type": "integer", "minimum": 1, "maximum": 6 },
+                      "itemCount": { "type": "integer", "minimum": 1, "maximum": 6 }
+                    },
+                    "required": ["id", "position", "itemCount"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "latestReply": {
+                    "type": "object",
+                    "properties": {
+                      "kind": { "type": "string", "enum": ["REQUESTER_RESUBMISSION", "HEAD_RESUBMISSION"] },
+                      "note": { "type": "string" },
+                      "author": {
+                        "type": "object",
+                        "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                        "required": ["id", "name"],
+                        "additionalProperties": false
+                      },
+                      "createdAt": { "type": "string", "format": "date-time" }
+                    },
+                    "required": ["kind", "note", "author", "createdAt"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
                   "needStep": {
                     "type": "object",
                     "properties": {
@@ -151058,6 +151515,8 @@
                   "cost",
                   "policy",
                   "submittedAt",
+                  "ticketRef",
+                  "latestReply",
                   "needStep",
                   "needDecision",
                   "withdrawal",

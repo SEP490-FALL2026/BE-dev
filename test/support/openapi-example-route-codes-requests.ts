@@ -1,4 +1,5 @@
 import type { RouteErrorStatus } from './openapi-example-manifest';
+import { ROUTE_ERROR_CODES_W4_C_VIEW } from './openapi-example-route-codes-w4-c-view';
 
 /**
  * Part of ROUTE_ERROR_CODES (requests (G5)), traced on BE `0da8f56` (Prompt 02, 26/10/2026):
@@ -7,6 +8,7 @@ import type { RouteErrorStatus } from './openapi-example-manifest';
 export const ROUTE_ERROR_CODES_REQUESTS: Readonly<
   Record<string, Partial<Record<RouteErrorStatus, readonly string[]>>>
 > = {
+  ...ROUTE_ERROR_CODES_W4_C_VIEW,
   accessRequestResubmit: {
     403: ['ACCESS_REQUEST.NOT_REQUESTER'],
     404: ['ACCESS_REQUEST.NOT_FOUND'],

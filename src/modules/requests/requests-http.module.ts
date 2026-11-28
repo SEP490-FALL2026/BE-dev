@@ -21,6 +21,7 @@ import { RequestAuditFlagsController } from './request-history/request-audit-fla
 import { MyRequestsController } from './request-history/request-history-mine.controller';
 import { RequestHistoryController } from './request-history/request-history.controller';
 import { AccessRequestsController } from './request-submission/access-requests.controller';
+import { RequestTicketViewController } from './request-ticket-view/request-ticket-view.controller';
 import { RequestsWorkFacadeModule } from './requests-work-facade.module';
 import { RequestsModule } from './requests.module';
 import { ReturnRequestsController } from './return-request/return-requests.controller';
@@ -41,6 +42,7 @@ import { TicketWithdrawalsController } from './withdraw/ticket-withdrawals.contr
     // The path `access-requests/drafts` is declared before `access-requests/:id`, so that it is a route of its own and never an id.
     RequestDraftsController,
     AccessRequestsController,
+    RequestTicketViewController,
     NeedDecisionController,
     WithdrawalController,
     TicketWithdrawalsController,
