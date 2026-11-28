@@ -229,7 +229,21 @@ describe('GET /request-tickets/:id and GET /access-requests/:id ticketRef/latest
       });
       await insertWithApprovedNeed(tx, world.plans.figmaFull, 'COMPLETED', 600_000n, { id: ticket.id, position: 1 });
       await insertWithApprovedNeed(tx, world.plans.miro, 'REJECTED', 500_000n, { id: ticket.id, position: 2 });
-      await insertWithApprovedNeed(tx, world.plans.notion, 'WITHDRAWN', 300_000n, { id: ticket.id, position: 3 });
+      const withdrawn = await insertWithApprovedNeed(tx, world.plans.notion, 'PENDING', 300_000n, {
+        id: ticket.id,
+        position: 3,
+      });
+      await requestRepo.setWithdrawal(
+        tx,
+        withdrawn.id,
+        {
+          requestedAt: submittedAt,
+          requestedByEmployeeId: world.e1.employeeId,
+          reason: null,
+          withdrawnAt: submittedAt,
+        },
+        'WITHDRAWN',
+      );
       return ticket.id;
     });
 
