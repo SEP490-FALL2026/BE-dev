@@ -1,5 +1,6 @@
 import { ROLE_GRANTS, type NestedArrayEntry } from './api-collection-registry';
 import { NESTED_ARRAYS_FIRST_HALF } from './api-collection-registry-nested-first-half';
+import { NESTED_ARRAYS_W4_C_VIEW } from './api-collection-registry-nested-w4-c-view';
 
 /** The second half of NESTED_ARRAYS, in the order of the recursive inventory. */
 const NESTED_ARRAYS_SECOND_HALF: readonly NestedArrayEntry[] = [
@@ -365,4 +366,8 @@ const NESTED_ARRAYS_SECOND_HALF: readonly NestedArrayEntry[] = [
  * inventory. A bounded entry names the exact source that enforces its number; its review condition is met by the first
  * change of that source.
  */
-export const NESTED_ARRAYS: readonly NestedArrayEntry[] = [...NESTED_ARRAYS_FIRST_HALF, ...NESTED_ARRAYS_SECOND_HALF];
+export const NESTED_ARRAYS: readonly NestedArrayEntry[] = [
+  ...NESTED_ARRAYS_FIRST_HALF,
+  ...NESTED_ARRAYS_SECOND_HALF,
+  ...NESTED_ARRAYS_W4_C_VIEW,
+];
