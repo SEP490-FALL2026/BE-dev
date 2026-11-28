@@ -99,6 +99,28 @@ export class StepReassignmentService {
     return orderByTicketPosition(await this.repo.spendQueueRequestIds()).map((row) => row.id);
   }
 
+  /**
+   * Collects all held-need requests and queued spend requests across pages, deduplicates, and sorts by
+   * ascending ticket position so same-ticket items run budget checks in order during the daily pass.
+   */
+  async dailyPassRequestIds(pageSize: number): Promise<string[]> {
+    const byId = new Map<string, { id: string; ticket: { id: string; position: number } | null }>();
+    let after: string | null = null;
+
+    for (;;) {
+      const page = await this.repo.pendingNeedTicketSlots(after, pageSize);
+      if (page.length === 0) break;
+      for (const slot of page) byId.set(slot.id, slot);
+      after = page[page.length - 1].id;
+    }
+
+    for (const slot of await this.repo.spendQueueRequestIds()) {
+      if (!byId.has(slot.id)) byId.set(slot.id, slot);
+    }
+
+    return orderByTicketPosition([...byId.values()]).map((slot) => slot.id);
+  }
+
   /** Looks again at one request in a transaction of its own, so that one that fails does not hold back the others. */
   reconcileInOwnTransaction(
     requestId: string,

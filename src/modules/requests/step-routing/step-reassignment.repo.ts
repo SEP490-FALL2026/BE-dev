@@ -246,13 +246,29 @@ export class StepReassignmentRepo {
 
   /** The next requests, by id after `after`, whose need step is held: the pass of the day over every held need step. */
   async pendingNeedRequestIds(after: string | null, limit: number): Promise<string[]> {
-    const rows = await this.prisma.$queryRaw<{ request_id: string }[]>`
-      SELECT DISTINCT request_id FROM access_request_steps
-       WHERE kind = 'NEED'::"AccessRequestStepKind" AND state = 'PENDING'::"AccessRequestStepState"
-         AND (${after}::uuid IS NULL OR request_id > ${after}::uuid)
-       ORDER BY request_id LIMIT ${limit}`;
+    return (await this.pendingNeedTicketSlots(after, limit)).map((row) => row.id);
+  }
 
-    return rows.map((row) => row.request_id);
+  /** Held-need requests after `after` with ticket membership for ticket-order sorting across the daily pass. */
+  async pendingNeedTicketSlots(
+    after: string | null,
+    limit: number,
+  ): Promise<{ id: string; ticket: { id: string; position: number } | null }[]> {
+    const rows = await this.prisma.$queryRaw<
+      { id: string; ticket_id: string | null; ticket_position: number | null }[]
+    >`
+      SELECT DISTINCT s.request_id AS id, r.ticket_id, r.ticket_position
+        FROM access_request_steps s
+        JOIN access_requests r ON r.id = s.request_id
+       WHERE s.kind = 'NEED'::"AccessRequestStepKind"
+         AND s.state = 'PENDING'::"AccessRequestStepState"
+         AND (${after}::uuid IS NULL OR s.request_id > ${after}::uuid)
+       ORDER BY s.request_id
+       LIMIT ${limit}`;
+
+    return rows.map((row) =>
+      toTicketSlotRow({ id: row.id, ticketId: row.ticket_id, ticketPosition: row.ticket_position }),
+    );
   }
 
   // --- the lock and the read ------------------------------------------------------------------------------

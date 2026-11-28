@@ -83,23 +83,12 @@ export class StepRedeterminationSweepApi {
     return result;
   }
 
-  /** Every held need step against the table of today, a page of requests at a time. */
+  /** Every held need step and queued spend request against the table of today, ordered by ticket position. */
   private async dailyPass(correlationId: string, now: Date): Promise<{ requests: number; failed: number }> {
-    let after: string | null = null;
-    let requests = 0;
-    let failed = 0;
-    for (;;) {
-      const page = await this.reassignment.heldNeedRequestIds(after, DAILY_PAGE);
-      if (page.length === 0) break;
-      requests += page.length;
-      failed += await this.each(page, 'EFFECTIVE_DATE_REACHED', correlationId, now);
-      after = page[page.length - 1];
-    }
-    const queued = await this.reassignment.spendQueueRequestIds();
-    requests += queued.length;
-    failed += await this.each(queued, 'EFFECTIVE_DATE_REACHED', correlationId, now);
+    const ids = await this.reassignment.dailyPassRequestIds(DAILY_PAGE);
+    const failed = await this.each(ids, 'EFFECTIVE_DATE_REACHED', correlationId, now);
 
-    return { requests, failed };
+    return { requests: ids.length, failed };
   }
 
   /** One transaction for each request; returns how many failed. A failure is logged by its kind, never its message. */

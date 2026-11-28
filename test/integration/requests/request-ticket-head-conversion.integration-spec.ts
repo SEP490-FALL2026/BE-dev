@@ -1,8 +1,10 @@
+import request from 'supertest';
 import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
 import { AccessRequestRepo } from '../../../src/modules/requests/access-request/access-request.repo';
 import type { NewAccessRequest } from '../../../src/modules/requests/access-request/access-request.types';
 import { RequestTicketRepo } from '../../../src/modules/requests/request-ticket/request-ticket.repo';
 import { ReassignmentHarness } from '../../support/reassignment-harness';
+import { changeRoleTo } from '../../support/builders/account.builder';
 import { buildTicketWorld, type TicketWorld } from '../../support/request-ticket-harness';
 
 const h = new ReassignmentHarness();
@@ -164,6 +166,137 @@ describe('W4-07 / W4-14: ticket items keep ticket position order on one-step con
         expect(checksR11[0]?.outcome).toBe('BLOCKED');
       } finally {
         await h.decideSpend(r12.id, { decision: 'REJECT', reason: 'Cleanup RB-9 iteration' }, world.c1.account);
+        await h.withdrawRequest(r11.id, {}, e5.account);
+        await h.makeHead(world.pDes, world.h1);
+      }
+    },
+  );
+
+  it.each([
+    { label: 'R11 (#2) inserted before R12 (#1)', insertR12First: false, suffix: 'SW-A' },
+    { label: 'R12 (#1) inserted before R11 (#2)', insertR12First: true, suffix: 'SW-B' },
+  ])(
+    'EFFECTIVE_DATE_REACHED sweep ($label): future-dated head checked in ticket position order (#1 before #2)',
+    async ({ insertR12First, suffix }) => {
+      const e5 = await h.staff(world.pDes, `W4-E5-${suffix}`);
+      const runner = h.ctx.app.get(TransactionRunner, { strict: false });
+      const ticketRepo = h.ctx.app.get(RequestTicketRepo, { strict: false });
+      const requestRepo = h.ctx.app.get(AccessRequestRepo, { strict: false });
+      const now = new Date('2026-06-01T08:00:00.000Z');
+
+      const make = (
+        planId: string,
+        termMonths: number,
+        monthlyPriceMinor: bigint,
+        ticket: { id: string; position: number },
+      ): NewAccessRequest => ({
+        organizationId: h.seed.organizationId,
+        type: 'GRANT',
+        branch: 'PAID_IN_CATALOG',
+        state: 'PENDING',
+        planId,
+        requesterEmployeeId: e5.employeeId,
+        beneficiaryEmployeeIds: [e5.employeeId],
+        departmentId: world.pDes.id,
+        costCenterId: world.ccDes!.id,
+        businessReason: 'Need license for design project',
+        termMonths,
+        pricing: {
+          status: 'PRICED',
+          missingReason: null,
+          kind: 'RECURRING',
+          budgetYear: 2026,
+          expectedEndDate: null,
+          amountMonths: termMonths,
+          amount: { amountMinor: monthlyPriceMinor * BigInt(termMonths), currency: 'VND' },
+          unitPrice: { amountMinor: monthlyPriceMinor, currency: 'VND' },
+          monthlyPriceMinor,
+          billingCycle: 'MONTHLY',
+          nextYearAmount: null,
+        },
+        policy: {
+          version: 2,
+          branch: 'PAID_IN_CATALOG',
+          chain: ['NEED', 'SPEND_APPROVAL', 'IT_EXECUTION'],
+          slaWorkingDays: 3,
+        },
+        createdByAppUserId: e5.account.appUserId,
+        now,
+        needStep: {
+          state: 'PENDING',
+          assigneeEmployeeId: world.h1.employeeId,
+          routingRow: 1,
+          waitingReason: null,
+          slaWorkingDays: 3,
+        },
+        ticket,
+      });
+
+      const { r11, r12 } = await runner.run(async (tx) => {
+        const ticket = await ticketRepo.insert(tx, {
+          organizationId: h.seed.organizationId,
+          requesterEmployeeId: e5.employeeId,
+          departmentId: world.pDes.id,
+          submittedAt: now,
+        });
+        if (insertR12First) {
+          const r12Row = await requestRepo.insert(
+            tx,
+            make(world.plans.miro, 4, 500_000n, { id: ticket.id, position: 1 }),
+          );
+          const r11Row = await requestRepo.insert(
+            tx,
+            make(world.plans.notion, 5, 300_000n, { id: ticket.id, position: 2 }),
+          );
+          return { r11: r11Row, r12: r12Row };
+        }
+        const r11Row = await requestRepo.insert(
+          tx,
+          make(world.plans.notion, 5, 300_000n, { id: ticket.id, position: 2 }),
+        );
+        const r12Row = await requestRepo.insert(
+          tx,
+          make(world.plans.miro, 4, 500_000n, { id: ticket.id, position: 1 }),
+        );
+        return { r11: r11Row, r12: r12Row };
+      });
+
+      try {
+        await h.decide(r12.id, { decision: 'APPROVE' }, world.h1.account).expect(200);
+        await changeRoleTo(h.ctx, h.admin, e5.employeeId, 'MANAGER');
+        await request(h.server())
+          .post(`/api/v1/departments/${world.pDes.id}/head-assignments`)
+          .set({ Authorization: `Bearer ${h.admin}` })
+          .send({ employeeId: e5.employeeId, effectiveFrom: h.tomorrow() })
+          .expect(200);
+        await h.sweep();
+        expect(await h.state(r12.id)).toBe('AWAITING_SPEND_SUBMISSION');
+        expect(await h.state(r11.id)).toBe('PENDING');
+
+        await h.ctx.sql.query(
+          `UPDATE department_head_periods
+              SET valid_from = LEAST(valid_from, ($2::date - 1)), valid_to = $2::date
+            WHERE department_id = $1 AND employee_id = $3 AND valid_to = $4::date`,
+          [world.pDes.id, h.today(), world.h1.employeeId, h.tomorrow()],
+        );
+        await h.ctx.sql.query(
+          `UPDATE department_head_periods SET valid_from = $2::date WHERE department_id = $1 AND employee_id = $3 AND valid_to IS NULL`,
+          [world.pDes.id, h.today(), e5.employeeId],
+        );
+        await h.sweep();
+
+        expect(await requestMeta(r12.id)).toEqual({
+          routing_mode: 'ONE_STEP',
+          one_step_reason: 'REQUESTER_IS_HEAD',
+          state: 'AWAITING_SPEND_DECISION',
+        });
+        expect(await requestMeta(r11.id)).toEqual({
+          routing_mode: 'ONE_STEP',
+          one_step_reason: 'REQUESTER_IS_HEAD',
+          state: 'AWAITING_REQUESTER_REVISION',
+        });
+      } finally {
+        await h.decideSpend(r12.id, { decision: 'REJECT', reason: 'Cleanup daily sweep test' }, world.c1.account);
         await h.withdrawRequest(r11.id, {}, e5.account);
         await h.makeHead(world.pDes, world.h1);
       }
