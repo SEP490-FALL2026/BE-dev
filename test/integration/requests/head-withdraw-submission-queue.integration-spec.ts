@@ -58,5 +58,6 @@ describe('W4-12 head withdrawal from the spend submission queue', () => {
     expect(h.codeOf(refused)).toBe('ACCESS_REQUEST.NOT_REQUESTER');
     const current = h.dataOf<{ request: AccessRequestWire }>(await h.fetch(sent.id, w.e1.account).expect(200)).request;
     expect(current.state).toBe('AWAITING_REQUESTER_REVISION');
+    expect(current.spend?.stage).toBe('RETURNED_TO_REQUESTER');
   });
 });

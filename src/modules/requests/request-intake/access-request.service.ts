@@ -61,10 +61,9 @@ export interface SenderLock {
   now: Date;
 }
 
-export interface PartyCheck extends SenderLock {
-  settings: RequestSettings;
-  facts?: PartyFacts;
-}
+type TicketPartyCheck = SenderLock & { settings: RequestSettings; mode: 'TICKET'; facts: PartyFacts };
+
+export type PartyCheck = (SenderLock & { settings: RequestSettings; mode: 'SINGLE' }) | TicketPartyCheck;
 
 export interface ItemFacts {
   body: SubmitBodyDto;
@@ -129,7 +128,7 @@ export class AccessRequestService {
     settings: RequestSettings,
     options: SubmitOptions = {},
   ): Promise<AccessRequestRecord> {
-    const party = { ...(await this.lockSenderWithin(tx, actor, options)), settings };
+    const party: PartyCheck = { ...(await this.lockSenderWithin(tx, actor, options)), settings, mode: 'SINGLE' };
     const item = await this.checkItemWithin(tx, actor, party, body, options);
     if (!item.ok) throw item.error;
     const created = await this.writeWithin(tx, actor, party, item.facts);
@@ -159,7 +158,7 @@ export class AccessRequestService {
     actor: AuthenticatedPrincipal,
     settings: RequestSettings,
     options: SubmitOptions,
-  ): Promise<PartyCheck> {
+  ): Promise<TicketPartyCheck> {
     const sender = await this.lockSenderWithin(tx, actor, options);
     const facts = await this.assessment.assessParty(tx, {
       employeeId: actor.employeeId,
@@ -167,7 +166,7 @@ export class AccessRequestService {
       lockDepartment: true,
     });
 
-    return { ...sender, settings, facts };
+    return { ...sender, settings, mode: 'TICKET', facts };
   }
 
   async checkItemWithin(
@@ -185,7 +184,7 @@ export class AccessRequestService {
       return { ok: false, error };
     }
     // The single submission judges its limits here. Tickets judge them across all their items together.
-    if (!party.facts) {
+    if (party.mode === 'SINGLE') {
       await this.limits.requireForOne(tx, {
         employeeId: actor.employeeId,
         planId: body.planId,
@@ -211,7 +210,7 @@ export class AccessRequestService {
       termMonths: body.termMonths,
       now: party.now,
       settings: party.settings,
-      lockDepartment: party.facts === undefined,
+      lockDepartment: party.mode === 'SINGLE',
     });
     this.requireNotHeld(assessed, options.toleratedSeatId);
     if (assessed.termRefusal !== null) {

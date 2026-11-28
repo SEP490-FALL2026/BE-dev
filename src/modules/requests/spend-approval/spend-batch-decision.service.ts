@@ -7,7 +7,7 @@ import { SpendBatchRepo } from '../spend/spend-batch.repo';
 import { SpendDecisionRepo } from '../spend/spend-decision.repo';
 import { SpendBatchGroupReturnService } from './spend-batch-group-return.service';
 import { SpendDecisionService, type JudgedSpendChecklist, type SpendDecisionInput } from './spend-decision.service';
-import { spendItemOutcome, type SpendItemOutcome } from './spend-item-outcome.policy';
+import { spendItemOutcome, type BatchReason, type SpendItemOutcome } from './spend-item-outcome.policy';
 import { SpendBatchNotFoundError, SpendDecisionRefusedError } from '../spend/spend.errors';
 import type { BatchDecisionResultWire } from '../spend-approval-view/spend-approval.dto';
 
@@ -87,7 +87,7 @@ export class SpendBatchDecisionService {
   ): Promise<BatchDecisionResultWire> {
     if (!of.inBatch.has(requestId)) return { requestId, outcome: 'SKIPPED', reason: 'NOT_IN_BATCH' };
 
-    let outcome: SpendItemOutcome | null;
+    let outcome: SpendItemOutcome<BatchReason> | null;
     try {
       const result = await this.decisions.decide(
         actor,
@@ -95,14 +95,13 @@ export class SpendBatchDecisionService {
         { decision: body.decision, reason: body.reason, checklist: body.checklist },
         of.judged,
       );
-      outcome = spendItemOutcome({ context: 'BATCH', decision: body.decision, result });
+      outcome = spendItemOutcome({ context: 'BATCH', result });
     } catch (error) {
-      outcome = spendItemOutcome({ context: 'BATCH', decision: body.decision, error });
+      outcome = spendItemOutcome({ context: 'BATCH', error });
       if (outcome === null) throw error;
     }
     if (outcome?.kind === 'RESULT') {
-      // The policy in BATCH context produces only batch reasons.
-      return { requestId, outcome: outcome.outcome, reason: outcome.reason as BatchDecisionResultWire['reason'] };
+      return { requestId, outcome: outcome.outcome, reason: outcome.reason };
     }
     if (outcome?.kind === 'NO_OPEN_STEP') return this.withoutOpenStep(actor, requestId, body.decision);
     if (outcome?.kind === 'GROUP_USES_LINES') {

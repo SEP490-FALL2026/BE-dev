@@ -33,3 +33,25 @@ Nền là commit `86562437` của `feat/redesign-w4`. Worktree `D:/Đồ án/w4-
 - B0 đạt tại `d7dff37f`. Hai spec integration mới và job quality đều đạt. Đối chiếu tên suite và từng test cho thấy toàn bộ 637 lỗi integration còn lại đã có trong 638 lỗi trên run nền. [B0](https://github.com/SEP490-FALL2026/BE-dev/actions/runs/46111552455)
 - B1 đạt tại `54f4ea41`. Hai spec integration W4 đạt. Job quality đạt 10.221 unit test và 346 test kiểm tra tĩnh. HTTP contract, integration tuần tự và smoke test cũng đạt. Toàn bộ 637 lỗi integration song song trùng tên suite và tên test với run nền. [B1](https://github.com/SEP490-FALL2026/BE-dev/actions/runs/46114002889)
 - Full test chỉ chạy trên CI GitHub.
+
+## Review sau B1
+
+- Harness mở chu kỳ ngân sách khi vừa tạo hoặc khi GET trả `DRAFT`, và chờ HTTP 201 ở route mở. Commit riêng `f07dde02`.
+- Ca policy nhóm theo QĐ-116b xác nhận trưởng phòng rút được dòng đã duyệt nhu cầu đang chờ trình, với lý do bắt buộc. Ca
+  tích hợp xác nhận Request đã trả về người xin vẫn ở trạng thái chi `RETURNED_TO_REQUESTER` sau khi từ chối thao tác rút
+  của trưởng phòng.
+- Quick check bằng Node 22 đạt `pnpm typecheck`, ESLint và Prettier trên các tệp sửa, `pnpm arch:check`,
+  `pnpm rules:check`, `pnpm rules:format`, 346 test tĩnh và 94 unit test trong 4 spec liên quan. OpenAPI export không
+  thay đổi `openapi.json`.
+
+### D-2 cần Owner chốt kết quả chi theo mục phiếu
+
+- `AccessRequestNotFoundError` dùng `NOT_IN_TICKET` cho phiếu, kể cả khi mục có trong phiếu nhưng người gọi không xem
+  được (§7.6). `NO_SPEND_STEP` từ `SpendDecisionRefusedError` tiếp tục phát tín hiệu nội bộ `NO_OPEN_STEP`. Đề xuất C-SPEND
+  dò quyết định gần nhất của người gọi để trả `ALREADY_DECIDED` khi gửi lại cùng quyết định, còn lại trả `NO_SPEND_STEP`
+  đúng danh sách §8.3 #4.
+- Với `STEP_NOT_PENDING`, đề xuất dò quyết định đã ghi như trên, sau đó dùng `NOT_CHECKABLE` khi bước tồn tại nhưng hiện
+  không thể quyết. Policy giữ kết cục nội bộ `STEP_NOT_PENDING` để Owner chốt cách ánh xạ.
+- Đề xuất C-SPEND chặn mục hai bước trước khi quyết bằng `USE_BATCH` theo §7.6. Nếu luồng một bước vẫn phát sinh
+  `BOUNCED_TO_HEAD` hoặc `GROUP_USES_LINES`, đề xuất coi đó là vi phạm điều kiện đầu vào của luồng và xử lý ở service.
+  Cả hai kết cục hiện chỉ có trong policy nội bộ.
