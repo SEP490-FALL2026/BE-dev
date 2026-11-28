@@ -13,15 +13,15 @@ Skill đã đọc: `ponytail` (full), `using-superpowers`, `using-agent-skills`,
 
 ## Gói và bằng chứng
 
-| Gói | Trạng thái | sha      | EV                   | Lệnh kiểm + pass/fail thực tế                                        | CI                              |
-| --- | ---------- | -------- | -------------------- | -------------------------------------------------------------------- | ------------------------------- |
-| P1  | xong local | bac2e26f | SPEC §4              | quick checks exit 0; gates 346/346; unit 68/68                       | chưa chạy                       |
-| P2a | xong local | b1a7440b | EV-01…05             | quick checks 0; gates 346/346; unit 116/116                          | chờ P5                          |
-| P2b | xong local | 96d829a6 | EV-09/10/14 catalog  | typecheck/lint/arch/rules/format 0; gates 346/346; catalog 1079/1079 | chờ P5                          |
-| P3a | xong local | d99e3371 | EV-06..12 complete   | quick checks 0; gates 346/346; unit 390/390                          | P5 pending                      |
-| P3b | xong local | 6a3f48bd | EV-06..12 revocation | lint 4214 files; gates 346/346; catalog+licensing 2181/2181          | P5 pending                      |
-| P4  | xong local | 0457a395 | EV-13..16            | quick checks 0; gates 346/346; unit 407/407; generators 474 ops      | P5 pending                      |
-| P5  | tiếp tục   | aa0ad0f6 | SPEC §8, EV-08/09    | quick checks 0; gates 346/346; catalog+licensing 2194/2194           | D-2 đóng; kiểm vòng sửa CI 1 |
+| Gói | Trạng thái | sha                 | EV                   | Lệnh kiểm + pass/fail thực tế                                                     | CI                                   |
+| --- | ---------- | ------------------- | -------------------- | --------------------------------------------------------------------------------- | ------------------------------------ |
+| P1  | hoàn thành | bac2e26f            | SPEC §4              | quick checks exit 0; gates 346 pass/0 fail; unit 68 pass/0 fail                   | 46164800057                          |
+| P2a | hoàn thành | b1a7440b            | EV-01…05             | quick checks 0; gates 346 pass/0 fail; unit 116 pass/0 fail                       | 46164800057                          |
+| P2b | hoàn thành | 96d829a6            | EV-09/10/14 catalog  | quick checks 0; gates 346 pass/0 fail; catalog 1079 pass/0 fail                   | 46164800057                          |
+| P3a | hoàn thành | d99e3371            | EV-06..12 complete   | quick checks 0; gates 346 pass/0 fail; unit 390 pass/0 fail                       | 46164800057                          |
+| P3b | hoàn thành | 6a3f48bd            | EV-06..12 revocation | lint 4214 file/0 lỗi; gates 346 pass/0 fail; catalog+licensing 2181 pass/0 fail   | 46164800057                          |
+| P4  | hoàn thành | 0457a395            | EV-13..16            | quick checks 0; gates 346 pass/0 fail; unit 407 pass/0 fail; 474 operations       | 46164800057                          |
+| P5  | hoàn thành | aa0ad0f6 + a01ff901 | SPEC §8, EV-08/09    | quick checks 0; gates 346 pass/0 fail; unit 2194 pass/0 fail; cuối 17 pass/0 fail | 637 nợ cũ/0 mới; 4 job bắt buộc xanh |
 
 ## Pre-flight interfaces
 
@@ -168,6 +168,21 @@ Skill đã đọc: `ponytail` (full), `using-superpowers`, `using-agent-skills`,
 - Root cause K1 fixture: `SeatTargetService.resolveSubscription` (nhánh K1) trả target PLAN, `subscriptionId=null` theo W3-17; `RevocationHarness.seat({subscriptionId})` ghi được assignment nhưng đọc lại qua filter subscription cũ nên không tìm thấy. Unit có sẵn `seat-target-k1.service.spec.ts` ghim hành vi này. Sửa **test mới** thành `h.plan('K1')` + `h.seat({planId})`; không sửa harness cũ, production, filter hoặc expectation test cũ. Đây là sửa thứ hai trong cùng vòng CI 1, không phải mở luật K1/K2.
 - Run đầu đã xong: integration shard 2 **1908 pass/180 fail**, 175 suites pass/31 fail; toàn bộ **180 nợ cũ/0 mới**. Tổng unique cả run **639 đỏ = 637 nợ cũ + 2 mới**, khớp đủ 637 cặp file/title của nền. Bảng từng test tại `CI-CLASSIFICATION-46162602020.md`; không phân loại chỉ theo số lượng.
 - Kiểm vòng sửa CI 1: typecheck/eslint hai test/arch/rules/rules:format/format/generators/arch:docs:check exit 0; gates **346 pass/0 fail**; unit hai file đã sửa của implementation **17 pass/0 fail**. Hai thay đổi test đang chờ CI xác minh, không chạy HTTP/integration local.
+- Vòng sửa CI 1 đã commit/push `a01ff901`; dispatch [46164800057](https://github.com/SEP490-FALL2026/BE-dev/actions/runs/46164800057), head chính xác `a01ff9016d1762d9e42f7604b08019837be69d53`. Chờ xác minh hai lỗi mới; chưa đánh dấu P5 xong.
+- Lượt xác minh: HTTP **2869 pass/0 fail**, 124 suites; spec inventory cũ và evidence HTTP mới đều PASS. Inband timing **31 pass/0 fail**, serial **100 pass/0 fail**; smoke **48 pass/0 fail**. Chưa có kết luận ba shard integration.
+
+### Kết quả cuối — P5 hoàn thành theo PLAN §7
+
+- [CI cuối 46164800057](https://github.com/SEP490-FALL2026/BE-dev/actions/runs/46164800057), head `a01ff9016d1762d9e42f7604b08019837be69d53`, đã kết thúc. Kết luận toàn run `failure` do nợ nền, **không phải toàn CI xanh**. Quality, HTTP, smoke và inband đều `success`; deploy `skipped`.
+- Quality: unit **10266 pass/0 fail**, 911 suites; gates **346 pass/0 fail**, 17 suites. Migrations được áp dụng thành công trên CI, schema drift **No difference detected**, OpenAPI và arch docs khớp. Không chạy migration/DB ở máy.
+- HTTP **2869 pass/0 fail**, 124 suites; smoke **48 pass/0 fail**, 10 suites; timing **31 pass/0 fail**, 8 suites; serial **100 pass/0 fail**, 14 suites.
+- Integration (1): **1902 pass/256 fail/1 skipped**; (2): **1908 pass/180 fail**; (3): **1801 pass/201 fail/4 skipped**. Tổng **5611 pass/637 fail/5 skipped**, 510 suites pass/108 fail/1 skipped. Hai file integration mới đều PASS, gồm K1 và bảo toàn K2.
+- So **từng** cặp file/full title: **637 nợ cũ, 0 mới, 0 thiếu so với tập nền**. Bảng đủ từng test: `CI-CLASSIFICATION-46164800057.md`; lịch sử 639 test của run đầu và hai lỗi mới đã sửa: `CI-CLASSIFICATION-46162602020.md`. Không suy ra chỉ từ tổng fail.
+- Một vòng sửa CI, hai lỗi mới đã hết: inventory POST (user cho phép D-2) và fixture K1 đọc theo plan thay filter subscription cũ. Không thay expectation nào khác; không sửa production sau `aa0ad0f6`. D-1/D-2 đều đóng, không có D-n chờ quyết định.
+- Kiểm cuối trước commit tài liệu: typecheck, eslint hai test đã sửa, arch/rules/rules:format/format exit 0; gates **346 pass/0 fail**; unit hai file implementation cuối **17 pass/0 fail**. Log `final-*.log`; không lặp full test local.
+- Self-review EV-01…16 có liên kết test ở bảng dưới; review độc lập ba Important đã xử lý, không Critical/Minor/Declined to judge. Không có lần review độc lập thứ hai; kết quả sau sửa do implementer xác minh bằng unit và CI.
+- P1 giữ nguyên guard; P3 giữ các kiểm cũ như các mục `Kiểm giữ:` và commit messages. Source mới chỉ ở catalog/licensing và test; không chạm requests, migration cũ, merged-migrations, dependency hay suppression. Không PR/merge/rebase/stash/deploy.
+- Full test chỉ chạy trên CI GitHub. Báo cáo tổng ở `D:/FPT/FALL2026/NOTE MD/logsCodex.txt`; giữ worktree/nhánh để điều phối review. **Hoàn thành triển khai theo PLAN, chưa phải Owner acceptance.**
 
 ### Self-review EV → kiểm thử
 
