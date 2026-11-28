@@ -19,7 +19,8 @@ export type PurchaseInvoiceRefusal =
   | 'ALREADY_RESUBMITTED'
   | 'SAME_PERSON'
   | 'NOT_SUBMITTED'
-  | 'NO_PLACE';
+  | 'NO_PLACE'
+  | 'NOT_RESPONSIBLE';
 
 export class PurchaseInvoiceRefusedError extends Error {
   constructor(

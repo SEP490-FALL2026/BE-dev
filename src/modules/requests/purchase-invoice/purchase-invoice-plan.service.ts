@@ -111,6 +111,7 @@ export class PurchaseInvoicePlanService {
     if (form.link.licenseLotId !== undefined) {
       return this.pool.buildLicenseLotLinkFacts({
         licenseLotId: form.link.licenseLotId,
+        actorEmployeeId: actor.employeeId,
         serviceMonth,
         scope,
         invoices: this.invoices,
@@ -123,6 +124,7 @@ export class PurchaseInvoicePlanService {
       ? this.requestFacts(form.link.requestId, form.link.provisioningTaskId ?? null, scope, serviceMonth, tx)
       : this.subscriptionFacts(
           form.link.subscriptionId as string,
+          actor.employeeId,
           serviceMonth,
           form.link.seatPurchaseId ?? null,
           form.link.subscriptionLineIds ?? [],
@@ -223,12 +225,10 @@ export class PurchaseInvoicePlanService {
     return target?.provisioningType === 'K2' ? this.poolSubscriptionOfPlan(request.planId, tx) : null;
   }
 
-  /**
-   * The invoice of a subscription comes from any IT Admin (`QĐ-111u`: every purchase has one, `QĐ-58b`: another IT Admin works in the place of
-   * the one who answers): a subscription has no owning department, so the route's role is its whole scope.
-   */
+  /** The invoice of a subscription (period, renewal, seat purchase, lines) comes only from the IT Admin who answers for it (`QĐ-118d`, `QĐ-118f`). */
   private async subscriptionFacts(
     subscriptionId: string,
+    actorEmployeeId: string,
     serviceMonth: BusinessDate,
     seatPurchaseId: string | null,
     subscriptionLineIds: readonly string[],
@@ -239,6 +239,7 @@ export class PurchaseInvoicePlanService {
     }
     const [period] = await this.pool.getPurchaseFacts([subscriptionId], tx);
     if (!period) throw new PurchaseInvoiceRefusedError('LINK_NOT_FOUND');
+    await this.requireResponsible(subscriptionId, actorEmployeeId, tx);
 
     const vendorId = await this.catalog.getPlanVendorId(period.planId, tx);
     if (vendorId === null) throw new PurchaseInvoiceRefusedError('NO_VENDOR');
@@ -285,6 +286,11 @@ export class PurchaseInvoicePlanService {
       renewedAssignmentId: null,
       licenseLotId: null,
     };
+  }
+
+  private async requireResponsible(subscriptionId: string, actorEmployeeId: string, tx?: DbTx): Promise<void> {
+    const responsible = await this.catalog.getSubscriptionResponsibleItAdmin(subscriptionId, tx);
+    if (responsible !== actorEmployeeId) throw new PurchaseInvoiceRefusedError('NOT_RESPONSIBLE');
   }
 
   private async validateSeatPurchaseLink(subscriptionId: string, seatPurchaseId: string | null, tx?: DbTx) {

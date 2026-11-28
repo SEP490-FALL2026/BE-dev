@@ -392,7 +392,7 @@ describe('purchase invoices over PostgreSQL (integration; PI-1.4, T-PI)', () => 
     expect(vendorId).toBeDefined();
   });
 
-  it('takes the invoice of a subscription of the shared pool, K2 or K4, from the IT Admin who answers for it and from every other IT Admin, and from nobody who is not one (PI-1c)', async () => {
+  it('takes the invoice of a subscription, K2 or K4, only from the IT Admin who answers for it, never from another IT Admin or from nobody who is not one, in the three forms of its link (QĐ-118d, QĐ-118f, Owner 28/11/2026)', async () => {
     const pool = async (type: 'K2' | 'K4'): Promise<string> => {
       const id = await takeOwnerOff(h, await h.subscription(10, type));
       await h.ctx.sql.query(
@@ -407,35 +407,111 @@ describe('purchase invoices over PostgreSQL (integration; PI-1.4, T-PI)', () => 
       account: ApiAccount,
       status: number,
       over: Record<string, unknown> = {},
+      link: Record<string, unknown> = {},
     ): Promise<request.Response> =>
       api('post', '', account)
         .send({
-          ...form(randomUUID(), { link: { subscriptionId: subscription }, quantity: 10, ...over }),
+          ...form(randomUUID(), { link: { subscriptionId: subscription, ...link }, quantity: 10, ...over }),
           documentIds: [await document(account)],
         })
         .expect(status);
+    const codeOf = (response: request.Response) => (response.body as { error: { code: string } }).error.code;
     const k2 = await pool('K2');
     const k4 = await pool('K4');
 
     const byResponsible = wire(await submitFor(k2, h.it1, 201));
-    const byOther = wire(await submitFor(k2, it2, 201, { servicePeriodMonth: `${h.year}-12` }));
-    const ofKey = wire(await submitFor(k4, it2, 201));
-
-    for (const kept of [byResponsible, byOther, ofKey]) {
+    const ofKey = wire(await submitFor(k4, h.it1, 201));
+    for (const kept of [byResponsible, ofKey]) {
       expect(kept).toMatchObject({ label: 'RENEWAL', matchResult: 'MATCHED', chargedCostCenterId: null });
     }
-    // The preview reads it the same way, and every subscription is of the pool now: any IT Admin submits its invoice.
-    expect(
-      h.dataOf<Preview>(
-        await api('post', '/preview', it2)
-          .send(form(randomUUID(), { link: { subscriptionId: k2 }, quantity: 10 }))
-          .expect(200),
-      ),
-    ).toMatchObject({ label: 'RENEWAL', matchResult: 'MATCHED' });
-    const owned = await h.subscription(10, 'K2');
-    await submitFor(owned, it2, 201);
+    // Another IT Admin is refused for a period, a seat purchase and the lines of a period, and the preview reads it the same way.
+    const forms: Record<string, unknown>[] = [
+      {},
+      { seatPurchaseId: randomUUID() },
+      { subscriptionLineIds: [randomUUID()] },
+    ];
+    for (const link of forms) {
+      expect(codeOf(await submitFor(k2, it2, 403, { servicePeriodMonth: `${h.year}-12` }, link))).toBe(
+        'PURCHASE_INVOICE.NOT_RESPONSIBLE',
+      );
+    }
+    expect(codeOf(await submitFor(k4, it2, 403))).toBe('PURCHASE_INVOICE.NOT_RESPONSIBLE');
+    const previewOf = (account: ApiAccount) =>
+      api('post', '/preview', account).send(form(randomUUID(), { link: { subscriptionId: k2 }, quantity: 10 }));
+    expect(codeOf(await previewOf(it2).expect(403))).toBe('PURCHASE_INVOICE.NOT_RESPONSIBLE');
+    expect(h.dataOf<Preview>(await previewOf(h.it1).expect(200))).toMatchObject({
+      label: 'RENEWAL',
+      matchResult: 'MATCHED',
+    });
+    // A subscription that names no IT Admin is refused to everyone.
+    const nobody = await pool('K2');
+    await h.ctx.sql.query(`UPDATE subscriptions SET responsible_it_admin_employee_id = NULL WHERE id = $1`, [nobody]);
+    expect(codeOf(await submitFor(nobody, h.it1, 403))).toBe('PURCHASE_INVOICE.NOT_RESPONSIBLE');
     await submitFor(k2, h.finance, 403);
     await submitFor(k2, h.boss.account, 403);
+  });
+
+  it('takes the invoice of a license lot that is not for a request only from the IT Admin who answers for it (QĐ-118d, Owner 28/11/2026)', async () => {
+    const plan4 = await h.plan('K4');
+    const lot = randomUUID();
+    await h.ctx.sql.query(
+      `INSERT INTO license_lots (id, organization_id, plan_id, purchased_on, license_count, unit_price_minor, purpose,
+         responsible_it_admin_employee_id, updated_at)
+       VALUES ($1, $2, $3, '2026-11-01', 3, 1000000, 'STOCK', $4, now())`,
+      [lot, h.seed.organizationId, plan4, h.it1.employeeId],
+    );
+    const send = async (account: ApiAccount) =>
+      api('post', '', account).send({
+        ...form(randomUUID(), { link: { licenseLotId: lot }, quantity: 3 }),
+        documentIds: [await document(account)],
+      });
+
+    const refused = await send(it2);
+    expect(refused.status).toBe(403);
+    expect((refused.body as { error: { code: string } }).error.code).toBe('PURCHASE_INVOICE.NOT_RESPONSIBLE');
+    const kept = await send(h.it1);
+    expect(kept.status).toBe(201);
+  });
+
+  it('lets the IT Admin who answers now submit a returned invoice of a subscription again after the Super Admin changed who answers, and refuses the one before (QĐ-118f, Owner 28/11/2026)', async () => {
+    const owned = await h.subscription(10, 'K2');
+    await h.ctx.sql.query(
+      `UPDATE subscriptions SET original_unit_price_minor = 1500, original_currency = 'USD' WHERE id = $1`,
+      [owned],
+    );
+    const first = wire(
+      await api('post', '', h.it1)
+        .send({
+          ...form(randomUUID(), { link: { subscriptionId: owned }, quantity: 10, vendorInvoiceNumber: 'RESP-1' }),
+          documentIds: [await document()],
+        })
+        .expect(201),
+    );
+    await h.ctx.sql.query(
+      `UPDATE purchase_invoices SET state = 'RETURNED', decided_by_employee_id = $2, decided_at = now(), return_reason = 'Sai' WHERE id = $1`,
+      [first.id, h.finance.employeeId],
+    );
+    await request(h.server())
+      .post(`/api/v1/subscriptions/${owned}/responsible-it-admin`)
+      .set('Authorization', `Bearer ${h.admin}`)
+      .send({ employeeId: it2.employeeId, reason: 'IT 1 is moving to another team' })
+      .expect(200);
+    const resend = async (account: ApiAccount) => {
+      const rest: Record<string, unknown> = form(randomUUID(), { quantity: 10, vendorInvoiceNumber: 'RESP-1' });
+      delete rest.link;
+
+      return api('post', `/${first.id}/resubmission`, account).send({
+        ...rest,
+        documentIds: [await document(account)],
+      });
+    };
+
+    const before = await resend(h.it1);
+    expect(before.status).toBe(403);
+    expect((before.body as { error: { code: string } }).error.code).toBe('PURCHASE_INVOICE.NOT_RESPONSIBLE');
+    const after = await resend(it2);
+    expect(after.status).toBe(201);
+    expect(wire(after)).toMatchObject({ state: 'SUBMITTED', resubmissionOfId: first.id });
   });
 
   it('marks over an invoice of the shared pool, linked to the pool or to a K2 request, and the invoice of a renewal, by the seats bought times the price of a month times the months to the renewal day, and never refuses it (B3B-06, QĐ-103w(3), QĐ-104c(3), QĐ-104d)', async () => {
