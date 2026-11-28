@@ -270,7 +270,7 @@ describe('ticket order in spend batches (integration, real PostgreSQL)', () => {
     expect(
       await checkRepo.pendingForItem(unitB.unitId, 2026, {
         id: notionId,
-        ticket: { id: ticketId, position: 0 },
+        ticket: { id: ticketId, position: 1 },
       }),
     ).toBe(2_500_000n);
     expect(

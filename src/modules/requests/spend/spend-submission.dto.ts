@@ -2,7 +2,7 @@ import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { checklistBodySchema } from '../../policies/public/policy-checklist.types';
-import { requestStateSchema } from '../access-request/access-request.dto';
+import { REPLY_NOTE_MAX_LENGTH, requestStateSchema } from '../access-request/access-request.dto';
 import { ticketRefSchema } from '../request-ticket/request-ticket.dto';
 
 const text = (max: number) => z.string().trim().min(1).max(max);
@@ -48,7 +48,7 @@ export const submitBatchBodySchema = z
      * Plain-text reply notes provided by the head when resubmitting requests returned by the spending approver (1 to 1000 trimmed characters).
      */
     replyNotes: z
-      .array(z.strictObject({ requestId: z.uuid(), note: text(1000) }))
+      .array(z.strictObject({ requestId: z.uuid(), note: text(REPLY_NOTE_MAX_LENGTH) }))
       .max(BATCH_MAX)
       .refine((items) => new Set(items.map((item) => item.requestId)).size === items.length, {
         message: 'A request has one reply note.',

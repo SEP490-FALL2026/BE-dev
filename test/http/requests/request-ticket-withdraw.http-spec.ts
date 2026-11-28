@@ -36,11 +36,10 @@ describe('POST /request-tickets/{id}/withdrawal HTTP contract', () => {
 
   afterAll(async () => app?.close());
 
+  const caller = principal(['EMPLOYEE']);
+
   const call = (body: object = {}) =>
-    request(app.getHttpServer())
-      .post(PATH)
-      .set('Authorization', bearer(principal(['EMPLOYEE'])))
-      .send(body);
+    request(app.getHttpServer()).post(PATH).set('Authorization', bearer(caller)).send(body);
 
   it('requires authentication (401)', async () => {
     await request(app.getHttpServer()).post(PATH).send({}).expect(401);
@@ -56,7 +55,7 @@ describe('POST /request-tickets/{id}/withdrawal HTTP contract', () => {
     const response = await call({ reason: 'No longer needed' }).expect(200);
 
     expect(withdraw).toHaveBeenCalledTimes(1);
-    expect(withdraw.mock.calls[0]?.[0].employeeId).toBeTruthy();
+    expect(withdraw.mock.calls[0]?.[0].employeeId).toBe(caller.employeeId);
     expect(withdraw.mock.calls[0]?.[1]).toBe(TICKET_ID);
     expect(withdraw.mock.calls[0]?.[2]).toEqual({ reason: 'No longer needed' });
     expect(bodyOf(response)).toMatchObject({

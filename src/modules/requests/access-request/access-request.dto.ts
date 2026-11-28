@@ -15,6 +15,9 @@ export const limitExemptionSchema = z.enum(LIMIT_EXEMPTIONS);
 /** The longest note of a reason or a label a request keeps; the DTO bounds the request with them. */
 export const REASON_MAX_LENGTH = 1000;
 
+/** The longest reply note a requester or head attaches when returning or resubmitting a request. */
+export const REPLY_NOTE_MAX_LENGTH = 1000;
+
 /**
  * The time of use, in whole months (`QĐ-111i`, `FR-2.8`): a plan bought by the month (`K1`) needs it, 1 to 9; a plan of seats (`K2`) or
  * internal software (`K5`) takes 1 to 12, or null for a right with no end (_Dùng lâu dài_), which a contractor, a freelancer or an intern

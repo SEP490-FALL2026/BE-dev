@@ -9,6 +9,7 @@ import {
   requestIdParamSchema,
   requestStateSchema,
   submitBodySchema,
+  withdrawBodySchema,
 } from '../access-request/access-request.dto';
 import { MAX_TICKET_ITEMS } from './request-ticket.policy';
 
@@ -84,10 +85,13 @@ export const ticketSchema = z.strictObject({
 });
 
 export const ticketSubmitBodySchema = z.strictObject({
-  items: z.array(submitBodySchema).min(1).max(TICKET_SUBMIT_BODY_MAX_ITEMS).meta({
-    description:
-      'Items to request in one ticket (at most 6 items; 7 to 20 items return an item-limit error, more than 20 is rejected as invalid input).',
-  }),
+  items: z
+    .array(submitBodySchema)
+    .min(1)
+    .max(TICKET_SUBMIT_BODY_MAX_ITEMS)
+    .meta({
+      description: `Items to request in one ticket (at most ${MAX_TICKET_ITEMS} items; ${MAX_TICKET_ITEMS + 1} to ${TICKET_SUBMIT_BODY_MAX_ITEMS} items return an item-limit error, more than ${TICKET_SUBMIT_BODY_MAX_ITEMS} is rejected as invalid input).`,
+    }),
 });
 
 export const ticketDecideBodySchema = z.strictObject({
@@ -102,9 +106,7 @@ export const ticketDecideBodySchema = z.strictObject({
   checklist: checklistBodySchema,
 });
 
-export const ticketWithdrawBodySchema = z.strictObject({
-  reason: z.string().trim().min(1).max(REASON_MAX_LENGTH).optional(),
-});
+export const ticketWithdrawBodySchema = withdrawBodySchema;
 
 export const ticketNeedResultSchema = z.strictObject({
   requestId: z.uuid(),

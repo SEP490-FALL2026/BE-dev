@@ -1,3 +1,4 @@
+import { MAX_TICKET_ITEMS } from './request-ticket.policy';
 import type { TicketItemRefusal } from './request-ticket.types';
 
 /** The ticket does not exist, or the caller cannot view any of its items. */
@@ -19,7 +20,7 @@ export class RequestTicketNotRequesterError extends Error {
 /** The ticket exceeds the maximum number of items allowed in one submission. */
 export class RequestTicketTooManyItemsError extends Error {
   constructor(readonly count: number) {
-    super(`A request ticket may contain at most 6 items (received ${count}).`);
+    super(`A request ticket may contain at most ${MAX_TICKET_ITEMS} items (received ${count}).`);
     this.name = 'RequestTicketTooManyItemsError';
   }
 }
