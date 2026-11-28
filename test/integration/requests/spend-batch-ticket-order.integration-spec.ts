@@ -258,29 +258,29 @@ describe('W4-07: ticket order in spend batches (integration, real PostgreSQL)', 
     expect(await h.state(miroId)).toBe('AWAITING_SPEND_SUBMISSION');
     expect(await h.state(notionId)).toBe('AWAITING_SPEND_DECISION');
 
-    // D-11 scope matrix on pendingForItem (Miro #1 2.5M is still AWAITING_RESERVE_CONFIRMATION):
+    // D-11 scope matrix on pendingForItem (Miro #1 2.5M is still AWAITING_RESERVE_CONFIRMATION; exclude Notion #2):
     const checkRepo = h.ctx.app.get(BudgetCheckRepo, { strict: false });
     expect(
       await checkRepo.pendingForItem(unitB.unitId, 2026, {
-        id: '00000000-0000-4000-8000-0000000000aa',
+        id: notionId,
         ticket: { id: ticketId, position: 2 },
       }),
     ).toBe(0n);
     expect(
       await checkRepo.pendingForItem(unitB.unitId, 2026, {
-        id: '00000000-0000-4000-8000-0000000000ab',
+        id: notionId,
         ticket: { id: ticketId, position: 0 },
       }),
     ).toBe(2_500_000n);
     expect(
       await checkRepo.pendingForItem(unitB.unitId, 2026, {
-        id: '00000000-0000-4000-8000-0000000000ac',
+        id: notionId,
         ticket: { id: '00000000-0000-4000-8000-0000000000dd', position: 2 },
       }),
     ).toBe(2_500_000n);
     expect(
       await checkRepo.pendingForItem(unitB.unitId, 2026, {
-        id: '00000000-0000-4000-8000-0000000000ad',
+        id: notionId,
         ticket: null,
       }),
     ).toBe(2_500_000n);

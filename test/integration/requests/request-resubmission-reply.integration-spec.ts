@@ -269,18 +269,31 @@ describe('W4-09: reply note on requester resubmission (integration, real Postgre
 
   it('nit: group request returned at NEED requires replyNote on resubmission (422 -> 200)', async () => {
     const u = await unit({ total: 100 * M });
-    const people = await h.colleagues(u, 2);
+    const [e1, e2] = await h.colleagues(u, 2);
     const group = h.dataOf<{ request: AccessRequestWire }>(
-      await h.submitGroup(h.groupBody(paid, people), u.head.account).expect(201),
+      await h.submitGroup(h.groupBody(paid, [e1, e2]), e1.account).expect(201),
     ).request;
 
-    await h.decide(group.id, { decision: 'RETURN', reason: 'Clarify group size' }, u.head.account).expect(200);
+    const no = h.checklists.questionsOf('1.2')[0];
+    await h
+      .decideLines(
+        group.id,
+        {
+          lines: [
+            { employeeId: e1.employeeId, decision: 'RETURN', reason: 'Clarify group size' },
+            { employeeId: e2.employeeId, decision: 'RETURN', reason: 'Clarify group size' },
+          ],
+          checklist: h.checklists.answer('1.2', [no]),
+        },
+        u.head.account,
+      )
+      .expect(200);
     expect(await h.state(group.id)).toBe('AWAITING_REQUESTER_REVISION');
 
-    const missing = await resubmit(group.id, u.head.account, {}).expect(422);
+    const missing = await resubmit(group.id, e1.account, {}).expect(422);
     expect(bodyOf(missing).error.code).toBe('ACCESS_REQUEST.REPLY_NOTE_REQUIRED');
 
-    await resubmit(group.id, u.head.account, { replyNote: 'Both people work on design' }).expect(200);
+    await resubmit(group.id, e1.account, { replyNote: 'Both people work on design' }).expect(200);
     expect(await h.state(group.id)).toBe('PENDING');
     expect(await repliesOf(group.id)).toHaveLength(1);
   });

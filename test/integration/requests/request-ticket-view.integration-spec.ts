@@ -72,7 +72,7 @@ describe('GET /request-tickets/:id and GET /access-requests/:id ticketRef/latest
     createdByAppUserId: world.e1.account.appUserId,
     now: new Date('2026-06-01T08:00:00.000Z'),
     needStep: {
-      state: 'APPROVED',
+      state: 'PENDING',
       assigneeEmployeeId: world.h1.employeeId,
       routingRow: 1,
       waitingReason: null,
@@ -89,6 +89,21 @@ describe('GET /request-tickets/:id and GET /access-requests/:id ticketRef/latest
       requestRepo.insert(tx, baseNewRequest(world.plans.figmaFull, 'PENDING', 600_000n)),
     );
 
+    const insertWithApprovedNeed = async (
+      tx: Parameters<Parameters<TransactionRunner['run']>[0]>[0],
+      planId: string,
+      state: Exclude<AccessRequestState, 'DRAFT'>,
+      monthlyPriceMinor: bigint,
+      ticket: { id: string; position: number },
+    ) => {
+      const created = await requestRepo.insert(tx, baseNewRequest(planId, state, monthlyPriceMinor, ticket));
+      await tx.accessRequestStep.update({
+        where: { id: created.needStepId },
+        data: { state: 'APPROVED', decidedAt: submittedAt },
+      });
+      return created;
+    };
+
     const inProgress = await runner.run(async (tx) => {
       const ticket = await ticketRepo.insert(tx, {
         organizationId: h.seed.organizationId,
@@ -96,18 +111,18 @@ describe('GET /request-tickets/:id and GET /access-requests/:id ticketRef/latest
         departmentId: world.pDes.id,
         submittedAt,
       });
-      const r1 = await requestRepo.insert(
-        tx,
-        baseNewRequest(world.plans.figmaFull, 'COMPLETED', 600_000n, { id: ticket.id, position: 1 }),
-      );
-      const r2 = await requestRepo.insert(
-        tx,
-        baseNewRequest(world.plans.miro, 'REJECTED', 500_000n, { id: ticket.id, position: 2 }),
-      );
-      const r3 = await requestRepo.insert(
-        tx,
-        baseNewRequest(world.plans.notion, 'AWAITING_SPEND_DECISION', 300_000n, { id: ticket.id, position: 3 }),
-      );
+      const r1 = await insertWithApprovedNeed(tx, world.plans.figmaFull, 'COMPLETED', 600_000n, {
+        id: ticket.id,
+        position: 1,
+      });
+      const r2 = await insertWithApprovedNeed(tx, world.plans.miro, 'REJECTED', 500_000n, {
+        id: ticket.id,
+        position: 2,
+      });
+      const r3 = await insertWithApprovedNeed(tx, world.plans.notion, 'AWAITING_SPEND_DECISION', 300_000n, {
+        id: ticket.id,
+        position: 3,
+      });
       await tx.accessRequestStep.create({
         data: {
           requestId: r3.id,
@@ -212,18 +227,9 @@ describe('GET /request-tickets/:id and GET /access-requests/:id ticketRef/latest
         departmentId: world.pDes.id,
         submittedAt,
       });
-      await requestRepo.insert(
-        tx,
-        baseNewRequest(world.plans.figmaFull, 'COMPLETED', 600_000n, { id: ticket.id, position: 1 }),
-      );
-      await requestRepo.insert(
-        tx,
-        baseNewRequest(world.plans.miro, 'REJECTED', 500_000n, { id: ticket.id, position: 2 }),
-      );
-      await requestRepo.insert(
-        tx,
-        baseNewRequest(world.plans.notion, 'WITHDRAWN', 300_000n, { id: ticket.id, position: 3 }),
-      );
+      await insertWithApprovedNeed(tx, world.plans.figmaFull, 'COMPLETED', 600_000n, { id: ticket.id, position: 1 });
+      await insertWithApprovedNeed(tx, world.plans.miro, 'REJECTED', 500_000n, { id: ticket.id, position: 2 });
+      await insertWithApprovedNeed(tx, world.plans.notion, 'WITHDRAWN', 300_000n, { id: ticket.id, position: 3 });
       return ticket.id;
     });
 
