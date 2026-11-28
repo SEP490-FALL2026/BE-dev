@@ -1,4 +1,4 @@
-# PLAN — File bằng chứng khi cấp/thu hồi (28/11/2026, bản 1.0)
+# PLAN — File bằng chứng khi cấp/thu hồi (28/11/2026, bản 1.1)
 
 > **Cho agent code:** dùng `superpowers:executing-plans` + `superpowers:test-driven-development`; bước dùng checkbox `- [ ]`. Đọc trọn
 > [SPEC.md](SPEC.md) trước — PLAN chỉ ghi quyết định code, luật nghiệp vụ ở SPEC (EV-xx).

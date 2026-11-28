@@ -1,6 +1,6 @@
-# SPEC — File bằng chứng khi cấp/thu hồi (28/11/2026, bản 1.0)
+# SPEC — File bằng chứng khi cấp/thu hồi (28/11/2026, bản 1.1)
 
-- **Trạng thái:** bản 1.0, Owner đã chốt 4 luật Q-EV1…Q-EV4 (28/11/2026, chat điều phối). Chưa vào sổ QĐ — gom ở lượt tài liệu cuối.
+- **Trạng thái:** bản 1.1 (áp review độc lập Opus 28/11: B1–B4, R1–R7, N1–N5), Owner đã chốt 4 luật Q-EV1…Q-EV4 (28/11/2026, chat điều phối). Chưa vào sổ QĐ — gom ở lượt tài liệu cuối.
 - **Nền đọc code:** `origin/dev` `595cdc48` (sau #101 hóa đơn QĐ-118d, #104 hotfix worker). Mọi `file:line` tính trên sha này.
 - **Nhánh code:** `feat/provisioning-evidence-files` (tách từ `dev`), PR riêng → `dev`. **Chạy song song đợt 4** — không chạm `src/modules/requests/**`.
 - **Nguồn:** yêu cầu FE (28/11), quyết định Owner Q-EV1…4 (mục 2), luật hiện có `US-07-02` AC-5 (bằng chứng text bắt buộc), `QĐ-90a`, `QĐ-118` (IT phụ
