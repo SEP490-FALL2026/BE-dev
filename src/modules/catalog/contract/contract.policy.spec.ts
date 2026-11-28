@@ -37,6 +37,8 @@ describe('who chooses which purpose of a file (US-04-04 AC-6, AC-9)', () => {
     ['SIGNATURE_RECORD', ['IT_ADMIN']],
     ['IMPORT_SOURCE', ['IT_ADMIN']],
     ['COST_STATEMENT', ['FINANCE']],
+    ['PROVISIONING_EVIDENCE', ['IT_ADMIN']],
+    ['ACCESS_CUT_EVIDENCE', ['IT_ADMIN']],
   ] as const)('lets %s be chosen by %j', (purpose, roles) => {
     expect(() => {
       assertMayChoosePurpose(purpose, roles);
@@ -51,6 +53,8 @@ describe('who chooses which purpose of a file (US-04-04 AC-6, AC-9)', () => {
     ['PURCHASE_DOCUMENT', ['EMPLOYEE']],
     ['CONTRACT_ATTACHMENT', ['MANAGER']],
     ['CONTRACT_ATTACHMENT', []],
+    ['PROVISIONING_EVIDENCE', ['FINANCE']],
+    ['ACCESS_CUT_EVIDENCE', ['FINANCE']],
   ] as const)('refuses %s to %j', (purpose, roles) => {
     expect(() => {
       assertMayChoosePurpose(purpose, roles);
