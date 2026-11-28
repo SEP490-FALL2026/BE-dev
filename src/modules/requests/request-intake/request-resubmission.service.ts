@@ -8,9 +8,12 @@ import {
   AccessRequestNotFoundError,
   AccessRequestNotRequesterError,
   AccessRequestNotAwaitingRevisionError,
+  AccessRequestReplyNoteRequiredError,
 } from '../access-request/access-request.errors';
 import type { AccessRequestRecord, NeedStepWithDecision } from '../access-request/access-request.types';
 import { RequestLineRepo } from '../group-request/request-line.repo';
+import { pendingHumanReturn } from '../request-reply/request-reply.policy';
+import { RequestReplyRepo } from '../request-reply/request-reply.repo';
 import { SpendRoutingService } from '../spend/spend-routing.service';
 import { RequesterHeadConversionService } from '../step-routing/requester-head-conversion.service';
 import { StepTargetService } from '../step-routing/step-target.service';
@@ -36,25 +39,54 @@ export class RequestResubmissionService {
     private readonly audit: AuditApi,
     private readonly targets: StepTargetService,
     private readonly heads: RequesterHeadConversionService,
+    private readonly replies: RequestReplyRepo,
   ) {}
 
-  async resubmit(actor: AuthenticatedPrincipal, id: string) {
+  async resubmit(actor: AuthenticatedPrincipal, id: string, input: { replyNote?: string } = {}) {
     return this.runner.run(async (tx) => {
       const request = await this.requests.lockById(tx, id);
       if (!request) throw new AccessRequestNotFoundError();
       if (request.requesterEmployeeId !== actor.employeeId) throw new AccessRequestNotRequesterError();
       if (request.state !== 'AWAITING_REQUESTER_REVISION') throw new AccessRequestNotAwaitingRevisionError();
+
+      const replyId = await this.recordReply(tx, actor, request, input.replyNote);
+
       if (await this.returnedAtAssessment(tx, request.id)) {
-        await this.reopenAssessment(tx, actor, request, new Date());
+        await this.reopenAssessment(tx, actor, request, new Date(), replyId);
       } else if (request.routing?.mode === 'ONE_STEP') {
         await this.spending.route(tx, actor, request, 'SUBMISSION', new Date());
       } else {
-        await this.reopenNeed(tx, actor, request, new Date());
+        await this.reopenNeed(tx, actor, request, new Date(), replyId);
       }
       const record = await this.requests.findById(id, tx);
       if (!record) throw new AccessRequestNotFoundError();
       return record;
     });
+  }
+
+  private async recordReply(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    request: AccessRequestRecord,
+    replyNote?: string,
+  ): Promise<string | undefined> {
+    const returns = await this.replies.humanReturnsOf(tx, request.id);
+    const replied = await this.replies.repliedStepIds(tx, request.id);
+    const pending = pendingHumanReturn({ returns, repliedStepIds: replied });
+    const trimmed = replyNote?.trim();
+    const note = trimmed && trimmed.length > 0 ? trimmed : undefined;
+    if (pending !== null && note === undefined) throw new AccessRequestReplyNoteRequiredError(pending.stepId);
+    if (note === undefined) return undefined;
+
+    const { id } = await this.replies.insert(tx, {
+      organizationId: request.organizationId,
+      requestId: request.id,
+      kind: 'REQUESTER_RESUBMISSION',
+      returnedStepId: pending?.stepId ?? null,
+      note,
+      authorEmployeeId: actor.employeeId,
+    });
+    return id;
   }
 
   /** Whether the last step the request had is the assessment of the IT Admin, closed because the proposal was sent back (a request waits for its sender at one step only). */
@@ -63,7 +95,13 @@ export class RequestResubmissionService {
   }
 
   /** A new step for the IT Admin in charge of today (any IT Admin when none works), and the request back to waiting for its assessment. */
-  private async reopenAssessment(tx: DbTx, actor: AuthenticatedPrincipal, request: AccessRequestRecord, now: Date) {
+  private async reopenAssessment(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    request: AccessRequestRecord,
+    now: Date,
+    replyId?: string,
+  ) {
     await this.requests.reopenAssessmentStep(tx, {
       requestId: request.id,
       assignee: await this.targets.assessmentTarget(tx, request.departmentId),
@@ -79,14 +117,25 @@ export class RequestResubmissionService {
         'ACCESS_REQUEST.RESUBMITTED',
         'ACCESS_REQUEST',
         request.id,
-        { requestId: request.id, reopenedStepKind: 'IT_ASSESSMENT', requestState: 'AWAITING_IT_ASSESSMENT' },
+        {
+          requestId: request.id,
+          reopenedStepKind: 'IT_ASSESSMENT',
+          requestState: 'AWAITING_IT_ASSESSMENT',
+          ...(replyId ? { replyId } : {}),
+        },
       ),
     );
   }
 
   /** A new need step for each returned one that something still waits on, or one-step conversion when a non-group requester became head. */
-  private async reopenNeed(tx: DbTx, actor: AuthenticatedPrincipal, request: AccessRequestRecord, now: Date) {
-    if (await this.convertResubmissionToOneStep(tx, actor, request, now)) return;
+  private async reopenNeed(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    request: AccessRequestRecord,
+    now: Date,
+    replyId?: string,
+  ) {
+    if (await this.convertResubmissionToOneStep(tx, actor, request, now, replyId)) return;
     const waiting = await this.stepsStillWaiting(tx, request);
     if (waiting.length === 0) throw new AccessRequestNotAwaitingRevisionError();
     const reopened: string[] = [];
@@ -122,6 +171,7 @@ export class RequestResubmissionService {
           reopenedStepIds: reopened.join(','),
           assigneeEmployeeIds: holders.join(','),
           requestState: 'PENDING',
+          ...(replyId ? { replyId } : {}),
         },
       ),
     );
@@ -132,6 +182,7 @@ export class RequestResubmissionService {
     actor: AuthenticatedPrincipal,
     request: AccessRequestRecord,
     now: Date,
+    replyId?: string,
   ): Promise<boolean> {
     if (request.type === 'GROUP_GRANT') return false;
     const becameHead = await this.targets.isRequesterHead(
@@ -161,6 +212,7 @@ export class RequestResubmissionService {
           requestId: request.id,
           oneStep: true,
           requestState: started?.state ?? request.state,
+          ...(replyId ? { replyId } : {}),
         },
       ),
     );

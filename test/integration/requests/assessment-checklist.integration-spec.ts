@@ -41,8 +41,10 @@ describe('the checklist of the assessment of a proposal (integration, real Postg
   };
   const post = (id: string, route: 'completion' | 'rejection', body: object, account = itInCharge.account) =>
     request(h.server()).post(`/api/v1/access-requests/${id}/assessment/${route}`).set(h.as(account)).send(body);
-  const resubmit = (id: string, account: Person['account']) =>
-    request(h.server()).post(`/api/v1/access-requests/${id}/resubmission`).set(h.as(account));
+  const resubmit = (id: string, account: Person['account'], body?: object) => {
+    const req = request(h.server()).post(`/api/v1/access-requests/${id}/resubmission`).set(h.as(account));
+    return body === undefined ? req : req.send(body);
+  };
   /** The question the IT Admin answers No: the first of the person. */
   const questionNo = () => h.checklists.questionsOf('1.3')[0];
   const stateOf = async (id: string) =>
@@ -249,7 +251,7 @@ describe('the checklist of the assessment of a proposal (integration, real Postg
 
       expect((await resubmit(proposed.id, head.account).expect(403)).status).toBe(403);
       const again = h.dataOf<{ request: AccessRequestWire }>(
-        await resubmit(proposed.id, proposed.sender.account).expect(200),
+        await resubmit(proposed.id, proposed.sender.account, { replyNote: 'Added 5 seats' }).expect(200),
       ).request;
 
       expect(again.state).toBe('AWAITING_IT_ASSESSMENT');
@@ -287,7 +289,7 @@ describe('the checklist of the assessment of a proposal (integration, real Postg
       }).expect(200);
 
       const again = h.dataOf<{ request: AccessRequestWire }>(
-        await resubmit(proposed.id, head.account).expect(200),
+        await resubmit(proposed.id, head.account, { replyNote: 'Used by design team' }).expect(200),
       ).request;
 
       expect(again.state).toBe('AWAITING_IT_ASSESSMENT');

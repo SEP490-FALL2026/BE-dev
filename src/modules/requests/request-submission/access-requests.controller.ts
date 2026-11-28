@@ -1,6 +1,7 @@
 import { RequestResubmissionService } from '../request-intake/request-resubmission.service';
+import { ResubmitAccessRequestDto } from '../request-intake/request-resubmission.dto';
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
@@ -147,10 +148,12 @@ export class AccessRequestsController {
   @Post(':id/resubmission')
   @HttpCode(HttpStatus.OK)
   @AuthenticatedOnly()
-  @ApiOperation({ operationId: 'accessRequestResubmit', summary: 'Send a revised one-step request again' })
+  @ApiOperation({ operationId: 'accessRequestResubmit', summary: 'Send a revised request again' })
+  @ApiBody({ type: ResubmitAccessRequestDto, required: false })
   @ApiSuccessResponse(AccessRequestResponseDto, {
     message: 'ACCESS_REQUEST.RESUBMITTED',
-    description: 'The request is checked again and either waits for its requester or goes to the spending approver.',
+    description:
+      'The request is checked again or reopened at the step that returned it. When the request is waiting after a human return that has not been answered yet, a plain-text replyNote (1 to 1000 characters) is required.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -167,13 +170,20 @@ export class AccessRequestsController {
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: 'The id is invalid (VALIDATION_ERROR).',
-      examples: [VALIDATION_EXAMPLE],
+      description:
+        'The id or body is invalid (VALIDATION_ERROR), or a reply note is required because the request was returned by a person and has not been answered yet (ACCESS_REQUEST.REPLY_NOTE_REQUIRED, details.returnedStepId).',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.REPLY_NOTE_REQUIRED],
     },
   )
-  async resubmit(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: RequestIdParamDto) {
+  async resubmit(
+    @CurrentPrincipal() actor: AuthenticatedPrincipal,
+    @Param() params: RequestIdParamDto,
+    @Body() body: ResubmitAccessRequestDto = {},
+  ) {
     try {
-      return { request: toWire(await this.queries.view(await this.resubmissions.resubmit(actor, params.id))) };
+      return {
+        request: toWire(await this.queries.view(await this.resubmissions.resubmit(actor, params.id, body))),
+      };
     } catch (error) {
       throw toAccessRequestApiException(error);
     }

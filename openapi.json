@@ -87011,9 +87011,13 @@
         "parameters": [
           { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
         ],
+        "requestBody": {
+          "required": false,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ResubmitAccessRequestDto" } } }
+        },
         "responses": {
           "200": {
-            "description": "The request is checked again and either waits for its requester or goes to the spending approver.",
+            "description": "The request is checked again or reopened at the step that returned it. When the request is waiting after a human return that has not been answered yet, a plain-text replyNote (1 to 1000 characters) is required.",
             "content": {
               "application/json": {
                 "schema": {
@@ -87021,6 +87025,27 @@
                     { "$ref": "#/components/schemas/AccessRequestResponseDto" },
                     { "properties": { "message": { "example": "ACCESS_REQUEST.RESUBMITTED" } } }
                   ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -87120,8 +87145,50 @@
               }
             }
           },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
           "422": {
-            "description": "The id is invalid (VALIDATION_ERROR).",
+            "description": "The id or body is invalid (VALIDATION_ERROR), or a reply note is required because the request was returned by a person and has not been answered yet (ACCESS_REQUEST.REPLY_NOTE_REQUIRED, details.returnedStepId).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -87134,6 +87201,18 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.REPLY_NOTE_REQUIRED": {
+                    "summary": "A reply note is required when resubmitting after a human return.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.REPLY_NOTE_REQUIRED",
+                        "message": "A reply note is required when resubmitting after a human return.",
+                        "details": { "returnedStepId": "<returned-step-id>" },
                         "requestId": "req_example"
                       }
                     }
@@ -87197,7 +87276,7 @@
           }
         },
         "security": [{ "bearer": [] }],
-        "summary": "Send a revised one-step request again",
+        "summary": "Send a revised request again",
         "tags": ["access-requests"]
       }
     },
@@ -142983,6 +143062,12 @@
           }
         },
         "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "ResubmitAccessRequestDto": {
+        "type": "object",
+        "properties": { "replyNote": { "type": "string", "minLength": 1, "maxLength": 1000 } },
+        "default": {},
         "additionalProperties": false
       },
       "AccessRequestOrDraftResponseDto": {

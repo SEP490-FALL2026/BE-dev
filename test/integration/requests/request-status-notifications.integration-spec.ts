@@ -369,8 +369,10 @@ describe('the status of a request told to the people it concerns, over PostgreSQ
   });
 
   describe('a request sent again after it was returned, and a proposal of a head (B1, B4)', () => {
-    const resubmit = (id: string, account: Unit['member']['account']) =>
-      request(h.server()).post(`/api/v1/access-requests/${id}/resubmission`).set(h.as(account));
+    const resubmit = (id: string, account: Unit['member']['account'], body?: object) => {
+      const req = request(h.server()).post(`/api/v1/access-requests/${id}/resubmission`).set(h.as(account));
+      return body === undefined ? req : req.send(body);
+    };
     const assigned = async (employeeId: string, id: string, cause: string) =>
       (await h.noticesOf(employeeId, 'STEP_ASSIGNED'))
         .filter((row) => row.subject_id === id && row.params.cause === cause)
@@ -383,7 +385,7 @@ describe('the status of a request told to the people it concerns, over PostgreSQ
       await h.project();
       expect(await assigned(u.head.employeeId, sent.id, 'RESUBMITTED')).toEqual([]);
 
-      await resubmit(sent.id, u.member.account).expect(200);
+      await resubmit(sent.id, u.member.account, { replyNote: 'Need 3 seats' }).expect(200);
       await h.project();
 
       expect(await assigned(u.head.employeeId, sent.id, 'RESUBMITTED')).toEqual([
@@ -407,7 +409,7 @@ describe('the status of a request told to the people it concerns, over PostgreSQ
       await h.project();
       expect(await assigned(h.it1.employeeId, proposed.id, 'RESUBMITTED')).toEqual([]);
 
-      await resubmit(proposed.id, u.member.account).expect(200);
+      await resubmit(proposed.id, u.member.account, { replyNote: 'Vendor is Miro Inc.' }).expect(200);
       await h.project();
 
       expect(await assigned(h.it1.employeeId, proposed.id, 'RESUBMITTED')).toEqual([

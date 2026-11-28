@@ -51,8 +51,10 @@ describe('the checklist of the need step (integration, real PostgreSQL)', () => 
         [requestId],
       )
       .then((result) => result.rows);
-  const resubmit = (id: string, account: Person['account']) =>
-    request(h.server()).post(`/api/v1/access-requests/${id}/resubmission`).set(h.as(account));
+  const resubmit = (id: string, account: Person['account'], body?: object) => {
+    const req = request(h.server()).post(`/api/v1/access-requests/${id}/resubmission`).set(h.as(account));
+    return body === undefined ? req : req.send(body);
+  };
   /** The question the head answers No: the second of the person. */
   const questionNo = 1;
 
@@ -179,7 +181,7 @@ describe('the checklist of the need step (integration, real PostgreSQL)', () => 
       await h.decide(sent.id, { decision: 'APPROVE' }, u.head.account).expect(409);
 
       const again = h.dataOf<{ request: AccessRequestWire }>(
-        await resubmit(sent.id, u.member.account).expect(200),
+        await resubmit(sent.id, u.member.account, { replyNote: 'Added business justification' }).expect(200),
       ).request;
 
       expect(again.state).toBe('PENDING');
@@ -358,7 +360,7 @@ describe('the checklist of the need step (integration, real PostgreSQL)', () => 
         [e1, e2, e3].map((person) => [person.employeeId, 'RETURN', true]).sort(),
       );
 
-      await resubmit(request.id, e1.account).expect(200);
+      await resubmit(request.id, e1.account, { replyNote: 'Added team details' }).expect(200);
 
       const steps = await h.needSteps(request.id);
       expect(steps.map((step) => step.state)).toEqual(['CLOSED', 'PENDING']);

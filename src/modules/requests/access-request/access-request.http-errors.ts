@@ -30,6 +30,7 @@ import {
   AccessRequestNotPriceableError,
   AccessRequestPlanBoundToDeviceError,
   AccessRequestPlanNotFoundError,
+  AccessRequestReplyNoteRequiredError,
 } from './access-request.errors';
 
 const refuse = (status: HttpStatus, code: string, message: string): ApiException =>
@@ -53,6 +54,13 @@ export function toAccessRequestApiException(error: unknown): unknown {
     return refuse(HttpStatus.FORBIDDEN, 'ACCESS_REQUEST.NOT_REQUESTER', error.message);
   if (error instanceof AccessRequestNotAwaitingRevisionError)
     return refuse(HttpStatus.CONFLICT, 'ACCESS_REQUEST.NOT_AWAITING_REVISION', error.message);
+  if (error instanceof AccessRequestReplyNoteRequiredError) {
+    return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, {
+      code: 'ACCESS_REQUEST.REPLY_NOTE_REQUIRED',
+      message: error.message,
+      details: { returnedStepId: error.returnedStepId },
+    });
+  }
 
   if (error instanceof AccessRequestNotFoundError) {
     return refuse(HttpStatus.NOT_FOUND, 'ACCESS_REQUEST.NOT_FOUND', error.message);
@@ -189,6 +197,7 @@ const cancellation = (reason: ConstructorParameters<typeof AccessRequestCancella
 /** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
 export const ACCESS_REQUEST_ERROR_EXAMPLES = {
   NOT_AWAITING_REVISION: example(new AccessRequestNotAwaitingRevisionError()),
+  REPLY_NOTE_REQUIRED: example(new AccessRequestReplyNoteRequiredError('<returned-step-id>')),
   NOT_FOUND: example(new AccessRequestNotFoundError()),
   PLAN_NOT_FOUND: example(new AccessRequestPlanNotFoundError()),
   PLAN_BOUND_TO_DEVICE: example(new AccessRequestPlanBoundToDeviceError()),
