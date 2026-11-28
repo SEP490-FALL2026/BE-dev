@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { declareApplication, declarePlan } from '../../support/builders/catalog.builder';
-import { enterEmployee } from '../../support/builders/organization.builder';
+import { createDepartment, enterEmployee } from '../../support/builders/organization.builder';
 import { GroupHarness } from '../../support/group-harness';
 import type { AccessRequestWire } from '../../support/request-harness';
 import { buildTicketWorld, type TicketWorld } from '../../support/request-ticket-harness';
@@ -208,10 +208,14 @@ describe('single requests on the Wave 3 baseline', () => {
   });
 
   it('refuses the device plan before the Cost Center check, but submits internal K5', async () => {
-    const bare = { ...(await h.bareDepartment()), unitId: '' };
+    const department = await createDepartment(h.ctx, h.admin, {
+      code: 'P-NO-CC',
+      name: 'Department without a Cost Center',
+      itAdminEmployeeId: w.it1.employeeId,
+    });
+    const bare = { ...department, unitId: '' };
     const employee = await h.staff(bare, 'REQ-NO-CC');
     await h.makeHead(bare, await h.staff(bare, 'REQ-NO-CC-HEAD'));
-    await h.setItAdminInCharge(bare, { employeeId: w.it1.employeeId, account: w.it1 });
     const device = await h.submit(h.form(w.plans.k4DeviceKey), employee.account).expect(422);
     expect(h.codeOf(device)).toBe('ACCESS_REQUEST.PLAN_BOUND_TO_DEVICE');
     const paid = await h.submit(h.form(w.plans.miro, { termMonths: 1 }), employee.account).expect(409);
