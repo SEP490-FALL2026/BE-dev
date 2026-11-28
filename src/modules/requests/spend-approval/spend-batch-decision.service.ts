@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, TransientDatabaseError } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { BudgetCommitmentExistsError, BudgetCommitmentNotHoldableError } from '../../budgets/public/budgets.errors';
 import { PolicyChecklistApi } from '../../policies/public/policy-checklist.api';
-import { AccessRequestGroupUsesLinesError, AccessRequestNotFoundError } from '../access-request/access-request.errors';
+import { AccessRequestNotFoundError } from '../access-request/access-request.errors';
 import { SpendBatchRepo } from '../spend/spend-batch.repo';
 import { SpendDecisionRepo } from '../spend/spend-decision.repo';
 import { SpendBatchGroupReturnService } from './spend-batch-group-return.service';
 import { SpendDecisionService, type JudgedSpendChecklist, type SpendDecisionInput } from './spend-decision.service';
+import { spendItemOutcome, type SpendItemOutcome } from './spend-item-outcome.policy';
 import { SpendBatchNotFoundError, SpendDecisionRefusedError } from '../spend/spend.errors';
 import type { BatchDecisionResultWire } from '../spend-approval-view/spend-approval.dto';
 
@@ -85,13 +85,9 @@ export class SpendBatchDecisionService {
     body: SpendDecisionInput,
     of: { inBatch: ReadonlySet<string>; judged: JudgedSpendChecklist },
   ): Promise<BatchDecisionResultWire> {
-    const skipped = (reason: NonNullable<BatchDecisionResultWire['reason']>): BatchDecisionResultWire => ({
-      requestId,
-      outcome: 'SKIPPED',
-      reason,
-    });
-    if (!of.inBatch.has(requestId)) return skipped('NOT_IN_BATCH');
+    if (!of.inBatch.has(requestId)) return { requestId, outcome: 'SKIPPED', reason: 'NOT_IN_BATCH' };
 
+    let outcome: SpendItemOutcome | null;
     try {
       const result = await this.decisions.decide(
         actor,
@@ -99,27 +95,23 @@ export class SpendBatchDecisionService {
         { decision: body.decision, reason: body.reason, checklist: body.checklist },
         of.judged,
       );
-      if (result.status === 'DECIDED') return { requestId, outcome: result.decision, reason: null };
-
-      return skipped('RECHECKED_RETURNED_TO_HEAD');
+      outcome = spendItemOutcome({ context: 'BATCH', decision: body.decision, result });
     } catch (error) {
-      if (error instanceof TransientDatabaseError)
-        return { requestId, outcome: 'RETRYABLE', reason: 'TRANSIENT_FAILURE' };
-      if (error instanceof AccessRequestNotFoundError) return skipped('NO_SPEND_STEP');
-      if (error instanceof AccessRequestGroupUsesLinesError) {
-        // A request for a group is decided for each person, never in bulk (`US-05-17`); but a return of the batch takes the whole group back.
-        if (body.decision === 'RETURN') return this.returnGroup(actor, requestId, of.judged);
-
-        return skipped('GROUP_NEEDS_LINES');
-      }
-      if (isNoOpenStep(error)) return this.withoutOpenStep(actor, requestId, body.decision);
-      if (error instanceof SpendDecisionRefusedError) return skipped(error.reason);
-      // The commitment could not be held (a safety net after the check): this request is skipped, the others of the batch go on.
-      if (error instanceof BudgetCommitmentNotHoldableError || error instanceof BudgetCommitmentExistsError) {
-        return skipped('COMMITMENT_NOT_HOLDABLE');
-      }
-      throw error;
+      outcome = spendItemOutcome({ context: 'BATCH', decision: body.decision, error });
+      if (outcome === null) throw error;
     }
+    if (outcome?.kind === 'RESULT') {
+      // The policy in BATCH context produces only batch reasons.
+      return { requestId, outcome: outcome.outcome, reason: outcome.reason as BatchDecisionResultWire['reason'] };
+    }
+    if (outcome?.kind === 'NO_OPEN_STEP') return this.withoutOpenStep(actor, requestId, body.decision);
+    if (outcome?.kind === 'GROUP_USES_LINES') {
+      // Each person in a group is decided separately. Returning a batch sends the whole group back.
+      if (body.decision === 'RETURN') return this.returnGroup(actor, requestId, of.judged);
+      return { requestId, outcome: 'SKIPPED', reason: 'GROUP_NEEDS_LINES' };
+    }
+
+    throw new Error(`No outcome for spend decision ${requestId}`);
   }
 
   /** The group goes back whole on the judgement of the batch; refused like any request of the batch when the person does not hold its step. */
