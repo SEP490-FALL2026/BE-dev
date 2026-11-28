@@ -18,6 +18,22 @@ import type { SeatPricing } from '../purchase-invoice.types';
 import { servingMonthlyPriceMinor } from '../../../catalog/public/subscription-line-price.policy';
 
 /**
+ * The lot of a request is submitted by the IT Admin of the department of the request (not found otherwise); any other lot only by the IT Admin
+ * who answers for it, none when it names no one (`QĐ-118d`, `QĐ-118f`).
+ */
+function refuseLotOfOthers(
+  lot: { purpose: string; responsibleItAdminEmployeeId: string | null },
+  request: { departmentId: string } | null,
+  by: { scope: readonly string[]; actorEmployeeId: string },
+): void {
+  if (lot.purpose === 'REQUEST') {
+    if (!request || !by.scope.includes(request.departmentId)) throw new PurchaseInvoiceRefusedError('LINK_NOT_FOUND');
+  } else if (lot.responsibleItAdminEmployeeId !== by.actorEmployeeId) {
+    throw new PurchaseInvoiceRefusedError('NOT_RESPONSIBLE');
+  }
+}
+
+/**
  * Aggregates subscription-line, seat-purchase, and prior-month `NONE` purchase facts from `catalog` and `licensing`
  * for `PurchaseInvoicePlanService` (`N7`, `N9`, `invoicedLater MONTHLY`).
  */
@@ -315,11 +331,24 @@ export class PurchaseInvoicePoolService {
     return ((await this.organizationReads.getOrganization(tx)) as { timeZone: string }).timeZone;
   }
 
+  /**
+   * Whether the invoice is answered for by the IT Admin responsible now rather than by whoever submitted it: one of a subscription, or of a lot
+   * not bought for a request (`QĐ-118d`, `QĐ-118f`). One of a request stays with the person who submitted it.
+   */
+  async isOfResponsibleItAdmin(row: { linkKind: string; licenseLotId: string | null }, tx: DbTx): Promise<boolean> {
+    if (row.linkKind === 'SUBSCRIPTION') return true;
+    if (row.linkKind !== 'LICENSE_LOT' || row.licenseLotId === null) return false;
+    const lot = await this.findLot(row.licenseLotId, tx);
+
+    return lot !== null && lot.purpose !== 'REQUEST';
+  }
+
   /** Builds link facts for a `LICENSE_LOT` purchase invoice, checking acting scope and `F14a` double-invoicing. */
   async buildLicenseLotLinkFacts(deps: {
     licenseLotId: string;
     serviceMonth: BusinessDate;
     scope: readonly string[];
+    actorEmployeeId: string;
     invoices: PurchaseInvoiceRepo;
     catalog: CatalogApi;
     tx?: DbTx;
@@ -331,9 +360,7 @@ export class PurchaseInvoicePoolService {
       lot.purpose === 'REQUEST' && lot.requestId !== null
         ? await deps.invoices.requestFacts(lot.requestId, deps.tx)
         : null;
-    if (lot.purpose === 'REQUEST' && (!request || !deps.scope.includes(request.departmentId))) {
-      throw new PurchaseInvoiceRefusedError('LINK_NOT_FOUND');
-    }
+    refuseLotOfOthers(lot, request, deps);
     if (lot.invoiceActualMinor !== null) throw new PurchaseInvoiceRefusedError('LOT_ALREADY_INVOICED');
 
     const vendorId = await deps.catalog.getPlanVendorId(lot.planId, deps.tx);

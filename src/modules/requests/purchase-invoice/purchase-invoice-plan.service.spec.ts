@@ -101,6 +101,7 @@ describe('PurchaseInvoicePlanService acting scope (S2-2)', () => {
       } as never,
       {
         getPlanVendorId: jest.fn().mockResolvedValue('vendor-1'),
+        getSubscriptionResponsibleItAdmin: jest.fn().mockResolvedValue('it-1'),
         getSubscriptionOriginalPrice: jest.fn().mockResolvedValue(null),
       } as never,
       {
@@ -171,6 +172,7 @@ describe('PurchaseInvoicePlanService acting scope (S2-2)', () => {
       { invoicedLinesForMonth } as never,
       {
         getPlanVendorId: jest.fn().mockResolvedValue('vendor-1'),
+        getSubscriptionResponsibleItAdmin: jest.fn().mockResolvedValue('it-1'),
         getSubscriptionOriginalPrice: jest.fn().mockResolvedValue(null),
       } as never,
       {
@@ -238,6 +240,7 @@ describe('PurchaseInvoicePlanService acting scope (S2-2)', () => {
       } as never,
       {
         getPlanVendorId: jest.fn().mockResolvedValue('vendor-1'),
+        getSubscriptionResponsibleItAdmin: jest.fn().mockResolvedValue('it-1'),
         getSubscriptionOriginalPrice: jest.fn().mockResolvedValue(null),
       } as never,
       {

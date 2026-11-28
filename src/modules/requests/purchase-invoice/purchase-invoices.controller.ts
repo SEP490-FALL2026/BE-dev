@@ -39,10 +39,17 @@ const FORBIDDEN = {
   examples: [FORBIDDEN_EXAMPLE],
 } as const;
 
+const NOT_RESPONSIBLE = {
+  status: HttpStatus.FORBIDDEN,
+  description:
+    'The caller is not an IT Admin (FORBIDDEN), or is an IT Admin who does not answer for the subscription or the license lot (of a purpose other than a request) the invoice is linked to (PURCHASE_INVOICE.NOT_RESPONSIBLE; QĐ-118d, QĐ-118f: only the Super Admin changes who answers). The Super Admin does not submit.',
+  examples: [FORBIDDEN_EXAMPLE, EXAMPLES.NOT_RESPONSIBLE],
+} as const;
+
 const LINK_NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
   description:
-    'The request or subscription does not exist or is not one the IT Admin works (PURCHASE_INVOICE.LINK_NOT_FOUND); any IT Admin works a subscription of the shared pool.',
+    'The request (or the license lot bought for it) does not exist or is not one of a department the IT Admin works (PURCHASE_INVOICE.LINK_NOT_FOUND), or the subscription or lot does not exist.',
   examples: [EXAMPLES.LINK_NOT_FOUND],
 } as const;
 
@@ -119,25 +126,25 @@ const INVALID_SUBMISSION = {
 
 const PREVIEW_ERRORS = [
   ...AUTH_ERRORS,
-  FORBIDDEN,
+  NOT_RESPONSIBLE,
   LINK_NOT_FOUND,
   NOT_PURCHASABLE_OR_NO_PLACE,
   INVALID_PREVIEW,
 ] as const;
 const SUBMIT_ERRORS = [
   ...AUTH_ERRORS,
-  FORBIDDEN,
+  NOT_RESPONSIBLE,
   LINK_NOT_FOUND,
   NOT_PURCHASABLE_TAKEN_OR_NO_PLACE,
   INVALID_SUBMISSION,
 ] as const;
 const RESUBMIT_ERRORS = [
   ...AUTH_ERRORS,
-  FORBIDDEN,
+  NOT_RESPONSIBLE,
   {
     status: HttpStatus.NOT_FOUND,
     description:
-      'The invoice does not exist or was not submitted by the caller (PURCHASE_INVOICE.NOT_FOUND), or its request or subscription is not one the IT Admin works (PURCHASE_INVOICE.LINK_NOT_FOUND).',
+      'The invoice does not exist, or one for a request was not submitted by the caller (PURCHASE_INVOICE.NOT_FOUND), or its request is not one of a department the IT Admin works (PURCHASE_INVOICE.LINK_NOT_FOUND).',
     examples: [EXAMPLES.LINK_NOT_FOUND, EXAMPLES.NOT_FOUND],
   },
   NOT_PURCHASABLE_TAKEN_OR_NOT_RETURNED,
@@ -188,7 +195,7 @@ export class PurchaseInvoicesController {
     status: HttpStatus.CREATED,
     message: 'PURCHASE_INVOICE.SUBMITTED',
     description:
-      'The invoice is kept as it was read against its request or subscription (any IT Admin may submit the invoice of a subscription period, as it has no owning department; one for a request is submitted by the IT Admin of the department of the request), with its files, and Finance is told. Nothing is spent until Finance signs. The amounts are what was taken out in dong; the count and the price of one are what the invoice says in the currency it states.',
+      'The invoice is kept as it was read against its request or subscription (the invoice of a subscription, a period, a renewal or a seat purchase, and that of a license lot not bought for a request, is submitted only by the IT Admin who answers for it, QĐ-118d, QĐ-118f; one for a request is submitted by the IT Admin of the department of the request), with its files, and Finance is told. Nothing is spent until Finance signs. The amounts are what was taken out in dong; the count and the price of one are what the invoice says in the currency it states.',
   })
   @ApiErrorResponses(...SUBMIT_ERRORS)
   async submit(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: PurchaseInvoiceSubmitBodyDto) {
@@ -206,7 +213,7 @@ export class PurchaseInvoicesController {
     status: HttpStatus.CREATED,
     message: 'PURCHASE_INVOICE.RESUBMITTED',
     description:
-      'A new invoice for the same request or subscription that points back at the one Finance returned; the number of the returned one may come back. It says everything again, with its own files.',
+      'A new invoice for the same request, subscription or license lot (a subscription or lot not bought for a request is submitted again by the IT Admin who answers for it now) that points back at the one Finance returned; the number of the returned one may come back. It says everything again, with its own files.',
   })
   @ApiErrorResponses(...RESUBMIT_ERRORS)
   async resubmit(
