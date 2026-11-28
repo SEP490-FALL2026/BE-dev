@@ -21,7 +21,8 @@ import type {
   SeatTarget,
   SeatTargetRef,
 } from './catalog.types';
-import { OnboardingFactsService } from '../subscription/onboarding-facts.service';
+import { ProvisioningEvidenceDocumentService } from '../contract/provisioning-evidence-document.service';
+import type { ProvisioningEvidencePurpose } from './catalog.types';
 import { DocumentService } from '../contract/document.service';
 import {
   DocumentAlreadyAttachedError,
@@ -48,7 +49,7 @@ import {
 export class CatalogApi {
   constructor(
     private readonly seatTargets: SeatTargetService,
-    private readonly onboarding: OnboardingFactsService,
+    private readonly evidence: ProvisioningEvidenceDocumentService,
     private readonly plans: PlanFactsService,
     private readonly subscriptions: SubscriptionFactsService,
     private readonly vendors: VendorFactsService,
@@ -135,7 +136,7 @@ export class CatalogApi {
 
   /** The plans with these ids by name, with their application, as far as they exist; `tx` reads in the caller's transaction, which sees the plans it made. */
   getPlanSummaries(ids: readonly string[], tx?: DbTx): Promise<PlanSummary[]> {
-    return this.onboarding.planSummaries(ids, tx);
+    return this.plans.summaries(ids, tx);
   }
 
   /** The same with the logo of the application of each plan (the https link the IT Admin pasted, or null), in the same read. */
@@ -342,8 +343,11 @@ export class CatalogApi {
   }
 
   /** How many applications, plans and subscriptions exist, for the onboarding checklist. */
-  getOnboardingFacts(): Promise<CatalogOnboardingFacts> {
-    return this.onboarding.read();
+  async getOnboardingFacts(): Promise<CatalogOnboardingFacts> {
+    const applications = await this.applicationLookup.count();
+    const plans = await this.plans.count();
+    const subscriptions = await this.subscriptions.count();
+    return { applications, plans, subscriptions };
   }
 
   /** The seat target without a lock, or null when the subscription or the plan does not exist. */
@@ -370,5 +374,36 @@ export class CatalogApi {
     tx?: DbTx,
   ): Promise<{ hasLines: boolean; servingLineIds: string[] }> {
     return this.subscriptions.servingLineIdsOfSubscription(subscriptionId, day, tx);
+  }
+
+  async attachProvisioningEvidence(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    input: {
+      documentIds: readonly string[];
+      provisioningTaskId: string;
+      purpose: ProvisioningEvidencePurpose;
+    },
+  ): Promise<void> {
+    try {
+      await this.evidence.attach(tx, actor, input);
+    } catch (error) {
+      if (error instanceof DocumentNotFoundError) throw new DocumentAttachRefusedError('NOT_FOUND');
+      if (error instanceof DocumentAlreadyAttachedError) throw new DocumentAttachRefusedError('ALREADY_ATTACHED');
+      if (error instanceof DocumentNotReadyToAttachError) throw new DocumentAttachRefusedError('NOT_READY_TO_ATTACH');
+      if (error instanceof DocumentPurposeMismatchError) throw new DocumentAttachRefusedError('PURPOSE_MISMATCH');
+      throw error;
+    }
+  }
+
+  listProvisioningEvidence(taskId: string, tx?: DbTx) {
+    return this.evidence.list(taskId, tx);
+  }
+
+  issueProvisioningEvidenceLink(
+    actor: AuthenticatedPrincipal,
+    input: { provisioningTaskId: string; documentId: string },
+  ) {
+    return this.evidence.issueLink(actor, input);
   }
 }

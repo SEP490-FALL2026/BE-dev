@@ -24,8 +24,7 @@ export const NEW_DOCUMENT_PURPOSES = [
 ] as const;
 export type NewDocumentPurpose = (typeof NEW_DOCUMENT_PURPOSES)[number];
 /** The purposes a stored file has: `COST_STATEMENT` stays only so that a file kept before is still read; the database keeps the value. */
-export type ProvisioningEvidencePurpose = 'PROVISIONING_EVIDENCE' | 'ACCESS_CUT_EVIDENCE';
-export type DocumentPurpose = NewDocumentPurpose | 'COST_STATEMENT' | ProvisioningEvidencePurpose;
+export type DocumentPurpose = NewDocumentPurpose | 'COST_STATEMENT';
 export type DocumentStatus = 'AWAITING_UPLOAD' | 'PENDING_ATTACH' | 'READY' | 'QUARANTINED' | 'EXPIRED';
 
 /** How long a link that opens a file lives (`US-04-04` AC-1, AC-2); it is never stored and a new request makes a new one. */

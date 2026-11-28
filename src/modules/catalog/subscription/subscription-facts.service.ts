@@ -36,6 +36,10 @@ export class SubscriptionFactsService {
     private readonly lines: SubscriptionLineRepo,
   ) {}
 
+  count(): Promise<number> {
+    return this.subscriptions.count();
+  }
+
   async servingLineIdsOfSubscription(
     subscriptionId: string,
     day: BusinessDate,

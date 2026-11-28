@@ -244,3 +244,13 @@ export interface BaselineSubscription {
   /** A later period of this purchase was recorded (`renewedFromId` points here): the year to come is that period's. */
   hasSuccessor: boolean;
 }
+
+export type ProvisioningEvidencePurpose = 'PROVISIONING_EVIDENCE' | 'ACCESS_CUT_EVIDENCE';
+export interface ProvisioningEvidenceFile {
+  id: string;
+  purpose: ProvisioningEvidencePurpose;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  attachedAt: Date;
+}

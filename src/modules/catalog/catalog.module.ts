@@ -62,7 +62,7 @@ import { CatalogNotificationNamesListener } from './requestable-software/catalog
 import { RequestableSoftwareController } from './requestable-software/requestable-software.controller';
 import { RequestableSoftwareRepo } from './requestable-software/requestable-software.repo';
 import { RequestableSoftwareService } from './requestable-software/requestable-software.service';
-import { OnboardingFactsService } from './subscription/onboarding-facts.service';
+import { ProvisioningEvidenceDocumentService } from './contract/provisioning-evidence-document.service';
 import { SeatTargetService } from './subscription/seat-target.service';
 import { SubscriptionFactsService } from './subscription/subscription-facts.service';
 import { SubscriptionNoticeService } from './subscription/subscription-notice.service';
@@ -250,7 +250,7 @@ import { WorkspacesController } from './workspace/workspaces.controller';
     SubscriptionWindowsService,
     SubscriptionPeriodService,
     SeatTargetService,
-    OnboardingFactsService,
+    ProvisioningEvidenceDocumentService,
     SeatOccupancyHook,
     SeatBaselinePhaseHook,
     ContractRepo,

@@ -1,4 +1,46 @@
 import { duplicateOf, type CatalogEntryFacts } from './catalog-duplicate.policy';
+import { CatalogApi } from './catalog.api';
+import { DocumentAttachRefusedError } from './catalog.errors';
+import {
+  DocumentNotFoundError,
+  DocumentPurposeMismatchError,
+  DocumentAlreadyAttachedError,
+  DocumentNotReadyToAttachError,
+} from '../contract/contract.errors';
+const makeApi = (evidence: object = {}) =>
+  new CatalogApi(
+    {} as never,
+    evidence as never,
+    { count: () => Promise.resolve(5), summaries: () => Promise.resolve([{ id: 'plan' }]) } as never,
+    { count: () => Promise.resolve(7) } as never,
+    {} as never,
+    {} as never,
+    { count: () => Promise.resolve(3) } as never,
+    {} as never,
+  );
+
+describe('catalog facade evidence and unchanged onboarding facts', () => {
+  it('keeps the three onboarding counts and plan summaries', async () => {
+    const api = makeApi();
+    await expect(api.getOnboardingFacts()).resolves.toEqual({ applications: 3, plans: 5, subscriptions: 7 });
+    await expect(api.getPlanSummaries(['plan'])).resolves.toEqual([{ id: 'plan' }]);
+  });
+  it.each([
+    [DocumentNotFoundError, 'NOT_FOUND'],
+    [DocumentPurposeMismatchError, 'PURPOSE_MISMATCH'],
+    [DocumentAlreadyAttachedError, 'ALREADY_ATTACHED'],
+    [DocumentNotReadyToAttachError, 'NOT_READY_TO_ATTACH'],
+  ] as const)('maps %s to a public attach refusal', async (ErrorType, problem) => {
+    const api = makeApi({ attach: () => Promise.reject(new ErrorType()) });
+    await expect(
+      api.attachProvisioningEvidence({} as never, {} as never, {
+        documentIds: ['a'],
+        provisioningTaskId: 'task',
+        purpose: 'PROVISIONING_EVIDENCE',
+      }),
+    ).rejects.toEqual(new DocumentAttachRefusedError(problem));
+  });
+});
 
 const figma: CatalogEntryFacts = { id: 'a-figma', name: 'Figma', domains: ['figma.com'] };
 const claude: CatalogEntryFacts = { id: 'a-claude', name: 'Claude', domains: ['claude.ai', 'anthropic.com'] };

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
+import type { ProvisioningEvidenceFile } from '../public/catalog.types';
 import type { DocumentPurpose, DocumentStatus } from './contract.policy';
 
 export interface DocumentRecord {
@@ -139,6 +140,38 @@ export class DocumentRepo {
     await tx.documentAttachment.update({
       where: { id },
       data: { status: 'READY', signerEmployeeId, attachedAt: now },
+    });
+  }
+
+  async markAttachedToProvisioningTask(tx: DbTx, id: string, provisioningTaskId: string, now: Date): Promise<void> {
+    await tx.documentAttachment.update({
+      where: { id },
+      data: { status: 'READY', provisioningTaskId, attachedAt: now },
+    });
+  }
+
+  async listReadyOfProvisioningTask(provisioningTaskId: string, tx?: DbTx): Promise<ProvisioningEvidenceFile[]> {
+    const rows = await (tx ?? this.prisma).documentAttachment.findMany({
+      where: { provisioningTaskId, status: 'READY', purpose: { in: ['PROVISIONING_EVIDENCE', 'ACCESS_CUT_EVIDENCE'] } },
+      select: { id: true, purpose: true, fileName: true, contentType: true, sizeBytes: true, attachedAt: true },
+      orderBy: [{ attachedAt: 'asc' }, { id: 'asc' }],
+      take: 6,
+    });
+    return rows.flatMap(({ purpose, attachedAt, ...row }) =>
+      (purpose === 'PROVISIONING_EVIDENCE' || purpose === 'ACCESS_CUT_EVIDENCE') && attachedAt !== null
+        ? [{ ...row, purpose, attachedAt }]
+        : [],
+    );
+  }
+
+  findReadyOfProvisioningTask(provisioningTaskId: string, id: string): Promise<DocumentRecord | null> {
+    return this.prisma.documentAttachment.findFirst({
+      where: {
+        id,
+        provisioningTaskId,
+        status: 'READY',
+        purpose: { in: ['PROVISIONING_EVIDENCE', 'ACCESS_CUT_EVIDENCE'] },
+      },
     });
   }
 }
