@@ -90,7 +90,13 @@ export interface PurchaseInvoiceFilter {
  */
 export type PurchaseInvoiceScope =
   | { kind: 'ALL' }
-  | { kind: 'IT_ADMIN'; employeeId: string; departmentIds: readonly string[]; subscriptionIds: readonly string[] };
+  | {
+      kind: 'IT_ADMIN';
+      employeeId: string;
+      departmentIds: readonly string[];
+      subscriptionIds: readonly string[];
+      licenseLotIds: readonly string[];
+    };
 
 const scopeWhere = (scope: PurchaseInvoiceScope): Prisma.PurchaseInvoiceWhereInput =>
   scope.kind === 'ALL'
@@ -100,7 +106,7 @@ const scopeWhere = (scope: PurchaseInvoiceScope): Prisma.PurchaseInvoiceWhereInp
           { submittedByEmployeeId: scope.employeeId },
           { request: { departmentId: { in: [...scope.departmentIds] } } },
           { subscriptionId: { in: [...scope.subscriptionIds] } },
-          { licenseLot: { purpose: { not: 'REQUEST' }, responsibleItAdminEmployeeId: scope.employeeId } },
+          { licenseLotId: { in: [...scope.licenseLotIds] } },
         ],
       };
 

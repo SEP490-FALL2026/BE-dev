@@ -138,7 +138,7 @@ flowchart BT
   policies -->|7| organization
   requests -->|67| audit
   requests -->|37| budgets
-  requests -->|57| catalog
+  requests -->|58| catalog
   requests -->|11| finance
   requests -->|42| identity_access
   requests -->|68| licensing

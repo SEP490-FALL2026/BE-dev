@@ -88,11 +88,11 @@ describe('purchase invoice responsibility over PostgreSQL (integration; QĐ-118d
 
   describe('after the Super Admin changes who answers for a subscription or a lot, the one who answers now takes over what was returned (QĐ-118f, Owner 28/11/2026)', () => {
     const codeOf = (response: request.Response) => (response.body as { error: { code: string } }).error.code;
-    const notices = async (purchaseId: string, to: string) =>
+    const notices = async (purchaseId: string, to: string, code = 'PURCHASE_INVOICE_RETURNED') =>
       (
         await h.ctx.sql.query(
-          `SELECT 1 FROM in_app_notifications WHERE code = 'PURCHASE_INVOICE_RETURNED' AND subject_id = $1 AND recipient_employee_id = $2`,
-          [purchaseId, to],
+          `SELECT 1 FROM in_app_notifications WHERE code = $3 AND subject_id = $1 AND recipient_employee_id = $2`,
+          [purchaseId, to, code],
         )
       ).rowCount;
     const changeResponsible = (route: string, id: string, to: ApiAccount) =>
@@ -203,6 +203,27 @@ describe('purchase invoice responsibility over PostgreSQL (integration; QĐ-118d
       const after = await resend(first.id, 'RESP-3', it2);
       expect(after.status).toBe(201);
       expect(wire(after)).toMatchObject({ state: 'SUBMITTED', resubmissionOfId: first.id });
+    });
+
+    it('subscription: Finance signing the invoice tells the IT Admin who answers now, not the one who submitted it', async () => {
+      const owned = await h.subscription(10, 'K2');
+      await h.ctx.sql.query(
+        `UPDATE subscriptions SET original_unit_price_minor = 1500, original_currency = 'USD' WHERE id = $1`,
+        [owned],
+      );
+      const kept = wire(
+        await api('post', '', h.it1)
+          .send({
+            ...form(randomUUID(), { link: { subscriptionId: owned }, quantity: 10, vendorInvoiceNumber: 'RESP-5' }),
+            documentIds: [await document()],
+          })
+          .expect(201),
+      );
+      await changeResponsible('subscriptions', owned, it2);
+      await api('post', `/${kept.id}/confirmation`, h.finance).expect(201);
+
+      expect(await notices(kept.id, it2.employeeId, 'PURCHASE_INVOICE_CONFIRMED')).toBe(1);
+      expect(await notices(kept.id, h.it1.employeeId, 'PURCHASE_INVOICE_CONFIRMED')).toBe(0);
     });
 
     it('request: the invoice stays with the one who submitted it, who is told, and nobody else reads or submits it again', async () => {

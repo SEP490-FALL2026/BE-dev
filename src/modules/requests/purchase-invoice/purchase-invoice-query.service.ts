@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { BudgetsApi } from '../../budgets/public/budgets.api';
+import { LicenseLotApi } from '../../catalog/public/license-lot.api';
 import { SubscriptionPeriodApi } from '../../catalog/public/subscription-period.api';
 import { FinanceApi } from '../../finance/public/finance.api';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
@@ -24,6 +25,7 @@ export class PurchaseInvoiceQueryService {
     private readonly finance: FinanceApi,
     private readonly budgets: BudgetsApi,
     private readonly subscriptions: SubscriptionPeriodApi,
+    private readonly lots: LicenseLotApi,
   ) {}
 
   async page(
@@ -88,6 +90,7 @@ export class PurchaseInvoiceQueryService {
       kind: 'IT_ADMIN',
       employeeId: actor.employeeId,
       subscriptionIds: await this.subscriptions.getResponsibleSubscriptionIds(actor.employeeId),
+      licenseLotIds: await this.lots.getResponsibleLotIds(actor.employeeId),
       departmentIds: await this.organizationReads.getItAdminScope(actor.employeeId, (ids) =>
         this.identity.findUsableItAdminEmployeeIds(ids),
       ),
