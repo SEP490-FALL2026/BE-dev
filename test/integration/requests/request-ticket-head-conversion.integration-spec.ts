@@ -277,13 +277,14 @@ describe('ticket items keep ticket position order on one-step conversion (integr
         expect(await h.state(r11.id)).toBe('PENDING');
 
         await h.ctx.sql.query(
-          `UPDATE department_head_periods
-              SET valid_from = LEAST(valid_from, ($2::date - 1)), valid_to = $2::date
-            WHERE department_id = $1 AND employee_id = $3 AND valid_to = $4::date`,
-          [world.pDes.id, h.today(), world.h1.employeeId, h.tomorrow()],
+          `DELETE FROM department_head_periods
+            WHERE department_id = $1 AND employee_id = $2 AND valid_to = $3::date`,
+          [world.pDes.id, world.h1.employeeId, h.tomorrow()],
         );
         await h.ctx.sql.query(
-          `UPDATE department_head_periods SET valid_from = $2::date WHERE department_id = $1 AND employee_id = $3 AND valid_to IS NULL`,
+          `UPDATE department_head_periods
+              SET valid_from = $2::date
+            WHERE department_id = $1 AND employee_id = $3 AND valid_to IS NULL`,
           [world.pDes.id, h.today(), e5.employeeId],
         );
         await h.sweep();
