@@ -17,6 +17,7 @@ import { stepWaitingAuditEvent } from './reassignment-audit.mapper';
 import { reassignmentAuditEvent } from '../step-routing/step-audit-event.mapper';
 import { RequesterHeadConversionService } from '../step-routing/requester-head-conversion.service';
 import {
+  orderByTicketPosition,
   StepReassignmentRepo,
   type ReassignableRequest,
   type ReassignableStep,
@@ -129,8 +130,10 @@ export class StepReassignmentService {
       endedNotRequired: 0,
       alerted: 0,
     };
-    const requests = await this.repo.lockWithOpenSteps(tx, requestIds);
-    if (requests.length === 0) return result;
+    const locked = await this.repo.lockWithOpenSteps(tx, requestIds);
+    if (locked.length === 0) return result;
+    // Locks stay ordered by id inside lockWithOpenSteps; same-ticket items check budget in ascending ticket position.
+    const requests = orderByTicketPosition(locked);
 
     const facts = await this.targets.gatherToday(tx, now);
     const gone = await this.holdersWhoLeft(tx, requests);

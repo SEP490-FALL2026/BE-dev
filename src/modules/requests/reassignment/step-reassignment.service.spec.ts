@@ -1,5 +1,5 @@
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { ReassignableRequest } from '../step-routing/step-reassignment.repo';
+import { orderByTicketPosition, type ReassignableRequest } from '../step-routing/step-reassignment.repo';
 import { StepReassignmentService } from './step-reassignment.service';
 
 /**
@@ -22,6 +22,7 @@ describe('StepReassignmentService: the request in the queue of the head', () => 
     beneficiaryEmployeeIds: ['emp-1'],
     lines: [],
     steps: [],
+    ticket: null,
     ...over,
   });
 
@@ -103,5 +104,144 @@ describe('StepReassignmentService: the request in the queue of the head', () => 
     await service.reconcileRequests(tx, ['req-1'], { kind: 'WAITING_RETRY', employeeId: null }, 'corr-1', now);
 
     expect(targets.isRequesterHead).not.toHaveBeenCalled();
+  });
+
+  it('reconciles same-ticket queued spend requests in ascending ticket position order regardless of id order', async () => {
+    const reqPos2 = { ...queued({ id: 'req-1' }), ticket: { id: 'ticket-1', position: 2 } };
+    const reqStandalone = { ...queued({ id: 'req-2' }), ticket: null };
+    const reqPos1 = { ...queued({ id: 'req-3' }), ticket: { id: 'ticket-1', position: 1 } };
+    const order: string[] = [];
+    const repo = { lockWithOpenSteps: jest.fn(() => Promise.resolve([reqPos2, reqStandalone, reqPos1])) };
+    const targets = {
+      gatherToday: jest.fn(() => Promise.resolve({ today: '2026-11-23' })),
+      isRequesterHead: jest.fn(() => Promise.resolve(true)),
+    };
+    const spending = {
+      finishConversionById: jest.fn((_tx: DbTx, id: string) => {
+        order.push(id);
+        return Promise.resolve();
+      }),
+    };
+    const heads = { convert: jest.fn(() => Promise.resolve()), record: jest.fn() };
+    const service = new StepReassignmentService(
+      {} as never,
+      repo as never,
+      targets as never,
+      {} as never,
+      { getEmployees: jest.fn(() => Promise.resolve([])) } as never,
+      { record: jest.fn() } as never,
+      spending as never,
+      heads as never,
+    );
+
+    const result = await service.reconcileRequests(
+      tx,
+      ['req-1', 'req-2', 'req-3'],
+      { kind: 'HEAD_CHANGED', employeeId: null },
+      'corr-1',
+      now,
+    );
+
+    expect(order).toEqual(['req-3', 'req-2', 'req-1']);
+    expect(result.endedNotRequired).toBe(3);
+  });
+
+  it('checks budget in ascending ticket position order across PENDING and AWAITING_SPEND_SUBMISSION items of one ticket (RB-9)', async () => {
+    const r11Pending = {
+      ...queued({
+        id: 'req-11',
+        state: 'PENDING',
+        steps: [
+          {
+            id: 'step-11',
+            kind: 'NEED' as const,
+            sequence: 1,
+            state: 'PENDING' as const,
+            assigneeEmployeeId: 'head-old',
+            waitingReason: null,
+            routingRow: 1,
+            samePersonAsSpend: false,
+            createdAt: now,
+            waitingSince: null,
+          },
+        ],
+      }),
+      ticket: { id: 'ticket-rb9', position: 2 },
+    };
+    const r12Queued = {
+      ...queued({ id: 'req-12', state: 'AWAITING_SPEND_SUBMISSION' }),
+      ticket: { id: 'ticket-rb9', position: 1 },
+    };
+    const order: string[] = [];
+    const repo = {
+      lockWithOpenSteps: jest.fn(() => Promise.resolve([r11Pending, r12Queued])),
+      endNeedStepNotRequired: jest.fn(() => Promise.resolve()),
+    };
+    const targets = {
+      gatherToday: jest.fn(() => Promise.resolve({ today: '2026-11-23' })),
+      targetOf: jest.fn(() =>
+        Promise.resolve({ assigneeEmployeeId: null, notRequired: 'REQUESTER_IS_HEAD', routingRow: 2 }),
+      ),
+      isRequesterHead: jest.fn(() => Promise.resolve(true)),
+    };
+    const spending = {
+      finishConversionById: jest.fn((_tx: DbTx, id: string) => {
+        order.push(id);
+        return Promise.resolve();
+      }),
+    };
+    const heads = { convert: jest.fn(() => Promise.resolve()), record: jest.fn(() => Promise.resolve()) };
+    const service = new StepReassignmentService(
+      {} as never,
+      repo as never,
+      targets as never,
+      {} as never,
+      { getEmployees: jest.fn(() => Promise.resolve([])) } as never,
+      { record: jest.fn() } as never,
+      spending as never,
+      heads as never,
+    );
+
+    const result = await service.reconcileRequests(
+      tx,
+      ['req-11', 'req-12'],
+      { kind: 'HEAD_CHANGED', employeeId: null },
+      'corr-1',
+      now,
+    );
+
+    expect(order).toEqual(['req-12', 'req-11']);
+    expect(result.endedNotRequired).toBe(2);
+  });
+
+  it.each([
+    {
+      name: '[R3(PH1#3), X, R1(PH1#1)] -> [R1, X, R3]',
+      items: [
+        { id: 'R3', ticket: { id: 'PH1', position: 3 } },
+        { id: 'X', ticket: null },
+        { id: 'R1', ticket: { id: 'PH1', position: 1 } },
+      ],
+      expected: ['R1', 'X', 'R3'],
+    },
+    {
+      name: '[A(PH1#2), B(PH2#1), C(PH1#1)] -> [C, B, A]',
+      items: [
+        { id: 'A', ticket: { id: 'PH1', position: 2 } },
+        { id: 'B', ticket: { id: 'PH2', position: 1 } },
+        { id: 'C', ticket: { id: 'PH1', position: 1 } },
+      ],
+      expected: ['C', 'B', 'A'],
+    },
+    {
+      name: 'without tickets keeps original order',
+      items: [
+        { id: 'X1', ticket: null },
+        { id: 'X2', ticket: null },
+      ],
+      expected: ['X1', 'X2'],
+    },
+  ])('orderByTicketPosition: $name', ({ items, expected }) => {
+    expect(orderByTicketPosition(items).map((item) => item.id)).toEqual(expected);
   });
 });
