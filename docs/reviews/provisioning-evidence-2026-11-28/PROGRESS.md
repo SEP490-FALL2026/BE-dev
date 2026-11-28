@@ -13,15 +13,15 @@ Skill đã đọc: `ponytail` (full), `using-superpowers`, `using-agent-skills`,
 
 ## Gói và bằng chứng
 
-| Gói | Trạng thái | sha       | EV                   | Lệnh kiểm + pass/fail thực tế                                        | CI            |
-| --- | ---------- | --------- | -------------------- | -------------------------------------------------------------------- | ------------- |
-| P1  | xong local | bac2e26f  | SPEC §4              | quick checks exit 0; gates 346/346; unit 68/68                       | chưa chạy     |
-| P2a | xong local | b1a7440b  | EV-01…05             | quick checks 0; gates 346/346; unit 116/116                          | chờ P5        |
-| P2b | xong local | 96d829a6  | EV-09/10/14 catalog  | typecheck/lint/arch/rules/format 0; gates 346/346; catalog 1079/1079 | chờ P5        |
-| P3a | xong local | d99e3371  | EV-06..12 complete   | quick checks 0; gates 346/346; unit 390/390                          | P5 pending    |
-| P3b | xong local | 6a3f48bd  | EV-06..12 revocation | lint 4214 files; gates 346/346; catalog+licensing 2181/2181          | P5 pending    |
-| P4  | xong local | 0457a395  | EV-13..16            | quick checks 0; gates 346/346; unit 407/407; generators 474 ops      | P5 pending    |
-| P5  | đang kiểm  | —         | SPEC §8              | có harness, integration và HTTP; đang kiểm local trước CI              | chưa dispatch |
+| Gói | Trạng thái | sha      | EV                   | Lệnh kiểm + pass/fail thực tế                                        | CI                              |
+| --- | ---------- | -------- | -------------------- | -------------------------------------------------------------------- | ------------------------------- |
+| P1  | xong local | bac2e26f | SPEC §4              | quick checks exit 0; gates 346/346; unit 68/68                       | chưa chạy                       |
+| P2a | xong local | b1a7440b | EV-01…05             | quick checks 0; gates 346/346; unit 116/116                          | chờ P5                          |
+| P2b | xong local | 96d829a6 | EV-09/10/14 catalog  | typecheck/lint/arch/rules/format 0; gates 346/346; catalog 1079/1079 | chờ P5                          |
+| P3a | xong local | d99e3371 | EV-06..12 complete   | quick checks 0; gates 346/346; unit 390/390                          | P5 pending                      |
+| P3b | xong local | 6a3f48bd | EV-06..12 revocation | lint 4214 files; gates 346/346; catalog+licensing 2181/2181          | P5 pending                      |
+| P4  | xong local | 0457a395 | EV-13..16            | quick checks 0; gates 346/346; unit 407/407; generators 474 ops      | P5 pending                      |
+| P5  | CHẶN D-2   | aa0ad0f6 | SPEC §8, EV-08/09    | quick checks 0; gates 346/346; catalog+licensing 2194/2194           | HTTP 1 đỏ mới; 3 shard còn chạy |
 
 ## Pre-flight interfaces
 
@@ -41,6 +41,15 @@ Skill đã đọc: `ponytail` (full), `using-superpowers`, `using-agent-skills`,
 - Giữ hành vi cũ theo LUẬT CỨNG 1 và 4. Không tự đổi K2 thành K1 trong test, không mở luật K2 để làm xanh.
 - Đã xử lý theo chỉ đạo user và SPEC 1.3 `d8f59225`: ca 6 là **K1** `UNTIL_PAID_END`, dùng checklist theo test hiện hành. K2 giữ 422 `REVOCATION.COMPLETION_NOT_ALLOWED`.
 - Lịch sử: đợt trước dừng sau P1 vì mâu thuẫn này. Nay tiếp tục P2a → P5, không cần thay đổi nghiệp vụ thu hồi.
+
+### D-2 — CẦN OWNER: ngoại lệ cho expectation inventory POST của test HTTP cũ
+
+- CI [46162602020](https://github.com/SEP490-FALL2026/BE-dev/actions/runs/46162602020), job `http-contract` có **1 fail/2868 pass**, 124 suites (123 pass/1 fail).
+- Test đỏ mới: `test/http/licensing/provisioning.http-spec.ts:414`, tên đầy đủ `provisioning queue routes (e2e, no database) › has no route that makes a revocation: each source opens it through the licensing facade (US-07-05 AC-3)`.
+- Test so khớp toàn bộ POST của `/provisioning-tasks`, nhận thêm `/{id}/evidence-files/{fileId}/links` đúng SPEC EV-14. Run nền HTTP xanh nên đây là đỏ mới, không được gọi là nợ cũ.
+- LUẬT CỨNG 4 cấm đổi expectation test cũ, chỉ cho ngoại lệ purpose list và số operation. Không thể thêm route đúng SPEC mà giữ nguyên inventory này; không đổi route/filter/OpenAPI/gate để né assertion.
+- Giữ nguyên file test. Đề xuất cụ thể, **chưa áp dụng**: thêm đúng chuỗi `/{id}/evidence-files/{fileId}/links` vào mảng expected ở dòng 414–428; giữ nguyên mọi route cũ và assert `/revoke` 404. Patch để xem tại `D-2-proposed-http-expectation.patch`.
+- P5 bị chặn bởi luật cứng, chưa hoàn tất. Chỉ thu nốt kết quả run hiện tại và bàn giao; không chạy vòng sửa CI hoặc commit code đỏ. Cần Owner cho phép thêm ngoại lệ này trước khi tiếp tục.
 
 ## Kiểm chứng P1
 
@@ -134,19 +143,33 @@ Skill đã đọc: `ponytail` (full), `using-superpowers`, `using-agent-skills`,
 - Final fix pass: chuẩn hóa chữ thường UUID trước Set/sort để cùng danh tính PostgreSQL có một thứ tự khóa; thêm 3 ca unit hồi quy. RED **3 fail/14 pass**, 2 suites. Sửa fixture đọc tác vụ thứ hai bằng IT2 và thêm ca phòng mồ côi; không đổi expectation test cũ.
 - GREEN cuối: `CI=true pnpm test --maxWorkers=2 src/modules/catalog src/modules/licensing` **2194 pass/0 fail**, 209 suites; `CI=true pnpm test:gates` **346 pass/0 fail**, 17 suites. Typecheck, eslint 8 file, arch/rules/rules:format/format exit 0. Generators + arch:docs:check và capabilities hai module exit 0, không drift sinh ngoài P4. Chưa có kết quả integration/HTTP tại commit P5; sẽ push/dispatch và ghi bằng chứng CI sau.
 - `Kiểm giữ:` fix catalog chỉ chuẩn hóa ID trước vòng khóa; giữ organization read, khóa/đọc lại document, uploader → purpose → trạng thái, markAttached và audit cùng tx. Policy giữ TOO_MANY trước DUPLICATE, không đổi empty/undefined. Không chạm service nghiệp vụ cũ ở fix này.
+- Đã push `aa0ad0f6`, dispatch [46162602020](https://github.com/SEP490-FALL2026/BE-dev/actions/runs/46162602020). Run nền giữ cố định [46116992628](https://github.com/SEP490-FALL2026/BE-dev/actions/runs/46116992628), không lấy dev mới thay nền. Nền: quality/http-contract/integration-inband xanh, e2e-smoke skipped; 637 test đỏ/108 suite ở ba shard integration.
+- Skill đọc thêm: `finishing-a-development-branch`; menu merge/PR và chạy full local của skill không áp dụng vì user đã chỉ đạo giữ worktree/nhánh, không PR/merge, full chỉ CI. Không cần hỏi lại lựa chọn đã được chỉ định.
+- Skill đọc thêm khi CI đỏ: `systematic-debugging`; trace log → inventory POST → route đúng EV-14 → luật cấm đổi expectation; không sửa production để né test.
+
+### Bàn giao tại D-2 — 28/11/2026 23:11 (UTC+7)
+
+- **P5 CHƯA XONG.** Tại snapshot cuối, run còn `in_progress`; không tuyên bố toàn CI xanh hoặc không có lỗi integration mới. Ba shard vẫn chạy. Phân loại test đỏ đã biết và link từng job tại `CI-CLASSIFICATION.md`.
+- Đã xác nhận trên CI: quality xanh, unit **10266 pass/0 fail** (911 suites), gates **346 pass/0 fail** (17 suites); e2e-smoke **48 pass/0 fail** (10 suites); integration-inband timing **31 pass/0 fail** (8 suites), serial **100 pass/0 fail** (14 suites). HTTP **2868 pass/1 fail**, 123 suites pass/1 fail. Spec HTTP mới `provisioning-evidence-files.http-spec.ts` PASS.
+- Không chạy vòng sửa CI vì D-2 cấm thay expectation cần thiết. Không cancel run đang chạy; điều phối có thể lấy log hoàn tất từ cùng run id. Không gọi lỗi mới này là nợ nền.
+- Kiểm trước commit tài liệu bàn giao: typecheck/arch/rules/rules:format/format exit 0; eslint 4 file của fix cuối 0 lỗi/0 cảnh báo; gates **346 pass/0 fail**, 17 suites; unit hai file policy/catalog đã sửa **17 pass/0 fail**, 2 suites. Không thêm code production sau `aa0ad0f6`.
+- Gần trần: `provisioning-task.repo.ts` **483 dòng code/500** (560 dòng vật lý); `document.service.ts` 498 dòng vật lý (không sửa); `openapi-example-manifest.ts` **398/400**, `api-coverage-manifest.ts` **399/400**, `api-collection-registry-events.ts` **391/400**; `revocation.policy.spec.ts` **389/400**, không thêm ca. Spec integration mới dài nhất 363/800, harness 38/400.
+- Guard P1: giữ nguyên `document_attachment_guard` từ migration `20261022130000_document_final_key_and_expiry`; chỉ thêm hai migration mới, enum/cột/index/CHECK như SPEC. Không sửa migration cũ, requests, merged-migrations, dependency, gate/suppression; không PR/merge/rebase/stash.
+- Báo cáo tổng được lưu tại `D:/FPT/FALL2026/NOTE MD/logsCodex.txt`, ghi rõ chặn D-2 và CI còn chạy để Claude tiếp tục kiểm. Đây là bàn giao dừng theo luật, không phải báo cáo P5 hoàn tất hay Owner acceptance.
+- Full test chỉ chạy trên CI GitHub. Giữ nguyên worktree và nhánh chờ điều phối quyết định D-2.
 
 ### Self-review EV → kiểm thử
 
-| EV | Kiểm thử / file |
-| --- | --- |
-| 01–03 | `contract.policy.spec.ts`: purposes/roles, upload types, target và hiding; integration ca 8/9 |
-| 04–05 | `contract.policy.spec.ts`: WebP signature/length; integration PNG/WebP ca 1, byte giả ca 9 |
-| 06–07 | grant/revocation service unit: omitted/empty IDs, ALREADY_GONE, EXTEND; integration ca 2/K1 |
-| 08 | evidence-files policy unit: max/duplicate/canonical UUID; integration ca 3 |
+| EV    | Kiểm thử / file                                                                                              |
+| ----- | ------------------------------------------------------------------------------------------------------------ |
+| 01–03 | `contract.policy.spec.ts`: purposes/roles, upload types, target và hiding; integration ca 8/9                |
+| 04–05 | `contract.policy.spec.ts`: WebP signature/length; integration PNG/WebP ca 1, byte giả ca 9                   |
+| 06–07 | grant/revocation service unit: omitted/empty IDs, ALREADY_GONE, EXTEND; integration ca 2/K1                  |
+| 08    | evidence-files policy unit: max/duplicate/canonical UUID; integration ca 3                                   |
 | 09–10 | catalog evidence service unit + repo unit; grant/revocation unit; integration ca 1/4/10 rollback/owner/audit |
-| 11 | grant completion unit EXTEND; revocation completion unit ALREADY_GONE; K1 integration ca 6 |
-| 12 | service unit order/failure; integration ca 5 frame wins, ca 11 two connections/barrier |
-| 13 | evidence service unit + repo unit; integration ca 1/7, collection 2/6 files/query projection |
-| 14 | catalog/link unit, integration ca 7 TTL/no-store/audit without URL/foreign file |
-| 15 | evidence service unit Super/IT/EmployeeNotStarted/TC-4; integration ca 7 current IT/orphan; HTTP role tests |
-| 16 | integration storage outage 503/no audit; existing shared HTTP mapping retained |
+| 11    | grant completion unit EXTEND; revocation completion unit ALREADY_GONE; K1 integration ca 6                   |
+| 12    | service unit order/failure; integration ca 5 frame wins, ca 11 two connections/barrier                       |
+| 13    | evidence service unit + repo unit; integration ca 1/7, collection 2/6 files/query projection                 |
+| 14    | catalog/link unit, integration ca 7 TTL/no-store/audit without URL/foreign file                              |
+| 15    | evidence service unit Super/IT/EmployeeNotStarted/TC-4; integration ca 7 current IT/orphan; HTTP role tests  |
+| 16    | integration storage outage 503/no audit; existing shared HTTP mapping retained                               |

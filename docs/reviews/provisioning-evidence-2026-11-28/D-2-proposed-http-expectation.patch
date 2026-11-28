@@ -1,0 +1,11 @@
+diff --git a/test/http/licensing/provisioning.http-spec.ts b/test/http/licensing/provisioning.http-spec.ts
+--- a/test/http/licensing/provisioning.http-spec.ts
++++ b/test/http/licensing/provisioning.http-spec.ts
+@@ -419,6 +419,7 @@
+           '/{id}/claim',
+           '/{id}/close-failed',
+           '/{id}/complete',
++          '/{id}/evidence-files/{fileId}/links',
+           '/{id}/hand-off',
+           '/{id}/report-failure',
+           '/{id}/retry',
