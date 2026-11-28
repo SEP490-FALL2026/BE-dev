@@ -151,7 +151,7 @@ import { SpendEffectsService } from './spend-effects/spend-effects.service';
 import { SpendHeadService } from './spend-submission/spend-head.service';
 import { SpendQueueService } from './spend-submission/spend-queue.service';
 import { SpendQueueOutcomeService } from './spend-submission/spend-queue-outcome.service';
-import { SpendTicketReplyService } from './spend-submission/spend-ticket-reply.service';
+import { SpendReplyFactsService } from './spend-submission/spend-reply-facts.service';
 import { SpendApprovalSnapshotService } from './spend-approval-view/spend-approval-snapshot.service';
 import { NextYearBudgetRepo } from './spend-approval-view/next-year-budget.repo';
 import { NextYearBudgetService } from './spend-approval-view/next-year-budget.service';
@@ -354,7 +354,7 @@ const HTTP_FACING_SERVICES = [
     SpendHeadService,
     SpendBatchRepo,
     SpendBatchRecorder,
-    SpendTicketReplyService,
+    SpendReplyFactsService,
     SpendBatchWriterService,
     SpendQueueOutcomeService,
     SpendApprovalSnapshotService,

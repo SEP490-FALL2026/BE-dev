@@ -1,10 +1,12 @@
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import type { RequestReplyRepo } from '../request-reply/request-reply.repo';
 import type { RequestTicketRepo } from '../request-ticket/request-ticket.repo';
 import type { SpendBatchRepo } from '../spend/spend-batch.repo';
 import type { SpendRequestRepo } from '../spend/spend-request.repo';
 import type { SpendWireViewService } from '../spend/spend-wire-view.service';
 import { SpendBatchViewService } from './spend-batch-view.service';
+import { SpendReplyFactsService } from './spend-reply-facts.service';
 
 const BATCH = '0a1b2c3d-0000-4000-8000-0000000000b1';
 const HEAD = 'head-employee';
@@ -53,7 +55,10 @@ function build(
         .fn()
         .mockResolvedValue(new Map([[HEAD, { employeeId: HEAD, employeeCode: 'NV-1', fullName: 'An Nguyen' }]])),
     } as unknown as SpendWireViewService,
-    { refsOf } as unknown as RequestTicketRepo,
+    new SpendReplyFactsService(
+      { refsOf } as unknown as RequestTicketRepo,
+      { returnFactsOf: jest.fn() } as unknown as RequestReplyRepo,
+    ),
   );
 
   return { service, heldBy: heldByMock, pageItems, refsOf };

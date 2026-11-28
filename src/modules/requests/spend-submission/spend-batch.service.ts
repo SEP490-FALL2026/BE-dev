@@ -16,8 +16,14 @@ import {
 } from '../spend/spend.errors';
 import { SpendRoutingService } from '../spend/spend-routing.service';
 import { processingOrder, restoreBodyOrder } from '../request-ticket/request-ticket-order.policy';
-import { SpendBatchWriterService, type BatchSubmitStopReason } from './spend-batch-writer.service';
+import type { HumanReturn } from '../request-reply/request-reply.types';
+import {
+  SpendBatchWriterService,
+  type BatchSubmitStopReason,
+  type HeadResubmissionInput,
+} from './spend-batch-writer.service';
 import { SpendHeadService } from './spend-head.service';
+import { SpendReplyFactsService } from './spend-reply-facts.service';
 
 /** What became of the confirmation of the reserve the head gave for a request of the batch (`RV-11`). */
 export type ConfirmationResult = 'APPLIED' | 'IGNORED' | 'NOT_GIVEN';
@@ -35,6 +41,7 @@ interface Sent {
   requestId: string;
   result: SubmitResult;
   openedFor: string | null;
+  headReply?: HeadResubmissionInput;
 }
 
 export interface ReserveConfirmationInput {
@@ -62,6 +69,7 @@ export class SpendBatchService {
     private readonly reserve: ReserveConfirmationService,
     private readonly organizationReads: OrganizationReadApi,
     private readonly writer: SpendBatchWriterService,
+    private readonly replyFacts: SpendReplyFactsService,
   ) {}
 
   /**
@@ -104,21 +112,23 @@ export class SpendBatchService {
     const unit = (await this.organizationReads.getOwningUnits([actor.employeeId], today, tx)).get(actor.employeeId);
     if (unit) this.organizationReads.requireUnitCostCenter(unit);
 
-    const organizationId = (locked.get(requestIds[0]) as AccessRequestRecord).organizationId;
+    const organizationId = requireLocked(locked, requestIds[0]).organizationId;
     const verdict =
       confirmations.length > 0 && checklist
         ? await this.reserve.judgeBatchChecklist(tx, organizationId, checklist)
         : null;
     const now = new Date();
+    const pendingReturns = await this.replyFacts.pendingSpendReturnsOf(requestIds, tx);
     const orderedIds = processingOrder(
-      requestIds.map((requestId) => ({ requestId, ticket: (locked.get(requestId) as AccessRequestRecord).ticket })),
+      requestIds.map((requestId) => ({ requestId, ticket: requireLocked(locked, requestId).ticket })),
     );
     const processed: Sent[] = [];
     for (const id of orderedIds) {
       processed.push(
-        await this.processItem(tx, actor, locked.get(id) as AccessRequestRecord, {
+        await this.processItem(tx, actor, requireLocked(locked, id), {
           reason: reasons.get(id),
           note: notes.get(id),
+          pendingReturn: pendingReturns.get(id) ?? null,
           now,
         }),
       );
@@ -141,6 +151,7 @@ export class SpendBatchService {
       requestIds,
       results,
       openedFor: sent.map((item) => item.openedFor),
+      headReplies: sent.flatMap((item) => (item.headReply ? [item.headReply] : [])),
     });
 
     return { batchId, results };
@@ -173,10 +184,9 @@ export class SpendBatchService {
     tx: DbTx,
     actor: AuthenticatedPrincipal,
     request: AccessRequestRecord,
-    given: { reason: string | undefined; note: string | undefined; now: Date },
+    given: { reason: string | undefined; note: string | undefined; pendingReturn: HumanReturn | null; now: Date },
   ): Promise<Sent> {
-    const pendingSpendReturn = await this.writer.pendingSpendReturn(tx, request.id);
-    if (pendingSpendReturn !== null && given.note === undefined) {
+    if (given.pendingReturn !== null && given.note === undefined) {
       return {
         requestId: request.id,
         result: {
@@ -191,14 +201,17 @@ export class SpendBatchService {
 
     const sent = await this.sendOn(tx, actor, request, { reason: given.reason, now: given.now });
     // Insert the reply only when the item actually leaves the reply-awaiting state; a STOPPED item stays in the queue.
-    if (pendingSpendReturn !== null && given.note !== undefined && sent.result.outcome !== 'STOPPED') {
-      await this.writer.recordHeadResubmission(tx, {
-        organizationId: request.organizationId,
-        requestId: request.id,
-        returnedStepId: pendingSpendReturn.stepId,
-        note: given.note,
-        authorEmployeeId: actor.employeeId,
-      });
+    if (given.pendingReturn !== null && given.note !== undefined && sent.result.outcome !== 'STOPPED') {
+      return {
+        ...sent,
+        headReply: {
+          organizationId: request.organizationId,
+          requestId: request.id,
+          returnedStepId: given.pendingReturn.stepId,
+          note: given.note,
+          authorEmployeeId: actor.employeeId,
+        },
+      };
     }
 
     return sent;
@@ -278,4 +291,10 @@ function cleanNotesMap(replyNotes: readonly ReplyNoteInput[]): Map<string, strin
     if (trimmed.length > 0) notes.set(entry.requestId, trimmed);
   }
   return notes;
+}
+
+function requireLocked(locked: ReadonlyMap<string, AccessRequestRecord>, id: string): AccessRequestRecord {
+  const record = locked.get(id);
+  if (!record) throw new Error(`Locked request ${id} is missing from the batch lock map.`);
+  return record;
 }

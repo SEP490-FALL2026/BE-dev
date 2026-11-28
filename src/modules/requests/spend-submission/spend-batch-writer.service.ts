@@ -1,13 +1,20 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import type { HumanReturn } from '../request-reply/request-reply.types';
+import { RequestReplyRepo } from '../request-reply/request-reply.repo';
 import { SpendBatchRepo } from '../spend/spend-batch.repo';
 import type { StopReason } from '../spend/spend-submission.policy';
 import { SpendBatchRecorder } from './spend-batch-recorder.service';
-import { SpendTicketReplyService } from './spend-ticket-reply.service';
 
 export type BatchSubmitStopReason = StopReason;
+
+export interface HeadResubmissionInput {
+  organizationId: string;
+  requestId: string;
+  returnedStepId: string;
+  note: string;
+  authorEmployeeId: string;
+}
 
 export interface BatchWriteInput {
   organizationId: string;
@@ -20,35 +27,26 @@ export interface BatchWriteInput {
     stopReason: BatchSubmitStopReason | null;
   }[];
   openedFor: readonly (string | null)[];
+  headReplies?: readonly HeadResubmissionInput[];
 }
 
-/** Persistence and reply-note coordination for submitting a spend batch. */
+/**
+ * Persistence and audit writer for submitting a spend batch.
+ * Lock order: caller locks access_requests in ascending id order (plus budget-year locks inside routing)
+ * before writing head replies, spend_batches, spend_batch_items, and audit events in the same transaction.
+ */
 @Injectable()
 export class SpendBatchWriterService {
   constructor(
     private readonly batches: SpendBatchRepo,
     private readonly recorder: SpendBatchRecorder,
-    private readonly ticketReplies: SpendTicketReplyService,
+    private readonly replies: RequestReplyRepo,
   ) {}
 
-  pendingSpendReturn(tx: DbTx, requestId: string): Promise<HumanReturn | null> {
-    return this.ticketReplies.pendingSpendReturn(tx, requestId);
-  }
-
-  recordHeadResubmission(
-    tx: DbTx,
-    input: {
-      organizationId: string;
-      requestId: string;
-      returnedStepId: string;
-      note: string;
-      authorEmployeeId: string;
-    },
-  ): Promise<{ id: string }> {
-    return this.ticketReplies.recordHeadResubmission(tx, input);
-  }
-
   async writeBatchAndAudit(tx: DbTx, actor: AuthenticatedPrincipal, input: BatchWriteInput): Promise<string> {
+    for (const reply of input.headReplies ?? []) {
+      await this.replies.insert(tx, { ...reply, kind: 'HEAD_RESUBMISSION' });
+    }
     const batchId = await this.batches.create(tx, {
       organizationId: input.organizationId,
       departmentId: input.departmentId,

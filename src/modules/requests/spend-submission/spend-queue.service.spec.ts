@@ -9,7 +9,7 @@ import type { SpendWireViewService } from '../spend/spend-wire-view.service';
 import type { SpendHeadService } from './spend-head.service';
 import type { SpendQueueOutcomeService } from './spend-queue-outcome.service';
 import { SpendQueueService } from './spend-queue.service';
-import { SpendTicketReplyService } from './spend-ticket-reply.service';
+import { SpendReplyFactsService } from './spend-reply-facts.service';
 
 const DEP = '00000000-0000-4000-8000-0000000000d1';
 const HEAD = '00000000-0000-4000-8000-0000000000f1';
@@ -91,7 +91,7 @@ describe('SpendQueueService.page (§7.4 ticketRef & §7.10 replyNoteRequired)', 
         ],
       ]),
     );
-    const ticketReplies = new SpendTicketReplyService(
+    const replyFacts = new SpendReplyFactsService(
       { refsOf } as unknown as RequestTicketRepo,
       { returnFactsOf } as unknown as RequestReplyRepo,
     );
@@ -109,7 +109,7 @@ describe('SpendQueueService.page (§7.4 ticketRef & §7.10 replyNoteRequired)', 
         units: jest.fn().mockResolvedValue(new Map([['VND', 0]])),
       } as unknown as SpendWireViewService,
       { ageOf: jest.fn().mockResolvedValue(new Map()) } as unknown as SlaQueueAgeService,
-      ticketReplies,
+      replyFacts,
     );
 
     const result = await service.page(actor, { page: 1, pageSize: 20 });

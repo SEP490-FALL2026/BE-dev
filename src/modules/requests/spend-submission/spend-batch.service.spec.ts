@@ -17,7 +17,7 @@ import type { SpendBatchRecorder } from './spend-batch-recorder.service';
 import { SpendBatchWriterService } from './spend-batch-writer.service';
 import { SpendBatchService } from './spend-batch.service';
 import type { SpendHeadService } from './spend-head.service';
-import { SpendTicketReplyService } from './spend-ticket-reply.service';
+import { SpendReplyFactsService } from './spend-reply-facts.service';
 
 const ORG = '00000000-0000-4000-8000-000000000001';
 const DEP = '00000000-0000-4000-8000-0000000000d1';
@@ -145,14 +145,12 @@ function buildHarness(options: {
   });
   const insertReply = jest.fn().mockResolvedValue({ id: 'reply-1' });
 
-  const ticketReplies = new SpendTicketReplyService(
-    { refsOf: jest.fn() } as unknown as RequestTicketRepo,
-    { returnFactsOf, insert: insertReply } as unknown as RequestReplyRepo,
-  );
+  const replies = { returnFactsOf, insert: insertReply } as unknown as RequestReplyRepo;
+  const replyFacts = new SpendReplyFactsService({ refsOf: jest.fn() } as unknown as RequestTicketRepo, replies);
   const writer = new SpendBatchWriterService(
     { create: createBatch } as unknown as SpendBatchRepo,
     { submitted: recorderSubmitted } as unknown as SpendBatchRecorder,
-    ticketReplies,
+    replies,
   );
 
   const service = new SpendBatchService(
@@ -171,9 +169,10 @@ function buildHarness(options: {
       requireUnitCostCenter: jest.fn(),
     } as unknown as OrganizationReadApi,
     writer,
+    replyFacts,
   );
 
-  return { service, runnerRun, lockById, createBatch, route, recorderSubmitted, insertReply };
+  return { service, runnerRun, lockById, createBatch, route, recorderSubmitted, insertReply, returnFactsOf };
 }
 
 const withinBase = (assigneeEmployeeId: string | null = APPROVER_A): RoutingOutcome => ({
@@ -352,6 +351,7 @@ describe('SpendBatchService (§7.7 ticket order & §7.10 reply notes)', () => {
       const response = await harness.service.submit(actor, bodyIds);
 
       expect(harness.lockById.mock.calls.map((call) => call[1])).toEqual([REQ_1, REQ_3, REQ_4]);
+      expect(harness.returnFactsOf).toHaveBeenCalledTimes(1);
       expect(routeCalls).toEqual([REQ_1, REQ_4, REQ_3]);
       expect(response.results).toEqual([
         { requestId: REQ_3, outcome: 'SENT_TO_APPROVER', stopReason: null, reserveConfirmation: 'NOT_GIVEN' },
