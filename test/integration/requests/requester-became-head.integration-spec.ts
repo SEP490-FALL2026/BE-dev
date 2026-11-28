@@ -87,8 +87,10 @@ describe('W1-17: when a requester becomes head, individual paid requests convert
     return found;
   };
 
-  const resubmit = (id: string, account: ApiAccount) =>
-    request(h.server()).post(`/api/v1/access-requests/${id}/resubmission`).set(h.as(account));
+  const resubmit = (id: string, account: ApiAccount, body?: object) => {
+    const req = request(h.server()).post(`/api/v1/access-requests/${id}/resubmission`).set(h.as(account));
+    return body === undefined ? req : req.send(body);
+  };
 
   const renew = (assignmentId: string, account: ApiAccount) =>
     request(h.server())
@@ -298,7 +300,7 @@ describe('W1-17: when a requester becomes head, individual paid requests convert
       });
       expect(await h.steps(sent.id, 'SPEND_APPROVAL')).toEqual([]);
 
-      await resubmit(sent.id, u.member.account).expect(200);
+      await resubmit(sent.id, u.member.account, { replyNote: 'Clarified scope for Q3' }).expect(200);
 
       expect(await requestMeta(sent.id)).toMatchObject({
         routing_mode: 'ONE_STEP',

@@ -5,6 +5,7 @@ import { RequestResubmissionService } from '../../../src/modules/requests/reques
 import {
   AccessRequestNotAwaitingRevisionError,
   AccessRequestNotRequesterError,
+  AccessRequestReplyNoteRequiredError,
 } from '../../../src/modules/requests/access-request/access-request.errors';
 import { AccessRequestQueryService } from '../../../src/modules/requests/request-view/access-request-query.service';
 import { bodyOf } from '../../support/api-body';
@@ -80,10 +81,12 @@ describe('BR-MF1-02: one-step resubmission HTTP contract', () => {
     resubmit.mockResolvedValue({ id: ID });
   });
   afterAll(async () => app?.close());
-  const call = () =>
-    request(app.getHttpServer())
+  const call = (body?: object) => {
+    const req = request(app.getHttpServer())
       .post(PATH)
       .set('Authorization', bearer(principal(['EMPLOYEE'])));
+    return body === undefined ? req : req.send(body);
+  };
   it('needs authentication', async () => {
     await request(app.getHttpServer()).post(PATH).expect(401);
     expect(resubmit).not.toHaveBeenCalled();
@@ -100,10 +103,27 @@ describe('BR-MF1-02: one-step resubmission HTTP contract', () => {
       'samePersonAsSpend',
     );
   });
+  it('accepts empty object {} and optional { replyNote } body, forwarding to service', async () => {
+    await call({}).expect(200);
+    expect(resubmit).toHaveBeenLastCalledWith(expect.any(Object), ID, {});
+
+    await call({ replyNote: '  dùng cho dự án X  ' }).expect(200);
+    expect(resubmit).toHaveBeenLastCalledWith(expect.any(Object), ID, { replyNote: 'dùng cho dự án X' });
+  });
+  it.each([
+    ['blank replyNote', { replyNote: '   ' }],
+    ['over-1000 replyNote', { replyNote: 'a'.repeat(1001) }],
+    ['unknown property', { extra: 1 }],
+  ])('rejects invalid body (%s) with 422 VALIDATION_ERROR', async (_label, payload) => {
+    const response = await call(payload).expect(422);
+    expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
+    expect(resubmit).not.toHaveBeenCalled();
+  });
   it.each([
     [new AccessRequestNotRequesterError(), 403, 'ACCESS_REQUEST.NOT_REQUESTER'],
     [new AccessRequestNotAwaitingRevisionError(), 409, 'ACCESS_REQUEST.NOT_AWAITING_REVISION'],
-  ])('maps requester/state refusal', async (error, status, code) => {
+    [new AccessRequestReplyNoteRequiredError(ID), 422, 'ACCESS_REQUEST.REPLY_NOTE_REQUIRED'],
+  ])('maps requester/state/reply-note refusal', async (error, status, code) => {
     resubmit.mockRejectedValue(error);
     expect(bodyOf(await call().expect(status)).error.code).toBe(code);
   });
