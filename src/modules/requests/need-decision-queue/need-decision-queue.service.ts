@@ -3,6 +3,7 @@ import { Page, pageOf } from '../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { RequestTicketRepo } from '../request-ticket/request-ticket.repo';
 import { SpendWireViewService } from '../spend/spend-wire-view.service';
 import { StepDueOnService } from '../spend-approval-view/step-due-on.service';
 import type { NeedQueueItemWire } from './need-decision-queue.dto';
@@ -24,6 +25,7 @@ export class NeedDecisionQueueService {
     private readonly organizationReads: OrganizationReadApi,
     private readonly wireView: SpendWireViewService,
     private readonly deadlines: StepDueOnService,
+    private readonly tickets: RequestTicketRepo,
   ) {}
 
   /** The need steps waiting for the caller, the oldest first. */
@@ -48,9 +50,18 @@ export class NeedDecisionQueueService {
 
   /** Everything a page is read against, one read of each whatever the size of the page. */
   private async lookupsFor(rows: readonly NeedQueueRow[]): Promise<NeedQueueLookups> {
-    if (rows.length === 0) return { people: new Map(), plans: [], departments: [], units: new Map(), due: new Map() };
+    if (rows.length === 0) {
+      return {
+        people: new Map(),
+        plans: [],
+        departments: [],
+        units: new Map(),
+        due: new Map(),
+        ticketRefs: new Map(),
+      };
+    }
     const planIds = [...new Set(rows.flatMap(({ request }) => (request.planId === null ? [] : [request.planId])))];
-    const [people, plans, departments, units, due] = await Promise.all([
+    const [people, plans, departments, units, due, ticketRefs] = await Promise.all([
       this.wireView.people(
         rows.flatMap(({ request }) => [
           request.requesterEmployeeId,
@@ -63,8 +74,9 @@ export class NeedDecisionQueueService {
       this.deadlines.dueOn(
         rows.map((row) => ({ id: row.id, createdAt: row.createdAt, slaWorkingDays: row.slaWorkingDays })),
       ),
+      this.tickets.refsOf([...new Set(rows.map((row) => row.requestId))]),
     ]);
 
-    return { people, plans, departments, units, due };
+    return { people, plans, departments, units, due, ticketRefs };
   }
 }

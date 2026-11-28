@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { employeeRef, requestSchema, requestStateSchema } from '../access-request/access-request.dto';
+import { ticketRefSchema } from '../request-ticket/request-ticket.dto';
 import { isStateList } from './my-requests.policy';
 import { LINE_STATES } from '../access-request/group-request.types';
 import { MY_REQUEST_INVOLVEMENTS, MY_REQUEST_TYPES, MY_REQUEST_VIEWS } from './my-requests.types';
@@ -108,8 +109,12 @@ export const myRequestSummarySchema = z.strictObject({
   myLine: z.strictObject({ state: z.enum(LINE_STATES), outcomeReason: z.string().nullable() }).nullable(),
 });
 
+export const myRequestItemSchema = myRequestSummarySchema.extend({
+  ticketRef: ticketRefSchema.nullable(),
+});
+
 const pageSchema = z.strictObject({
-  items: z.array(myRequestSummarySchema),
+  items: z.array(myRequestItemSchema),
   pagination: z.strictObject({
     page: z.number().int().positive(),
     pageSize: z.number().int().positive(),
@@ -118,7 +123,7 @@ const pageSchema = z.strictObject({
   }),
 });
 
-export type MyRequestSummaryWire = z.infer<typeof myRequestSummarySchema>;
+export type MyRequestSummaryWire = z.infer<typeof myRequestItemSchema>;
 export type MyRequestPageWire = z.infer<typeof pageSchema>;
 
 export class MyRequestsQueryDto extends createZodDto(myRequestsQuerySchema) {}

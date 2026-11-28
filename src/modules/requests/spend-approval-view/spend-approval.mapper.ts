@@ -3,6 +3,7 @@ import type { CatalogApi } from '../../catalog/public/catalog.api';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import type { AssessmentRecord } from '../access-request/assessment-record.types';
+import type { TicketRef } from '../request-ticket/request-ticket.types';
 import type { BudgetCheckRepo } from '../spend/budget-check.repo';
 import { codesOf, type BlockReason, type BudgetOutcome, type YearResult } from '../spend/budget-check.policy';
 import type { SpendDecisionRepo } from '../spend/spend-decision.repo';
@@ -27,6 +28,7 @@ export interface QueueLookups {
   due: Map<string, string>;
   /** What is left of the budget of the year after for each request, by request id (`QĐ-111al`); a request absent keeps nothing of it. */
   nextYear: Map<string, ApprovalSummaryWire['nextYearBudget']>;
+  ticketRefs: ReadonlyMap<string, TicketRef>;
 }
 
 function planOf(
@@ -110,6 +112,7 @@ export function approvalSummaryOf(row: OpenSpendRow, lookups: QueueLookups): App
     ...checkOf(lookups.checks.get(row.requestId)),
     nextYearBudget: lookups.nextYear.get(row.requestId) ?? null,
     batchId: lookups.batches.get(row.requestId) ?? null,
+    ticketRef: lookups.ticketRefs.get(row.requestId) ?? null,
   };
 }
 

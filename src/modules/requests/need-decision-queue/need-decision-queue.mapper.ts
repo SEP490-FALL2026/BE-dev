@@ -3,6 +3,7 @@ import { formatAmount } from '../../../core/money/money';
 import type { CatalogApi } from '../../catalog/public/catalog.api';
 import type { DepartmentBrief } from '../../organization/public/organization.types';
 import { deciderRoleOf } from '../access-request/need-decision.policy';
+import type { TicketRef } from '../request-ticket/request-ticket.types';
 import type { EmployeeWire } from '../spend/spend-wire-view.service';
 import type { NeedQueueItemWire } from './need-decision-queue.dto';
 import { reasonExcerptOf } from './need-decision-queue.policy';
@@ -17,6 +18,7 @@ export interface NeedQueueLookups {
   departments: readonly DepartmentBrief[];
   units: ReadonlyMap<string, number>;
   due: ReadonlyMap<string, string>;
+  ticketRefs: ReadonlyMap<string, TicketRef>;
 }
 
 /** A step points at a record that is missing only when the data is broken: say which step, never answer a half row. */
@@ -73,5 +75,6 @@ export function needQueueItemOf(row: NeedQueueRow, lookups: NeedQueueLookups): N
     termMonths: request.termMonths,
     expectedEndDate: request.expectedEndDate ? fromDateColumn(request.expectedEndDate) : null,
     pricing: pricingOf(request, lookups.units),
+    ticketRef: lookups.ticketRefs.get(row.requestId) ?? null,
   };
 }
