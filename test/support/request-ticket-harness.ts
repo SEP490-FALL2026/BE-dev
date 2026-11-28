@@ -61,9 +61,9 @@ export async function buildTicketWorld(
       });
   const pDes = { ...department, unitId: ccDes?.id ?? '' };
   const other = await h.departmentWithUnit('P-OTHER');
-  const e1 = await h.staff(pDes, 'E1');
-  const h1 = await h.staff(pDes, 'H1');
-  const c1 = await h.staff(other, 'C1');
+  const e1 = await h.staff(pDes, 'W4-E1');
+  const h1 = await h.staff(pDes, 'W4-H1');
+  const c1 = await h.staff(other, 'W4-C1');
   if (!opts.withoutHead) await h.makeHead(pDes, h1);
   await h.setRole('SPENDING_APPROVER', c1);
   await h.setItAdminInCharge(pDes, { employeeId: h.it1.employeeId, account: h.it1 });
