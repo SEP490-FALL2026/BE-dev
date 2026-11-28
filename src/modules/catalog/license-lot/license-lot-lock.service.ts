@@ -56,6 +56,11 @@ export class LicenseLotLockService {
     return new Set((await this.lots.findMany(ids, tx)).keys());
   }
 
+  /** The ids of the lots not bought for a request this IT Admin answers for. */
+  responsibleLotIds(employeeId: string, tx?: DbTx): Promise<string[]> {
+    return this.lots.idsResponsibleFor(employeeId, tx);
+  }
+
   /** The lot with its plan, without a lock; null when it does not exist. */
   async find(lotId: string, tx?: DbTx): Promise<LicenseLotView | null> {
     const lot = await this.lots.find(lotId, tx);

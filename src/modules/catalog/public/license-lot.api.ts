@@ -46,6 +46,11 @@ export class LicenseLotApi {
     return this.locks.idsOfLots(ids, tx);
   }
 
+  /** The ids of the lots, not bought for a request, this IT Admin answers for: whose invoices they read (`QĐ-118f`). */
+  getResponsibleLotIds(employeeId: string, tx?: DbTx): Promise<string[]> {
+    return this.locks.responsibleLotIds(employeeId, tx);
+  }
+
   /** The lot with its plan and application, without a lock; null when it does not exist. */
   findLot(lotId: string, tx?: DbTx): Promise<LicenseLotView | null> {
     return this.locks.find(lotId, tx);

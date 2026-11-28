@@ -138,13 +138,13 @@ flowchart BT
   policies -->|7| organization
   requests -->|67| audit
   requests -->|37| budgets
-  requests -->|55| catalog
+  requests -->|58| catalog
   requests -->|11| finance
   requests -->|42| identity_access
   requests -->|68| licensing
   requests -->|15| notifications
   requests -->|13| operating_parameters
-  requests -->|109| organization
+  requests -->|110| organization
   requests -->|35| policies
   usage -->|10| audit
   usage -->|3| budgets

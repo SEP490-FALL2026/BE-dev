@@ -7,7 +7,6 @@ import { BudgetsApi } from '../../budgets/public/budgets.api';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import type { LicenseLotView } from '../../catalog/public/license-lot.types';
 import { FinanceApi } from '../../finance/public/finance.api';
-import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { LicensingOpenGrantsApi } from '../../licensing/public/licensing-open-grants.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import {
@@ -27,6 +26,7 @@ import {
 import { PurchaseInvoiceRefusedError } from './purchase-invoice.errors';
 import { matchPurchaseInvoice } from './purchase-invoice-match.policy';
 import { PurchaseInvoiceRepo, type RequestPurchaseFacts } from './purchase-invoice.repo';
+import { PurchaseInvoiceSubscriptionLinkService } from './subscription-link/purchase-invoice-subscription-link.service';
 import type { PurchaseInvoiceFormInput } from './purchase-invoice.dto';
 import type {
   LinkFacts,
@@ -55,8 +55,8 @@ export class PurchaseInvoicePlanService {
     private readonly budgets: BudgetsApi,
     private readonly grants: LicensingOpenGrantsApi,
     private readonly organizationReads: OrganizationReadApi,
-    private readonly identity: IdentityAccessApi,
     private readonly finance: FinanceApi,
+    private readonly subscriptionLink: PurchaseInvoiceSubscriptionLinkService,
   ) {}
 
   /** Resolves license-lot allocation month & active beneficiary count when Finance confirms a lot invoice. */
@@ -94,6 +94,11 @@ export class PurchaseInvoicePlanService {
     return null;
   }
 
+  /** Who is told what became of the invoice (`QĐ-118f`): the IT Admin who answers for it now. */
+  recipientOf(row: Parameters<PurchaseInvoiceSubscriptionLinkService['recipientOf']>[0], tx: DbTx): Promise<string> {
+    return this.subscriptionLink.recipientOf(row, tx);
+  }
+
   /** Throws PurchaseInvoiceRefusedError and the money errors of `core/money`. */
   async plan(actor: AuthenticatedPrincipal, form: PurchaseInvoiceFormInput, tx?: DbTx): Promise<PurchaseInvoicePlan> {
     const facts = await this.factsOf(actor, form, tx);
@@ -101,16 +106,13 @@ export class PurchaseInvoicePlanService {
   }
 
   private async factsOf(actor: AuthenticatedPrincipal, form: PurchaseInvoiceFormInput, tx?: DbTx): Promise<LinkFacts> {
-    const scope = await this.organizationReads.getItAdminActingScope(
-      actor.employeeId,
-      (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
-      tx,
-    );
+    const scope = await this.subscriptionLink.actingScopeOf(actor.employeeId, tx);
     const serviceMonth = `${form.servicePeriodMonth}-01`;
 
     if (form.link.licenseLotId !== undefined) {
       return this.pool.buildLicenseLotLinkFacts({
         licenseLotId: form.link.licenseLotId,
+        actorEmployeeId: actor.employeeId,
         serviceMonth,
         scope,
         invoices: this.invoices,
@@ -121,8 +123,9 @@ export class PurchaseInvoicePlanService {
 
     return form.link.requestId !== undefined
       ? this.requestFacts(form.link.requestId, form.link.provisioningTaskId ?? null, scope, serviceMonth, tx)
-      : this.subscriptionFacts(
+      : this.subscriptionLink.factsOf(
           form.link.subscriptionId as string,
+          actor.employeeId,
           serviceMonth,
           form.link.seatPurchaseId ?? null,
           form.link.subscriptionLineIds ?? [],
@@ -221,113 +224,6 @@ export class PurchaseInvoicePlanService {
     const [target] = await this.catalog.findPlanSeatTargets([request.planId], tx);
 
     return target?.provisioningType === 'K2' ? this.poolSubscriptionOfPlan(request.planId, tx) : null;
-  }
-
-  /**
-   * The invoice of a subscription comes from any IT Admin (`QĐ-111u`: every purchase has one, `QĐ-58b`: another IT Admin works in the place of
-   * the one who answers): a subscription has no owning department, so the route's role is its whole scope.
-   */
-  private async subscriptionFacts(
-    subscriptionId: string,
-    serviceMonth: BusinessDate,
-    seatPurchaseId: string | null,
-    subscriptionLineIds: readonly string[],
-    tx?: DbTx,
-  ): Promise<LinkFacts> {
-    if (tx !== undefined && seatPurchaseId === null) {
-      await this.pool.lockPeriod(tx, subscriptionId);
-    }
-    const [period] = await this.pool.getPurchaseFacts([subscriptionId], tx);
-    if (!period) throw new PurchaseInvoiceRefusedError('LINK_NOT_FOUND');
-
-    const vendorId = await this.catalog.getPlanVendorId(period.planId, tx);
-    if (vendorId === null) throw new PurchaseInvoiceRefusedError('NO_VENDOR');
-    const purchase = await this.validateSeatPurchaseLink(subscriptionId, seatPurchaseId, tx);
-    if (seatPurchaseId === null) {
-      await this.validateLineSelection(subscriptionId, serviceMonth, subscriptionLineIds, tx);
-    }
-    const organization = await this.organizationReads.getOrganization(tx);
-    const poolSource =
-      period.provisioningType === 'K2'
-        ? await this.pool.subscriptionSource({
-            subscriptionId,
-            period,
-            serviceMonth,
-            seatPurchaseId,
-            subscriptionLineIds,
-            tx,
-          })
-        : null;
-
-    return {
-      organizationId: (organization as { id: string }).id,
-      link: { kind: 'SUBSCRIPTION', subscriptionId, seatPurchaseId, subscriptionLineIds },
-      vendorId,
-      continuation: false,
-      startMonth: null,
-      termMonths: null,
-      expectedQuantity: purchase ? purchase.quantity : period.purchasedQuantity,
-      expectedUnitPrice: await this.catalog.getSubscriptionOriginalPrice(subscriptionId, tx),
-      requestCostCenterId: null,
-      failedGrantDepartmentId: null,
-      requestId: null,
-      holderBound: false,
-      poolSubscriptionId: null,
-      ceilingParts: await this.pool.ceilingPartsOf({
-        period,
-        serviceMonth,
-        seatPurchaseId,
-        subscriptionLineIds,
-        expectedQuantity: purchase ? purchase.quantity : period.purchasedQuantity,
-        tx,
-      }),
-      poolSource,
-      renewedAssignmentId: null,
-      licenseLotId: null,
-    };
-  }
-
-  private async validateSeatPurchaseLink(subscriptionId: string, seatPurchaseId: string | null, tx?: DbTx) {
-    if (seatPurchaseId === null) return null;
-    const purchase = await this.pool.findSeatPurchase(seatPurchaseId, tx);
-    if (!purchase) throw new PurchaseInvoiceRefusedError('LINK_NOT_FOUND');
-    const [line] = await this.pool.linesOfIds([purchase.subscriptionLineId], tx);
-    if (!line || line.subscriptionId !== subscriptionId) {
-      throw new PurchaseInvoiceRefusedError('INVALID_LINE_SELECTION');
-    }
-    if (await this.invoices.seatPurchaseHasOpenInvoice(seatPurchaseId, tx)) {
-      throw new PurchaseInvoiceRefusedError('SEAT_PURCHASE_INVOICED');
-    }
-
-    return purchase;
-  }
-
-  private async validateLineSelection(
-    subscriptionId: string,
-    serviceMonth: BusinessDate,
-    subscriptionLineIds: readonly string[],
-    tx?: DbTx,
-  ): Promise<void> {
-    const invoiced = await this.invoices.invoicedLinesForMonth(subscriptionId, serviceMonth, tx);
-    if (subscriptionLineIds.length === 0) {
-      if (invoiced.lineIds.size > 0) {
-        throw new PurchaseInvoiceRefusedError('LINE_ALREADY_INVOICED', undefined, { lineIds: [...invoiced.lineIds] });
-      }
-
-      return;
-    }
-    const lines = (await this.pool.linesOfSubscription(subscriptionId, tx)).filter((l) => l.closedReason !== 'REMOVED');
-    const validIds = new Set(lines.map((l) => l.id));
-    if (subscriptionLineIds.some((id) => !validIds.has(id))) {
-      throw new PurchaseInvoiceRefusedError('INVALID_LINE_SELECTION');
-    }
-    if (invoiced.wholePeriodInvoiced) {
-      throw new PurchaseInvoiceRefusedError('LINE_ALREADY_INVOICED', undefined, { lineIds: subscriptionLineIds });
-    }
-    const overlap = subscriptionLineIds.filter((id) => invoiced.lineIds.has(id));
-    if (overlap.length > 0) {
-      throw new PurchaseInvoiceRefusedError('LINE_ALREADY_INVOICED', undefined, { lineIds: overlap });
-    }
   }
 
   /** Reads K2 pool expectation inputs for a submitted invoice being confirmed. */

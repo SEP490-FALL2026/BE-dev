@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { WorkerModule } from './worker/worker.module';
-import { validateEnvironment } from './infrastructure/config/env-schema';
+import { readBackgroundJobsTransport } from './infrastructure/redis/redis.config';
 import { RequestContextService } from './infrastructure/observability/request-context.service';
 import { StructuredJsonLogger } from './infrastructure/observability/structured-json.logger';
 import { createStartupReporter } from './infrastructure/observability/startup-timing';
@@ -9,8 +9,9 @@ import { createStartupReporter } from './infrastructure/observability/startup-ti
 async function bootstrapWorker(): Promise<void> {
   const startup = createStartupReporter('software-license-worker');
   startup('imports-loaded');
-  const { BACKGROUND_JOBS_TRANSPORT } = validateEnvironment(process.env);
-  const app = await NestFactory.createApplicationContext(WorkerModule.forTransport(BACKGROUND_JOBS_TRANSPORT), {
+  // The full environment was validated when WorkerModule was imported; validating process.env again here fails (see the reader).
+  const transport = readBackgroundJobsTransport(process.env);
+  const app = await NestFactory.createApplicationContext(WorkerModule.forTransport(transport), {
     bufferLogs: true,
   });
   app.useLogger(new StructuredJsonLogger(app.get(RequestContextService), 'software-license-worker'));

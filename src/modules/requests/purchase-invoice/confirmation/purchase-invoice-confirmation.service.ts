@@ -222,7 +222,7 @@ export class PurchaseInvoiceConfirmationService {
     });
   }
 
-  /** The inbox of the IT Admin who submitted the invoice. */
+  /** The inbox of the IT Admin who answers for the invoice now: the one who submitted it, but for a subscription or a lot not bought for a request (`QĐ-118f`). */
   private async tell(
     tx: DbTx,
     row: PurchaseInvoiceRow,
@@ -230,7 +230,7 @@ export class PurchaseInvoiceConfirmationService {
   ): Promise<void> {
     await this.notifications.notifyInApp(tx, {
       organizationId: row.organizationId,
-      recipientEmployeeId: row.submittedByEmployeeId,
+      recipientEmployeeId: await this.plans.recipientOf(row, tx),
       code,
       subject: { type: 'PURCHASE_INVOICE', id: row.id },
       params: {

@@ -127,6 +127,7 @@ function build(
       poolSubscriptionOfRequest: jest.fn(),
       k1AnnualAllocationFactsOf,
       lotConfirmationContextOf: jest.fn().mockResolvedValue(null),
+      recipientOf: jest.fn((row: { submittedByEmployeeId: string }) => Promise.resolve(row.submittedByEmployeeId)),
     } as unknown as PurchaseInvoicePlanService,
     { getValue } as unknown as OperatingParametersApi,
   );
