@@ -8,7 +8,7 @@ Trả lời bằng **tiếng Việt**; giữ tiếng Anh cho tên file, hàm, l�
 
 Bạn code tính năng **file bằng chứng khi IT Admin hoàn tất cấp/thu hồi** cho BE SaaS-Sentry (NestJS 11 + Prisma 7 + PostgreSQL). Làm trong worktree
 **`D:/FPT/FALL2026/Code/BE-evidence`**, nhánh **`feat/provisioning-evidence-files`** (đã tạo từ `origin/dev` `595cdc48`). Thư mục việc
-`docs/reviews/provisioning-evidence-2026-11-28/`. Năm gói **tuần tự** P1 → P2 → P3 → P4 → P5. Chế độ tự quyết: làm hết không chờ duyệt giữa gói; chỉ dừng
+`docs/reviews/provisioning-evidence-2026-11-28/`. Bảy gói **tuần tự** P1 → P2a → P2b → (mốc) → P3a → P3b → (mốc) → P4 → P5. Chế độ tự quyết: làm hết không chờ duyệt giữa gói; chỉ dừng
 ở LUẬT CỨNG / điều kiện dừng.
 
 ## 0. Skill Preflight (trước mọi việc, và lại sau mỗi lần compact)

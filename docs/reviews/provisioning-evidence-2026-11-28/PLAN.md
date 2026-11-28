@@ -1,4 +1,4 @@
-# PLAN — File bằng chứng khi cấp/thu hồi (28/11/2026, bản 1.1)
+# PLAN — File bằng chứng khi cấp/thu hồi (28/11/2026, bản 1.2)
 
 > **Cho agent code:** dùng `superpowers:executing-plans` + `superpowers:test-driven-development`; bước dùng checkbox `- [ ]`. Đọc trọn
 > [SPEC.md](SPEC.md) trước — PLAN chỉ ghi quyết định code, luật nghiệp vụ ở SPEC (EV-xx).
@@ -33,7 +33,8 @@ hoàn tất qua `CatalogApi`, và mở 2 route đọc trong thư mục mới `pr
 
 ## 1. Thứ tự gói
 
-**P1 DB → P2 catalog → P3 licensing ghi → P4 licensing đọc → P5 test tích hợp + sinh file + CI.** Tuần tự, một nhánh `feat/provisioning-evidence-files`.
+**P1 DB (S) → P2a luật file (S) → P2b catalog gắn/đọc (M) → [mốc] → P3a cấp xong (M) → P3b thu hồi + cắt truy cập (S/M) → [mốc] → P4 route đọc (M)
+→ P5 test tích hợp + sinh file + CI (M).** Tuần tự, một nhánh `feat/provisioning-evidence-files`.
 
 ## 2. Nền
 
@@ -42,15 +43,17 @@ hoàn tất qua `CatalogApi`, và mở 2 route đọc trong thư mục mới `pr
 
 ## 3. Bảng file
 
-| Gói | Tạo                                                                                                                                                                                                           | Sửa                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P1  | `prisma/migrations/20261211000000_provisioning_evidence_enum_values/migration.sql`, `prisma/migrations/20261211000100_provisioning_evidence_documents/migration.sql`                                          | `prisma/models/catalog.prisma`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| P2  | `src/modules/catalog/contract/provisioning-evidence-document.service.ts` (+ `.spec.ts`)                                                                                                                       | `catalog/contract/contract.policy.ts` (+ spec), `document.repo.ts`, `document.service.ts` (chỉ nếu `assertFileAllowed` đổi chữ ký), `contract.dto.ts` (nếu enum không tự theo `NEW_DOCUMENT_PURPOSES`), `catalog/public/catalog.api.ts`, `catalog/public/catalog.types.ts` (nếu có), `catalog.module.ts` (provider), `catalog/README.md`, `test/support/fake-object-storage.ts`                                                                                                                                                                                                                          |
-| P3  | `licensing/provisioning/evidence-files/provisioning-evidence-files.policy.ts` (+ spec) — kiểm danh sách thuần; `provisioning-evidence-files.service.ts` (+ spec) — điểm vào nhóm: hàm gắn                     | `licensing/provisioning/provisioning.dto.ts`, `provisioning.errors.ts`, `provisioning.http-errors.ts`, `provisioning-task-frame.service.ts` (kiểu `after`), `tasks/provisioning-grant-completion.service.ts`, `tasks/provisioning.service.ts` (+ spec, audit), `tasks/provisioning-tasks.controller.ts` (khai lỗi 422 inline `:229-241`), `revocation-completion/revocation-completion.service.ts`, `revocation-completion/revocation-tasks.controller.ts` (`COMPLETE_REVOCATION_ERRORS` `:28` + access-cut inline `:107-127`), `docs/rules/database-business.md` (hàng khóa `3c`), registry test (dưới) |
-| P4  | `licensing/provisioning/evidence-files/provisioning-evidence-files.controller.ts`, `provisioning-evidence-files.dto.ts`; thêm hàm đọc vào `provisioning-evidence-files.service.ts` (+ spec)                   | `licensing/licensing.module.ts`, `licensing/README.md`, `provisioning.errors.ts`, `provisioning.http-errors.ts`, registry test                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| P5  | `test/integration/licensing/provisioning-evidence-files.integration-spec.ts`, `test/http/licensing/provisioning-evidence-files.http-spec.ts`, `test/support/provisioning-evidence-harness.ts` (bắt buộc — P5) | `openapi.json`, `docs/generated/*` (qua generator), `test/http/platform/openapi-presentation.http-spec.ts` (số operation +2), `scripts/verify/capability-graph.test.mjs` (nếu số capability/cạnh đổi)                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Gói     | Tạo                                                                                                                                                                                                           | Sửa                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P1      | `prisma/migrations/20261211000000_provisioning_evidence_enum_values/migration.sql`, `prisma/migrations/20261211000100_provisioning_evidence_documents/migration.sql`                                          | `prisma/models/catalog.prisma`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| P2a/P2b | `src/modules/catalog/contract/provisioning-evidence-document.service.ts` (+ `.spec.ts`)                                                                                                                       | `catalog/contract/contract.policy.ts` (+ spec), `document.repo.ts`, `document.service.ts` (chỉ nếu `assertFileAllowed` đổi chữ ký), `contract.dto.ts` (nếu enum không tự theo `NEW_DOCUMENT_PURPOSES`), `catalog/public/catalog.api.ts`, `catalog/public/catalog.types.ts` (nếu có), `catalog.module.ts` (provider), `catalog/README.md`, `test/support/fake-object-storage.ts`                                                                                                                                                                                                                          |
+| P3a/P3b | `licensing/provisioning/evidence-files/provisioning-evidence-files.policy.ts` (+ spec) — kiểm danh sách thuần; `provisioning-evidence-files.service.ts` (+ spec) — điểm vào nhóm: hàm gắn                     | `licensing/provisioning/provisioning.dto.ts`, `provisioning.errors.ts`, `provisioning.http-errors.ts`, `provisioning-task-frame.service.ts` (kiểu `after`), `tasks/provisioning-grant-completion.service.ts`, `tasks/provisioning.service.ts` (+ spec, audit), `tasks/provisioning-tasks.controller.ts` (khai lỗi 422 inline `:229-241`), `revocation-completion/revocation-completion.service.ts`, `revocation-completion/revocation-tasks.controller.ts` (`COMPLETE_REVOCATION_ERRORS` `:28` + access-cut inline `:107-127`), `docs/rules/database-business.md` (hàng khóa `3c`), registry test (dưới) |
+| P4      | `licensing/provisioning/evidence-files/provisioning-evidence-files.controller.ts`, `provisioning-evidence-files.dto.ts`; thêm hàm đọc vào `provisioning-evidence-files.service.ts` (+ spec)                   | `licensing/licensing.module.ts`, `licensing/README.md`, `provisioning.errors.ts`, `provisioning.http-errors.ts`, registry test                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| P5      | `test/integration/licensing/provisioning-evidence-files.integration-spec.ts`, `test/http/licensing/provisioning-evidence-files.http-spec.ts`, `test/support/provisioning-evidence-harness.ts` (bắt buộc — P5) | `openapi.json`, `docs/generated/*` (qua generator), `test/http/platform/openapi-presentation.http-spec.ts` (số operation +2), `scripts/verify/capability-graph.test.mjs` (nếu số capability/cạnh đổi)                                                                                                                                                                                                                                                                                                                                                                                                    |
 
-Registry test phải cập nhật cùng gói thêm route/mã: `test/support/openapi-example-manifest.ts` (message thành công), `test/support/openapi-example-route-codes-licensing.ts`
+**Registry dùng file mảnh** (như đợt 4 — tránh xung đột khi gộp): mỗi registry thêm **một** file `…-provisioning-evidence.ts` cạnh file gộp và **một**
+dòng import/spread ở file gộp (khuôn: `git show origin/feat/redesign-w4-wave-c --stat` có `openapi-example-route-codes-w4-c-view.ts`,
+`api-coverage-manifest-w4-c-view.ts`, `api-collection-registry-nested-w4-c-view.ts`). Registry test phải cập nhật cùng gói thêm route/mã: `test/support/openapi-example-manifest.ts` (message thành công), `test/support/openapi-example-route-codes-licensing.ts`
 (mã theo route + status), `test/support/api-coverage-manifest.ts`, `api-collection-registry*.ts` (danh sách có chặn `items` của `evidence-files` — mục
 `API-LIST-DETAIL.1` loại bounded). Tìm đúng tên file bằng `git grep -l "provisioningTaskComplete" test/`.
 
@@ -94,9 +97,12 @@ rồi `pnpm arch:docs:check`. Kết quả thật (số pass/fail) ghi `PROGRESS.
 
 (Test DB của CHECK/guard nằm ở P5 ca 10 — chạy trên CI.)
 
-### P2 — Catalog: luật file + gắn/liệt kê/ký link (EV-01…05, EV-09/10 phía catalog)
+### P2a — Catalog: luật file (EV-01…EV-05) — cỡ S
 
-**Interfaces — Produces (cửa `CatalogApi`, dùng ở P3/P4):**
+**Tiêu chí:** (1) hai purpose mới chỉ IT Admin khai được; (2) WebP chỉ nhận cho hai purpose mới, purpose cũ giữ PDF/PNG/JPEG; (3) `mayOpen` không bao giờ
+`OPEN` file bằng chứng `READY`.
+
+**Interfaces — Produces (P2b tạo; cửa `CatalogApi`, dùng ở P3/P4):**
 
 ```ts
 type ProvisioningEvidencePurpose = 'PROVISIONING_EVIDENCE' | 'ACCESS_CUT_EVIDENCE';
@@ -123,7 +129,8 @@ Kiểu xuất ở `catalog/public/` (file types hiện có của public, hoặc 
 contentType:'image/webp'}` qua; `{purpose:'CONTRACT_ATTACHMENT', … 'a.webp','image/webp'}` ném `DocumentTypeNotAllowedError`; `'a.png'` +
     `'image/webp'` ném (đuôi không khớp).
   - `contentMatchesType('image/webp', RIFF 01 02 03 04 WEBP …)` true; `RIFF…WAVE` false; prefix 11 byte false; `SIGNATURE_PREFIX_BYTES >= 12`.
-    Nhận diện WebP **dùng lại** `src/infrastructure/object-storage/picture-image.ts:27` (export nếu chưa export; không chép bảng byte).
+    Nhận diện WebP **dùng lại** `pictureKindOf(prefix)?.contentType === 'image/webp'` (`src/infrastructure/object-storage/picture-image.ts:24`, đã export;
+    không chép bảng byte).
   - `mayOpen({purpose:'PROVISIONING_EVIDENCE', status:'READY', roles:['IT_ADMIN'], …})` = `'HIDDEN'`; cùng cho `FINANCE` (`'FORBIDDEN'` hoặc `'HIDDEN'` —
     khẳng định **không** `'OPEN'`); `PENDING_ATTACH` + uploader = actor ⟹ `'OPEN'`.
   - `assertPurposeAttachesTo('PROVISIONING_EVIDENCE','PROVISIONING_TASK')` qua; `('CONTRACT_ATTACHMENT','PROVISIONING_TASK')` ném
@@ -132,6 +139,14 @@ contentType:'image/webp'}` qua; `{purpose:'CONTRACT_ATTACHMENT', … 'a.webp','i
       `ALLOWED_TYPES` theo purpose (giữ bảng cũ cho purpose cũ; bảng thêm `image/webp: ['webp']` cho hai purpose mới), `contentMatchesType` nhận WebP
       qua `picture-image.ts`, `mayOpen`. Nơi gọi duy nhất `document.service.ts:87` truyền `purpose`.
 - [ ] `test/support/fake-object-storage.ts` `GENUINE_START['image/webp']` = `[0x52,0x49,0x46,0x46,0x24,0,0,0,0x57,0x45,0x42,0x50]`.
+- [ ] Bộ kiểm nhanh + `CI=true pnpm test -- src/modules/catalog/contract`. Commit `feat(catalog): evidence purposes and WebP for provisioning
+    evidence files` — `Spec: EV-01…EV-05`.
+
+### P2b — Catalog: gắn/liệt kê/ký link file bằng chứng (EV-09, EV-10, EV-14 phía catalog) — cỡ M
+
+**Tiêu chí:** (1) chỉ gắn file `PENDING_ATTACH` của chính người hoàn tất, đúng purpose, khóa theo `id` tăng; (2) danh sách chỉ `READY` của tác vụ;
+(3) link không qua `mayOpen`, audit `DOCUMENT.LINK_ISSUED` không chứa URL.
+
 - [ ] Test đỏ `provisioning-evidence-document.service.spec.ts` (mock repo/audit như `budget-attachment-*.spec.ts` hoặc spec catalog hiện có):
   - khóa theo id đã sắp (`lock` gọi theo thứ tự `['a','b']` khi vào `['b','a']`);
   - uploader khác ⟹ `DocumentNotFoundError`; purpose `ACCESS_CUT_EVIDENCE` khi input `PROVISIONING_EVIDENCE` ⟹ `DocumentPurposeMismatchError`; `READY` ⟹
@@ -142,52 +157,79 @@ contentType:'image/webp'}` qua; `{purpose:'CONTRACT_ATTACHMENT', … 'a.webp','i
 - [ ] Code service mới (`@Injectable`, một use case nhóm "file bằng chứng tác vụ") + repo `markAttachedToProvisioningTask`, `listReadyOfProvisioningTask`,
       (đọc một file theo id + task) theo khuôn `markAttachedToOutOfProcessCase`; facade 3 hàm; đăng ký provider `catalog.module.ts`.
 - [ ] `catalog/README.md`: thêm vào thẻ capability `contract/` (purpose mới, file mới, 3 hàm facade).
-- [ ] Bộ kiểm nhanh. Commit `feat(catalog): evidence files of a provisioning task (purposes, WebP, attach, list, link)` — `Spec: EV-01…EV-05, EV-09, EV-10`.
+- [ ] Bộ kiểm nhanh. Commit `feat(catalog): attach, list and link the evidence files of a provisioning task` — `Spec: EV-09, EV-10, EV-14 (catalog)`.
 
-### P3 — Licensing: gắn file khi hoàn tất (EV-06…EV-12)
+**Mốc kiểm (sau P2b):** `pnpm typecheck`, `pnpm test:gates`, `CI=true pnpm test -- src/modules/catalog` xanh; ghi số thật vào `PROGRESS.md`.
 
-**Interfaces — Consumes:** `CatalogApi.attachProvisioningEvidence`, `DocumentAttachRefusedError` (P2).
-**Produces:**
+### P3a — Licensing: nền gắn file + cấp xong (EV-06…EV-12 cho `complete`) — cỡ M
 
-- `ProvisioningEvidenceFileInvalidError(problem)` ở `provisioning.errors.ts`.
+**Interfaces — Consumes:** `CatalogApi.attachProvisioningEvidence`, `DocumentAttachRefusedError`, kiểu `ProvisioningEvidencePurpose` (P2b).
+**Produces (P3b, P4 dùng):**
+
+- `ProvisioningEvidenceFileInvalidError(problem)` ở `provisioning.errors.ts` → 422 `PROVISIONING_TASK.EVIDENCE_FILE_INVALID` `details { problem }`.
 - Hàm thuần `assertEvidenceFileList(ids: readonly string[] | undefined): readonly string[]` (trả mảng đã sắp, `[]` khi thiếu; ném `TOO_MANY`/`DUPLICATE`),
   hằng `EVIDENCE_FILES_MAX = 3` ở `evidence-files/provisioning-evidence-files.policy.ts`.
 - `ProvisioningEvidenceFilesService` (`@Injectable`, điểm vào nhóm `evidence-files/provisioning-evidence-files.service.ts`):
   `attach(tx: DbTx, actor: AuthenticatedPrincipal, taskId: string, ids: readonly string[] | undefined, purpose: ProvisioningEvidencePurpose): Promise<readonly string[]>`
   — gọi `assertEvidenceFileList`; mảng rỗng ⟹ trả `[]`, không gọi catalog; còn lại gọi `CatalogApi.attachProvisioningEvidence`, bắt
   `DocumentAttachRefusedError` ⟹ ném `ProvisioningEvidenceFileInvalidError(error.problem)`; trả mảng id đã sắp.
+- `TaskWrite.after` (`provisioning-task-frame.service.ts:20`) nới thành `Record<string, AuditValue>` (`audit/public/audit.types.ts:4`).
+
+**Tiêu chí:** (1) `complete` không gửi file chạy y như cũ (spec cũ xanh, không đổi kỳ vọng); (2) gửi file ⟹ gắn là bước đầu của `write`, trước
+`markCompleted` và mọi khóa khác; (3) audit `PROVISIONING_TASK.COMPLETED` có `evidenceDocumentIds`.
 
 - [ ] Test đỏ `provisioning-evidence-files.policy.spec.ts`: `undefined`/`[]` ⟹ `[]`; 3 id ⟹ đủ, đã sắp; 4 id ⟹ `ProvisioningEvidenceFileInvalidError`
       `problem 'TOO_MANY'`; `['a','a']` ⟹ `'DUPLICATE'`.
 - [ ] Test đỏ `provisioning-evidence-files.service.spec.ts` (phần `attach`): rỗng ⟹ không gọi catalog, trả `[]`; 2 id ⟹ gọi catalog đúng `purpose`, trả đã
       sắp; catalog ném `DocumentAttachRefusedError('PURPOSE_MISMATCH')` ⟹ `ProvisioningEvidenceFileInvalidError` `problem 'PURPOSE_MISMATCH'`.
-- [ ] DTO: `evidenceDocumentIds: z.array(z.uuid()).max(20).optional()` ở `completeBodySchema`, `revocationCompletionBodySchema`, `accessCutBodySchema`, kèm
-      `.meta({ description })` tiếng Anh (tối đa 3 file đã upload qua `/documents` với purpose tương ứng; không chứa mã QĐ).
-- [ ] Lỗi: `ProvisioningEvidenceFileInvalidError` → 422 `PROVISIONING_TASK.EVIDENCE_FILE_INVALID` `details { problem }` trong `provisioning.http-errors.ts`
-      (+ ví dụ trong `*_ERROR_EXAMPLES`). Khai ở **từng** chỗ: `complete` inline (`provisioning-tasks.controller.ts:229-241`), `COMPLETE_REVOCATION_ERRORS`
-      (`revocation-tasks.controller.ts:28`, cho `revocation-completion`), access-cut inline (`:107-127`).
-- [ ] Kiểu audit: `TaskWrite.after` (`provisioning-task-frame.service.ts:20`) nới thành `Record<string, AuditValue>` (`audit/public/audit.types.ts:4`).
-- [ ] Ghi — gắn là **dòng đầu** callback `write` (sau khung, trước mọi khóa khác; SPEC EV-09):
-  - `ProvisioningGrantCompletion.write` / `writeExtension` (tham số thật là `context`): `const evidenceDocumentIds = await this.evidenceFiles.attach(tx,
-actor, context.task.id, input.evidenceDocumentIds, 'PROVISIONING_EVIDENCE')` rồi phần cũ y nguyên; hai hàm **trả** `evidenceDocumentIds` (đang `void`).
-    `ProvisioningService.complete` (`tasks/provisioning.service.ts:165-190`) thêm `evidenceDocumentIds` vào `after` của audit `PROVISIONING_TASK.COMPLETED`.
-  - `RevocationCompletionService.complete`: một dòng gọi `attach(..., 'PROVISIONING_EVIDENCE')` đầu `write`; thêm `evidenceDocumentIds` vào after của
-    `REVOCATION_COMPLETED` (qua tham số của `completedRevocationAudit`). Callback đã ~52 dòng tính (trần 60) — nếu vượt, tách phần cũ ra hàm riêng **không
-    đổi thứ tự**. `recordAccessCut`: một dòng gọi `attach(..., 'ACCESS_CUT_EVIDENCE')` đầu `write`; after `ACCESS_CUT` thêm `evidenceDocumentIds`.
-  - Kiểu input: thêm `evidenceDocumentIds?: readonly string[]` ở chữ ký service (`complete` của grant; `CompletionInput` của thu hồi mở rộng **tại chữ ký
-    service**, không sửa `revocation.policy.ts`); controller truyền nguyên DTO.
-  - `docs/rules/database-business.md` bảng _Thứ tự khóa chuẩn_: thêm hàng `3c` `document_attachments` `FOR UPDATE` theo `id` tăng — gắn file bằng chứng
-    tác vụ, sau `3a`/`3b`, trước `4`.
-- [ ] Unit (**chỉ thêm ca** vào `tasks/provisioning.service.spec.ts`, `revocation-completion/revocation-completion.service.spec.ts`; `ProvisioningGrantCompletion`
-      chưa có spec ⟹ ca grant đặt ở `provisioning.service.spec.ts` hoặc spec mới `provisioning-grant-completion.service.spec.ts`): không gửi file ⟹ audit
-      có `evidenceDocumentIds: []`; gửi 2 file ⟹ `evidenceFiles.attach` gọi **trước** `markCompleted`/`markRevocationCompleted`/`markAccessCut` và trước
-      khóa dòng/assignment (`invocationCallOrder`); `attach` ném ⟹ **không** gọi `markCompleted`. `revocation.policy.spec.ts` (389 dòng) **không** thêm ca.
-- [ ] Registry: route codes (422 mới ở 3 route), ví dụ lỗi. Đăng ký provider `ProvisioningEvidenceFilesService` ở `licensing.module.ts`.
-- [ ] Bộ kiểm nhanh + `CI=true pnpm test -- src/modules/licensing/provisioning`. Commit `feat(licensing): attach evidence files when a provisioning task
-    is completed or access is cut` — `Spec: EV-06…EV-12`; ghi `Kiểm giữ:` liệt kê mọi kiểm cũ của 3 hàm ghi (khung, `cleanEvidence`, K1, K4, `NOT_BEFORE`,
-      `NOT_TERMINATING`) và khẳng định thứ tự giữa chúng không đổi.
+- [ ] Code policy + service + lỗi (`provisioning.errors.ts`, `provisioning.http-errors.ts` + ví dụ trong `*_ERROR_EXAMPLES`); đăng ký provider ở
+      `licensing.module.ts`; nới `TaskWrite.after`.
+- [ ] DTO `completeBodySchema`: `evidenceDocumentIds: z.array(z.uuid()).max(20).optional()` + `.meta({ description })` tiếng Anh (tối đa 3 file đã upload
+      qua `/documents` với purpose `PROVISIONING_EVIDENCE`; không chứa mã QĐ). Khai 422 ở `complete` inline (`provisioning-tasks.controller.ts:229-241`).
+- [ ] Ghi: `ProvisioningService.complete` (`tasks/provisioning.service.ts:165-190`) thêm `evidenceDocumentIds?` vào kiểu `input` (`:168`) và truyền xuống;
+      `ProvisioningGrantCompletion.write` / `writeExtension` (tham số thật là `context`) có **dòng đầu** `const evidenceDocumentIds = await
+    this.evidenceFiles.attach(tx, actor, context.task.id, input.evidenceDocumentIds, 'PROVISIONING_EVIDENCE')`, phần cũ y nguyên, và **trả**
+      `evidenceDocumentIds` (đang `void`); `ProvisioningService.complete` đưa giá trị trả vào `after` (`:184-188`).
+- [ ] Unit (**chỉ thêm ca** — `ProvisioningGrantCompletion` chưa có spec ⟹ spec mới `tasks/provisioning-grant-completion.service.spec.ts` hoặc thêm vào
+      `tasks/provisioning.service.spec.ts`): không file ⟹ after có `evidenceDocumentIds: []`; 2 file ⟹ `evidenceFiles.attach` gọi **trước** `markCompleted`
+      (`mock.invocationCallOrder`); `attach` ném ⟹ không gọi `markCompleted`.
+- [ ] `docs/rules/database-business.md` bảng _Thứ tự khóa chuẩn_: thêm hàng `3c` `document_attachments` `FOR UPDATE` theo `id` tăng — gắn file bằng chứng
+      tác vụ, sau `3a`/`3b`, trước `4`.
+- [ ] Registry (file mảnh, mục 3): mã 422 của `provisioningTaskComplete`.
+- [ ] Bộ kiểm nhanh + `CI=true pnpm test -- src/modules/licensing/provisioning`. Commit `feat(licensing): attach evidence files when a provisioning task is
+    completed` — `Spec: EV-06…EV-12 (complete)`; `Kiểm giữ:` khung (`assertItAdmin`, khóa, `requireActingItAdmin`), `cleanEvidence`/K1 trước khung,
+      `assertNotRevocationTask`, `nextStatus`, `assertKeyFits`, checklist K1, `markCompleted` — thứ tự giữa chúng không đổi.
 
-### P4 — Licensing: route đọc (EV-13…EV-16)
+### P3b — Licensing: thu hồi xong + cắt truy cập (EV-06…EV-12 cho hai route thu hồi) — cỡ S/M
+
+**Interfaces — Consumes:** `ProvisioningEvidenceFilesService.attach`, `ProvisioningEvidenceFileInvalidError` (P3a).
+
+**Tiêu chí:** (1) hai route không gửi file chạy y như cũ; (2) gắn là bước đầu của `write`, trước `lockLine`/`ending.lock`; (3) audit `REVOCATION_COMPLETED`
+và `ACCESS_CUT` có `evidenceDocumentIds`; (4) callback `complete` không vượt 60 dòng tính.
+
+- [ ] DTO `revocationCompletionBodySchema`, `accessCutBodySchema`: thêm `evidenceDocumentIds` như P3a (mô tả nêu purpose `PROVISIONING_EVIDENCE` /
+      `ACCESS_CUT_EVIDENCE`). Khai 422 ở `COMPLETE_REVOCATION_ERRORS` (`revocation-tasks.controller.ts:28`) và access-cut inline (`:107-127`).
+- [ ] `RevocationCompletionService.complete`: kiểu input mở rộng **tại chữ ký service** (`CompletionInput & { evidenceDocumentIds?: readonly string[] }`,
+      không sửa `revocation.policy.ts`); **dòng đầu** `write` gọi `attach(..., 'PROVISIONING_EVIDENCE')`; hàm module `completedRevocationAudit`
+      (`revocation-completion.service.ts:162`) nhận thêm tham số thứ 5 `evidenceDocumentIds` và đặt vào `after`. Callback đã ~52 dòng tính (trần 60) — vượt ⟹
+      tách phần cũ ra hàm riêng **không đổi thứ tự**.
+- [ ] `recordAccessCut` (`:116-159`): **dòng đầu** `write` gọi `attach(..., 'ACCESS_CUT_EVIDENCE')`; after của `ACCESS_CUT` thêm `evidenceDocumentIds`.
+- [ ] Unit (**chỉ thêm ca** vào `revocation-completion/revocation-completion.service.spec.ts`, hoặc spec mới cạnh nó nếu > 400 dòng): không file ⟹ after có
+      `[]`; có file ⟹ `attach` gọi trước `aftermath.lockLine`/`ending.lock` và `markRevocationCompleted`/`markAccessCut`; `attach` ném ⟹ không gọi
+      `markRevocationCompleted`. `revocation.policy.spec.ts` (389 dòng) **không** thêm ca.
+- [ ] Registry (file mảnh): mã 422 của `provisioningTaskCompleteRevocation`, `provisioningTaskRecordAccessCut`.
+- [ ] Bộ kiểm nhanh + `CI=true pnpm test -- src/modules/licensing/provisioning`. Commit `feat(licensing): attach evidence files when a revocation is
+    completed or access is cut` — `Spec: EV-06…EV-12 (revocation)`; `Kiểm giữ:` `assertRevocationTask`, `nextStatus`, `assertNotBefore`, `BEFORE_WORK`,
+      `lockLine`, `ending.lock`, `planCompletion`/`cleanEvidence`/note `ALREADY_GONE`, `planKeyReturn`, `NOT_TERMINATING`, `AssignmentNotOpenError`,
+      `planAccessCut` — thứ tự giữa chúng không đổi.
+
+**Mốc kiểm (sau P3b):** `pnpm typecheck`, `pnpm lint`, `pnpm test:gates`, `CI=true pnpm test -- src/modules/catalog src/modules/licensing` xanh; ghi số thật
+vào `PROGRESS.md` trước khi sang P4.
+
+### P4 — Licensing: route đọc (EV-13…EV-16) — cỡ M
+
+**Tiêu chí:** (1) Super Admin đọc mọi tác vụ; (2) IT chỉ đọc khi **đang** phụ trách (`requireActingItAdmin`), ngoài phạm vi ⟹ 404
+`PROVISIONING_TASK.NOT_FOUND`; (3) tác vụ chưa xếp phòng đã hoàn tất ⟹ chỉ Super Admin (SPEC TC-4 — Owner chưa xác nhận: nếu bị đổi, chỉ sửa nhánh này).
 
 **Interfaces — Consumes:** `CatalogApi.listProvisioningEvidence`, `issueProvisioningEvidenceLink` (P2); `ProvisioningTaskFrame.requireActingItAdmin` (frame `:134`);
 repo đọc tác vụ có `assignment.employeeId` (khung đọc ở `provisioning-task-frame.service.ts:72-73` — dùng hàm đọc **không khóa** có sẵn của
@@ -209,7 +251,9 @@ repo đọc tác vụ có `assignment.employeeId` (khung đọc ở `provisionin
       `pnpm arch:capabilities --module licensing` ⟹ không vòng; cập nhật `scripts/verify/capability-graph.test.mjs` nếu số liệu đổi.
 - [ ] Bộ kiểm nhanh. Commit `feat(licensing): list and open the evidence files of a provisioning task (responsible IT Admin, Super Admin)` — `Spec: EV-13…EV-16`.
 
-### P5 — Test tích hợp + HTTP + CI
+### P5 — Test tích hợp + HTTP + CI — cỡ M
+
+**Tiêu chí:** 11 ca integration SPEC §8 + HTTP spec chạy thật trên CI GitHub; không test đỏ mới so với nền.
 
 - [ ] Harness: đọc `test/support/provisioning-harness.ts` (`granted` `:249`, `complete` `:236`), `revocation-harness.ts` (`revoked` `:153`, `accessCut`
       `:158`), `document-harness.ts` (`providerOverrides` `OBJECT_STORAGE` `:23-31`, `uploaded()` `:70`), `devices-harness.ts:118` (khuôn kế thừa).
@@ -218,7 +262,8 @@ repo đọc tác vụ có `assignment.employeeId` (khung đọc ở `provisionin
       `RevocationHarness`, override `start` thêm `FakeObjectStorage` qua `providerOverrides` (`provisioning-harness.ts:173-179`), mang
       `createDocument/completeDocument/putObject/uploaded` như `document-harness.ts:23-39,70` — cho ca 6. Không sửa hành vi harness cũ.
 - [ ] Integration `provisioning-evidence-files.integration-spec.ts`: đủ 11 ca SPEC §8 (≤ 800 dòng; quá ⟹ tách `…-read.integration-spec.ts`). Ca 10 theo khuôn
-      `test/integration/catalog/document-constraints.integration-spec.ts:142` (khẳng định cả `code` lẫn **tên** constraint). Ca 11 theo một spec
+      `test/integration/catalog/document-constraints.integration-spec.ts:142` (helper `move` của spec đó trả SQLSTATE: khẳng định `23514`/`55000`; muốn khẳng định tên constraint thì đọc `error.constraint` của `pg` — không qua Prisma,
+      vì adapter Prisma 7 bỏ tên constraint). Ca 11 theo một spec
       đồng thời có sẵn (`git grep -ln "40P01" test/integration`).
 - [ ] HTTP `provisioning-evidence-files.http-spec.ts` (khuôn `test/http/licensing/provisioning.http-spec.ts`): vai 2 route mới; uuid sai ⟹ 400;
       `evidenceDocumentIds: ['x']` ⟹ 400 ở 3 route; OpenAPI khai 422 `EVIDENCE_FILE_INVALID` ở 3 route, 404 `EVIDENCE_FILE_NOT_FOUND` ở route link.
@@ -228,6 +273,12 @@ repo đọc tác vụ có `assignment.employeeId` (khung đọc ở `provisionin
 - [ ] Push; `gh workflow run ci.yml --ref feat/provisioning-evidence-files`; chờ xong; phân loại **từng test đỏ** so với run nền (mục 2): đỏ cùng tên trên nền ⟹
       nợ cũ; đỏ mới ⟹ sửa (tối đa 2 vòng), rồi CI lại. Ghi run id + bảng phân loại ở `PROGRESS.md`.
 - [ ] Commit `test(licensing): evidence files of provisioning tasks end to end` — `Spec: SPEC §8`.
+
+## 6b. Gộp với đợt 4
+
+Nhánh này và đợt 4 cùng đụng `openapi.json`, `docs/generated/*`, `openapi-presentation.http-spec.ts` (số operation) và file gộp của registry. PR nào
+vào `dev` sau: `git merge origin/dev` (không rebase nhánh đã push), giữ cả hai phía ở file gộp registry, rồi `pnpm openapi:export && pnpm arch:routes &&
+pnpm arch:graph`, sửa số operation = số thật. Migration `20261211…` đứng sau mọi migration đợt 4 — không đổi tên.
 
 ## 7. Xong khi
 

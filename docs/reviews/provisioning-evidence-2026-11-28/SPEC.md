@@ -202,8 +202,8 @@ Integration (`test/integration/licensing/provisioning-evidence-files.integration
 9. Khai báo WebP: purpose `PROVISIONING_EVIDENCE` ⟹ 201; `CONTRACT_ATTACHMENT` ⟹ 422 `DOCUMENT.TYPE_NOT_ALLOWED`. Finance khai `PROVISIONING_EVIDENCE` ⟹
    403 `DOCUMENT.PURPOSE_FORBIDDEN`.
 10. DB (SQL trực tiếp, khuôn `test/integration/catalog/document-constraints.integration-spec.ts:142`): `UPDATE` một hàng `CONTRACT_ATTACHMENT` đang
-    `PENDING_ATTACH` thành `status='READY', attached_at=now(), provisioning_task_id=$x` ⟹ `23514` **tên** `document_attachments_purpose_fits_owner`; hàng
-    `PROVISIONING_EVIDENCE` `PENDING_ATTACH` đặt cả `contract_id` và `provisioning_task_id` khi chuyển `READY` ⟹ `23514` `document_attachments_owner_state`;
+    `PENDING_ATTACH` thành `status='READY', attached_at=now(), provisioning_task_id=$x` ⟹ `23514` (vi phạm `document_attachments_purpose_fits_owner`); hàng
+    `PROVISIONING_EVIDENCE` `PENDING_ATTACH` đặt cả `contract_id` và `provisioning_task_id` khi chuyển `READY` ⟹ `23514` (vi phạm `document_attachments_owner_state`);
     đổi `provisioning_task_id` của hàng đã `READY` ⟹ `55000` (`document_attachments_one_way`, guard hiện có).
 11. Đồng thời (EV-12): hai IT phụ trách hai phòng, mỗi người một tác vụ `IN_PROGRESS`; cùng một `documentId` (người upload là IT thứ nhất); 2 connection có
     barrier gọi `complete` ⟹ đúng một 200, một 422 `EVIDENCE_FILE_INVALID` (`problem` `NOT_FOUND` hoặc `ALREADY_ATTACHED`), không `40P01`; file gắn đúng
