@@ -98,6 +98,32 @@ export class RequestTicketRepo {
     return { id: created.id };
   }
 
+  async summaryWithItems(
+    tx: DbTx,
+    ticketId: string,
+  ): Promise<{ id: string; requesterEmployeeId: string; items: { requestId: string; position: number }[] } | null> {
+    const row = await tx.requestTicket.findUnique({
+      where: { id: ticketId },
+      select: {
+        id: true,
+        requesterEmployeeId: true,
+        items: { select: { id: true, ticketPosition: true }, orderBy: { ticketPosition: 'asc' } },
+      },
+    });
+    if (!row) return null;
+
+    return {
+      id: row.id,
+      requesterEmployeeId: row.requesterEmployeeId,
+      items: row.items.map((item) => {
+        if (item.ticketPosition === null) {
+          throw new Error(`Ticket item ${item.id} is missing ticketPosition.`);
+        }
+        return { requestId: item.id, position: item.ticketPosition };
+      }),
+    };
+  }
+
   async itemsOf(tx: DbTx, ticketId: string): Promise<{ requestId: string; position: number }[]> {
     const rows = await tx.accessRequest.findMany({
       where: { ticketId },

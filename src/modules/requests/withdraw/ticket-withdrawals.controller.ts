@@ -35,7 +35,7 @@ export class TicketWithdrawalsController {
   @ApiSuccessResponse(TicketWithdrawalResponseDto, {
     message: 'REQUEST_TICKET.WITHDRAWN',
     description:
-      'Withdraws every item of the ticket in position order, each in its own transaction, on behalf of the requester. Items already withdrawn by the caller report ALREADY_WITHDRAWN without writing again; items past their first decision, already ended, pending IT closure, or with a running or completed grant are skipped with their reason.',
+      'Withdraws every item of the ticket in position order, each in its own transaction, on behalf of the requester. Items already withdrawn by the caller report ALREADY_WITHDRAWN without writing again; items past their first decision, already ended, pending IT closure, or with a running or completed grant are skipped with their reason. Items already withdrawn remain unchanged if a later item skips or fails, so retrying the request is safe.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,

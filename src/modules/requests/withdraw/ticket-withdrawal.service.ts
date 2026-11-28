@@ -1,23 +1,26 @@
 import { Injectable } from '@nestjs/common';
-import { TransactionRunner, TransientDatabaseError } from '../../../infrastructure/database/transaction-runner';
+import { TransientDatabaseError } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import {
   AccessRequestNotFoundError,
   AccessRequestWithdrawalRefusedError,
 } from '../access-request/access-request.errors';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
-import type { AccessRequestRecord } from '../access-request/access-request.types';
 import type { WithdrawalRefusal } from '../access-request/withdrawal.policy';
 import type { TicketWithdrawResultWire } from '../request-ticket/request-ticket.dto';
-import { RequestTicketNotFoundError, RequestTicketNotRequesterError } from '../request-ticket/request-ticket.errors';
-import { orderByPosition } from '../request-ticket/request-ticket.policy';
-import { RequestTicketRepo } from '../request-ticket/request-ticket.repo';
+import { RequestTicketNotRequesterError } from '../request-ticket/request-ticket.errors';
 import { RequestReadAccessService } from '../request-view/request-read-access.service';
 import { WithdrawalService } from './withdrawal.service';
 
-type SkippableWithdrawalRefusal = Exclude<WithdrawalRefusal, 'NOT_REQUESTER' | 'REASON_REQUIRED'>;
+type SkippableReason =
+  | 'WITHDRAWAL_AFTER_DECISION'
+  | 'ALREADY_ENDED'
+  | 'WITHDRAWAL_PENDING'
+  | 'GRANT_RUNNING'
+  | 'GRANT_COMPLETED'
+  | 'NOT_IN_TICKET';
 
-function toSkippableReason(reason: WithdrawalRefusal): SkippableWithdrawalRefusal | null {
+function toSkippableReason(reason: WithdrawalRefusal): SkippableReason {
   switch (reason) {
     case 'WITHDRAWAL_AFTER_DECISION':
     case 'ALREADY_ENDED':
@@ -25,25 +28,25 @@ function toSkippableReason(reason: WithdrawalRefusal): SkippableWithdrawalRefusa
     case 'GRANT_RUNNING':
     case 'GRANT_COMPLETED':
       return reason;
-    default:
-      return null;
+    case 'REASON_REQUIRED':
+      return 'WITHDRAWAL_AFTER_DECISION';
+    case 'NOT_REQUESTER':
+      return 'NOT_IN_TICKET';
   }
 }
 
 /**
  * Withdraws a whole request ticket on behalf of its requester.
  *
- * Lock order: reads ticket item membership and request records in a lock-free read transaction, then withdraws each item
- * sequentially in ascending `position` order, one transaction per item via `WithdrawalService.withdraw` (grant task at
- * level 3a -> access request at level 4; no ticket lock).
+ * Lock order: reads ticket membership and visibility in one read transaction via `readAccess.visibleTicket`, then
+ * withdraws each item sequentially in ascending `position` order, one transaction per item via
+ * `WithdrawalService.withdraw` (grant task at level 3a -> access request at level 4; no ticket lock).
  */
 @Injectable()
 export class TicketWithdrawalService {
   constructor(
-    private readonly runner: TransactionRunner,
-    private readonly tickets: RequestTicketRepo,
-    private readonly requests: AccessRequestRepo,
     private readonly readAccess: RequestReadAccessService,
+    private readonly requests: AccessRequestRepo,
     private readonly withdrawals: WithdrawalService,
   ) {}
 
@@ -53,46 +56,16 @@ export class TicketWithdrawalService {
     ticketId: string,
     input: { reason?: string },
   ): Promise<TicketWithdrawResultWire[]> {
-    const { ordered, byId } = await this.loadTicketItems(actor, ticketId);
-    const results: TicketWithdrawResultWire[] = [];
-
-    for (const item of ordered) {
-      const existing = byId.get(item.requestId);
-      if (existing?.state === 'WITHDRAWN' && existing.withdrawal?.requestedByEmployeeId === actor.employeeId) {
-        results.push({ requestId: item.requestId, outcome: 'WITHDRAWN', reason: 'ALREADY_WITHDRAWN' });
-        continue;
-      }
-      results.push(await this.withdrawOne(actor, item.requestId, input));
-    }
-
-    return results;
-  }
-
-  private async loadTicketItems(actor: AuthenticatedPrincipal, ticketId: string) {
-    const { items, records } = await this.runner.run(async (tx) => {
-      const items = await this.tickets.itemsOf(tx, ticketId);
-      if (items.length === 0) return { items, records: [] as AccessRequestRecord[] };
-      const records = await this.requests.findByIds(
-        items.map((item) => item.requestId),
-        tx,
-      );
-
-      return { items, records };
-    });
-
-    if (items.length === 0 || records.length === 0) throw new RequestTicketNotFoundError();
-    const visibleIds = await this.readAccess.visibleItemIds(actor, records);
-    if (visibleIds.size === 0) {
-      throw new RequestTicketNotFoundError();
-    }
-    if (records[0].requesterEmployeeId !== actor.employeeId) {
+    const { ticket, items } = await this.readAccess.visibleTicket(actor, ticketId);
+    if (ticket.requesterEmployeeId !== actor.employeeId) {
       throw new RequestTicketNotRequesterError();
     }
 
-    return {
-      ordered: orderByPosition(items),
-      byId: new Map(records.map((record) => [record.id, record])),
-    };
+    const results: TicketWithdrawResultWire[] = [];
+    for (const item of items) {
+      results.push(await this.withdrawOne(actor, item.requestId, input));
+    }
+    return results;
   }
 
   private async withdrawOne(
@@ -102,7 +75,6 @@ export class TicketWithdrawalService {
   ): Promise<TicketWithdrawResultWire> {
     try {
       await this.withdrawals.withdraw(actor, requestId, input);
-
       return { requestId, outcome: 'WITHDRAWN', reason: null };
     } catch (error) {
       if (error instanceof TransientDatabaseError) {
@@ -112,10 +84,23 @@ export class TicketWithdrawalService {
         return { requestId, outcome: 'SKIPPED', reason: 'NOT_IN_TICKET' };
       }
       if (error instanceof AccessRequestWithdrawalRefusedError) {
-        const reason = toSkippableReason(error.reason);
-        if (reason) return { requestId, outcome: 'SKIPPED', reason };
+        return this.mapRefusal(actor, requestId, error.reason);
       }
       throw error;
     }
+  }
+
+  private async mapRefusal(
+    actor: AuthenticatedPrincipal,
+    requestId: string,
+    reason: WithdrawalRefusal,
+  ): Promise<TicketWithdrawResultWire> {
+    if (reason === 'ALREADY_ENDED') {
+      const latest = await this.requests.findById(requestId);
+      if (latest?.state === 'WITHDRAWN' && latest.withdrawal?.requestedByEmployeeId === actor.employeeId) {
+        return { requestId, outcome: 'WITHDRAWN', reason: 'ALREADY_WITHDRAWN' };
+      }
+    }
+    return { requestId, outcome: 'SKIPPED', reason: toSkippableReason(reason) };
   }
 }

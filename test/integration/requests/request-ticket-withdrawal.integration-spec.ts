@@ -270,6 +270,19 @@ describe('W4-08: withdraw a whole request ticket (integration, real PostgreSQL)'
       const [resA, resB] = await Promise.all([first, second]);
       expect(resA.status).toBe(200);
       expect(resB.status).toBe(200);
+      const resultsA = h.dataOf<{ results: { requestId: string; outcome: string; reason: string | null }[] }>(
+        resA,
+      ).results;
+      const resultsB = h.dataOf<{ results: { requestId: string; outcome: string; reason: string | null }[] }>(
+        resB,
+      ).results;
+      expect(resultsA.map((r) => r.requestId)).toEqual(requestIds);
+      expect(resultsB.map((r) => r.requestId)).toEqual(requestIds);
+      for (let i = 0; i < requestIds.length; i += 1) {
+        expect(resultsA[i].outcome).toBe('WITHDRAWN');
+        expect(resultsB[i].outcome).toBe('WITHDRAWN');
+        expect(new Set([resultsA[i].reason, resultsB[i].reason])).toEqual(new Set([null, 'ALREADY_WITHDRAWN']));
+      }
       for (const reqId of requestIds) {
         expect(await h.state(reqId)).toBe('WITHDRAWN');
         expect(await withdrawnEventsCount(reqId)).toBe(1);

@@ -3,7 +3,6 @@ import { TransactionRunner } from '../../../infrastructure/database/transaction-
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { TicketWire } from '../request-ticket/request-ticket.dto';
 import { RequestTicketNotFoundError } from '../request-ticket/request-ticket.errors';
 import { toTicketWire } from '../request-ticket/request-ticket.mapper';
@@ -56,19 +55,18 @@ export class RequestTicketViewService {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly tickets: RequestTicketRepo,
-    private readonly requests: AccessRequestRepo,
     private readonly readAccess: RequestReadAccessService,
     private readonly organizationReads: OrganizationReadApi,
     private readonly catalog: CatalogApi,
   ) {}
 
   async get(actor: AuthenticatedPrincipal, ticketId: string): Promise<TicketWire> {
-    const rawView = await this.runner.run((tx) => this.tickets.view(tx, ticketId));
-    if (!rawView) throw new RequestTicketNotFoundError();
-
-    const records = await this.requests.findByIds(rawView.items.map((item) => item.requestId));
-    const visibleIds = await this.readAccess.visibleItemIds(actor, records);
-    if (visibleIds.size === 0) throw new RequestTicketNotFoundError();
+    const { rawView, visibleIds } = await this.runner.run(async (tx) => {
+      const rawView = await this.tickets.view(tx, ticketId);
+      if (!rawView) throw new RequestTicketNotFoundError();
+      const { visibleIds } = await this.readAccess.visibleTicket(actor, ticketId, tx);
+      return { rawView, visibleIds };
+    });
 
     return toTicketWire(await this.assembleView(rawView), visibleIds);
   }
