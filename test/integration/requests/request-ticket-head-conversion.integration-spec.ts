@@ -302,4 +302,111 @@ describe('W4-07 / W4-14: ticket items keep ticket position order on one-step con
       }
     },
   );
+
+  it('HEAD_PERIOD_END without successor: queued spend item is untouched while pending need item waits for head', async () => {
+    const e5 = await h.staff(world.pDes, 'W4-E5-END');
+    const runner = h.ctx.app.get(TransactionRunner, { strict: false });
+    const ticketRepo = h.ctx.app.get(RequestTicketRepo, { strict: false });
+    const requestRepo = h.ctx.app.get(AccessRequestRepo, { strict: false });
+    const now = new Date('2026-06-01T08:00:00.000Z');
+
+    const make = (
+      planId: string,
+      termMonths: number,
+      monthlyPriceMinor: bigint,
+      ticket: { id: string; position: number },
+    ): NewAccessRequest => ({
+      organizationId: h.seed.organizationId,
+      type: 'GRANT',
+      branch: 'PAID_IN_CATALOG',
+      state: 'PENDING',
+      planId,
+      requesterEmployeeId: e5.employeeId,
+      beneficiaryEmployeeIds: [e5.employeeId],
+      departmentId: world.pDes.id,
+      costCenterId: world.ccDes!.id,
+      businessReason: 'Need license during head vacancy',
+      termMonths,
+      pricing: {
+        status: 'PRICED',
+        missingReason: null,
+        kind: 'RECURRING',
+        budgetYear: 2026,
+        expectedEndDate: null,
+        amountMonths: termMonths,
+        amount: { amountMinor: monthlyPriceMinor * BigInt(termMonths), currency: 'VND' },
+        unitPrice: { amountMinor: monthlyPriceMinor, currency: 'VND' },
+        monthlyPriceMinor,
+        billingCycle: 'MONTHLY',
+        nextYearAmount: null,
+      },
+      policy: {
+        version: 2,
+        branch: 'PAID_IN_CATALOG',
+        chain: ['NEED', 'SPEND_APPROVAL', 'IT_EXECUTION'],
+        slaWorkingDays: 3,
+      },
+      createdByAppUserId: e5.account.appUserId,
+      now,
+      needStep: {
+        state: 'PENDING',
+        assigneeEmployeeId: world.h1.employeeId,
+        routingRow: 1,
+        waitingReason: null,
+        slaWorkingDays: 3,
+      },
+      ticket,
+    });
+
+    const { r11, r12 } = await runner.run(async (tx) => {
+      const ticket = await ticketRepo.insert(tx, {
+        organizationId: h.seed.organizationId,
+        requesterEmployeeId: e5.employeeId,
+        departmentId: world.pDes.id,
+        submittedAt: now,
+      });
+      const r12Row = await requestRepo.insert(tx, make(world.plans.miro, 4, 500_000n, { id: ticket.id, position: 1 }));
+      const r11Row = await requestRepo.insert(
+        tx,
+        make(world.plans.notion, 5, 300_000n, { id: ticket.id, position: 2 }),
+      );
+      return { r11: r11Row, r12: r12Row };
+    });
+
+    try {
+      await h.decide(r12.id, { decision: 'APPROVE' }, world.h1.account).expect(200);
+      expect(await h.state(r12.id)).toBe('AWAITING_SPEND_SUBMISSION');
+      expect(await h.state(r11.id)).toBe('PENDING');
+
+      await h.vacateHead(world.pDes.id).expect(200);
+
+      expect(await requestMeta(r12.id)).toEqual({
+        routing_mode: 'VIA_HEAD',
+        one_step_reason: null,
+        state: 'AWAITING_SPEND_SUBMISSION',
+      });
+      expect(await h.steps(r12.id, 'SPEND_APPROVAL')).toEqual([]);
+      const { rows: checksR12 } = await h.ctx.sql.query<{ count: string }>(
+        `SELECT COUNT(*)::text AS count FROM request_budget_checks WHERE request_id = $1`,
+        [r12.id],
+      );
+      expect(checksR12[0]?.count).toBe('0');
+      expect(await h.audit('ACCESS_REQUEST.STEP_NOT_REQUIRED', r12.needStepId)).toEqual([]);
+
+      expect(await requestMeta(r11.id)).toEqual({
+        routing_mode: 'VIA_HEAD',
+        one_step_reason: null,
+        state: 'WAITING_CONTROLLED',
+      });
+      expect(await h.stepOf(r11.id, 'NEED')).toMatchObject({
+        state: 'WAITING',
+        waiting_reason: 'NO_DEPARTMENT_HEAD',
+      });
+    } finally {
+      await h.makeHead(world.pDes, world.h1);
+      await h.sendOn([r12.id], world.h1.account);
+      await h.decideSpend(r12.id, { decision: 'REJECT', reason: 'Cleanup HEAD_PERIOD_END test' }, world.c1.account);
+      await h.withdrawRequest(r11.id, {}, e5.account);
+    }
+  });
 });
