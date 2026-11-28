@@ -53,7 +53,11 @@ function build() {
   const routing = { start: jest.fn() };
   const runner = { run: (work: (client: DbTx) => unknown) => work(tx) };
   const sender = { lockEligible: jest.fn().mockResolvedValue({ organizationId: 'organization' }) };
-  const assessment = { settings: jest.fn().mockResolvedValue({}), assess: jest.fn().mockResolvedValue(assessed) };
+  const assessment = {
+    settings: jest.fn().mockResolvedValue({}),
+    assess: jest.fn().mockResolvedValue(assessed),
+    assessParty: jest.fn().mockResolvedValue({ today: '2026-06-01', unit: assessed.unit }),
+  };
   const audit = { record: jest.fn() };
   const limits = { settings: jest.fn().mockResolvedValue({}), lock: jest.fn(), requireForOne: jest.fn() };
   const service = new AccessRequestService(
@@ -146,6 +150,7 @@ describe('AccessRequestService single submission', () => {
       pricing: { status: 'NOT_APPLICABLE' },
     });
     await expect(f.service.submit(actor, body)).resolves.toBe(f.stored);
+    expect(f.assessment.assessParty).not.toHaveBeenCalled();
     expect(f.repo.insert).toHaveBeenCalledWith(
       tx,
       expect.objectContaining({ branch: 'INTERNAL_FREE', costCenterId: null }),
