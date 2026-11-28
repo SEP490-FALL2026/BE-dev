@@ -70,9 +70,12 @@ export class RequestResubmissionService {
     request: AccessRequestRecord,
     replyNote?: string,
   ): Promise<string | undefined> {
-    const returns = await this.replies.humanReturnsOf(tx, request.id);
-    const replied = await this.replies.repliedStepIds(tx, request.id);
-    const pending = pendingHumanReturn({ returns, repliedStepIds: replied });
+    // Single shared definition: evaluate pendingHumanReturn over raw returnFactsOf.
+    const facts = (await this.replies.returnFactsOf([request.id], tx)).get(request.id) ?? {
+      steps: [],
+      repliedStepIds: new Set<string>(),
+    };
+    const pending = pendingHumanReturn(facts);
     const trimmed = replyNote?.trim();
     const note = trimmed && trimmed.length > 0 ? trimmed : undefined;
     if (pending !== null && note === undefined) throw new AccessRequestReplyNoteRequiredError(pending.stepId);

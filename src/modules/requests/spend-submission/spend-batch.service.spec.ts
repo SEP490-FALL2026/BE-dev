@@ -5,9 +5,8 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
-import { pendingHumanReturn } from '../request-reply/request-reply.policy';
 import type { RequestReplyRepo } from '../request-reply/request-reply.repo';
-import type { HumanReturn } from '../request-reply/request-reply.types';
+import type { HumanReturn, ReturnFacts, ReturnStepFact } from '../request-reply/request-reply.types';
 import type { RequestTicketRepo } from '../request-ticket/request-ticket.repo';
 import type { ReserveConfirmationService } from '../reserve-confirmation/reserve-confirmation.service';
 import type { SpendBatchRepo } from '../spend/spend-batch.repo';
@@ -127,14 +126,20 @@ function buildHarness(options: {
     });
   });
   const recorderSubmitted = jest.fn().mockResolvedValue(undefined);
-  const pendingSpendReturnsOf = jest.fn((ids: readonly string[]) => {
-    const map = new Map<string, HumanReturn>();
+  const returnFactsOf = jest.fn((ids: readonly string[]) => {
+    const map = new Map<string, ReturnFacts>();
     for (const id of ids) {
-      const pending = pendingHumanReturn({
-        returns: options.humanReturns?.get(id) ?? [],
-        repliedStepIds: options.repliedSteps?.get(id) ?? new Set<string>(),
-      });
-      if (pending?.kind === 'SPEND') map.set(id, pending);
+      const steps: ReturnStepFact[] = (options.humanReturns?.get(id) ?? []).map((ret, idx) => ({
+        id: ret.stepId,
+        kind: ret.kind === 'SPEND' ? 'SPEND_APPROVAL' : ret.kind,
+        sequence: idx + 1,
+        state: 'CLOSED',
+        createdAt: new Date(ret.closedAt.getTime() - 60_000),
+        decidedAt: ret.closedAt,
+        approvalRecord: ret.kind === 'IT_ASSESSMENT' ? null : { decision: 'RETURNED', decidedAt: ret.closedAt },
+        spendDecision: null,
+      }));
+      map.set(id, { steps, repliedStepIds: options.repliedSteps?.get(id) ?? new Set<string>() });
     }
     return Promise.resolve(map);
   });
@@ -142,7 +147,7 @@ function buildHarness(options: {
 
   const ticketReplies = new SpendTicketReplyService(
     { refsOf: jest.fn() } as unknown as RequestTicketRepo,
-    { pendingSpendReturnsOf, insert: insertReply } as unknown as RequestReplyRepo,
+    { returnFactsOf, insert: insertReply } as unknown as RequestReplyRepo,
   );
   const writer = new SpendBatchWriterService(
     { create: createBatch } as unknown as SpendBatchRepo,

@@ -1,5 +1,9 @@
 import request from 'supertest';
 import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
+import {
+  pendingHumanReturn,
+  pendingSpendReturn,
+} from '../../../src/modules/requests/request-reply/request-reply.policy';
 import { RequestReplyRepo } from '../../../src/modules/requests/request-reply/request-reply.repo';
 import { bodyOf } from '../../support/api-body';
 import { Barrier } from '../../support/concurrency-harness';
@@ -238,7 +242,8 @@ describe('W4-09: reply note on requester resubmission (integration, real Postgre
       .expect(201);
 
     const repo = h.ctx.app.get(RequestReplyRepo, { strict: false });
-    const awaiting = await repo.spendReturnsAwaitingReply([reqReturned.id, reqReplied.id, reqPending.id]);
+    const facts = await repo.returnFactsOf([reqReturned.id, reqReplied.id, reqPending.id]);
+    const awaiting = new Set([...facts.entries()].filter(([, f]) => pendingSpendReturn(f) !== null).map(([id]) => id));
     expect(awaiting).toEqual(new Set([reqReturned.id]));
 
     const latest = await repo.latestOfMany([reqReturned.id, reqReplied.id, reqPending.id]);
@@ -260,8 +265,9 @@ describe('W4-09: reply note on requester resubmission (integration, real Postgre
 
     const runner = h.ctx.app.get(TransactionRunner, { strict: false });
     const repo = h.ctx.app.get(RequestReplyRepo, { strict: false });
-    const returns = await runner.run((tx) => repo.humanReturnsOf(tx, oneStepProposal.id));
-    expect(returns).toEqual([]);
+    const facts = await runner.run((tx) => repo.returnFactsOf([oneStepProposal.id], tx));
+    const pending = facts.get(oneStepProposal.id);
+    expect(pending ? pendingHumanReturn(pending) : null).toBeNull();
 
     await resubmit(oneStepProposal.id, u.head.account).expect(200);
     expect(await repliesOf(oneStepProposal.id)).toEqual([]);

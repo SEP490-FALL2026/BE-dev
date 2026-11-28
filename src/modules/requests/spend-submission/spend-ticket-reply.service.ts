@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { pendingSpendReturn } from '../request-reply/request-reply.policy';
 import { RequestReplyRepo } from '../request-reply/request-reply.repo';
 import type { HumanReturn } from '../request-reply/request-reply.types';
 import { RequestTicketRepo } from '../request-ticket/request-ticket.repo';
@@ -17,12 +18,18 @@ export class SpendTicketReplyService {
     return this.tickets.refsOf(requestIds);
   }
 
-  spendReturnsAwaitingReply(requestIds: readonly string[]): Promise<Set<string>> {
-    return this.replies.spendReturnsAwaitingReply(requestIds);
+  async spendReturnsAwaitingReply(requestIds: readonly string[]): Promise<Set<string>> {
+    const factsByRequest = await this.replies.returnFactsOf(requestIds);
+    const awaiting = new Set<string>();
+    for (const [requestId, facts] of factsByRequest) {
+      if (pendingSpendReturn(facts)) awaiting.add(requestId);
+    }
+    return awaiting;
   }
 
   async pendingSpendReturn(tx: DbTx, requestId: string): Promise<HumanReturn | null> {
-    return (await this.replies.pendingSpendReturnsOf([requestId], tx)).get(requestId) ?? null;
+    const facts = (await this.replies.returnFactsOf([requestId], tx)).get(requestId);
+    return facts ? pendingSpendReturn(facts) : null;
   }
 
   recordHeadResubmission(

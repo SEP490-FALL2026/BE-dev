@@ -25,7 +25,7 @@ describe('BR-MF1-02: requester resubmission', () => {
   const lines = { lock: jest.fn(), repointNeed: jest.fn() };
   const audit = { record: jest.fn() };
   const targets = { assessmentTarget: jest.fn() };
-  const replies = { humanReturnsOf: jest.fn(), repliedStepIds: jest.fn(), insert: jest.fn() };
+  const replies = { returnFactsOf: jest.fn(), insert: jest.fn() };
   const service = new RequestResubmissionService(
     { run: (fn: (tx: unknown) => unknown) => fn(tx) } as never,
     repo as never,
@@ -41,8 +41,7 @@ describe('BR-MF1-02: requester resubmission', () => {
     jest.resetAllMocks();
     repo.lockById.mockResolvedValue(request);
     repo.findById.mockResolvedValue(request);
-    replies.humanReturnsOf.mockResolvedValue([]);
-    replies.repliedStepIds.mockResolvedValue(new Set());
+    replies.returnFactsOf.mockResolvedValue(new Map());
   });
   it('uses the package-3 check even when its result still blocks', async () => {
     await expect(service.resubmit(actor, 'request')).resolves.toBe(request);
@@ -92,7 +91,7 @@ describe('PL-2.2 (QĐ-111ap, R-24): the sender sends on again a request the head
   const lines = { lock: jest.fn(), repointNeed: jest.fn() };
   const audit = { record: jest.fn() };
   const targets = { assessmentTarget: jest.fn(), isRequesterHead: jest.fn() };
-  const replies = { humanReturnsOf: jest.fn(), repliedStepIds: jest.fn(), insert: jest.fn() };
+  const replies = { returnFactsOf: jest.fn(), insert: jest.fn() };
   const service = new RequestResubmissionService(
     { run: (fn: (tx: unknown) => unknown) => fn(tx) } as never,
     repo as never,
@@ -110,8 +109,7 @@ describe('PL-2.2 (QĐ-111ap, R-24): the sender sends on again a request the head
     repo.findById.mockResolvedValue(viaHead);
     repo.addNeedStep.mockResolvedValue('step-2');
     targets.isRequesterHead.mockResolvedValue(false);
-    replies.humanReturnsOf.mockResolvedValue([]);
-    replies.repliedStepIds.mockResolvedValue(new Set());
+    replies.returnFactsOf.mockResolvedValue(new Map());
   });
 
   it('opens a new need step for the head of the returned one and waits for the head, not for the spending approver', async () => {
@@ -215,6 +213,23 @@ describe('PL-2.2 (QĐ-111ap, R-24): the sender sends on again a request the head
         .map((c) => (c as unknown as [unknown, { action: string; after: Record<string, unknown> }])[1])
         .find((e) => e.action === 'ACCESS_REQUEST.RESUBMITTED')?.after;
 
+    const factsFor = (kind: 'NEED' | 'IT_ASSESSMENT' | 'SPEND', stepId: string, replied: string[] = []) => {
+      const stepKind = kind === 'SPEND' ? 'SPEND_APPROVAL' : kind;
+      const approvalRecord = kind === 'IT_ASSESSMENT' ? null : { decision: 'RETURNED', decidedAt: dt };
+      const createdAt = new Date(dt.getTime() - 60_000);
+      const step = {
+        id: stepId,
+        kind: stepKind,
+        sequence: 1,
+        state: 'CLOSED',
+        createdAt,
+        decidedAt: dt,
+        approvalRecord,
+        spendDecision: null,
+      };
+      return new Map([['request', { steps: [step], repliedStepIds: new Set(replied) }]]);
+    };
+
     beforeEach(() => {
       repo.lockById.mockResolvedValue(base);
       repo.findById.mockResolvedValue(base);
@@ -228,7 +243,7 @@ describe('PL-2.2 (QĐ-111ap, R-24): the sender sends on again a request the head
       ['IT_ASSESSMENT', 'step-it-1'],
       ['SPEND', 'step-spend-1'],
     ] as const)('throws AccessRequestReplyNoteRequiredError for unreplied %s return', async (kind, stepId) => {
-      replies.humanReturnsOf.mockResolvedValue([{ kind, stepId, closedAt: dt }]);
+      replies.returnFactsOf.mockResolvedValue(factsFor(kind, stepId));
       const error = await service.resubmit(actor, 'request').catch((e: unknown) => e);
       expect(error).toBeInstanceOf(AccessRequestReplyNoteRequiredError);
       expect((error as AccessRequestReplyNoteRequiredError).returnedStepId).toBe(stepId);
@@ -252,7 +267,7 @@ describe('PL-2.2 (QĐ-111ap, R-24): the sender sends on again a request the head
       'inserts reply linked to %s returnedStepId and includes replyId in audit',
       async (kind, stepId, sentBack, note, expectedAudit) => {
         repo.assessmentSentBack.mockResolvedValue(sentBack);
-        replies.humanReturnsOf.mockResolvedValue([{ kind, stepId, closedAt: dt }]);
+        replies.returnFactsOf.mockResolvedValue(factsFor(kind, stepId));
         await service.resubmit(actor, 'request', { replyNote: note });
         expect(replies.insert).toHaveBeenCalledWith(tx, replyPayload(stepId, note));
         expect(resubmittedAfter()).toMatchObject(expectedAudit);
@@ -262,8 +277,7 @@ describe('PL-2.2 (QĐ-111ap, R-24): the sender sends on again a request the head
     it('proceeds without inserting a reply when no pending human return and no replyNote (§7.9 D/E)', async () => {
       repo.lockById.mockResolvedValue(oneStep);
       repo.findById.mockResolvedValue(oneStep);
-      replies.humanReturnsOf.mockResolvedValue([{ kind: 'SPEND', stepId: 'step-spend-1', closedAt: dt }]);
-      replies.repliedStepIds.mockResolvedValue(new Set(['step-spend-1']));
+      replies.returnFactsOf.mockResolvedValue(factsFor('SPEND', 'step-spend-1', ['step-spend-1']));
       await expect(service.resubmit(actor, 'request')).resolves.toBe(oneStep);
       expect(replies.insert).not.toHaveBeenCalled();
       expect(spend.route).toHaveBeenCalledWith(tx, actor, oneStep, 'SUBMISSION', expect.any(Date), undefined);
@@ -284,7 +298,7 @@ describe('PL-2.2 (QĐ-111ap, R-24): the sender sends on again a request the head
     it('passes { replyId } to SpendRoutingService.route when resubmitting one-step returned by SPEND with replyNote', async () => {
       repo.lockById.mockResolvedValue(oneStep);
       repo.findById.mockResolvedValue(oneStep);
-      replies.humanReturnsOf.mockResolvedValue([{ kind: 'SPEND', stepId: 'step-spend-1', closedAt: dt }]);
+      replies.returnFactsOf.mockResolvedValue(factsFor('SPEND', 'step-spend-1'));
       await service.resubmit(actor, 'request', { replyNote: 'Giải trình cho C1' });
       expect(replies.insert).toHaveBeenCalledWith(tx, replyPayload('step-spend-1', 'Giải trình cho C1'));
       expect(spend.route).toHaveBeenCalledWith(tx, actor, oneStep, 'SUBMISSION', expect.any(Date), {
@@ -320,7 +334,7 @@ describe('PL-2.4 (QĐ-111ap, R-24): the sender sends on again a proposal the IT 
   const lines = { lock: jest.fn(), repointNeed: jest.fn() };
   const audit = { record: jest.fn() };
   const targets = { assessmentTarget: jest.fn() };
-  const replies = { humanReturnsOf: jest.fn(), repliedStepIds: jest.fn(), insert: jest.fn() };
+  const replies = { returnFactsOf: jest.fn(), insert: jest.fn() };
   const service = new RequestResubmissionService(
     { run: (fn: (tx: unknown) => unknown) => fn(tx) } as never,
     repo as never,
@@ -338,8 +352,7 @@ describe('PL-2.4 (QĐ-111ap, R-24): the sender sends on again a proposal the IT 
     repo.findById.mockResolvedValue(proposal);
     repo.assessmentSentBack.mockResolvedValue(true);
     targets.assessmentTarget.mockResolvedValue('it-admin');
-    replies.humanReturnsOf.mockResolvedValue([]);
-    replies.repliedStepIds.mockResolvedValue(new Set());
+    replies.returnFactsOf.mockResolvedValue(new Map());
   });
 
   it('opens a new step for the IT Admin in charge of today and waits for the assessment, not for the head or the spend step', async () => {

@@ -68,10 +68,32 @@ describe('SpendQueueService.page (§7.4 ticketRef & §7.10 replyNoteRequired)', 
     ];
 
     const refsOf = jest.fn().mockResolvedValue(new Map([[REQ_1, { id: TICKET_1, position: 2, itemCount: 3 }]]));
-    const spendReturnsAwaitingReply = jest.fn().mockResolvedValue(new Set([REQ_1]));
+    const closedAt = new Date('2026-06-01T00:00:00.000Z');
+    const returnFactsOf = jest.fn().mockResolvedValue(
+      new Map([
+        [
+          REQ_1,
+          {
+            steps: [
+              {
+                id: 'step-spend-1',
+                kind: 'SPEND_APPROVAL',
+                sequence: 2,
+                state: 'CLOSED',
+                createdAt: new Date(closedAt.getTime() - 60_000),
+                decidedAt: closedAt,
+                approvalRecord: { decision: 'RETURNED', decidedAt: closedAt },
+                spendDecision: null,
+              },
+            ],
+            repliedStepIds: new Set<string>(),
+          },
+        ],
+      ]),
+    );
     const ticketReplies = new SpendTicketReplyService(
       { refsOf } as unknown as RequestTicketRepo,
-      { spendReturnsAwaitingReply } as unknown as RequestReplyRepo,
+      { returnFactsOf } as unknown as RequestReplyRepo,
     );
 
     const service = new SpendQueueService(
@@ -94,8 +116,8 @@ describe('SpendQueueService.page (§7.4 ticketRef & §7.10 replyNoteRequired)', 
 
     expect(refsOf).toHaveBeenCalledTimes(1);
     expect(refsOf).toHaveBeenCalledWith([REQ_1, REQ_2]);
-    expect(spendReturnsAwaitingReply).toHaveBeenCalledTimes(1);
-    expect(spendReturnsAwaitingReply).toHaveBeenCalledWith([REQ_1, REQ_2]);
+    expect(returnFactsOf).toHaveBeenCalledTimes(1);
+    expect(returnFactsOf).toHaveBeenCalledWith([REQ_1, REQ_2]);
     expect(result.items[0]).toMatchObject({
       requestId: REQ_1,
       ticketRef: { id: TICKET_1, position: 2, itemCount: 3 },
