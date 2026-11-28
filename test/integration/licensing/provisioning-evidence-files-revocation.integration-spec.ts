@@ -15,8 +15,8 @@ describe('evidence of K1 revocation and access cut (integration, real PostgreSQL
   afterAll(() => h.stop());
 
   it('SPEC case 6: keeps completion and access-cut files on the same K1 task', async () => {
-    const subscriptionId = await h.subscription(2, 'K1');
-    const assignmentId = await h.seat({ subscriptionId }, 'E-EV-K1');
+    const planId = await h.plan('K1');
+    const assignmentId = await h.seat({ planId }, 'E-EV-K1');
     const { taskId } = await h.open(assignmentId, 'ABRUPT_DEPARTURE');
     await h.claim(taskId).expect(200);
     const pdf = await h.uploaded();

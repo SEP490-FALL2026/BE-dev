@@ -1,4 +1,6 @@
-# Phân loại CI tại điểm dừng D-2
+# Phân loại CI P5
+
+**Cập nhật sau snapshot bên dưới:** user đã cho phép ngoại lệ D-2; run `46162602020` đã xong. Có **639 test đỏ duy nhất = 637 nợ cũ + 2 mới**. Danh sách từng test: [CI-CLASSIFICATION-46162602020.md](CI-CLASSIFICATION-46162602020.md). Hai lỗi mới là inventory POST cũ và fixture K1 của test mới; đang sửa trong vòng CI 1. Các bảng snapshot bên dưới giữ lại lịch sử trước khi user trả lời, không phải trạng thái mới nhất.
 
 Skill: `verification-before-completion`, `systematic-debugging`.
 

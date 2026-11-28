@@ -21,7 +21,7 @@ Skill đã đọc: `ponytail` (full), `using-superpowers`, `using-agent-skills`,
 | P3a | xong local | d99e3371 | EV-06..12 complete   | quick checks 0; gates 346/346; unit 390/390                          | P5 pending                      |
 | P3b | xong local | 6a3f48bd | EV-06..12 revocation | lint 4214 files; gates 346/346; catalog+licensing 2181/2181          | P5 pending                      |
 | P4  | xong local | 0457a395 | EV-13..16            | quick checks 0; gates 346/346; unit 407/407; generators 474 ops      | P5 pending                      |
-| P5  | CHẶN D-2   | aa0ad0f6 | SPEC §8, EV-08/09    | quick checks 0; gates 346/346; catalog+licensing 2194/2194           | HTTP 1 đỏ mới; 3 shard còn chạy |
+| P5  | tiếp tục   | aa0ad0f6 | SPEC §8, EV-08/09    | quick checks 0; gates 346/346; catalog+licensing 2194/2194           | D-2 đóng; kiểm vòng sửa CI 1 |
 
 ## Pre-flight interfaces
 
@@ -42,7 +42,7 @@ Skill đã đọc: `ponytail` (full), `using-superpowers`, `using-agent-skills`,
 - Đã xử lý theo chỉ đạo user và SPEC 1.3 `d8f59225`: ca 6 là **K1** `UNTIL_PAID_END`, dùng checklist theo test hiện hành. K2 giữ 422 `REVOCATION.COMPLETION_NOT_ALLOWED`.
 - Lịch sử: đợt trước dừng sau P1 vì mâu thuẫn này. Nay tiếp tục P2a → P5, không cần thay đổi nghiệp vụ thu hồi.
 
-### D-2 — CẦN OWNER: ngoại lệ cho expectation inventory POST của test HTTP cũ
+### D-2 — ĐÃ ĐÓNG: user cho phép thêm đúng route vào expectation inventory POST
 
 - CI [46162602020](https://github.com/SEP490-FALL2026/BE-dev/actions/runs/46162602020), job `http-contract` có **1 fail/2868 pass**, 124 suites (123 pass/1 fail).
 - Test đỏ mới: `test/http/licensing/provisioning.http-spec.ts:414`, tên đầy đủ `provisioning queue routes (e2e, no database) › has no route that makes a revocation: each source opens it through the licensing facade (US-07-05 AC-3)`.
@@ -50,6 +50,7 @@ Skill đã đọc: `ponytail` (full), `using-superpowers`, `using-agent-skills`,
 - LUẬT CỨNG 4 cấm đổi expectation test cũ, chỉ cho ngoại lệ purpose list và số operation. Không thể thêm route đúng SPEC mà giữ nguyên inventory này; không đổi route/filter/OpenAPI/gate để né assertion.
 - Giữ nguyên file test. Đề xuất cụ thể, **chưa áp dụng**: thêm đúng chuỗi `/{id}/evidence-files/{fileId}/links` vào mảng expected ở dòng 414–428; giữ nguyên mọi route cũ và assert `/revoke` 404. Patch để xem tại `D-2-proposed-http-expectation.patch`.
 - P5 bị chặn bởi luật cứng, chưa hoàn tất. Chỉ thu nốt kết quả run hiện tại và bàn giao; không chạy vòng sửa CI hoặc commit code đỏ. Cần Owner cho phép thêm ngoại lệ này trước khi tiếp tục.
+- Cập nhật sau snapshot bàn giao: user trả lời trực tiếp **“Cho phép thêm đúng route này”** cho câu hỏi về patch đã trình bày. Đã áp dụng đúng một dòng `/{id}/evidence-files/{fileId}/links`; không đổi kỳ vọng nào khác. D-2 đóng, tiếp tục P5 và các job integration còn chạy. Snapshot chặn trước đó giữ lại làm lịch sử, không phải trạng thái hiện tại.
 
 ## Kiểm chứng P1
 
@@ -157,6 +158,16 @@ Skill đã đọc: `ponytail` (full), `using-superpowers`, `using-agent-skills`,
 - Guard P1: giữ nguyên `document_attachment_guard` từ migration `20261022130000_document_final_key_and_expiry`; chỉ thêm hai migration mới, enum/cột/index/CHECK như SPEC. Không sửa migration cũ, requests, merged-migrations, dependency, gate/suppression; không PR/merge/rebase/stash.
 - Báo cáo tổng được lưu tại `D:/FPT/FALL2026/NOTE MD/logsCodex.txt`, ghi rõ chặn D-2 và CI còn chạy để Claude tiếp tục kiểm. Đây là bàn giao dừng theo luật, không phải báo cáo P5 hoàn tất hay Owner acceptance.
 - Full test chỉ chạy trên CI GitHub. Giữ nguyên worktree và nhánh chờ điều phối quyết định D-2.
+
+### Tiếp tục sau D-2
+
+- User cho phép thêm **đúng route link** vào expectation inventory POST. Patch đã áp dụng, diff test cũ chỉ một dòng thêm; không có thay đổi assertion/route cũ khác. Bản ghi bàn giao D-2 phía trên là lịch sử trước câu trả lời này.
+- Shard integration (3) của run `46162602020` đã xong: **1801 pass/201 fail/4 skipped**, 164 suites pass/41 fail/1 skipped. Đối chiếu từng cặp file + full title: **201 nợ cũ, 0 mới**. `provisioning-evidence-files.integration-spec.ts` **PASS**.
+- Vòng sửa CI 1 chỉ sửa expectation được phép; chờ kết quả hai shard còn lại và kiểm lại trước commit/dispatch. Không áp dụng lại thay đổi production.
+- Shard integration (1): **1901 pass/257 fail/1 skipped**, 170 suites pass/37 fail; **256 nợ cũ/1 mới**. Ca mới K1 dừng ở fixture `no seat of E-EV-K1`, chưa tới thao tác file; ca K2 bảo toàn luật vẫn pass.
+- Root cause K1 fixture: `SeatTargetService.resolveSubscription` (nhánh K1) trả target PLAN, `subscriptionId=null` theo W3-17; `RevocationHarness.seat({subscriptionId})` ghi được assignment nhưng đọc lại qua filter subscription cũ nên không tìm thấy. Unit có sẵn `seat-target-k1.service.spec.ts` ghim hành vi này. Sửa **test mới** thành `h.plan('K1')` + `h.seat({planId})`; không sửa harness cũ, production, filter hoặc expectation test cũ. Đây là sửa thứ hai trong cùng vòng CI 1, không phải mở luật K1/K2.
+- Run đầu đã xong: integration shard 2 **1908 pass/180 fail**, 175 suites pass/31 fail; toàn bộ **180 nợ cũ/0 mới**. Tổng unique cả run **639 đỏ = 637 nợ cũ + 2 mới**, khớp đủ 637 cặp file/title của nền. Bảng từng test tại `CI-CLASSIFICATION-46162602020.md`; không phân loại chỉ theo số lượng.
+- Kiểm vòng sửa CI 1: typecheck/eslint hai test/arch/rules/rules:format/format/generators/arch:docs:check exit 0; gates **346 pass/0 fail**; unit hai file đã sửa của implementation **17 pass/0 fail**. Hai thay đổi test đang chờ CI xác minh, không chạy HTTP/integration local.
 
 ### Self-review EV → kiểm thử
 

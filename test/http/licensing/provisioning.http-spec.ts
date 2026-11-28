@@ -419,6 +419,7 @@ describe('provisioning queue routes (e2e, no database)', () => {
           '/{id}/claim',
           '/{id}/close-failed',
           '/{id}/complete',
+          '/{id}/evidence-files/{fileId}/links',
           '/{id}/hand-off',
           '/{id}/report-failure',
           '/{id}/retry',
