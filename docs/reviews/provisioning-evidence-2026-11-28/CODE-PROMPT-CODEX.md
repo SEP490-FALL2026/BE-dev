@@ -37,7 +37,8 @@ Tạo `docs/reviews/provisioning-evidence-2026-11-28/PROGRESS.md`: bảng gói �
 1. **Không đổi hành vi nghiệp vụ ngoài SPEC mục 5** (EV-01…EV-16), kể cả khi thấy hợp lý hơn ⟹ ghi `D-n` _cần Owner_ ở `PROGRESS.md`, giữ hành vi cũ.
 2. **Sửa service cũ thì giữ mọi kiểm cũ** (guard, đọc lại sau khóa, mã lỗi, thứ tự kiểm); liệt kê dưới `Kiểm giữ:` trong commit message.
 3. **Spec unit nằm cạnh file nó test**; test lỗi khẳng định **mã lỗi** (và `problem` khi có), không chỉ HTTP status.
-4. **Không nới** test, gate, manifest, registry, eslint-suppressions để cho xanh. **Không đổi kỳ vọng test cũ** — chỉ thêm ca.
+4. **Không nới** test, gate, manifest, registry, eslint-suppressions để cho xanh. **Không đổi kỳ vọng test cũ** — chỉ thêm ca. Ngoại lệ duy nhất (SPEC EV-01): danh sách
+   `NEW_DOCUMENT_PURPOSES` ở `contract.policy.spec.ts:69-75` và số operation ở `openapi-presentation.http-spec.ts`.
 5. Không chạm `src/modules/requests/**`, `prisma/migrations/*` đã có, `scripts/verify/merged-migrations.txt`. Chỉ hai migration mới của P1.
 6. Không sửa tay `openapi.json`, `docs/generated/*` — chỉ qua `pnpm openapi:export`, `pnpm arch:routes`, `pnpm arch:graph`.
 7. Trần: 500 dòng code/file, 60 dòng/hàm, 25 file/thư mục (thư mục `licensing/provisioning/` **đã đủ 25** — file mới vào `provisioning/evidence-files/`),
@@ -53,9 +54,9 @@ Tạo `docs/reviews/provisioning-evidence-2026-11-28/PROGRESS.md`: bảng gói �
 
 Theo PLAN mục 6 (khuôn mục 5, bước 0 → 8). Lưu ý:
 
-- **P1:** đọc guard `document_attachment_guard` **mới nhất** trước khi viết M2; ghi trong commit nhánh nào của SPEC §4 (guard liệt kê cột / guard tổng quát).
+- **P1:** guard `document_attachment_guard` **không đổi** (SPEC §4); commit P1 gồm cả union `DocumentPurpose` + `PURPOSE_ROLES` để typecheck xanh.
 - **P2:** WebP chỉ cho hai purpose mới; purpose cũ giữ PDF/PNG/JPEG. `mayOpen` không bao giờ `OPEN` file bằng chứng `READY` qua route chung.
-- **P3:** gắn file **trong** giao dịch của `ProvisioningTaskFrame.work`, **trước** dòng ghi trạng thái hoàn tất; từ chối ⟹ cả giao dịch hủy.
+- **P3:** gắn file **trong** giao dịch của `ProvisioningTaskFrame.work`, là **dòng đầu** callback `write` (trước mọi khóa khác); từ chối ⟹ cả giao dịch hủy. Tên file nhóm `provisioning-evidence-files.*`.
 - **P4:** quyền đọc dùng `requireActingItAdmin` (IT **đang** phụ trách), **không** dùng `getItAdminScope`; ngoài phạm vi ⟹ 404 `PROVISIONING_TASK.NOT_FOUND`.
 - **P5:** push; `gh workflow run ci.yml --ref feat/provisioning-evidence-files`; phân loại **từng test đỏ** so với run nền (đỏ cùng tên trên nền = nợ cũ;
   đỏ mới = sửa, tối đa 2 vòng, CI lại).
