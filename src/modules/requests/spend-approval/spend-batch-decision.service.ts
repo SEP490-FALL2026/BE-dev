@@ -1,23 +1,17 @@
 import { Injectable } from '@nestjs/common';
-import { TransactionRunner, TransientDatabaseError } from '../../../infrastructure/database/transaction-runner';
+import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { PolicyChecklistApi } from '../../policies/public/policy-checklist.api';
-import { AccessRequestNotFoundError } from '../access-request/access-request.errors';
 import { SpendBatchRepo } from '../spend/spend-batch.repo';
 import { SpendDecisionRepo } from '../spend/spend-decision.repo';
 import { SpendBatchGroupReturnService } from './spend-batch-group-return.service';
 import { SpendDecisionService, type JudgedSpendChecklist, type SpendDecisionInput } from './spend-decision.service';
 import { spendItemOutcome, type BatchReason, type SpendItemOutcome } from './spend-item-outcome.policy';
-import { SpendBatchNotFoundError, SpendDecisionRefusedError } from '../spend/spend.errors';
+import { SpendBatchNotFoundError } from '../spend/spend.errors';
 import type { BatchDecisionResultWire } from '../spend-approval-view/spend-approval.dto';
 
 /** The decision of the record of approval each decision of the body writes. */
 const RECORDED_AS = { APPROVE: 'APPROVED', REJECT: 'REJECTED', RETURN: 'RETURNED' } as const;
-
-/** A request with no spend step open is refused with this reason; a request that is not there at all is not found. */
-function isNoOpenStep(error: unknown): boolean {
-  return error instanceof SpendDecisionRefusedError && error.reason === 'NO_SPEND_STEP';
-}
 
 /**
  * The spending approver decides the requests they hold in a batch together, approving or refusing them one by one, in the
@@ -124,13 +118,10 @@ export class SpendBatchDecisionService {
 
       return { requestId, outcome: 'RETURNED', reason: null };
     } catch (error) {
-      if (error instanceof TransientDatabaseError)
-        return { requestId, outcome: 'RETRYABLE', reason: 'TRANSIENT_FAILURE' };
-      if (error instanceof AccessRequestNotFoundError)
-        return { requestId, outcome: 'SKIPPED', reason: 'NO_SPEND_STEP' };
-      if (isNoOpenStep(error)) return this.withoutOpenStep(actor, requestId, 'RETURN');
-      if (error instanceof SpendDecisionRefusedError) return { requestId, outcome: 'SKIPPED', reason: error.reason };
-      throw error;
+      const outcome = spendItemOutcome({ context: 'BATCH', error });
+      if (!outcome || outcome.kind === 'GROUP_USES_LINES') throw error;
+      if (outcome.kind === 'NO_OPEN_STEP') return this.withoutOpenStep(actor, requestId, 'RETURN');
+      return { requestId, outcome: outcome.outcome, reason: outcome.reason };
     }
   }
 
