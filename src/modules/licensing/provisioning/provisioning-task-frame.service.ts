@@ -1,3 +1,4 @@
+import type { AuditValue } from '../../audit/public/audit.types';
 import { Injectable } from '@nestjs/common';
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
@@ -17,7 +18,7 @@ import type { ProvisioningTaskRecord } from './provisioning-task.types';
 import { ProvisioningTaskRepo } from './provisioning-task.repo';
 
 /** What a write of one of the actions decided: the audit action and the after-snapshot, or nothing changed. */
-export type TaskWrite = false | { action: string; after: Record<string, string | number | boolean | null> };
+export type TaskWrite = false | { action: string; after: Record<string, AuditValue> };
 
 export interface TaskWorkContext {
   tx: DbTx;

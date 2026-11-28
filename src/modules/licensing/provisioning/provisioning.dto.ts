@@ -54,6 +54,10 @@ const k1ChecklistBodySchema = z.strictObject({
 });
 
 export const completeBodySchema = z.strictObject({
+  evidenceDocumentIds: z.array(z.uuid()).max(20).optional().meta({
+    description:
+      'At most 3 uploaded evidence files with purpose PROVISIONING_EVIDENCE. Optional; the evidence note remains required.',
+  }),
   evidence: z.string().max(EVIDENCE_MAX_LENGTH).default(''),
   /** K4 only, and then required: the free key of the store the seat is given (`QĐ-103d`); a purchased key is imported first. */
   licenseKeyId: z.uuid().optional(),

@@ -230,9 +230,10 @@ export class ProvisioningTasksController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The request is invalid (VALIDATION_ERROR), has no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED), a K4 grant names no key (PROVISIONING.KEY_REQUIRED) or a grant of another kind names one (PROVISIONING.KEY_NOT_APPLICABLE), or the checklist of a K1 grant is refused: a step missing, not ticked or with no time, or no evidence, or no checklist (PROVISIONING.K1_CHECKLIST_INCOMPLETE), a step timed before one that comes first (PROVISIONING.K1_CHECKLIST_OUT_OF_ORDER), a step the grant does not have or sent twice, or a checklist sent for a grant that takes none (PROVISIONING.K1_CHECKLIST_NOT_ALLOWED). A refused checklist of a K1 grant tells details.variant (GRANT) and details.codes, the steps expected in order. The task is unchanged.',
+        'The request is invalid (VALIDATION_ERROR), has no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED), a K4 grant names no key (PROVISIONING.KEY_REQUIRED) or a grant of another kind names one (PROVISIONING.KEY_NOT_APPLICABLE), or the checklist of a K1 grant is refused: a step missing, not ticked or with no time, or no evidence, or no checklist (PROVISIONING.K1_CHECKLIST_INCOMPLETE), a step timed before one that comes first (PROVISIONING.K1_CHECKLIST_OUT_OF_ORDER), a step the grant does not have or sent twice, or a checklist sent for a grant that takes none (PROVISIONING.K1_CHECKLIST_NOT_ALLOWED). A refused checklist of a K1 grant tells details.variant (GRANT) and details.codes, the steps expected in order. The task is unchanged. Invalid evidence files return PROVISIONING_TASK.EVIDENCE_FILE_INVALID with details.problem.',
       examples: [
         VALIDATION_EXAMPLE,
+        PROVISIONING_ERROR_EXAMPLES.EVIDENCE_FILE_INVALID,
         PROVISIONING_ERROR_EXAMPLES.EVIDENCE_REQUIRED,
         PROVISIONING_ERROR_EXAMPLES.KEY_REQUIRED,
         PROVISIONING_ERROR_EXAMPLES.KEY_NOT_APPLICABLE,

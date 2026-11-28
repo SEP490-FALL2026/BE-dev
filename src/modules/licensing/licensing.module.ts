@@ -1,3 +1,4 @@
+import { ProvisioningEvidenceFilesService } from './provisioning/evidence-files/provisioning-evidence-files.service';
 import { Module } from '@nestjs/common';
 import { LicensingSeatMonthFacadeModule } from './licensing-seat-month-facade.module';
 import { ConfigService } from '@nestjs/config';
@@ -267,6 +268,7 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     ProvisioningGrantService,
     ProvisioningService,
     ProvisioningGrantCompletion,
+    ProvisioningEvidenceFilesService,
     ProvisioningDecisionService,
     ProvisioningCancellationService,
     ProvisioningFailureService,

@@ -1,3 +1,4 @@
+import { ROUTE_ERROR_CODES_PROVISIONING_EVIDENCE } from './openapi-example-route-codes-provisioning-evidence';
 import type { RouteErrorStatus } from './openapi-example-manifest';
 import { ROUTE_ERROR_CODES_WAVE2 } from './openapi-example-route-codes-wave2';
 import { ROUTE_ERROR_CODES_WAVE3_TECH } from './openapi-example-route-codes-wave3-tech';
@@ -10,6 +11,7 @@ export const ROUTE_ERROR_CODES_LICENSING: Readonly<
   Record<string, Partial<Record<RouteErrorStatus, readonly string[]>>>
 > = {
   ...ROUTE_ERROR_CODES_WAVE2,
+  ...ROUTE_ERROR_CODES_PROVISIONING_EVIDENCE,
   ...ROUTE_ERROR_CODES_WAVE3_TECH,
   assignmentExpiryReminderList: {
     '403': ['ASSIGNMENT_EXPIRY.SCOPE_FORBIDDEN'],
@@ -170,28 +172,7 @@ export const ROUTE_ERROR_CODES_LICENSING: Readonly<
     '409': ['EMPLOYEE.NOT_STARTED', 'PROVISIONING_TASK.NOT_FAILED', 'PROVISIONING_TASK.WITHDRAWAL_PENDING'],
     '422': ['PROVISIONING_TASK.REASON_REQUIRED'],
   },
-  provisioningTaskComplete: {
-    '403': ['PROVISIONING.NOT_IN_CHARGE'],
-    '404': ['LICENSE_KEY.NOT_FOUND', 'PROVISIONING_TASK.NOT_FOUND'],
-    '409': [
-      'EMPLOYEE.NOT_STARTED',
-      'LICENSE_KEY.NOT_IN_STORE',
-      'LICENSE_KEY.SUBSCRIPTION_MISMATCH',
-      'LICENSE_KEY.WITHDRAWN',
-      'PROVISIONING.PLAN_BOUND_TO_DEVICE',
-      'PROVISIONING_TASK.IS_REVOCATION',
-      'PROVISIONING_TASK.NOT_IN_PROGRESS',
-      'PROVISIONING_TASK.NOT_MANUAL',
-    ],
-    '422': [
-      'PROVISIONING.K1_CHECKLIST_INCOMPLETE',
-      'PROVISIONING.K1_CHECKLIST_NOT_ALLOWED',
-      'PROVISIONING.K1_CHECKLIST_OUT_OF_ORDER',
-      'PROVISIONING.KEY_NOT_APPLICABLE',
-      'PROVISIONING.KEY_REQUIRED',
-      'PROVISIONING_TASK.EVIDENCE_REQUIRED',
-    ],
-  },
+
   provisioningTaskGet: {
     '404': ['PROVISIONING_TASK.NOT_FOUND'],
   },

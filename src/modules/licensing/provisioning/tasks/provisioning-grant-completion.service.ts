@@ -1,3 +1,4 @@
+import { ProvisioningEvidenceFilesService } from '../evidence-files/provisioning-evidence-files.service';
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
@@ -12,6 +13,13 @@ import { ProvisioningK1ChecklistError, ProvisioningKeyError } from '../provision
 import { assertKeyFits } from '../provisioning.policy';
 import { ProvisioningTaskRepo } from '../provisioning-task.repo';
 import type { ProvisioningTaskRecord } from '../provisioning-task.types';
+
+interface GrantCompletionInput {
+  evidence: string;
+  licenseKeyId?: string | undefined;
+  k1Checklist?: K1ChecklistClaim | undefined;
+  evidenceDocumentIds?: readonly string[] | undefined;
+}
 
 /**
  * What the completion of the task of a grant writes, in the transaction that holds the task (`US-07-01`, `BR-MF1-09`): the task is
@@ -32,6 +40,7 @@ export class ProvisioningGrantCompletion {
     private readonly assignments: AssignmentService,
     private readonly keys: LicenseKeyAssignmentService,
     private readonly checklists: ProvisioningK1Checklist,
+    private readonly evidenceFiles: ProvisioningEvidenceFilesService,
   ) {}
 
   /**
@@ -42,7 +51,7 @@ export class ProvisioningGrantCompletion {
     tx: DbTx,
     actor: AuthenticatedPrincipal,
     context: { task: ProvisioningTaskRecord; requestId: string; now: Date },
-    input: { evidence: string; licenseKeyId?: string | undefined; k1Checklist?: K1ChecklistClaim | undefined },
+    input: GrantCompletionInput,
   ): Promise<void> {
     if (input.licenseKeyId !== undefined) throw new ProvisioningKeyError('KEY_NOT_APPLICABLE');
     if (input.k1Checklist !== undefined) throw new ProvisioningK1ChecklistError('K1_CHECKLIST_NOT_ALLOWED');
@@ -54,13 +63,20 @@ export class ProvisioningGrantCompletion {
     tx: DbTx,
     actor: AuthenticatedPrincipal,
     context: { task: ProvisioningTaskRecord; now: Date; organizationId: string },
-    input: { evidence: string; licenseKeyId?: string | undefined; k1Checklist?: K1ChecklistClaim | undefined },
-  ): Promise<void> {
+    input: GrantCompletionInput,
+  ): Promise<string[]> {
+    const evidenceDocumentIds = await this.evidenceFiles.attach(
+      tx,
+      actor,
+      context.task.id,
+      input.evidenceDocumentIds,
+      'PROVISIONING_EVIDENCE',
+    );
     const { task, now, organizationId } = context;
     if (task.kind === 'EXTEND' && task.requestId !== null) {
       await this.writeExtension(tx, actor, { task, requestId: task.requestId, now }, input);
 
-      return;
+      return evidenceDocumentIds;
     }
     const provisioningType = await this.sharedPool.provisioningTypeOf(tx, task.assignment.planId);
     assertKeyFits(provisioningType, input.licenseKeyId);
@@ -92,6 +108,7 @@ export class ProvisioningGrantCompletion {
     const granted = await this.assignments.recordGranted(tx, task.assignmentId, completedOn);
     await this.notifyGrantedOutcome(tx, { task, provisioningType, completedOn, granted, keyMeta });
     if (keyMeta && !keyMeta.costBorne) await this.keys.markCostBorne(tx, keyMeta.licenseKeyId);
+    return evidenceDocumentIds;
   }
 
   private async notifyGrantedOutcome(

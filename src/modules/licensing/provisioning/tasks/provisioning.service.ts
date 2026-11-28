@@ -165,7 +165,12 @@ export class ProvisioningService {
   async complete(
     actor: AuthenticatedPrincipal,
     id: string,
-    input: { evidence: string; licenseKeyId?: string | undefined; k1Checklist?: K1ChecklistClaim | undefined },
+    input: {
+      evidence: string;
+      licenseKeyId?: string | undefined;
+      k1Checklist?: K1ChecklistClaim | undefined;
+      evidenceDocumentIds?: readonly string[] | undefined;
+    },
   ): Promise<TaskView> {
     const evidence = input.k1Checklist === undefined ? cleanEvidence(input.evidence) : input.evidence.trim();
     const task = await this.frame.work(actor, id, {
@@ -175,15 +180,21 @@ export class ProvisioningService {
         nextStatus(locked.status, 'COMPLETE', locked.channel);
       },
       write: async ({ tx, task: locked, now, organizationId }) => {
-        await this.completion.write(
+        const evidenceDocumentIds = await this.completion.write(
           tx,
           actor,
           { task: locked, now, organizationId },
-          { evidence, licenseKeyId: input.licenseKeyId, k1Checklist: input.k1Checklist },
+          {
+            evidence,
+            licenseKeyId: input.licenseKeyId,
+            k1Checklist: input.k1Checklist,
+            evidenceDocumentIds: input.evidenceDocumentIds,
+          },
         );
         const after = {
           status: 'COMPLETED',
           completedBy: actor.appUserId,
+          evidenceDocumentIds,
           ...(input.licenseKeyId === undefined ? {} : { licenseKeyId: input.licenseKeyId }),
         };
 

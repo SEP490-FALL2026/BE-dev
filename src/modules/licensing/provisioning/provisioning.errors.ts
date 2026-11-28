@@ -1,3 +1,4 @@
+import type { DocumentAttachProblem } from '../../catalog/public/catalog.errors';
 import type { K1ChecklistExpectation } from '../public/licensing.types';
 
 /**
@@ -56,5 +57,13 @@ export class ProvisioningNotInChargeError extends Error {
   constructor() {
     super('Only the IT Admin in charge or an appointed substitute for this department may act on this task.');
     this.name = 'ProvisioningNotInChargeError';
+  }
+}
+
+export type ProvisioningEvidenceFileProblem = 'TOO_MANY' | 'DUPLICATE' | DocumentAttachProblem;
+export class ProvisioningEvidenceFileInvalidError extends Error {
+  constructor(readonly problem: ProvisioningEvidenceFileProblem) {
+    super(`The evidence file is not valid (${problem}).`);
+    this.name = 'ProvisioningEvidenceFileInvalidError';
   }
 }

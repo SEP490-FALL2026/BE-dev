@@ -17,8 +17,8 @@ Skill đã đọc: `ponytail` (full), `using-superpowers`, `using-agent-skills`,
 | --- | ---------- | ---------- | ------------------- | -------------------------------------------------------------------- | ------------- |
 | P1  | xong local | bac2e26f   | SPEC §4             | quick checks exit 0; gates 346/346; unit 68/68                       | chưa chạy     |
 | P2a | xong local | b1a7440b   | EV-01…05            | quick checks 0; gates 346/346; unit 116/116                          | chờ P5        |
-| P2b | xong local | commit P2b | EV-09/10/14 catalog | typecheck/lint/arch/rules/format 0; gates 346/346; catalog 1079/1079 | chờ P5        |
-| P3a | chờ        | —          | EV-06…12 complete   | chưa chạy                                                            | chưa chạy     |
+| P2b | xong local | 96d829a6   | EV-09/10/14 catalog | typecheck/lint/arch/rules/format 0; gates 346/346; catalog 1079/1079 | chờ P5        |
+| P3a | xong local | commit P3a | EV-06..12 complete  | quick checks 0; gates 346/346; unit 390/390                          | P5 pending    |
 | P3b | chờ        | —          | EV-06…12 revocation | chưa chạy                                                            | chưa chạy     |
 | P4  | chờ        | —          | EV-13…16            | chưa chạy                                                            | chưa chạy     |
 | P5  | chờ        | —          | SPEC §8             | chưa chạy                                                            | chưa dispatch |
@@ -77,3 +77,12 @@ Skill đã đọc: `ponytail` (full), `using-superpowers`, `using-agent-skills`,
 - Vòng sửa 2: gate chỉ còn `catalog/public: 26 files`; thêm các ca facade vào `catalog-duplicate.policy.spec.ts` hiện có cùng thư mục (25 file), không thay kỳ vọng cũ. Không tăng trần gate hoặc tạo ngoại lệ.
 - Kết quả cuối: `pnpm typecheck`, eslint các file sửa, `arch:check`, `rules:check`, `format:check` exit 0; `CI=true pnpm test:gates` 346 pass/0 fail (17 suites); `CI=true pnpm test -- src/modules/catalog` 1079 pass/0 fail (103 suites). Đây đồng thời là mốc sau P2b.
 - Self-review EV-09/10/14: khóa id tăng, uploader → purpose → trạng thái, ghi/audit cùng tx; query list chỉ projection READY của task, take 6, attachedAt/id; query link lọc cả task/id/status/purpose, ký 300 giây và audit chỉ expiresAt. Không qua mayOpen ở route riêng.
+
+## P3a — Hoàn tất cấp
+
+- Skill bổ sung đã đọc: `debugging-and-error-recovery` để chẩn đoán lỗi kiểm nhanh theo log, sửa tối thiểu và kiểm lại đúng bước đỏ.
+- RED: 16 fail/16 ca mới; GREEN và kiểm cuối: `CI=true pnpm test -- src/modules/licensing/provisioning` **390 pass/0 fail**, 27 suites.
+- `typecheck`, eslint các file sửa, `arch:check`, `rules:check`, `format:check`: exit 0; gates **346 pass/0 fail**, 17 suites. Vòng sửa 1: matcher bất đối xứng của Jest bị kiểu `any` nên thay bằng khẳng định lớp lỗi + problem; format lại DTO. Không nới rule hay kỳ vọng cũ.
+- Ruling: `write` chung gắn file ở dòng đầu trước khi rẽ GRANT/EXTEND; `writeExtension` không gắn lần hai. Cả hai nhánh trả mảng id từ `write` để dựng audit; unit chứng minh đúng một lần gắn, trước mọi ghi và không markCompleted khi gắn bị từ chối. Input type dùng chung cho hai nhánh để giữ trần 60 dòng/hàm.
+- `Kiểm giữ:` `assertItAdmin`, khóa và đọc lại tác vụ, `requireActingItAdmin`, `cleanEvidence`/K1 trước frame, `assertNotRevocationTask`, `nextStatus`, `assertKeyFits`, checklist K1, `markCompleted`, khóa/chọn K4, `recordGranted`, gate báo kết quả và `markCostBorne` giữ thứ tự cũ giữa chúng.
+- Thêm hàng khóa `3c` trong database rules; registry mã 422 dùng file mảnh. Chưa sửa service thu hồi.
