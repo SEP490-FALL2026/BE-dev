@@ -6,15 +6,24 @@ import { AuditApi } from '../../audit/public/audit.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import {
   AccessRequestAlreadyHoldsAccessError,
+  AccessRequestApplicationRetiredError,
   AccessRequestNotDraftError,
   AccessRequestNotFoundError,
+  AccessRequestNotPriceableError,
+  AccessRequestPlanBoundToDeviceError,
+  AccessRequestPlanNotFoundError,
   AccessRequestSuperAdminCannotRequestError,
   AccessRequestTermRefusedError,
 } from '../access-request/access-request.errors';
 import { mayRequest } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
-import { RequestFactsService, type Assessment, type RequestSettings } from '../access-request/request-facts.service';
+import {
+  RequestFactsService,
+  type Assessment,
+  type PartyFacts,
+  type RequestSettings,
+} from '../access-request/request-facts.service';
 import { RequestLimitsService, type LimitSettings } from '../request-limits/request-limits.service';
 import { RequestSenderService } from './request-sender.service';
 import { RequestDraftRepo } from '../request-draft/request-draft.repo';
@@ -45,6 +54,42 @@ export interface SubmitOptions {
   draftId?: string;
   /** GH-2 as read before the transaction opened; read here when the caller did not. */
   limitSettings?: LimitSettings;
+}
+
+export interface SenderLock {
+  organizationId: string;
+  now: Date;
+}
+
+type TicketPartyCheck = SenderLock & { settings: RequestSettings; mode: 'TICKET'; facts: PartyFacts };
+
+export type PartyCheck = (SenderLock & { settings: RequestSettings; mode: 'SINGLE' }) | TicketPartyCheck;
+
+export interface ItemFacts {
+  body: SubmitBodyDto;
+  assessed: Assessment;
+  draftId?: string;
+}
+
+type ItemRefusalError =
+  | AccessRequestAlreadyHoldsAccessError
+  | AccessRequestApplicationRetiredError
+  | AccessRequestNotPriceableError
+  | AccessRequestPlanBoundToDeviceError
+  | AccessRequestPlanNotFoundError
+  | AccessRequestTermRefusedError;
+
+export type ItemCheck = { ok: true; facts: ItemFacts } | { ok: false; error: ItemRefusalError };
+
+function isItemRefusal(error: unknown): error is ItemRefusalError {
+  return (
+    error instanceof AccessRequestAlreadyHoldsAccessError ||
+    error instanceof AccessRequestApplicationRetiredError ||
+    error instanceof AccessRequestNotPriceableError ||
+    error instanceof AccessRequestPlanBoundToDeviceError ||
+    error instanceof AccessRequestPlanNotFoundError ||
+    error instanceof AccessRequestTermRefusedError
+  );
 }
 
 @Injectable()
@@ -83,6 +128,19 @@ export class AccessRequestService {
     settings: RequestSettings,
     options: SubmitOptions = {},
   ): Promise<AccessRequestRecord> {
+    const party: PartyCheck = { ...(await this.lockSenderWithin(tx, actor, options)), settings, mode: 'SINGLE' };
+    const item = await this.checkItemWithin(tx, actor, party, body, options);
+    if (!item.ok) throw item.error;
+    const created = await this.writeWithin(tx, actor, party, item.facts);
+    await this.routeWithin(tx, actor, created.id, party.now);
+
+    const record = await this.repo.findById(created.id, tx);
+    if (!record) throw new Error(`The request ${created.id} was not found after it was written.`);
+
+    return record;
+  }
+
+  async lockSenderWithin(tx: DbTx, actor: AuthenticatedPrincipal, options: SubmitOptions): Promise<SenderLock> {
     // The Super Admin sends no request, on any route that sends one, the renewal that is sent late included.
     if (!mayRequest(actor.roles)) throw new AccessRequestSuperAdminCannotRequestError();
     if (options.draftId) await this.lockDraft(tx, actor, options.draftId);
@@ -92,14 +150,67 @@ export class AccessRequestService {
     // The limits of the person are judged one sending after the other: the lock is taken before any department is.
     await this.limits.lock(tx, [actor.employeeId]);
 
-    const now = new Date();
+    return { organizationId: employee.organizationId, now: new Date() };
+  }
+
+  async checkPartyWithin(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    settings: RequestSettings,
+    options: SubmitOptions,
+  ): Promise<TicketPartyCheck> {
+    const sender = await this.lockSenderWithin(tx, actor, options);
+    const facts = await this.assessment.assessParty(tx, {
+      employeeId: actor.employeeId,
+      now: sender.now,
+      lockDepartment: true,
+    });
+
+    return { ...sender, settings, mode: 'TICKET', facts };
+  }
+
+  async checkItemWithin(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    party: PartyCheck,
+    body: SubmitBodyDto,
+    options: SubmitOptions,
+  ): Promise<ItemCheck> {
+    let assessed: Assessment;
+    try {
+      assessed = await this.assessItem(tx, actor, party, body, options);
+    } catch (error) {
+      if (!isItemRefusal(error)) throw error;
+      return { ok: false, error };
+    }
+    // The single submission judges its limits here. Tickets judge them across all their items together.
+    if (party.mode === 'SINGLE') {
+      await this.limits.requireForOne(tx, {
+        employeeId: actor.employeeId,
+        planId: body.planId,
+        now: party.now,
+        settings: options.limitSettings ?? (await this.limits.settings()),
+        exemptions: assessed.graceHold ? new Map([[actor.employeeId, 'TRANSFER_GRACE' as const]]) : undefined,
+      });
+    }
+
+    return { ok: true, facts: { body, assessed, draftId: options.draftId } };
+  }
+
+  private async assessItem(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    party: PartyCheck,
+    body: SubmitBodyDto,
+    options: SubmitOptions,
+  ): Promise<Assessment> {
     const assessed = await this.assessment.assess(tx, {
       employeeId: actor.employeeId,
       planId: body.planId,
       termMonths: body.termMonths,
-      now,
-      settings,
-      lockDepartment: true,
+      now: party.now,
+      settings: party.settings,
+      lockDepartment: party.mode === 'SINGLE',
     });
     this.requireNotHeld(assessed, options.toleratedSeatId);
     if (assessed.termRefusal !== null) {
@@ -109,30 +220,31 @@ export class AccessRequestService {
         assessed.target.provisioningType,
       );
     }
-    await this.limits.requireForOne(tx, {
-      employeeId: actor.employeeId,
-      planId: body.planId,
-      now,
-      settings: options.limitSettings ?? (await this.limits.settings()),
-      exemptions: assessed.graceHold ? new Map([[actor.employeeId, 'TRANSFER_GRACE' as const]]) : undefined,
-    });
+    return assessed;
+  }
+
+  async writeWithin(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    party: PartyCheck,
+    item: ItemFacts,
+  ): Promise<{ id: string }> {
     const sent: SubmittedRequest = {
       actor,
-      organizationId: employee.organizationId,
-      body,
-      assessed,
-      now,
-      draftId: options.draftId,
-      graceHold: assessed.graceHold,
+      organizationId: party.organizationId,
+      body: item.body,
+      assessed: item.assessed,
+      now: party.now,
+      draftId: item.draftId,
+      graceHold: item.assessed.graceHold,
     };
     const created = await this.repo.insert(tx, newRequestOf(sent));
     await this.auditSubmitted(tx, actor, sent, created);
-    await this.spendRouting.start(tx, actor, created.id, now);
+    return created;
+  }
 
-    const record = await this.repo.findById(created.id, tx);
-    if (!record) throw new Error(`The request ${created.id} was not found after it was written.`);
-
-    return record;
+  routeWithin(tx: DbTx, actor: AuthenticatedPrincipal, requestId: string, now: Date): Promise<void> {
+    return this.spendRouting.start(tx, actor, requestId, now);
   }
 
   /**

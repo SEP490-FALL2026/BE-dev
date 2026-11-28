@@ -98,6 +98,21 @@ describe('withdrawing one person of a request for a group (US-05-08, US-05-17 AC
     },
   );
 
+  it('lets the head withdraw a line from a group request in the submission queue with a reason', () => {
+    const queued: LineWithdrawalFacts = {
+      ...facts,
+      actorEmployeeId: 'head',
+      actorHeadsDepartment: true,
+      lineState: 'NEED_CONFIRMED',
+      needStep: 'APPROVED',
+      requestState: 'AWAITING_SPEND_SUBMISSION',
+      spendStage: 'NOT_SUBMITTED',
+    };
+
+    expect(checkLineWithdrawal({ ...queued, reason: 'Left the project' })).toBeNull();
+    expect(checkLineWithdrawal(queued)).toBe('REASON_REQUIRED');
+  });
+
   it('sends the person whose seat is real to a return, and tells that the withdrawal waits for the IT Admin', () => {
     expect(checkLineWithdrawal({ ...facts, lineState: 'COMPLETED' })).toBe('GRANT_COMPLETED');
     expect(checkLineWithdrawal({ ...facts, lineState: 'AWAITING_IT_CLOSE' })).toBe('WITHDRAWAL_PENDING');

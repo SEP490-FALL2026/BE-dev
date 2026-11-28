@@ -97,6 +97,12 @@ describe('checkWithdrawal (US-05-08)', () => {
       needStep: 'APPROVED' as const,
     };
 
+    it('W4-12 allows the head to withdraw from the submission queue only with a reason', () => {
+      const inQueue = { ...head, spendStage: 'NOT_SUBMITTED' as const };
+      expect(checkWithdrawal(withFacts({ ...inQueue, reason: 'No longer needed' }))).toBeNull();
+      expect(checkWithdrawal(withFacts({ ...inQueue, reason: null }))).toBe('REASON_REQUIRED');
+    });
+
     it('BR-MF1-06h/06i: withdraws, with a reason, a request that is blocked or one that waits for the confirmation of the reserve', () => {
       for (const spendStage of ['BLOCKED', 'RESERVE_CONFIRMATION'] as const) {
         expect(checkWithdrawal(withFacts({ ...head, spendStage, reason: 'Moved to next year' }))).toBeNull();
@@ -109,7 +115,7 @@ describe('checkWithdrawal (US-05-08)', () => {
     });
 
     it('does not withdraw a request that is anywhere else, nor one of another department', () => {
-      for (const spendStage of ['NOT_SUBMITTED', 'WAITING_SPEND_DECISION', null] as const) {
+      for (const spendStage of ['RETURNED_TO_REQUESTER', 'WAITING_SPEND_DECISION', null] as const) {
         expect(checkWithdrawal(withFacts({ ...head, spendStage, reason: 'x' }))).toBe('NOT_REQUESTER');
       }
       expect(

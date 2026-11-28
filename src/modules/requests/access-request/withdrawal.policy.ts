@@ -20,7 +20,7 @@ export type WithdrawalRefusal =
   | 'WITHDRAWAL_AFTER_DECISION';
 
 /** The stages of a request that costs money in which its head may withdraw it (`FR-3.20`, `FR-3.21`, `QĐ-82n` B). */
-const HEAD_MAY_WITHDRAW_AT: readonly SpendStage[] = ['BLOCKED', 'RESERVE_CONFIRMATION'];
+const HEAD_MAY_WITHDRAW_AT: readonly SpendStage[] = ['NOT_SUBMITTED', 'BLOCKED', 'RESERVE_CONFIRMATION'];
 
 export interface WithdrawalFacts {
   actorEmployeeId: string;

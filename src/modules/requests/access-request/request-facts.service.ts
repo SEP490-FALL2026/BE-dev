@@ -48,6 +48,11 @@ type OwningUnit =
 type CostedUnit = ReturnType<OrganizationReadApi['requireUnitCostCenter']>;
 type SeatTarget = NonNullable<Awaited<ReturnType<CatalogApi['findPlanSeatTargets']>>[number]>;
 
+export interface PartyFacts {
+  today: BusinessDate;
+  unit: CostedUnit;
+}
+
 /** Everything a request is decided by, read for one person asking for one plan on one day. */
 export interface Assessment {
   today: BusinessDate;
@@ -156,6 +161,16 @@ export class RequestFactsService {
     }
 
     return found;
+  }
+
+  /** Reads the sender's costed department once before checking the items of a ticket. */
+  async assessParty(tx: DbTx, input: { employeeId: string; now: Date; lockDepartment: boolean }): Promise<PartyFacts> {
+    const today = await this.organizationReads.businessToday(input.now, tx);
+    const found = await this.requireStartedOwningUnit(tx, input.employeeId, today);
+    const unit = this.organizationReads.requireUnitCostCenter(found);
+    if (input.lockDepartment) await this.organizationReads.lockDepartmentShared(tx, unit.departmentId);
+
+    return { today, unit };
   }
 
   /**

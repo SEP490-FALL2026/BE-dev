@@ -3,7 +3,7 @@ import { TransactionRunner, type DbTx } from '../../../infrastructure/database/t
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { PolicyChecklistApi } from '../../policies/public/policy-checklist.api';
-import type { ChecklistBody } from '../../policies/public/policy-checklist.types';
+import type { ChecklistBody, ChecklistVerdict } from '../../policies/public/policy-checklist.types';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import {
   AccessRequestDecisionRefusedError,
@@ -21,6 +21,11 @@ import {
 } from '../access-request/need-decision.policy';
 import { RequestFactsService } from '../access-request/request-facts.service';
 import { NeedDecisionEffects } from './need-decision-effects.service';
+
+export interface JudgedNeedChecklist {
+  verdict: ChecklistVerdict;
+  reason: string | null;
+}
 
 /**
  * Deciding the need step (`US-05-04`, `US-01-12` AC-6): the person the routing table gave the step approves or refuses
@@ -52,17 +57,20 @@ export class NeedDecisionService {
     actor: AuthenticatedPrincipal,
     requestId: string,
     input: DecisionInput & { checklist: ChecklistBody },
+    judged?: JudgedNeedChecklist,
   ): Promise<AccessRequestRecord> {
     return this.runner.run(async (tx) => {
       const request = await this.lockDecidable(tx, actor, requestId);
       const outcome = needDecisionOutcome({ branch: request.branch, routingRow: request.needStep.routingRow }, input);
-      const { verdict, reason } = await this.checklists.judge(tx, {
-        organizationId: request.organizationId,
-        stepCode: '1.2',
-        checklist: input.checklist,
-        decision: input.decision,
-        reason: input.reason,
-      });
+      const { verdict, reason } =
+        judged ??
+        (await this.checklists.judge(tx, {
+          organizationId: request.organizationId,
+          stepCode: '1.2',
+          checklist: input.checklist,
+          decision: input.decision,
+          reason: input.reason,
+        }));
       const decidedAt = new Date();
       await this.writeDecision(tx, actor, request, { reason, outcome, decidedAt });
       await this.checklists.record(tx, {
