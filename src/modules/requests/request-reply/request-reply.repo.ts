@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { pendingHumanReturn } from './request-reply.policy';
-import type { HumanReturn, LatestReply, ReplyKind } from './request-reply.types';
+import type { HumanReturn, LatestReplyRow, ReplyKind } from './request-reply.types';
 
 interface StepRow {
   id: string;
@@ -97,12 +97,12 @@ export class RequestReplyRepo {
     });
   }
 
-  async latestOf(requestId: string, tx?: DbTx): Promise<LatestReply | null> {
+  async latestOf(requestId: string, tx?: DbTx): Promise<LatestReplyRow | null> {
     return (await this.latestOfMany([requestId], tx)).get(requestId) ?? null;
   }
 
-  async latestOfMany(requestIds: readonly string[], tx?: DbTx): Promise<Map<string, LatestReply>> {
-    const result = new Map<string, LatestReply>();
+  async latestOfMany(requestIds: readonly string[], tx?: DbTx): Promise<Map<string, LatestReplyRow>> {
+    const result = new Map<string, LatestReplyRow>();
     if (requestIds.length === 0) return result;
 
     const rows = await (tx ?? this.prisma).accessRequestReply.findMany({
@@ -113,8 +113,8 @@ export class RequestReplyRepo {
         requestId: true,
         kind: true,
         note: true,
+        authorEmployeeId: true,
         createdAt: true,
-        author: { select: { id: true, fullName: true } },
       },
     });
 
@@ -122,7 +122,7 @@ export class RequestReplyRepo {
       result.set(row.requestId, {
         kind: row.kind,
         note: row.note,
-        author: { id: row.author.id, name: row.author.fullName },
+        authorEmployeeId: row.authorEmployeeId,
         createdAt: row.createdAt,
       });
     }

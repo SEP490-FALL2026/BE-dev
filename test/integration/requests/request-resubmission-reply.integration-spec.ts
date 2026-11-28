@@ -247,7 +247,7 @@ describe('W4-09: reply note on requester resubmission (integration, real Postgre
     expect(latest.get(reqReplied.id)).toMatchObject({
       kind: 'HEAD_RESUBMISSION',
       note: 'Answered spend info',
-      author: { id: u.head.employeeId },
+      authorEmployeeId: u.head.employeeId,
     });
   });
 

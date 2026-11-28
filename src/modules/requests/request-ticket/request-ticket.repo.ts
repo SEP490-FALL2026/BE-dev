@@ -3,13 +3,13 @@ import type { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { currentStateOf } from '../access-request/access-request.policy';
-import type { RequestTicketItemView, RequestTicketView, TicketRef } from './request-ticket.types';
+import type { RequestTicketItemRawView, RequestTicketRawView, TicketRef } from './request-ticket.types';
 
 const SELECT_TICKET_VIEW = {
   id: true,
+  requesterEmployeeId: true,
+  departmentId: true,
   submittedAt: true,
-  requester: { select: { id: true, employeeCode: true, fullName: true } },
-  department: { select: { id: true, code: true, name: true } },
   items: {
     orderBy: { ticketPosition: 'asc' },
     select: {
@@ -18,15 +18,15 @@ const SELECT_TICKET_VIEW = {
       state: true,
       termMonths: true,
       routingMode: true,
-      plan: { select: { id: true, name: true } },
+      planId: true,
       replies: {
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         take: 1,
         select: {
           kind: true,
           note: true,
+          authorEmployeeId: true,
           createdAt: true,
-          author: { select: { id: true, fullName: true } },
         },
       },
     },
@@ -42,8 +42,8 @@ interface TicketRefRow {
   item_count: number;
 }
 
-function toTicketItemView(item: TicketViewRow['items'][number]): RequestTicketItemView {
-  if (item.ticketPosition === null || item.plan === null || item.state === 'DRAFT') {
+function toTicketItemRawView(item: TicketViewRow['items'][number]): RequestTicketItemRawView {
+  if (item.ticketPosition === null || item.planId === null || item.state === 'DRAFT') {
     throw new Error(`Ticket item ${item.id} has invalid ticket state or missing metadata.`);
   }
   const reply = item.replies[0] ?? null;
@@ -51,7 +51,7 @@ function toTicketItemView(item: TicketViewRow['items'][number]): RequestTicketIt
   return {
     position: item.ticketPosition,
     requestId: item.id,
-    plan: { id: item.plan.id, name: item.plan.name },
+    planId: item.planId,
     state: currentStateOf(item.state),
     termMonths: item.termMonths,
     routingMode: item.routingMode,
@@ -59,24 +59,20 @@ function toTicketItemView(item: TicketViewRow['items'][number]): RequestTicketIt
       ? {
           kind: reply.kind,
           note: reply.note,
-          author: { id: reply.author.id, name: reply.author.fullName },
+          authorEmployeeId: reply.authorEmployeeId,
           createdAt: reply.createdAt,
         }
       : null,
   };
 }
 
-function toTicketView(row: TicketViewRow): RequestTicketView {
+function toTicketRawView(row: TicketViewRow): RequestTicketRawView {
   return {
     id: row.id,
-    requester: {
-      employeeId: row.requester.id,
-      employeeCode: row.requester.employeeCode,
-      fullName: row.requester.fullName,
-    },
-    department: { id: row.department.id, code: row.department.code, name: row.department.name },
+    requesterEmployeeId: row.requesterEmployeeId,
+    departmentId: row.departmentId,
     submittedAt: row.submittedAt,
-    items: row.items.map(toTicketItemView),
+    items: row.items.map(toTicketItemRawView),
   };
 }
 
@@ -117,14 +113,14 @@ export class RequestTicketRepo {
     });
   }
 
-  /** Reads a ticket with all items ordered by position and each item's latest reply without N+1 fan-out. */
-  async view(tx: DbTx, ticketId: string): Promise<RequestTicketView | null> {
+  /** Reads a ticket with raw IDs and each item's latest reply without cross-module joins or N+1 fan-out. */
+  async view(tx: DbTx, ticketId: string): Promise<RequestTicketRawView | null> {
     const row = await tx.requestTicket.findUnique({
       where: { id: ticketId },
       select: SELECT_TICKET_VIEW,
     });
 
-    return row ? toTicketView(row) : null;
+    return row ? toTicketRawView(row) : null;
   }
 
   /** Fetches ticket references (id, position, itemCount) for a page of requestIds in one SQL statement. */

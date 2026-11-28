@@ -1,11 +1,29 @@
 import type { BusinessDate } from '../../../core/business-date';
 import type { TermKind, TermRefusal } from '../../../core/term-limit';
 import type { AccessRequestState, TicketRef } from '../access-request/access-request.types';
-import type { LatestReply } from '../request-reply/request-reply.types';
+import type { LatestReply, LatestReplyRow } from '../request-reply/request-reply.types';
 
 export type { TicketRef };
 
 export type TicketItemState = Exclude<AccessRequestState, 'DRAFT'>;
+
+export interface RequestTicketItemRawView {
+  position: number;
+  requestId: string;
+  planId: string;
+  state: TicketItemState;
+  termMonths: number | null;
+  routingMode: 'VIA_HEAD' | 'ONE_STEP';
+  latestReply: LatestReplyRow | null;
+}
+
+export interface RequestTicketRawView {
+  id: string;
+  requesterEmployeeId: string;
+  departmentId: string;
+  submittedAt: Date;
+  items: RequestTicketItemRawView[];
+}
 
 export interface RequestTicketItemView {
   position: number;

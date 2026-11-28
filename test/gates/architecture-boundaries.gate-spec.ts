@@ -250,6 +250,164 @@ function prismaDelegateName(model: string): string {
   return model.charAt(0).toLowerCase() + model.slice(1);
 }
 
+/**
+ * Reads relation fields (`field TargetModel ...`) for every Prisma model owned by a module.
+ */
+function listPrismaRelations(): Map<string, Map<string, string>> {
+  const modelsRoot = join(process.cwd(), 'prisma', 'models');
+  const ownedModels = new Set(Object.keys(PRISMA_MODEL_OWNER));
+  const relations = new Map<string, Map<string, string>>();
+
+  for (const entry of readdirSync(modelsRoot)) {
+    const content = readFileSync(join(modelsRoot, entry), 'utf8');
+    for (const match of content.matchAll(/^model\s+(\w+)\s*\{([\s\S]*?)^\}/gm)) {
+      const model = match[1];
+      const fields = new Map<string, string>();
+      for (const line of match[2].split(/\r?\n/)) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('@@')) continue;
+        const fieldMatch = /^([a-zA-Z_][a-zA-Z0-9_]*)\s+([A-Z][A-Za-z0-9_]*)(?:\[\]|\?)?\b/.exec(trimmed);
+        if (!fieldMatch) continue;
+        if (ownedModels.has(fieldMatch[2])) {
+          fields.set(fieldMatch[1], fieldMatch[2]);
+        }
+      }
+      relations.set(model, fields);
+    }
+  }
+
+  return relations;
+}
+
+const LEGACY_CROSS_MODULE_RELATION_SELECTS = new Set([
+  'identity-access/accounts/app-user.repo.ts:AppUser.employee',
+  'identity-access/accounts/super-admin-holder.repo.ts:AppUser.employee',
+  'identity-access/auth/session.repo.ts:AppUser.employee',
+  'licensing/assignment/rule-seats.repo.ts:LicenseAssignment.plan',
+  'licensing/assignment/usage-facts.repo.ts:LicenseAssignment.plan',
+  'licensing/device-activation/device-activation.repo.ts:LicenseKey.subscription',
+  'licensing/device-activation/device-activation.repo.ts:LicenseKey.licenseLot',
+  'licensing/shared-pool/shared-pool-avoided-cost.repo.ts:LicenseAssignment.plan',
+]);
+
+interface CrossModuleRelationAccess {
+  key: string;
+  file: string;
+  model: string;
+  field: string;
+  targetModel: string;
+  targetOwner: string;
+  owner: string;
+}
+
+function findCrossModuleRelationSelects(
+  modulesRoot: string,
+  relations: Map<string, Map<string, string>>,
+): CrossModuleRelationAccess[] {
+  const delegateToModel = new Map(Object.keys(PRISMA_MODEL_OWNER).map((model) => [prismaDelegateName(model), model]));
+  const findings: CrossModuleRelationAccess[] = [];
+
+  const unwrapObject = (expr: ts.Expression | undefined): ts.ObjectLiteralExpression | null => {
+    if (!expr) return null;
+    if (ts.isObjectLiteralExpression(expr)) return expr;
+    if (ts.isParenthesizedExpression(expr) || ts.isAsExpression(expr) || ts.isSatisfiesExpression(expr)) {
+      return unwrapObject(expr.expression);
+    }
+    return null;
+  };
+
+  const propNameText = (name: ts.PropertyName): string | null => {
+    if (ts.isIdentifier(name) || ts.isStringLiteral(name)) return name.text;
+    return null;
+  };
+
+  for (const file of listTypeScriptFiles(modulesRoot)) {
+    const source = readFileSync(file, 'utf8');
+    if (!file.endsWith('.repo.ts') && !source.includes('Prisma.')) continue;
+
+    const owner = relative(modulesRoot, file).split(sep)[0];
+    const relPath = relative(modulesRoot, file).split(sep).join('/');
+    const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
+    const seen = new Set<string>();
+
+    const walkSelectOrInclude = (obj: ts.ObjectLiteralExpression, model: string): void => {
+      const modelRels = relations.get(model);
+      if (!modelRels) return;
+      for (const prop of obj.properties) {
+        if (!ts.isPropertyAssignment(prop)) continue;
+        const field = propNameText(prop.name);
+        if (!field) continue;
+        const targetModel = modelRels.get(field);
+        if (!targetModel) continue;
+
+        const targetOwner = PRISMA_MODEL_OWNER[targetModel];
+        if (targetOwner !== undefined && targetOwner !== owner) {
+          const line = sf.getLineAndCharacterOfPosition(prop.getStart(sf)).line + 1;
+          const dedupeKey = `${relPath}:${line}:${model}.${field}`;
+          if (!seen.has(dedupeKey)) {
+            seen.add(dedupeKey);
+            findings.push({
+              key: `${relPath}:${model}.${field}`,
+              file: relPath,
+              model,
+              field,
+              targetModel,
+              targetOwner,
+              owner,
+            });
+          }
+          continue;
+        }
+
+        const nested = unwrapObject(prop.initializer);
+        if (nested) walkOptionsObject(nested, targetModel);
+      }
+    };
+
+    const walkOptionsObject = (obj: ts.ObjectLiteralExpression, model: string): void => {
+      for (const prop of obj.properties) {
+        if (!ts.isPropertyAssignment(prop)) continue;
+        const key = propNameText(prop.name);
+        if (key !== 'select' && key !== 'include') continue;
+        const inner = unwrapObject(prop.initializer);
+        if (inner) walkSelectOrInclude(inner, model);
+      }
+    };
+
+    const prismaSelectModelOfType = (typeNode: ts.TypeNode | undefined): string | null => {
+      if (!typeNode || !ts.isTypeReferenceNode(typeNode)) return null;
+      const text = typeNode.typeName.getText(sf);
+      const match = /^Prisma\.([A-Z][A-Za-z0-9_]*)(?:Select|Include)$/.exec(text);
+      return match && PRISMA_MODEL_OWNER[match[1]] ? match[1] : null;
+    };
+
+    const visit = (node: ts.Node): void => {
+      if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
+        const receiver = node.expression.expression;
+        if (ts.isPropertyAccessExpression(receiver)) {
+          const model = delegateToModel.get(receiver.name.text);
+          if (model) {
+            const arg0 = unwrapObject(node.arguments[0]);
+            if (arg0) walkOptionsObject(arg0, model);
+          }
+        }
+      } else if (ts.isSatisfiesExpression(node) || ts.isAsExpression(node)) {
+        const model = prismaSelectModelOfType(node.type);
+        const obj = unwrapObject(node.expression);
+        if (model && obj) walkSelectOrInclude(obj, model);
+      } else if (ts.isVariableDeclaration(node) && node.type && node.initializer) {
+        const model = prismaSelectModelOfType(node.type);
+        const obj = unwrapObject(node.initializer);
+        if (model && obj) walkSelectOrInclude(obj, model);
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(sf);
+  }
+
+  return findings;
+}
+
 describe('architecture boundaries', () => {
   const sourceRoot = join(process.cwd(), 'src');
 
@@ -309,6 +467,19 @@ describe('architecture boundaries', () => {
         expect({ ...location, owner: delegateOwnerModule }).toEqual({ ...location, owner });
       }
     }
+  });
+
+  it('forbids Prisma relation selects/includes targeting models owned by another module', () => {
+    const modulesRoot = join(sourceRoot, 'modules');
+    const relations = listPrismaRelations();
+    const findings = findCrossModuleRelationSelects(modulesRoot, relations);
+
+    const violations = findings.filter((item) => !LEGACY_CROSS_MODULE_RELATION_SELECTS.has(item.key));
+    expect(violations).toEqual([]);
+
+    const activeKeys = new Set(findings.map((item) => item.key));
+    const staleLegacy = [...LEGACY_CROSS_MODULE_RELATION_SELECTS].filter((key) => !activeKeys.has(key));
+    expect(staleLegacy).toEqual([]);
   });
 
   it('confines PrismaService to repository files inside business modules', () => {

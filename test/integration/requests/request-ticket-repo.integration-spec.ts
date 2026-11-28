@@ -145,7 +145,7 @@ describe('RequestTicketRepo and AccessRequestRepo ticket integration (PostgreSQL
     expect(viewCounted.result?.items[1].latestReply).toMatchObject({
       kind: 'REQUESTER_RESUBMISSION',
       note: 'Latest reply',
-      author: { id: requester.employeeId },
+      authorEmployeeId: requester.employeeId,
     });
     expect(viewCounted.result?.items[2].latestReply).toBeNull();
 

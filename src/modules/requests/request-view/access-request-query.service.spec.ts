@@ -147,7 +147,12 @@ describe('AccessRequestQueryService', () => {
     const record = makeRecord({ ticket });
     repo.findById.mockResolvedValue(record);
     readAccess.accessOf.mockResolvedValue({ read: true, onlyLineOf: null });
-    replies.latestOf.mockResolvedValue(latestReply);
+    replies.latestOf.mockResolvedValue({
+      kind: 'REQUESTER_RESUBMISSION',
+      note: 'dùng cho dự án X, 3 tháng',
+      authorEmployeeId: 'emp-1',
+      createdAt: REPLY_TS,
+    });
 
     const result = await service.get(actor, 'req-1');
 
@@ -155,6 +160,34 @@ describe('AccessRequestQueryService', () => {
     expect(replies.latestOf).toHaveBeenCalledWith('req-1');
     expect(result.ticketRef).toEqual(ticket);
     expect(result.latestReply).toEqual(latestReply);
+  });
+
+  it('loads reply author via OrganizationReadApi when author is not in request peopleIds', async () => {
+    const record = makeRecord({ ticket: null });
+    repo.findById.mockResolvedValue(record);
+    readAccess.accessOf.mockResolvedValue({ read: true, onlyLineOf: null });
+    replies.latestOf.mockResolvedValue({
+      kind: 'HEAD_RESUBMISSION',
+      note: 'Head note',
+      authorEmployeeId: 'former-head-1',
+      createdAt: REPLY_TS,
+    });
+    organizationReads.getEmployees
+      .mockResolvedValueOnce([
+        { id: 'emp-1', employeeCode: 'E1', fullName: 'Requester' },
+        { id: 'head-1', employeeCode: 'H1', fullName: 'Head' },
+      ])
+      .mockResolvedValueOnce([{ id: 'former-head-1', employeeCode: 'H0', fullName: 'Former Head' }]);
+
+    const result = await service.get(actor, 'req-1');
+
+    expect(organizationReads.getEmployees).toHaveBeenLastCalledWith(['former-head-1']);
+    expect(result.latestReply).toEqual({
+      kind: 'HEAD_RESUBMISSION',
+      note: 'Head note',
+      author: { id: 'former-head-1', name: 'Former Head' },
+      createdAt: REPLY_TS,
+    });
   });
 
   it('returns ticketRef: null and latestReply: null for a standalone request without replies', async () => {
