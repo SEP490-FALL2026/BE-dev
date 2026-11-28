@@ -19,7 +19,8 @@ interface ReplyRow {
   author_employee_id: string;
 }
 
-describe('W4-10 & W4-04: head resubmission reply notes in spend batches and queue/batch item fields (integration, real PostgreSQL)', () => {
+// W4-10 & W4-04
+describe('head resubmission reply notes in spend batches and queue/batch item fields (integration, real PostgreSQL)', () => {
   let w: TicketWorld;
   let runner: TransactionRunner;
   let ticketRepo: RequestTicketRepo;
@@ -389,7 +390,8 @@ describe('W4-10 & W4-04: head resubmission reply notes in spend batches and queu
     ]);
   });
 
-  it('D-10: POST /spend-batches returns STOPPED/REPLY_NOTE_REQUIRED, persists the spend_batch_items row, and GET /spend-batches/{id}/items matches', async () => {
+  // D-10
+  it('POST /spend-batches returns STOPPED/REPLY_NOTE_REQUIRED, persists the spend_batch_items row, and GET /spend-batches/{id}/items matches', async () => {
     const r1 = await runner.run(async (tx) => {
       const created = await requestRepo.insert(
         tx,

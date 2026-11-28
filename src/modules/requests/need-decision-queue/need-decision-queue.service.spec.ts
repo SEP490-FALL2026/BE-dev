@@ -2,7 +2,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import type { CatalogApi } from '../../catalog/public/catalog.api';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { RequestTicketRepo } from '../request-ticket/request-ticket.repo';
-import type { TicketRef } from '../request-ticket/request-ticket.types';
+import type { TicketRef } from '../access-request/access-request.types';
 import type { SpendWireViewService } from '../spend/spend-wire-view.service';
 import type { StepDueOnService } from '../spend-approval-view/step-due-on.service';
 import type { NeedDecisionQueueRepo, NeedQueueRow } from './need-decision-queue.repo';

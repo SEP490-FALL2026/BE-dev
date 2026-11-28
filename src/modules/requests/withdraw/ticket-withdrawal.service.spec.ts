@@ -102,7 +102,8 @@ function buildService(options: {
   return { service, requests, readAccess, withdrawals };
 }
 
-describe('TicketWithdrawalService (W4-08)', () => {
+// W4-08
+describe('TicketWithdrawalService', () => {
   it('throws RequestTicketNotFoundError when ticket has no items or caller cannot view any item', async () => {
     const { service, withdrawals } = buildService({ visibleError: new RequestTicketNotFoundError() });
     await expect(service.withdraw(actorOf(OUTSIDER_ID), TICKET_ID, {})).rejects.toThrow(RequestTicketNotFoundError);

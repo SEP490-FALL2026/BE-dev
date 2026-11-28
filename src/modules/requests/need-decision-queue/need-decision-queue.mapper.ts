@@ -3,7 +3,7 @@ import { formatAmount } from '../../../core/money/money';
 import type { CatalogApi } from '../../catalog/public/catalog.api';
 import type { DepartmentBrief } from '../../organization/public/organization.types';
 import { deciderRoleOf } from '../access-request/need-decision.policy';
-import type { TicketRef } from '../request-ticket/request-ticket.types';
+import type { TicketRef } from '../access-request/access-request.types';
 import type { EmployeeWire } from '../spend/spend-wire-view.service';
 import type { NeedQueueItemWire } from './need-decision-queue.dto';
 import { reasonExcerptOf } from './need-decision-queue.policy';

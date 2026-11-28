@@ -1,4 +1,4 @@
-import type { TicketRef } from '../request-ticket/request-ticket.types';
+import type { TicketRef } from '../access-request/access-request.types';
 import type { MyRequestSummaryWire } from './my-requests.dto';
 import { canWithdrawOwn, outcomeOf, spendStageOf, waitingForOf } from './my-requests.policy';
 import type { MyLine, MyRequestRow, OutcomeFacts, SpendStageFacts } from './my-requests.types';

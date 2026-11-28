@@ -16,7 +16,8 @@ const REQ_1 = '11111111-1111-4111-8111-111111111111';
 const REQ_2 = '22222222-2222-4222-8222-222222222222';
 const PATH = `/api/v1/request-tickets/${TICKET_ID}/withdrawal`;
 
-describe('W4-08: POST /request-tickets/{id}/withdrawal HTTP contract', () => {
+// W4-08
+describe('POST /request-tickets/{id}/withdrawal HTTP contract', () => {
   let app: INestApplication<App>;
   const withdraw = jest.fn<
     Promise<TicketWithdrawResultWire[]>,

@@ -6,8 +6,7 @@ chuyển bước khi tổ chức đổi (ADR-0015). Story chính: US-05-01 → U
 US-05-18, US-05-20, US-05-21, US-06-01 → US-06-03, US-06-12 → US-06-14; US-03-02 (gửi thay), US-03-04 (nghỉ việc).
 Tầng: T5 (`scripts/arch/tiers.cjs`). Phụ thuộc: budgets, licensing, catalog, organization, identity-access, finance,
 operating-parameters, audit, notifications. Được dùng bởi: personnel, dashboards; gốc `src/app/app.module.ts`,
-`src/worker/worker.module.ts`, `src/worker/request-work.job.ts`. Nest module: `requests.module.ts` (API, mọi
-controller) và `requests-work-facade.module.ts` (phần worker chạy, API dùng chung: chuyển bước, SLA, trạng thái).
+`src/worker/worker.module.ts`, `src/worker/request-work.job.ts`. Nest module: `requests.module.ts` (service/provider nội bộ, không controller), `requests-http.module.ts` (`RequestsHttpModule`, mọi controller cho API) và `requests-work-facade.module.ts` (phần worker chạy, API dùng chung: chuyển bước, SLA, trạng thái).
 
 ## Public API (`public/`)
 
@@ -36,8 +35,8 @@ controller) và `requests-work-facade.module.ts` (phần worker chạy, API dùn
 
 ## Bảng sở hữu
 
-- Request: `access_requests`, `access_request_beneficiaries`, `access_request_steps`, `approval_records`,
-  `access_request_proposals`, `access_request_assessments`, `access_request_service_accounts` (không còn ghi từ `QĐ-110m`; bảng giữ tới đợt dọn),
+- Request: `request_tickets`, `access_requests`, `access_request_beneficiaries`, `access_request_steps`, `approval_records`,
+  `access_request_proposals`, `access_request_assessments`, `access_request_replies`, `access_request_service_accounts` (không còn ghi từ `QĐ-110m`; bảng giữ tới đợt dọn),
   `access_request_renewals`, `return_requests`. Nhóm: `access_request_lines`, `access_request_line_decisions`,
   `access_request_line_amounts`.
 - Chi tiêu: `request_budget_checks`, `request_budget_check_years`, `request_finance_reviews`, `spend_batches`,
@@ -115,7 +114,7 @@ file; capability có controller không bị import trừ danh sách ngoại lệ
 `DelegationRefusal`, `ENDED_STATES`, `SpendStage`, `AskRefusal`/`AnswerRefusal`/`ReviewRefusal` ở `spend.errors.ts`, kiểu bản ghi thẩm định
 `assessment-record.types.ts`); chuyển file về capability sở hữu; tách controller ra capability lá đặt tên theo use case; đưa dịch vụ điều
 phối lên tầng trên. `*.errors.ts` không import policy của capability khác (gate). Không đổi hành vi, route, mã lỗi, thứ tự khóa và
-transaction; thứ tự controller trong `requests.module.ts` giữ để `openapi.json` đúng byte.
+transaction; thứ tự controller trong `requests-http.module.ts` giữ để `openapi.json` đúng byte.
 
 **`AccessRequestView` ở `request-view/` (L2).** View ghép trạng thái chi (`spend-status.service`) nên không ở L0 được; mười
 controller dùng nó import `request-view/`. `assessment-read.repo.ts` ở L0 là phần đọc bản ghi thẩm định mà lõi, `spend` và `request-view`
@@ -123,7 +122,7 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
 
 ## Capability → file chính
 
-39 capability ngang hàng (ADR-0019, `OD-A5`), tầng ở bảng trên. **`access-request/` là lõi chung** (`docs/rules/module-structure.md`).
+49 capability ngang hàng (ADR-0019, `OD-A5`), tầng ở bảng trên. **`access-request/` là lõi chung** (`docs/rules/module-structure.md`).
 
 - **Lõi và dùng chung (không controller)**
   - `access-request/` — `access-request.repo.ts` (writer duy nhất của `access_requests`, `access_request_beneficiaries`,
@@ -133,6 +132,9 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
   - `request-view/` — `AccessRequestView`: `access-request-query.service.ts`, `access-request.mapper.ts`, `pricing-view.service.ts` (`vendorChargeUntilRenewal` từ `vendor-charge.policy.ts`, trả ở `accessRequestGet` và `spendApprovalGet` khi kho hết `free === 0` và dòng cấp có kỳ cam kết 12 tháng; vắng khi còn Trống).
   - `request-intake/` — `AccessRequestService`: gửi một request cá nhân (draft, gia hạn và controller cùng gọi).
   - Lỗi của checklist khi quyết định (`QĐ-111ap`; `PolicyChecklistApi` của `policies`, ánh xạ ở `policies/public/policy-checklist.http-errors.ts`) thành câu trả lời HTTP: 409 `POLICY.VERSION_CHANGED`, 422 `POLICY.CHECKLIST_INCOMPLETE`, `POLICY.CHECKLIST_HAS_NO`, và lý do thiếu thành `VALIDATION_ERROR`. Bước nhu cầu (`need-decision/`, `group-line-decisions/`) và xác nhận dùng dự phòng (`reserve-confirmation/`) nhận `checklist` trong body; `RETURN` đưa Request về người gửi (`AWAITING_REQUESTER_REVISION`, bản ghi phê duyệt `RETURNED`) và `request-intake/request-resubmission.service.ts` mở lại bước nhu cầu cho trưởng phòng (nhóm: các dòng chuyển sang bước mới) hoặc, cho đề xuất IT Admin trả về ở đánh giá (kể cả Request một bước), một bước đánh giá mới (`AccessRequestRepo.assessmentSentBack`, `reopenAssessmentStep`). Duyệt chi (`spend-approval/`, `group-line-decisions/`, lô), đánh giá (`assessment/`) cũng nhận `checklist`; phiên bản ngân sách (`budgets`), ghost seat và đẩy sớm (`optimization`) có checklist ở README của module đó.
+  - `request-reply/` (L0) — `request-reply.repo.ts` (writer duy nhất của `access_request_replies`, `returnFactsOf`), `request-reply.policy.ts` (`pendingHumanReturn`, `pendingSpendReturn`, `latestSpendReturnAt` theo SPEC §7.9).
+  - `request-ticket/` (L1) — `request-ticket.repo.ts` (writer duy nhất của `request_tickets`, `refsOf` theo lô), `request-ticket.policy.ts` (`MAX_TICKET_ITEMS`, `findDuplicates`, `openLimitRefusals`, `ticketStatusOf`, `orderByPosition`), `request-ticket-order.policy.ts` (`orderByTicketPosition`, `processingOrder`, `restoreBodyOrder`), `request-ticket.dto.ts`.
+  - `request-ticket-view/` (L3) — `request-ticket-view.controller.ts` (`GET /request-tickets/{id}`), `request-ticket-view.service.ts` (ghép tên người/phòng/gói theo lô và lọc mục người gọi được xem).
   - `request-draft/` — kho bản nháp: `request-draft.repo.ts`, `request-draft.policy.ts`.
   - `request-end/` — `RequestEndService`: kết thúc request, trả cam kết ngân sách (cancellation, withdraw dùng).
   - `grant/` — `access-request-grant.listener.ts`, `grant-settlement.service.ts`, `grant.policy.ts`, `pool-grant-release.policy.ts`, `seat-release.service.ts`: cổng grant của licensing (`licensing.grant-request-gate`). Xử lý tiết kiệm tránh chi (`avoidedCostForPoolGrant` gọi `LicensingApi.recordAvoidedCost`), cấp khóa từ lô `K4` (`F10` giải phóng cam kết cho chính Request của lô, ngược lại ghi nhận `BudgetsApi.recordExcessLotLicenseGrant`), giải phóng cam kết theo ngày cho `K2` (rải ngược theo tháng lịch) và thu hồi/điều chuyển `K1` năm (`paidThroughOn` giữ phần đã trả khi thu hồi thường; điều chuyển tách tháng cuốn còn lại sang phòng mới qua `BudgetsApi.transferK1AnnualAllocations`, tôn trọng giới hạn `D-16`), cùng bù trừ rút thành viên nhóm sau hóa đơn lô `K4` (`F13c` qua `BudgetsApi.recordLotWithdrawalAfterInvoice`).

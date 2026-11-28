@@ -28,7 +28,8 @@ describe('request-ticket.policy', () => {
     });
   });
 
-  describe('findDuplicates (§7.2 step 3, OQ-W4-5 = A)', () => {
+  // OQ-W4-5 = A
+  describe('findDuplicates (§7.2 step 3)', () => {
     it('flags a later item with the same planId as DUPLICATE_IN_TICKET pointing to the earlier position', () => {
       expect(
         findDuplicates([

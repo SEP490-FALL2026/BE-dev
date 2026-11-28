@@ -85,7 +85,7 @@ export class RequestsOrganizationChangeListener implements OrganizationChangeLis
             ...(await this.repo.needRequestIdsOfDepartment(change.departmentId, tx)),
             // Include queued spend requests on HEAD_PERIOD_END too: replacing a head writes the new head period before
             // emitting HEAD_PERIOD_END then HEAD_PERIOD_START, so same-ticket items across NEED and AWAITING_SPEND_SUBMISSION
-            // enter one reconcileRequests batch and preserve ascending ticket position order (RB-9).
+            // enter one reconcileRequests batch and preserve ascending ticket position order.
             ...(await this.repo.spendQueueRequestIdsOfDepartment(change.departmentId, tx)),
           ],
           trigger: { kind: 'HEAD_CHANGED', employeeId: null },

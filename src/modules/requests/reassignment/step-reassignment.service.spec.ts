@@ -147,7 +147,8 @@ describe('StepReassignmentService: the request in the queue of the head', () => 
     expect(result.endedNotRequired).toBe(3);
   });
 
-  it('checks budget in ascending ticket position order across PENDING and AWAITING_SPEND_SUBMISSION items of one ticket (RB-9)', async () => {
+  // RB-9
+  it('checks budget in ascending ticket position order across PENDING and AWAITING_SPEND_SUBMISSION items of one ticket', async () => {
     const r11Pending = {
       ...queued({
         id: 'req-11',

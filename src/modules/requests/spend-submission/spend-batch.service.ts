@@ -17,22 +17,18 @@ import {
 import { SpendRoutingService } from '../spend/spend-routing.service';
 import { processingOrder, restoreBodyOrder } from '../request-ticket/request-ticket-order.policy';
 import type { HumanReturn } from '../request-reply/request-reply.types';
-import {
-  SpendBatchWriterService,
-  type BatchSubmitStopReason,
-  type HeadResubmissionInput,
-} from './spend-batch-writer.service';
+import type { StopReason } from '../spend/spend-submission.policy';
+import { SpendBatchWriterService, type HeadResubmissionInput } from './spend-batch-writer.service';
 import { SpendHeadService } from './spend-head.service';
 import { SpendReplyFactsService } from './spend-reply-facts.service';
 
 /** What became of the confirmation of the reserve the head gave for a request of the batch (`RV-11`). */
 export type ConfirmationResult = 'APPLIED' | 'IGNORED' | 'NOT_GIVEN';
-export type { BatchSubmitStopReason };
 
 export interface SubmitResult {
   requestId: string;
   outcome: 'SENT_TO_APPROVER' | 'AWAITING_RESERVE_CONFIRMATION' | 'STOPPED';
-  stopReason: BatchSubmitStopReason | null;
+  stopReason: StopReason | null;
   reserveConfirmation: ConfirmationResult;
 }
 
@@ -226,7 +222,7 @@ export class SpendBatchService {
   ): Promise<Sent> {
     const ignored: ConfirmationResult = given.reason === undefined ? 'NOT_GIVEN' : 'IGNORED';
     const routed = await this.routing.route(tx, actor, request, 'SUBMISSION', given.now);
-    const stopped = (stopReason: BatchSubmitStopReason | null): Sent => ({
+    const stopped = (stopReason: StopReason | null): Sent => ({
       requestId: request.id,
       result: { requestId: request.id, outcome: 'STOPPED', stopReason, reserveConfirmation: ignored },
       openedFor: null,

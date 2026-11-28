@@ -192,7 +192,8 @@ describe('PL-2.2 (QĐ-111ap, R-24): the sender sends on again a request the head
     });
   });
 
-  describe('W4-09: reply note required after a human return on resubmission', () => {
+  // W4-09
+  describe('reply note required after a human return on resubmission', () => {
     const base = {
       ...viaHead,
       departmentId: 'dept-1',
@@ -212,19 +213,15 @@ describe('PL-2.2 (QĐ-111ap, R-24): the sender sends on again a request the head
       audit.record.mock.calls
         .map((c) => (c as unknown as [unknown, { action: string; after: Record<string, unknown> }])[1])
         .find((e) => e.action === 'ACCESS_REQUEST.RESUBMITTED')?.after;
-
     const factsFor = (kind: 'NEED' | 'IT_ASSESSMENT' | 'SPEND', stepId: string, replied: string[] = []) => {
-      const stepKind = kind === 'SPEND' ? 'SPEND_APPROVAL' : kind;
-      const approvalRecord = kind === 'IT_ASSESSMENT' ? null : { decision: 'RETURNED', decidedAt: dt };
-      const createdAt = new Date(dt.getTime() - 60_000);
       const step = {
         id: stepId,
-        kind: stepKind,
+        kind: kind === 'SPEND' ? 'SPEND_APPROVAL' : kind,
         sequence: 1,
         state: 'CLOSED',
-        createdAt,
+        createdAt: new Date(dt.getTime() - 60_000),
         decidedAt: dt,
-        approvalRecord,
+        approvalRecord: kind === 'IT_ASSESSMENT' ? null : { decision: 'RETURNED', decidedAt: dt },
         spendDecision: null,
       };
       return new Map([['request', { steps: [step], repliedStepIds: new Set(replied) }]]);

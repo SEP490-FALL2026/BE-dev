@@ -152,7 +152,8 @@ describe('request-ticket.mapper', () => {
     expect(toTicketWire(doneView).status).toBe('DONE');
   });
 
-  it('filters hidden items when visibleRequestIds is given while keeping ticket-wide status (RB-11)', () => {
+  // RB-11
+  it('filters hidden items when visibleRequestIds is given while keeping ticket-wide status', () => {
     const visible = new Set(['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1']);
     const wire = toTicketWire(makeView(), visible);
 

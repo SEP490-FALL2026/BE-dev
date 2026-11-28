@@ -1,11 +1,3 @@
-import { RequestFactsService } from './access-request/request-facts.service';
-import { PendingSpendListener } from './spend/pending-spend.listener';
-import { RequestsRoutingFacadeModule } from './requests-routing-facade.module';
-import { RequestsDashboardApi } from './public/requests-dashboard.api';
-import { RequestResubmissionService } from './request-intake/request-resubmission.service';
-import { RequestTicketRepo } from './request-ticket/request-ticket.repo';
-import { RequestTicketViewService } from './request-ticket-view/request-ticket-view.service';
-import { RequestReplyRepo } from './request-reply/request-reply.repo';
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { AuditModule } from '../audit/audit.module';
@@ -19,6 +11,14 @@ import { IdentityAccessFacadeModule } from '../identity-access/identity-access-f
 import { OperatingParametersModule } from '../operating-parameters/operating-parameters.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { OrganizationModule } from '../organization/organization.module';
+import { RequestFactsService } from './access-request/request-facts.service';
+import { PendingSpendListener } from './spend/pending-spend.listener';
+import { RequestsRoutingFacadeModule } from './requests-routing-facade.module';
+import { RequestsDashboardApi } from './public/requests-dashboard.api';
+import { RequestResubmissionService } from './request-intake/request-resubmission.service';
+import { RequestTicketRepo } from './request-ticket/request-ticket.repo';
+import { RequestTicketViewService } from './request-ticket-view/request-ticket-view.service';
+import { RequestReplyRepo } from './request-reply/request-reply.repo';
 import { AccessRequestGrantGate } from './grant/access-request-grant.listener';
 import { GrantSettlementService } from './grant/grant-settlement.service';
 import { SeatReleaseRepo } from './grant/seat-release.repo';
@@ -206,9 +206,10 @@ import { PurchaseInvoiceSubmissionService } from './purchase-invoice/purchase-in
 /**
  * The requests context (C4, ADR-0015): the request for access to software, the people it is for and the steps that decide
  * it. It reads the organization, the approval roles, the catalog and the operating parameters through their facades and
- * writes nothing of theirs. The HTTP controller lives in the module itself because no graph other than the API needs it
- * yet; the part the worker runs (the reassignment of steps when the organization or a role changes) is
- * `RequestsWorkFacadeModule`, which this module imports for who a step is given to and the queue of the steps that wait.
+ * writes nothing of theirs. HTTP controllers live in `RequestsHttpModule` (`requests-http.module.ts`) so the API
+ * mounts them without pulling controllers into worker/CLI graphs; the part the worker runs (the reassignment of steps when the
+ * organization or a role changes) is `RequestsWorkFacadeModule`, which this module imports for who a step is given to and the
+ * queue of the steps that wait.
  * It exports its facade `RequestsApi`, which gives the personnel context the requests of a person who leaves that are still open,
  * and the extension point `RequestOutcomeListeners` the personnel context listens to. `RequestsAiSourceApi` gives the summary of the
  * queue of a person the steps that wait for them (`US-15-05`).

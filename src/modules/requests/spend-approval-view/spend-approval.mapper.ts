@@ -3,7 +3,7 @@ import type { CatalogApi } from '../../catalog/public/catalog.api';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import type { AssessmentRecord } from '../access-request/assessment-record.types';
-import type { TicketRef } from '../request-ticket/request-ticket.types';
+import type { TicketRef } from '../access-request/access-request.types';
 import type { BudgetCheckRepo } from '../spend/budget-check.repo';
 import { codesOf, type BlockReason, type BudgetOutcome, type YearResult } from '../spend/budget-check.policy';
 import type { SpendDecisionRepo } from '../spend/spend-decision.repo';

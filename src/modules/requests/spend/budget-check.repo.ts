@@ -182,10 +182,10 @@ export class BudgetCheckRepo {
   /**
    * What the requests of the Cost Center that wait to be decided as spend cost in the year (`BR-MF1-06f`, RV-10): the one definition of
    * _a request that waits to be decided_, which budgets read through `PendingSpendContributions` (budget views may temporarily show negative
-   * remaining when an unconfirmed ticket item precedes a later one under `QĐ-117k`(1), accepted in `D-11`). Requests returned by a spending
+   * remaining when an unconfirmed ticket item precedes a later one under `QĐ-117k`(1)). Requests returned by a spending
    * approver after their latest budget check stop counting immediately (`QĐ-117k`(2)) rather than waiting in branch 2 as `USES_RESERVE`.
    * When judging a budget check via {@link pendingForItem}, `QĐ-117k`(1) exempts unconfirmed (`AWAITING_SPEND_SUBMISSION + USES_RESERVE`)
-   * items of the **same ticket** at an earlier `ticket_position` (`D-11`); requests with an open `SPEND_APPROVAL` step, later ticket
+   * items of the **same ticket** at an earlier `ticket_position`; requests with an open `SPEND_APPROVAL` step, later ticket
    * positions, other tickets, and standalone requests remain counted. `exceptRequestId` is the request that is being checked: it does not
    * wait on itself.
    */
@@ -193,7 +193,7 @@ export class BudgetCheckRepo {
     return (await this.pendingMany([{ costCenterId, year }], tx, exceptRequestId)).get(`${costCenterId}:${year}`) ?? 0n;
   }
 
-  /** Item-scoped pending spend for budget checks (`QĐ-117k`(1), `D-11`): ignores earlier unconfirmed items of the same ticket. */
+  /** Item-scoped pending spend for budget checks (`QĐ-117k`(1)): ignores earlier unconfirmed items of the same ticket. */
   async pendingForItem(
     costCenterId: string,
     year: number,
@@ -223,7 +223,7 @@ export class BudgetCheckRepo {
   ): Promise<Map<string, bigint>> {
     if (pairs.length === 0) return new Map();
     const wanted = Prisma.join(pairs.map((pair) => Prisma.sql`(${pair.costCenterId}::uuid, ${pair.year}::int)`));
-    // NULL-safe exclusion of earlier same-ticket items awaiting reserve confirmation (QĐ-117k(1), D-11).
+    // NULL-safe exclusion of earlier same-ticket items awaiting reserve confirmation (`QĐ-117k`(1)).
     const excludeEarlierSameTicket = ticketScope
       ? Prisma.sql`AND (r.ticket_id IS DISTINCT FROM ${ticketScope.ticketId}::uuid OR r.ticket_position >= ${ticketScope.position}::int)`
       : Prisma.empty;

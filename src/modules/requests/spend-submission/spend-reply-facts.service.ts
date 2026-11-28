@@ -4,7 +4,7 @@ import { latestSpendReturnAt, pendingSpendReturn } from '../request-reply/reques
 import { RequestReplyRepo } from '../request-reply/request-reply.repo';
 import type { HumanReturn } from '../request-reply/request-reply.types';
 import { RequestTicketRepo } from '../request-ticket/request-ticket.repo';
-import type { TicketRef } from '../request-ticket/request-ticket.types';
+import type { TicketRef } from '../access-request/access-request.types';
 
 /** Shared batch reader for ticket references and pending spend human returns across spend queue, batch, and view. */
 @Injectable()

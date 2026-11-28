@@ -23,7 +23,8 @@ interface ReplyRow {
   author_employee_id: string;
 }
 
-describe('W4-09: reply note on requester resubmission (integration, real PostgreSQL)', () => {
+// W4-09
+describe('reply note on requester resubmission (integration, real PostgreSQL)', () => {
   let paid: string;
   let counter = 0;
 

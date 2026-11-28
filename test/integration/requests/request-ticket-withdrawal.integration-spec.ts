@@ -13,7 +13,8 @@ import { SpendHarness } from '../../support/spend-harness';
 const h = new SpendHarness();
 const SUBMITTED_AT = new Date('2026-06-01T08:00:00.000Z');
 
-describe('W4-08: withdraw a whole request ticket (integration, real PostgreSQL)', () => {
+// W4-08
+describe('withdraw a whole request ticket (integration, real PostgreSQL)', () => {
   let world: TicketWorld;
   let outsider: Person;
   let runner: TransactionRunner;

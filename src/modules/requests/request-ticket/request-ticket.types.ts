@@ -1,9 +1,7 @@
 import type { BusinessDate } from '../../../core/business-date';
 import type { TermKind, TermRefusal } from '../../../core/term-limit';
-import type { AccessRequestState, TicketRef } from '../access-request/access-request.types';
+import type { AccessRequestState } from '../access-request/access-request.types';
 import type { LatestReply, LatestReplyRow } from '../request-reply/request-reply.types';
-
-export type { TicketRef };
 
 export type TicketItemState = Exclude<AccessRequestState, 'DRAFT'>;
 

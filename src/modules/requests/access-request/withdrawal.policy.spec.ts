@@ -97,7 +97,8 @@ describe('checkWithdrawal (US-05-08)', () => {
       needStep: 'APPROVED' as const,
     };
 
-    it('W4-12 allows the head to withdraw from the submission queue only with a reason', () => {
+    // W4-12
+    it('allows the head to withdraw from the submission queue only with a reason', () => {
       const inQueue = { ...head, spendStage: 'NOT_SUBMITTED' as const };
       expect(checkWithdrawal(withFacts({ ...inQueue, reason: 'No longer needed' }))).toBeNull();
       expect(checkWithdrawal(withFacts({ ...inQueue, reason: null }))).toBe('REASON_REQUIRED');

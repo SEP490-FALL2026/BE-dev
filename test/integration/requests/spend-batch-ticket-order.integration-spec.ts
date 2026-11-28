@@ -10,7 +10,8 @@ import { SpendHarness } from '../../support/spend-harness';
 
 const h = new SpendHarness();
 
-describe('W4-07: ticket order in spend batches (integration, real PostgreSQL)', () => {
+// W4-07
+describe('ticket order in spend batches (integration, real PostgreSQL)', () => {
   let w: TicketWorld;
   let runner: TransactionRunner;
   let ticketRepo: RequestTicketRepo;
@@ -258,7 +259,7 @@ describe('W4-07: ticket order in spend batches (integration, real PostgreSQL)', 
     expect(await h.state(miroId)).toBe('AWAITING_SPEND_SUBMISSION');
     expect(await h.state(notionId)).toBe('AWAITING_SPEND_DECISION');
 
-    // D-11 scope matrix on pendingForItem (Miro #1 2.5M is still AWAITING_RESERVE_CONFIRMATION; exclude Notion #2):
+    // Scope matrix on pendingForItem (Miro #1 2.5M is still AWAITING_RESERVE_CONFIRMATION; exclude Notion #2):
     const checkRepo = h.ctx.app.get(BudgetCheckRepo, { strict: false });
     expect(
       await checkRepo.pendingForItem(unitB.unitId, 2026, {

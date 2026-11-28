@@ -3,7 +3,8 @@ import type { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { currentStateOf } from '../access-request/access-request.policy';
-import type { RequestTicketItemRawView, RequestTicketRawView, TicketRef } from './request-ticket.types';
+import type { TicketRef } from '../access-request/access-request.types';
+import type { RequestTicketItemRawView, RequestTicketRawView } from './request-ticket.types';
 
 const SELECT_TICKET_VIEW = {
   id: true,

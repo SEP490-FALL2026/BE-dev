@@ -11,7 +11,7 @@ import { SpendWireViewService } from '../spend/spend-wire-view.service';
 import { SpendRequestRepo } from '../spend/spend-request.repo';
 import { isSpendReturnedAfterCheck, queuedStatus } from '../spend/spend-status.service';
 import type { QueueItemWire } from '../spend/spend-submission.dto';
-import type { TicketRef } from '../request-ticket/request-ticket.types';
+import type { TicketRef } from '../access-request/access-request.types';
 import { SpendReplyFactsService } from './spend-reply-facts.service';
 
 /**

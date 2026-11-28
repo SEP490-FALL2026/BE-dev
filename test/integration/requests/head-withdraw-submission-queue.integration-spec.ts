@@ -4,7 +4,8 @@ import { StatusHarness } from '../../support/status-harness';
 
 const h = new StatusHarness();
 
-describe('W4-12 head withdrawal from the spend submission queue', () => {
+// W4-12
+describe('head withdrawal from the spend submission queue', () => {
   let w: TicketWorld;
 
   beforeAll(async () => {

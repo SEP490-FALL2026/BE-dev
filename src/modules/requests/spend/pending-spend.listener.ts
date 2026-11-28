@@ -11,7 +11,7 @@ import { BudgetCheckRepo } from './budget-check.repo';
  * within the base or uses the reserve (confirmed or not, unless a spending approver returned the request after that check per `QĐ-117k`(2))
  * and that have no decision yet, never a blocked one (M-05). Budgets continue to use `BudgetCheckRepo.pendingFor`/`pendingMany`; only
  * item-level checks (`pendingForItem`, `QĐ-117k`(1)) exempt earlier unconfirmed items of the same ticket so later ticket items are not
- * blocked, meaning budget screens may temporarily report negative remaining (`D-11`). Adds itself when the module starts so budgets never
+ * blocked, meaning budget screens may temporarily report negative remaining. Adds itself when the module starts so budgets never
  * import this module (ADR-0016).
  */
 @Injectable()

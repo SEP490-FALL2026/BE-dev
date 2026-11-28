@@ -15,7 +15,8 @@ interface RequestMetaRow {
   state: string;
 }
 
-describe('W4-07 / W4-14: ticket items keep ticket position order on one-step conversion (integration, real PostgreSQL)', () => {
+// W4-07 / W4-14
+describe('ticket items keep ticket position order on one-step conversion (integration, real PostgreSQL)', () => {
   let world: TicketWorld;
 
   beforeAll(async () => {
@@ -39,7 +40,8 @@ describe('W4-07 / W4-14: ticket items keep ticket position order on one-step con
     { label: 'R11 (#2) inserted before R12 (#1)', insertR12First: false, suffix: 'A' },
     { label: 'R12 (#1) inserted before R11 (#2)', insertR12First: true, suffix: 'B' },
   ])(
-    'RB-9 ($label): when requester becomes department head, ticket #1 checks budget first and passes while #2 pending is blocked',
+    // RB-9
+    '($label): when requester becomes department head, ticket #1 checks budget first and passes while #2 pending is blocked',
     async ({ insertR12First, suffix }) => {
       const summary = h.dataOf<{
         totals: Record<string, { runningUncommitted: { amount: string; currency: string } }>;
@@ -165,7 +167,8 @@ describe('W4-07 / W4-14: ticket items keep ticket position order on one-step con
         expect(checksR12[0]?.outcome).toBe('WITHIN_BASE');
         expect(checksR11[0]?.outcome).toBe('BLOCKED');
       } finally {
-        await h.decideSpend(r12.id, { decision: 'REJECT', reason: 'Cleanup RB-9 iteration' }, world.c1.account);
+        // RB-9 cleanup
+        await h.decideSpend(r12.id, { decision: 'REJECT', reason: 'Cleanup iteration' }, world.c1.account);
         await h.withdrawRequest(r11.id, {}, e5.account);
         await h.makeHead(world.pDes, world.h1);
       }

@@ -188,7 +188,8 @@ describe('QĐ-111an, S-1: the cost of a request is its amount in dong, as it sta
   });
 });
 
-describe('BudgetCheckRepo.pendingForItem SQL scope (D-11, QĐ-117k(1))', () => {
+// D-11
+describe('BudgetCheckRepo.pendingForItem SQL scope (QĐ-117k(1))', () => {
   const CC_ID = '00000000-0000-4000-8000-0000000000c1';
   const REQ_2 = '00000000-0000-4000-8000-000000000002';
   const TICKET_1 = '00000000-0000-4000-8000-000000000101';

@@ -6,8 +6,6 @@ import { SpendBatchRepo } from '../spend/spend-batch.repo';
 import type { StopReason } from '../spend/spend-submission.policy';
 import { SpendBatchRecorder } from './spend-batch-recorder.service';
 
-export type BatchSubmitStopReason = StopReason;
-
 export interface HeadResubmissionInput {
   organizationId: string;
   requestId: string;
@@ -24,7 +22,7 @@ export interface BatchWriteInput {
   results: readonly {
     requestId: string;
     outcome: 'SENT_TO_APPROVER' | 'AWAITING_RESERVE_CONFIRMATION' | 'STOPPED';
-    stopReason: BatchSubmitStopReason | null;
+    stopReason: StopReason | null;
   }[];
   openedFor: readonly (string | null)[];
   headReplies?: readonly HeadResubmissionInput[];

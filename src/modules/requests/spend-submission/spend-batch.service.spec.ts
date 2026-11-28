@@ -238,8 +238,9 @@ describe('SpendBatchService (§7.7 ticket order & §7.10 reply notes)', () => {
         expectedRoutedIds: [REQ_1],
         expectedInserts: [replyInsert(REQ_1, 'Bo sung giai trinh chi phi')],
       },
+      // D & T-W4-6
       {
-        name: 'D & T-W4-6: no pending C1 return (e.g. system recheck only) -> proceeds without note, ignores extra note',
+        name: 'no pending C1 return (e.g. system recheck only) -> proceeds without note, ignores extra note',
         requestIds: [REQ_1],
         replyNotes: [{ requestId: REQ_1, note: 'Unneeded note' }],
         humanReturns: new Map<string, HumanReturn[]>(),
