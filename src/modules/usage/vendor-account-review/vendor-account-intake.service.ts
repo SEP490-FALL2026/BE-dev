@@ -4,6 +4,7 @@ import { formatAmount } from '../../../core/money/money';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { FinanceApi } from '../../finance/public/finance.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { InvoiceDiscrepancyReferral } from '../../requests/public/requests.extension-points';
 import type { UsageImportConfirmedEvent } from '../public/usage.extension-points';
 import {
@@ -29,6 +30,7 @@ export class VendorAccountIntakeService {
     private readonly catalog: CatalogApi,
     private readonly finance: FinanceApi,
     private readonly notifier: VendorAccountReviewNotifier,
+    private readonly organizationReads: OrganizationReadApi,
   ) {}
 
   /** The open findings and open identifiers the confirmed report contains; returns how many differences are new. */
@@ -95,7 +97,7 @@ export class VendorAccountIntakeService {
         vendorId: referral.vendorId,
         employeeId: null,
         identity: null,
-        evidenceOn: referral.closedAt.toISOString().slice(0, 10),
+        evidenceOn: await this.organizationReads.businessToday(referral.closedAt, tx),
         now,
         ...valuesOfInvoiceDifference({
           quantity: referral.quantity,

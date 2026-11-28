@@ -88,13 +88,13 @@ export function toSubscriptionLineApiException(error: unknown): unknown {
     return refuse(UNPROCESSABLE, 'SUBSCRIPTION_LINE.UPDATE_EMPTY', error.message);
   }
   if (error instanceof WorkspaceVendorMismatchError) {
-    return refuse(UNPROCESSABLE, 'WORKSPACE_VENDOR_MISMATCH', error.message);
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION_LINE.WORKSPACE_VENDOR_MISMATCH', error.message);
   }
   if (error instanceof PlanNotFoundError) {
-    return refuse(UNPROCESSABLE, 'PLAN.NOT_FOUND', error.message);
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION_LINE.PLAN_NOT_FOUND', error.message);
   }
   if (error instanceof PlanApplicationRetiredError) {
-    return refuse(UNPROCESSABLE, 'APPLICATION.RETIRED', error.message);
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION_LINE.APPLICATION_RETIRED', error.message);
   }
   const money = toMoneyApiException(error);
   if (money) return money;
